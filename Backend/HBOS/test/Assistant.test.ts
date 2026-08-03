@@ -2,7 +2,7 @@ import { AssistantEngine } from "../Core/AssistantEngine";
 import { Project } from "../Core/Project";
 
 
-test("AssistantEngine analyzes project", () => {
+test("AssistantEngine analyzes project context", () => {
 
     const assistant = new AssistantEngine();
 
@@ -12,11 +12,18 @@ test("AssistantEngine analyzes project", () => {
     );
 
 
+    const context = assistant.createContext(
+        project,
+        []
+    );
+
+
     const result =
-        assistant.analyzeProject(project);
+        assistant.analyzeProject(context);
 
 
     expect(result)
         .toContain("HBOS Core");
+
 
 });

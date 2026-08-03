@@ -1,5 +1,7 @@
 import { Project } from "./Project";
 import { DecisionEngine } from "./DecisionEngine";
+import { AssistantContext } from "./AssistantContext";
+import { MemoryEvent } from "./MemoryEvent";
 
 
 export class AssistantEngine {
@@ -30,18 +32,32 @@ export class AssistantEngine {
     }
 
 
-    analyzeProject(project: Project): string {
+    createContext(
+        project: Project,
+        memories: MemoryEvent[]
+    ): AssistantContext {
+
+        return new AssistantContext(
+            project,
+            memories
+        );
+
+    }
+
+
+    analyzeProject(
+        context: AssistantContext
+    ): string {
+
 
         const decision =
             this.decisionEngine.evaluateProject(
-                project.status
+                context.project.status
             );
 
 
         return `
-Project: ${project.name}
-
-Status: ${project.status}
+${context.summary()}
 
 Assistant Suggestion:
 ${decision.message}
