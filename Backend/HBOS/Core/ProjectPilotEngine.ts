@@ -2,6 +2,7 @@ import { ProjectRegistry } from "./ProjectRegistry";
 import { Project } from "./Project";
 import { DecisionEngine } from "./DecisionEngine";
 import { ProjectDecision } from "./ProjectDecision";
+import { ProjectInsight } from "./ProjectInsight";
 
 
 export class ProjectPilotEngine {
@@ -53,6 +54,20 @@ export class ProjectPilotEngine {
     getProjectDecision(project: Project): ProjectDecision {
 
         return this.decisionEngine.evaluateProject(project.status);
+
+    }
+
+
+    getProjectInsight(project: Project): ProjectInsight {
+
+        const decision = this.getProjectDecision(project);
+
+
+        return new ProjectInsight(
+            project.name,
+            project.status,
+            decision.message
+        );
 
     }
 
