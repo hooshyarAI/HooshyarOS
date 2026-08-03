@@ -4,6 +4,7 @@ import { AssistantContext } from "./AssistantContext";
 import { AssistantMemory } from "./AssistantMemory";
 import { MemoryEngine } from "./MemoryEngine";
 import { AssistantReasoning } from "./AssistantReasoning";
+import { AssistantResponse } from "./AssistantResponse";
 
 
 export class AssistantEngine {
@@ -66,7 +67,7 @@ export class AssistantEngine {
 
     analyzeProject(
         context: AssistantContext
-    ): string {
+    ): AssistantResponse {
 
 
         const reasoning =
@@ -81,15 +82,16 @@ export class AssistantEngine {
                 );
 
 
-        return `
-${context.summary()}
+        return new AssistantResponse(
+            context.summary(),
 
-Reasoning:
-${reasoning}
+            `${reasoning}
 
 Decision:
-${decision.message}
-        `.trim();
+${decision.message}`,
+
+            0.85
+        );
 
     }
 
