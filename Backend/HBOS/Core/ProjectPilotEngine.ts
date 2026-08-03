@@ -4,6 +4,7 @@ import { DecisionEngine } from "./DecisionEngine";
 import { ProjectDecision } from "./ProjectDecision";
 import { ProjectInsight } from "./ProjectInsight";
 import { MemoryEngine } from "./MemoryEngine";
+import { MemoryEvent } from "./MemoryEvent";
 
 
 export class ProjectPilotEngine {
@@ -46,9 +47,15 @@ export class ProjectPilotEngine {
 
         this.registry.addProject(name);
 
-        this.memoryEngine.store(
-            `Project ${name} Created`
+
+        const event = new MemoryEvent(
+            "PROJECT_CREATED",
+            name,
+            this.name
         );
+
+
+        this.memoryEngine.store(event);
 
     }
 
@@ -81,7 +88,7 @@ export class ProjectPilotEngine {
     }
 
 
-    getMemory(): string[] {
+    getMemory(): MemoryEvent[] {
 
         return this.memoryEngine.retrieve();
 

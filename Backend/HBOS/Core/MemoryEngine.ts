@@ -1,8 +1,11 @@
+import { MemoryEvent } from "./MemoryEvent";
+
+
 export class MemoryEngine {
 
     name: string = "MemoryEngine";
 
-    private memories: string[] = [];
+    private memories: MemoryEvent[] = [];
 
 
     initialize(): void {
@@ -19,14 +22,14 @@ export class MemoryEngine {
     }
 
 
-    store(memory: string): void {
+    store(event: MemoryEvent): void {
 
-        this.memories.push(memory);
+        this.memories.push(event);
 
     }
 
 
-    retrieve(): string[] {
+    retrieve(): MemoryEvent[] {
 
         return this.memories;
 

@@ -40,8 +40,10 @@ test("ProjectPilot stores project creation in memory", () => {
 
     const memories = pilot.getMemory();
 
-    expect(memories).toContain(
-        "Project HBOS Core Created"
-    );
+  expect(memories[0].type).toBe("PROJECT_CREATED");
+
+expect(memories[0].data).toBe("HBOS Core");
+
+expect(memories[0].source).toBe("ProjectPilotEngine");
 
 });
