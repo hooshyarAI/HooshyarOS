@@ -1,6 +1,18 @@
+import { ProjectRegistry } from "./ProjectRegistry";
+
+
 export class ProjectPilotEngine {
 
     name: string = "ProjectPilotEngine";
+
+    private registry: ProjectRegistry;
+
+
+    constructor() {
+
+        this.registry = new ProjectRegistry();
+
+    }
 
 
     initialize(): void {
@@ -13,6 +25,20 @@ export class ProjectPilotEngine {
     health(): boolean {
 
         return true;
+
+    }
+
+
+    createProject(name: string): void {
+
+        this.registry.addProject(name);
+
+    }
+
+
+    getProjects(): string[] {
+
+        return this.registry.listProjects();
 
     }
 
