@@ -5,6 +5,7 @@ import { AssistantMemory } from "./AssistantMemory";
 import { MemoryEngine } from "./MemoryEngine";
 import { AssistantReasoning } from "./AssistantReasoning";
 import { AssistantResponse } from "./AssistantResponse";
+import { AssistantConfidence } from "./AssistantConfidence";
 
 
 export class AssistantEngine {
@@ -15,6 +16,7 @@ export class AssistantEngine {
     private decisionEngine: DecisionEngine;
     private assistantMemory: AssistantMemory;
     private reasoning: AssistantReasoning;
+    private confidence: AssistantConfidence;
 
 
     constructor() {
@@ -31,6 +33,10 @@ export class AssistantEngine {
 
         this.reasoning =
             new AssistantReasoning();
+
+
+        this.confidence =
+            new AssistantConfidence();
 
     }
 
@@ -82,15 +88,24 @@ export class AssistantEngine {
                 );
 
 
+        const confidence =
+            this.confidence
+                .calculate(context);
+
+
         return new AssistantResponse(
+
             context.summary(),
+
 
             `${reasoning}
 
 Decision:
 ${decision.message}`,
 
-            0.85
+
+            confidence
+
         );
 
     }
