@@ -1,66 +1,27 @@
-import { SystemStatus } from "../Types/SystemTypes";
+import { EngineRegistry } from "./EngineRegistry";
+import { MemoryEngine } from "./MemoryEngine";
+import { DecisionEngine } from "./DecisionEngine";
 
-import { MemoryEngine } from "../Memory/MemoryEngine";
-import { DecisionEngine } from "../Decision/DecisionEngine";
-import { ReviewEngine } from "../Review/ReviewEngine";
 
 export class HBOS {
 
-    private version = "1.0.0";
+    private registry: EngineRegistry;
 
-    private initialized = false;
 
-    private memory = new MemoryEngine();
+    constructor() {
 
-    private decision = new DecisionEngine();
+        this.registry = new EngineRegistry();
 
-    private review = new ReviewEngine();
+        this.registry.register(new MemoryEngine());
 
-    constructor() {}
-
-    public initialize(): void {
-
-        if (this.initialized) return;
-
-        console.log("Initializing Hooshyar Build Operating System...");
-
-        this.memory.initialize();
-
-        this.decision.initialize();
-
-        this.review.initialize();
-
-        this.initialized = true;
-
-        console.log("HBOS Ready.");
+        this.registry.register(new DecisionEngine());
 
     }
 
-    public status(): SystemStatus {
 
-        return {
+    boot(): void {
 
-            version: this.version,
-
-            initialized: this.initialized,
-
-            timestamp: new Date()
-
-        };
-
-    }
-
-    public engines() {
-
-        return {
-
-            memory: this.memory,
-
-            decision: this.decision,
-
-            review: this.review
-
-        };
+        this.registry.initializeAll();
 
     }
 
