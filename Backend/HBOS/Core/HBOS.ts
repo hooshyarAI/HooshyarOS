@@ -1,6 +1,7 @@
 import { EngineRegistry } from "./EngineRegistry";
 import { MemoryEngine } from "./MemoryEngine";
 import { DecisionEngine } from "./DecisionEngine";
+import { ProjectPilotEngine } from "./ProjectPilotEngine";
 
 
 export class HBOS {
@@ -15,6 +16,8 @@ export class HBOS {
         this.registry.register(new MemoryEngine());
 
         this.registry.register(new DecisionEngine());
+
+        this.registry.register(new ProjectPilotEngine());
 
     }
 
