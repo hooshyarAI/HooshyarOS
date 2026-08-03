@@ -1,4 +1,5 @@
 import { MemoryEvent } from "./MemoryEvent";
+import { ReactionEngine } from "./ReactionEngine";
 
 
 export class MemoryEngine {
@@ -6,6 +7,8 @@ export class MemoryEngine {
     name: string = "MemoryEngine";
 
     private memories: MemoryEvent[] = [];
+
+    private reactionEngine?: ReactionEngine;
 
 
     initialize(): void {
@@ -22,9 +25,23 @@ export class MemoryEngine {
     }
 
 
+    subscribe(reactionEngine: ReactionEngine): void {
+
+        this.reactionEngine = reactionEngine;
+
+    }
+
+
     store(event: MemoryEvent): void {
 
         this.memories.push(event);
+
+
+        if (this.reactionEngine) {
+
+            this.reactionEngine.react(event);
+
+        }
 
     }
 

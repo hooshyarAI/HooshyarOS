@@ -5,6 +5,7 @@ import { ProjectDecision } from "./ProjectDecision";
 import { ProjectInsight } from "./ProjectInsight";
 import { MemoryEngine } from "./MemoryEngine";
 import { MemoryEvent } from "./MemoryEvent";
+import { ReactionEngine } from "./ReactionEngine";
 
 
 export class ProjectPilotEngine {
@@ -17,6 +18,8 @@ export class ProjectPilotEngine {
 
     private memoryEngine: MemoryEngine;
 
+    private reactionEngine: ReactionEngine;
+
 
     constructor() {
 
@@ -25,6 +28,13 @@ export class ProjectPilotEngine {
         this.decisionEngine = new DecisionEngine();
 
         this.memoryEngine = new MemoryEngine();
+
+        this.reactionEngine = new ReactionEngine();
+
+
+        this.memoryEngine.subscribe(
+            this.reactionEngine
+        );
 
     }
 
