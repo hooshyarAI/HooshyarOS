@@ -13,9 +13,8 @@ test("AssistantEngine analyzes project context", () => {
 
 
     const context = assistant.createContext(
-        project,
-        []
-    );
+    project
+);
 
 
     const result =

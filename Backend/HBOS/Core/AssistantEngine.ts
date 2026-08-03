@@ -2,6 +2,8 @@ import { Project } from "./Project";
 import { DecisionEngine } from "./DecisionEngine";
 import { AssistantContext } from "./AssistantContext";
 import { MemoryEvent } from "./MemoryEvent";
+import { AssistantMemory } from "./AssistantMemory";
+import { MemoryEngine } from "./MemoryEngine";
 
 
 export class AssistantEngine {
@@ -9,11 +11,17 @@ export class AssistantEngine {
     name: string = "AssistantEngine";
 
     private decisionEngine: DecisionEngine;
+    private assistantMemory: AssistantMemory;
 
 
     constructor() {
 
         this.decisionEngine = new DecisionEngine();
+
+        this.assistantMemory =
+            new AssistantMemory(
+                new MemoryEngine()
+            );
 
     }
 
@@ -33,9 +41,14 @@ export class AssistantEngine {
 
 
     createContext(
-        project: Project,
-        memories: MemoryEvent[]
+        project: Project
     ): AssistantContext {
+
+
+        const memories =
+            this.assistantMemory
+                .getRecentEvents();
+
 
         return new AssistantContext(
             project,
