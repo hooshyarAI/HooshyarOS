@@ -1,34 +1,44 @@
 import { Project } from "./Project";
 import { DecisionEngine } from "./DecisionEngine";
 import { AssistantContext } from "./AssistantContext";
-import { MemoryEvent } from "./MemoryEvent";
 import { AssistantMemory } from "./AssistantMemory";
 import { MemoryEngine } from "./MemoryEngine";
+import { AssistantReasoning } from "./AssistantReasoning";
 
 
 export class AssistantEngine {
 
     name: string = "AssistantEngine";
 
+
     private decisionEngine: DecisionEngine;
     private assistantMemory: AssistantMemory;
+    private reasoning: AssistantReasoning;
 
 
     constructor() {
 
-        this.decisionEngine = new DecisionEngine();
+        this.decisionEngine =
+            new DecisionEngine();
+
 
         this.assistantMemory =
             new AssistantMemory(
                 new MemoryEngine()
             );
 
+
+        this.reasoning =
+            new AssistantReasoning();
+
     }
 
 
     initialize(): void {
 
-        console.log("Assistant Engine Started");
+        console.log(
+            "Assistant Engine Started"
+        );
 
     }
 
@@ -45,14 +55,10 @@ export class AssistantEngine {
     ): AssistantContext {
 
 
-        const memories =
-            this.assistantMemory
-                .getRecentEvents();
-
-
         return new AssistantContext(
             project,
-            memories
+            this.assistantMemory
+                .getRecentEvents()
         );
 
     }
@@ -63,16 +69,25 @@ export class AssistantEngine {
     ): string {
 
 
+        const reasoning =
+            this.reasoning
+                .analyze(context);
+
+
         const decision =
-            this.decisionEngine.evaluateProject(
-                context.project.status
-            );
+            this.decisionEngine
+                .evaluateProject(
+                    context.project.status
+                );
 
 
         return `
 ${context.summary()}
 
-Assistant Suggestion:
+Reasoning:
+${reasoning}
+
+Decision:
 ${decision.message}
         `.trim();
 
