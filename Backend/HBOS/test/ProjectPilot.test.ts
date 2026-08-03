@@ -9,6 +9,8 @@ test("ProjectPilot can create project", () => {
 
     const projects = pilot.getProjects();
 
-    expect(projects).toContain("HBOS Core");
+    expect(projects[0].name).toBe("HBOS Core");
+
+    expect(projects[0].status).toBe("Active");
 
 });

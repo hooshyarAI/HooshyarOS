@@ -1,16 +1,21 @@
+import { Project } from "./Project";
+
+
 export class ProjectRegistry {
 
-    private projects: string[] = [];
+    private projects: Project[] = [];
 
 
     addProject(name: string): void {
 
-        this.projects.push(name);
+        const project = new Project(name);
+
+        this.projects.push(project);
 
     }
 
 
-    listProjects(): string[] {
+    listProjects(): Project[] {
 
         return this.projects;
 

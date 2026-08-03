@@ -1,4 +1,5 @@
 import { ProjectRegistry } from "./ProjectRegistry";
+import { Project } from "./Project";
 
 
 export class ProjectPilotEngine {
@@ -36,7 +37,7 @@ export class ProjectPilotEngine {
     }
 
 
-    getProjects(): string[] {
+    getProjects(): Project[] {
 
         return this.registry.listProjects();
 
