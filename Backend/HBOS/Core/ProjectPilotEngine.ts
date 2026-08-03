@@ -1,5 +1,7 @@
 import { ProjectRegistry } from "./ProjectRegistry";
 import { Project } from "./Project";
+import { DecisionEngine } from "./DecisionEngine";
+import { ProjectDecision } from "./ProjectDecision";
 
 
 export class ProjectPilotEngine {
@@ -8,10 +10,14 @@ export class ProjectPilotEngine {
 
     private registry: ProjectRegistry;
 
+    private decisionEngine: DecisionEngine;
+
 
     constructor() {
 
         this.registry = new ProjectRegistry();
+
+        this.decisionEngine = new DecisionEngine();
 
     }
 
@@ -40,6 +46,13 @@ export class ProjectPilotEngine {
     getProjects(): Project[] {
 
         return this.registry.listProjects();
+
+    }
+
+
+    getProjectDecision(project: Project): ProjectDecision {
+
+        return this.decisionEngine.evaluateProject(project.status);
 
     }
 

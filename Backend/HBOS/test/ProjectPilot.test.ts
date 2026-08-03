@@ -17,7 +17,7 @@ test("ProjectPilot can create project", () => {
 });
 
 
-test("Project can change status", () => {
+test("ProjectPilot can generate project decision", () => {
 
     const pilot = new ProjectPilotEngine();
 
@@ -25,8 +25,10 @@ test("Project can change status", () => {
 
     const project = pilot.getProjects()[0];
 
-    project.activate();
+    const decision = pilot.getProjectDecision(project);
 
-    expect(project.status).toBe(ProjectStatus.Active);
+    expect(decision.status).toBe(ProjectStatus.Planning);
+
+    expect(decision.message).toBe("Start project planning");
 
 });
