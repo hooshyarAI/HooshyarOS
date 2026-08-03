@@ -24,3 +24,5 @@ Build an Enterprise Intelligence Platform that continuously improves organizatio
 Does this feature create sustainable value for humans, organizations and society?
 
 If not, redesign it.
+The platform is designed as a Living Organization System,
+not merely enterprise software.
