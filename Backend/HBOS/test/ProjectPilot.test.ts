@@ -32,3 +32,16 @@ test("ProjectPilot can generate project decision", () => {
     expect(decision.message).toBe("Start project planning");
 
 });
+test("ProjectPilot stores project creation in memory", () => {
+
+    const pilot = new ProjectPilotEngine();
+
+    pilot.createProject("HBOS Core");
+
+    const memories = pilot.getMemory();
+
+    expect(memories).toContain(
+        "Project HBOS Core Created"
+    );
+
+});

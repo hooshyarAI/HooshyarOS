@@ -3,6 +3,7 @@ import { Project } from "./Project";
 import { DecisionEngine } from "./DecisionEngine";
 import { ProjectDecision } from "./ProjectDecision";
 import { ProjectInsight } from "./ProjectInsight";
+import { MemoryEngine } from "./MemoryEngine";
 
 
 export class ProjectPilotEngine {
@@ -13,12 +14,16 @@ export class ProjectPilotEngine {
 
     private decisionEngine: DecisionEngine;
 
+    private memoryEngine: MemoryEngine;
+
 
     constructor() {
 
         this.registry = new ProjectRegistry();
 
         this.decisionEngine = new DecisionEngine();
+
+        this.memoryEngine = new MemoryEngine();
 
     }
 
@@ -40,6 +45,10 @@ export class ProjectPilotEngine {
     createProject(name: string): void {
 
         this.registry.addProject(name);
+
+        this.memoryEngine.store(
+            `Project ${name} Created`
+        );
 
     }
 
@@ -68,6 +77,13 @@ export class ProjectPilotEngine {
             project.status,
             decision.message
         );
+
+    }
+
+
+    getMemory(): string[] {
+
+        return this.memoryEngine.retrieve();
 
     }
 
