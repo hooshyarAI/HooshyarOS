@@ -1,12 +1,20 @@
 import { Knowledge } from "../Entities/Knowledge";
 import { KnowledgeRule } from "../Entities/KnowledgeRule";
 import { MemoryEvent } from "../Entities/MemoryEvent";
+import { EventListener } from "../Interfaces/EventListener";
 
-export class KnowledgeEngine {
+
+export class KnowledgeEngine implements EventListener {
+
+
+    name: string = "KnowledgeEngine";
+
 
     private knowledge: Knowledge[] = [];
 
+
     private rules: KnowledgeRule[] = [];
+
 
 
     initialize(): void {
@@ -18,13 +26,37 @@ export class KnowledgeEngine {
     }
 
 
+
+    health(): boolean {
+
+        return true;
+
+    }
+
+
+
+    onEvent(
+        event: MemoryEvent
+    ): void {
+
+        this.learn(
+            event
+        );
+
+    }
+
+
+
     addRule(
         rule: KnowledgeRule
     ): void {
 
-        this.rules.push(rule);
+        this.rules.push(
+            rule
+        );
 
     }
+
 
 
     getRules(): KnowledgeRule[] {
@@ -34,9 +66,11 @@ export class KnowledgeEngine {
     }
 
 
+
     learn(
         event: MemoryEvent
     ): Knowledge {
+
 
         const knowledge =
             new Knowledge(
@@ -49,13 +83,18 @@ export class KnowledgeEngine {
 
             );
 
+
+
         this.knowledge.push(
             knowledge
         );
 
+
+
         return knowledge;
 
     }
+
 
 
     getKnowledge(): Knowledge[] {
@@ -63,6 +102,7 @@ export class KnowledgeEngine {
         return this.knowledge;
 
     }
+
 
 
     count(): number {

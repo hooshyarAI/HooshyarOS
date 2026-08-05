@@ -1,10 +1,12 @@
-import { ProjectRegistry } from "./ProjectRegistry";
-import { Project } from "./Project";
+import { ProjectRegistry } from "../Services/ProjectRegistry";
+
+import { Project } from "../Entities/Project";
+import { ProjectDecision } from "../Entities/ProjectDecision";
+import { ProjectInsight } from "../Entities/ProjectInsight";
+import { MemoryEvent } from "../Entities/MemoryEvent";
+
 import { DecisionEngine } from "./DecisionEngine";
-import { ProjectDecision } from "./ProjectDecision";
-import { ProjectInsight } from "./ProjectInsight";
 import { MemoryEngine } from "./MemoryEngine";
-import { MemoryEvent } from "./MemoryEvent";
 import { ReactionEngine } from "./ReactionEngine";
 
 
@@ -12,7 +14,7 @@ export class ProjectPilotEngine {
 
     name: string = "ProjectPilotEngine";
 
-    private registry: ProjectRegistry;
+    private projectRegistry: ProjectRegistry;
 
     private decisionEngine: DecisionEngine;
 
@@ -23,18 +25,13 @@ export class ProjectPilotEngine {
 
     constructor() {
 
-        this.registry = new ProjectRegistry();
+        this.projectRegistry = new ProjectRegistry();
 
         this.decisionEngine = new DecisionEngine();
 
         this.memoryEngine = new MemoryEngine();
 
         this.reactionEngine = new ReactionEngine();
-
-
-        this.memoryEngine.subscribe(
-            this.reactionEngine
-        );
 
     }
 
@@ -53,54 +50,62 @@ export class ProjectPilotEngine {
     }
 
 
-    createProject(name: string): void {
+    createProject(
+        name: string
+    ): Project {
 
-        this.registry.addProject(name);
+        const project = new Project(name);
 
+        this.projectRegistry.register(project);
 
-        const event = new MemoryEvent(
-            "PROJECT_CREATED",
-            name,
-            this.name
+        this.memoryEngine.store(
+
+            new MemoryEvent(
+
+                "PROJECT_CREATED",
+
+                name,
+
+                "ProjectPilotEngine"
+
+            )
+
         );
 
-
-        this.memoryEngine.store(event);
+        return project;
 
     }
 
 
     getProjects(): Project[] {
 
-        return this.registry.listProjects();
+        return this.projectRegistry.getProjects();
 
     }
 
 
-    getProjectDecision(project: Project): ProjectDecision {
-
-        return this.decisionEngine.evaluateProject(project.status);
-
-    }
-
-
-    getProjectInsight(project: Project): ProjectInsight {
-
-        const decision = this.getProjectDecision(project);
-
+    analyzeProject(
+        project: Project
+    ): ProjectInsight {
 
         return new ProjectInsight(
+
             project.name,
+
             project.status,
-            decision.message
+
+            "Project analysis completed"
+
         );
 
     }
 
 
-    getMemory(): MemoryEvent[] {
+    makeDecision(
+        project: Project
+    ): ProjectDecision {
 
-        return this.memoryEngine.retrieve();
+        return this.decisionEngine.decide(project);
 
     }
 

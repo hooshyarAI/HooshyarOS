@@ -1,11 +1,7 @@
-import { Project } from "./Project";
+import { Project } from "../Entities/Project";
 import { DecisionEngine } from "./DecisionEngine";
-import { AssistantContext } from "./AssistantContext";
-import { AssistantMemory } from "./AssistantMemory";
-import { MemoryEngine } from "./MemoryEngine";
-import { AssistantReasoning } from "./AssistantReasoning";
-import { AssistantResponse } from "./AssistantResponse";
-import { AssistantConfidence } from "./AssistantConfidence";
+import { AssistantMemory } from "../Entities/AssistantMemory";
+import { AssistantResponse } from "../Entities/AssistantResponse";
 
 
 export class AssistantEngine {
@@ -14,29 +10,15 @@ export class AssistantEngine {
 
 
     private decisionEngine: DecisionEngine;
-    private assistantMemory: AssistantMemory;
-    private reasoning: AssistantReasoning;
-    private confidence: AssistantConfidence;
+
+    private memory: AssistantMemory;
 
 
     constructor() {
 
-        this.decisionEngine =
-            new DecisionEngine();
+        this.decisionEngine = new DecisionEngine();
 
-
-        this.assistantMemory =
-            new AssistantMemory(
-                new MemoryEngine()
-            );
-
-
-        this.reasoning =
-            new AssistantReasoning();
-
-
-        this.confidence =
-            new AssistantConfidence();
+        this.memory = new AssistantMemory();
 
     }
 
@@ -57,57 +39,33 @@ export class AssistantEngine {
     }
 
 
-    createContext(
-        project: Project
-    ): AssistantContext {
-
-
-        return new AssistantContext(
-            project,
-            this.assistantMemory
-                .getRecentEvents()
-        );
-
-    }
-
-
     analyzeProject(
-        context: AssistantContext
+        project: Project
     ): AssistantResponse {
 
 
-        const reasoning =
-            this.reasoning
-                .analyze(context);
-
-
         const decision =
-            this.decisionEngine
-                .evaluateProject(
-                    context.project.status
-                );
+            this.decisionEngine.decide(
+                project
+            );
 
 
-        const confidence =
-            this.confidence
-                .calculate(context);
+        this.memory.store(
+            project.name
+        );
 
 
         return new AssistantResponse(
 
-            context.summary(),
+            project,
 
+            "HBOS Core",
 
-            `${reasoning}
-
-Decision:
-${decision.message}`,
-
-
-            confidence
+            0.85
 
         );
 
     }
+
 
 }

@@ -1,10 +1,8 @@
-import { MemoryEvent } from "./MemoryEvent";
-
+import { MemoryEvent } from "../Entities/MemoryEvent";
 
 export class ReactionEngine {
 
     name: string = "ReactionEngine";
-
 
     initialize(): void {
 
@@ -12,24 +10,17 @@ export class ReactionEngine {
 
     }
 
-
     health(): boolean {
 
         return true;
 
     }
 
+    react(event: MemoryEvent): void {
 
-    react(event: MemoryEvent): string {
-
-        if (event.type === "PROJECT_CREATED") {
-
-            return "PROJECT_INSIGHT_REQUIRED";
-
-        }
-
-
-        return "NO_ACTION";
+        console.log(
+            `[Reaction] ${event.type} | ${event.data} | ${event.source}`
+        );
 
     }
 

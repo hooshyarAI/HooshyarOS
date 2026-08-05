@@ -1,6 +1,5 @@
 import { ProjectStatus } from "./ProjectStatus";
 
-
 export class ProjectInsight {
 
     projectName: string;
@@ -11,9 +10,13 @@ export class ProjectInsight {
 
 
     constructor(
+
         projectName: string,
+
         status: ProjectStatus,
+
         message: string
+
     ) {
 
         this.projectName = projectName;

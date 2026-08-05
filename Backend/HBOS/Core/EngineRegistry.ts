@@ -1,16 +1,10 @@
-export interface Engine {
+import { Engine } from "./Engine";
 
-    name: string;
-
-    initialize(): void;
-
-    health(): boolean;
-
-}
 
 export class EngineRegistry {
 
     private engines: Engine[] = [];
+
 
     register(engine: Engine): void {
 
@@ -18,21 +12,38 @@ export class EngineRegistry {
 
     }
 
+
     initializeAll(): void {
 
-        this.engines.forEach(engine => engine.initialize());
+        this.engines.forEach(engine => {
+
+            engine.initialize();
+
+        });
 
     }
+
 
     healthReport() {
 
         return this.engines.map(engine => ({
 
-            engine: engine.name,
+            name: engine.name,
 
             healthy: engine.health()
 
         }));
+
+    }
+
+
+    getEngine<T extends Engine>(
+        name: string
+    ): T | undefined {
+
+        return this.engines.find(
+            engine => engine.name === name
+        ) as T | undefined;
 
     }
 

@@ -1,40 +1,87 @@
 import { EngineRegistry } from "./EngineRegistry";
-import { MemoryEngine } from "./MemoryEngine";
-import { DecisionEngine } from "./DecisionEngine";
-import { ProjectPilotEngine } from "./ProjectPilotEngine";
-import { AssistantEngine } from "./AssistantEngine";
+
+import { MemoryEngine } from "../Engines/MemoryEngine";
+import { DecisionEngine } from "../Engines/DecisionEngine";
+import { ProjectPilotEngine } from "../Engines/ProjectPilotEngine";
+import { AssistantEngine } from "../Engines/AssistantEngine";
+import { KnowledgeEngine } from "../Engines/KnowledgeEngine";
+import { ReactionEngine } from "../Engines/ReactionEngine";
 
 
 export class HBOS {
+
 
     private registry: EngineRegistry;
 
 
     constructor() {
 
+
         this.registry = new EngineRegistry();
 
 
-        this.registry.register(
-            new MemoryEngine()
+        const memoryEngine =
+            new MemoryEngine();
+
+
+        const reactionEngine =
+            new ReactionEngine();
+
+
+        const decisionEngine =
+            new DecisionEngine();
+
+
+        const projectPilotEngine =
+            new ProjectPilotEngine();
+
+
+        const knowledgeEngine =
+            new KnowledgeEngine();
+
+
+        const assistantEngine =
+            new AssistantEngine();
+
+
+
+        memoryEngine.subscribe(
+            reactionEngine
         );
 
 
         this.registry.register(
-            new DecisionEngine()
+            memoryEngine
         );
 
 
         this.registry.register(
-            new ProjectPilotEngine()
+            reactionEngine
         );
 
 
         this.registry.register(
-            new AssistantEngine()
+            decisionEngine
         );
+
+
+        this.registry.register(
+            projectPilotEngine
+        );
+
+
+        this.registry.register(
+            knowledgeEngine
+        );
+
+
+        this.registry.register(
+            assistantEngine
+        );
+
 
     }
+
 
 
     boot(): void {
@@ -42,6 +89,7 @@ export class HBOS {
         this.registry.initializeAll();
 
     }
+
 
 
     health() {

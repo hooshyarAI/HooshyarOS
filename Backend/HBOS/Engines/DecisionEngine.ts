@@ -1,17 +1,22 @@
-import { ProjectStatus } from "./ProjectStatus";
-import { ProjectDecision } from "./ProjectDecision";
+import { ProjectDecision } from "../Entities/ProjectDecision";
+import { Project } from "../Entities/Project";
 
 
 export class DecisionEngine {
 
+
     name: string = "DecisionEngine";
+
 
 
     initialize(): void {
 
-        console.log("Decision Engine Started");
+        console.log(
+            "Decision Engine Started"
+        );
 
     }
+
 
 
     health(): boolean {
@@ -21,51 +26,37 @@ export class DecisionEngine {
     }
 
 
-    evaluateProject(status: ProjectStatus): ProjectDecision {
 
-        switch(status) {
-
-            case ProjectStatus.Planning:
-
-                return new ProjectDecision(
-                    status,
-                    "Start project planning"
-                );
+    decide(
+        project: Project
+    ): ProjectDecision {
 
 
-            case ProjectStatus.Active:
-
-                return new ProjectDecision(
-                    status,
-                    "Monitor project progress"
-                );
+        let decision =
+            "Maintain current project direction";
 
 
-            case ProjectStatus.Completed:
 
-                return new ProjectDecision(
-                    status,
-                    "Review project results"
-                );
+        if (project.status) {
 
-
-            case ProjectStatus.Archived:
-
-                return new ProjectDecision(
-                    status,
-                    "Archive project records"
-                );
-
-
-            default:
-
-                return new ProjectDecision(
-                    status,
-                    "Unknown status"
-                );
+            decision =
+                `Analyze project status: ${project.status}`;
 
         }
 
+
+
+        return new ProjectDecision(
+
+            project.status,
+
+            decision
+
+        );
+
+
     }
+
+
 
 }
