@@ -1,27 +1,70 @@
-﻿export class EngineRegistry {
+﻿import { BuilderEngine } from "../Builder/Core/BuilderEngine";
+
+export class EngineRegistry {
 
     private engines:any[] = [];
 
-    register(name:string,status:string){
 
-        this.engines.push({
-            name,
-            status
-        });
+    constructor(){
+
+        this.register(
+            new BuilderEngine()
+        );
 
     }
 
-    getAll(){
+
+    register(
+        name:any,
+        status?:string
+    ){
+
+        if(typeof name === "string"){
+
+            this.engines.push({
+                name,
+                status: status || "UNKNOWN"
+            });
+
+        }
+        else{
+
+            this.engines.push(name);
+
+        }
+
+    }
+
+
+    initialize(){
+
+        this.engines.forEach(
+            engine=>{
+                if(engine.initialize){
+                    engine.initialize();
+                }
+            }
+        );
 
         return this.engines;
 
     }
 
+
     find(name:string){
 
         return this.engines.find(
-            engine => engine.name === name
+            (engine:any)=>
+                engine.name === name ||
+                engine.constructor?.name === name
         );
+
+    }
+
+
+    getEngines(){
+
+        return this.engines;
 
     }
 
