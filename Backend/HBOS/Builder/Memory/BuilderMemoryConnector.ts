@@ -1,21 +1,13 @@
 ﻿export class BuilderMemoryConnector {
 
+private memories:any[] = [];
 
-    private memories:any[] = [];
+remember(event:any){
+    this.memories.push(event);
+}
 
-
-    remember(event:any){
-
-        this.memories.push(event);
-
-    }
-
-
-    getMemories(){
-
-        return this.memories;
-
-    }
-
+getMemories(){
+    return this.memories;
+}
 
 }
