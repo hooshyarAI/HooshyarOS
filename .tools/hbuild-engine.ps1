@@ -1,0 +1,66 @@
+﻿param(
+[string]$EngineName
+)
+
+if(!$EngineName){
+
+Write-Host "Please enter engine name"
+exit 1
+
+}
+
+
+$enginePath="Backend/HBOS/Engines/$EngineName.ts"
+$testPath="Backend/HBOS/test/$EngineName.test.ts"
+
+
+@"
+export class $EngineName {
+
+    initialize(){
+
+        console.log("$EngineName Started");
+
+        return {
+            name:"$EngineName",
+            status:"READY"
+        };
+
+    }
+
+}
+"@ | Out-File $enginePath -Encoding utf8
+
+
+
+@"
+import { $EngineName } from "../Engines/$EngineName";
+
+
+describe("$EngineName",()=>{
+
+
+test("engine should initialize",()=>{
+
+
+const engine=new $EngineName();
+
+
+expect(
+engine.initialize().status
+)
+.toBe("READY");
+
+
+});
+
+
+});
+"@ | Out-File $testPath -Encoding utf8
+
+
+
+Write-Host ""
+Write-Host "================================"
+Write-Host "$EngineName created"
+Write-Host "================================"
