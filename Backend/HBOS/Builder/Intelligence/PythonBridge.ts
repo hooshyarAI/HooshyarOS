@@ -1,13 +1,13 @@
 ﻿export class PythonBridge {
 
-    analyze(project:any){
+analyze(data:any){
 
-        return {
-            engine:"PythonBridge",
-            status:"ready",
-            message:"Python intelligence connection initialized"
-        };
+    return {
+        engine:"PythonBridge",
+        status:"ready",
+        input:data
+    };
 
-    }
+}
 
 }
