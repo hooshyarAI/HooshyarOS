@@ -1,0 +1,28 @@
+﻿export class EngineRegistry {
+
+    private engines:any[] = [];
+
+    register(name:string,status:string){
+
+        this.engines.push({
+            name,
+            status
+        });
+
+    }
+
+    getAll(){
+
+        return this.engines;
+
+    }
+
+    find(name:string){
+
+        return this.engines.find(
+            engine => engine.name === name
+        );
+
+    }
+
+}
