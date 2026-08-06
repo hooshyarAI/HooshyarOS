@@ -1,18 +1,11 @@
-﻿# PROJECT CONTEXT
+﻿# HooshyarOS Project Context
 
-Project Name:
-HooshyarOS
+AI Operating System Platform.
 
-Purpose:
-AI Operating System for intelligent financial and managerial decision support.
+Goal:
+Build intelligent financial and management decision systems.
 
-Current Phase:
-HBOS Core + AI Development Factory
-
-Main Goal:
-Transform HooshyarOS architecture into a testable intelligent platform.
-
-Development Principle:
+Development Rule:
 One capability.
 One class.
 One test.

@@ -1,9 +1,12 @@
-﻿# AI MEMORY
+﻿# AI Memory Rules
 
-Permanent rules for AI Agents.
+Always respect architecture.
 
-Follow:
-One capability.
-One class.
-One test.
-One commit.
+Never break existing tests.
+
+Every capability requires:
+Design
+Implementation
+Test
+Review
+Commit.
