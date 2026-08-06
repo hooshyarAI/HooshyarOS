@@ -1,0 +1,14 @@
+@'
+export class BuilderEngine {
+
+    build(project:string){
+
+        return {
+            project,
+            status:"READY"
+        };
+
+    }
+
+}
+'@ | Out-File Builder\Core\BuilderEngine.ts -Encoding utf8
