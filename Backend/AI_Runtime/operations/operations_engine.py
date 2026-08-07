@@ -1,12 +1,10 @@
-﻿class AutonomousOperationsEngine:
+﻿class OperationsEngine:
 
     def __init__(self):
-        self.name = "AutonomousOperationsEngine"
+        self.name = "OperationsEngine"
 
     def execute(self, task):
-
         return {
-            "engine": self.name,
             "task": task,
-            "status": "executed"
+            "status": "completed"
         }
