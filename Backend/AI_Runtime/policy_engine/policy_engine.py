@@ -1,7 +1,7 @@
 ﻿class PolicyEngine:
 
-    def check(self, policy):
+    def define(self, policy):
         return {
             "policy": policy,
-            "status": "policy_checked"
+            "status": "policy_defined"
         }
