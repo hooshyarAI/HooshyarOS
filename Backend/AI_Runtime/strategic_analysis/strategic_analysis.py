@@ -1,7 +1,10 @@
 ﻿class StrategicAnalysis:
 
-    def analyze(self, strategy):
+    def analyze(self, input):
         return {
-            "strategy": strategy,
-            "status": "strategy_analyzed"
+            "input": input,
+            "status": "strategic_analysis_completed"
         }
+
+    def analysis(self, input):
+        return self.analyze(input)
