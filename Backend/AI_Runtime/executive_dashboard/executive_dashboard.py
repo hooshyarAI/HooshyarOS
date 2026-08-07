@@ -1,7 +1,7 @@
 ﻿class ExecutiveDashboard:
 
-    def build(self, data):
+    def generate(self, data):
         return {
             "data": data,
-            "status": "dashboard_generated"
+            "status": "executive_dashboard_ready"
         }
