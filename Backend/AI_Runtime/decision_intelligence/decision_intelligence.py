@@ -1,7 +1,7 @@
 ﻿class DecisionIntelligence:
 
-    def decide(self, options):
+    def analyze(self, data):
         return {
-            "options": options,
-            "status": "decided"
+            "data": data,
+            "status": "decision_analyzed"
         }

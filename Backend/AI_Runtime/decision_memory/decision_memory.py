@@ -3,5 +3,5 @@
     def store(self, decision):
         return {
             "decision": decision,
-            "status": "stored"
+            "status": "decision_saved"
         }
