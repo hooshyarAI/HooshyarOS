@@ -1,22 +1,21 @@
-﻿from Backend.AI_Runtime.agents.core.base_agent import BaseAgent
+﻿from Backend.AI_Runtime.agents.base.runtime_agent import RuntimeAgent
 
-
-class PlannerAgent(BaseAgent):
+class PlannerAgent(RuntimeAgent):
 
     def __init__(self):
         super().__init__(
-            "PlannerAgent",
-            "Planning"
+            "PlannerAgent"
         )
 
     def plan(self, goal):
 
         return {
+            "agent": self.name,
             "goal": goal,
             "steps": [
                 "analysis",
-                "design",
-                "execution",
+                "build",
                 "test"
-            ]
+            ],
+            "status": "planned"
         }

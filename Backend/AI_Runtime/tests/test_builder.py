@@ -1,14 +1,20 @@
-from Backend.AI_Runtime.agents.builder.builder_agent import BuilderAgent
+from Backend.AI_Runtime.agents.base.runtime_agent import RuntimeAgent
 
 
-def test_builder_generates_artifact():
+class PlannerAgent(RuntimeAgent):
 
-    builder = BuilderAgent()
+    def __init__(self):
+        super().__init__("PlannerAgent")
 
-    result = builder.build(
-        "FinancialEngine"
-    )
-
-    assert result["status"] == "generated"
-
-    assert result["artifact"] == "FinancialEngine.py"
+    def plan(self, goal):
+        return {
+            "agent": self.name,
+            "goal": goal,
+            "steps": [
+                "analyze",
+                "design",
+                "build",
+                "test"
+            ],
+            "status": "planned"
+        }

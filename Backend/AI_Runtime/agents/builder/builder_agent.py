@@ -1,19 +1,14 @@
-﻿from Backend.AI_Runtime.agents.core.base_agent import BaseAgent
+﻿from Backend.AI_Runtime.agents.base.runtime_agent import RuntimeAgent
 
 
-class BuilderAgent(BaseAgent):
+class BuilderAgent(RuntimeAgent):
 
     def __init__(self):
-        super().__init__(
-            "BuilderAgent",
-            "Code Generation"
-        )
+        super().__init__("BuilderAgent")
 
-
-    def build(self, task):
-
+    def build(self, target):
         return {
-            "task": task,
-            "status": "generated",
-            "artifact": task + ".py"
+            "agent": self.name,
+            "artifact": target,
+            "status": "generated"
         }
