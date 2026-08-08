@@ -1,4 +1,4 @@
-import { AutonomousDevelopmentLoop } from "../AutonomousDevelopmentLoop";
+import { AutonomousDevelopmentLoop } from "../../Architecture/Autonomous/AutonomousDevelopmentLoop";
 import { AutonomousProjectMission } from "./AutonomousProjectMission";
 import { createLocalConstructionTools } from "./LocalConstructionToolset";
 

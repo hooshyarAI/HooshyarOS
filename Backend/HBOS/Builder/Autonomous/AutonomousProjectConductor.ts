@@ -58,7 +58,7 @@ export class AutonomousProjectConductor {
         const walk = (directory: string) => {
             for (const entry of readdirSync(directory)) {
                 const full = join(directory, entry);
-                const rel = relative(this.root, full).replaceAll("\\", "/");
+                const rel = relative(this.root, full).replace(/\\/g, "/");
                 const stat = statSync(full);
                 if (stat.isDirectory()) {
                     directories.push(rel);
