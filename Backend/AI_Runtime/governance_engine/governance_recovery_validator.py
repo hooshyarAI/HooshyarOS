@@ -1,6 +1,6 @@
 ﻿class GovernanceRecoveryValidator:
-    def validate(self, governance):
+    def validate(self, context):
         return {
-            "governance": governance,
+            "context": context,
             "status": "governance_recovery_validated"
         }
