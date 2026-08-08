@@ -1,5 +1,4 @@
-﻿
-class PolicyEngine:
+﻿class PolicyEngine:
 
     def define(self, input):
         return self.evaluate(input)
@@ -12,4 +11,3 @@ class PolicyEngine:
             "input": input,
             "status": "policy_defined"
         }
-
