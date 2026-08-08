@@ -1,20 +1,47 @@
-﻿export class AutonomousDevelopmentLoop {
+import { ArchitectureDrivenBuildController } from "../../Builder/Autonomous/ArchitectureDrivenBuildController";
+import { ConstructionResult, ConstructionTool } from "../../Builder/Autonomous/AutonomousConstructionEngine";
+import { GoalPlanner, GoalPlan } from "../Planner/GoalPlanner";
 
-execute(goal:any){
-
-return {
-    goal,
-    pipeline:[
-        "plan",
-        "build",
-        "test",
-        "review",
-        "fix",
-        "approve"
-    ]
-};
-
+export interface AutonomousDevelopmentResult {
+    goal: any;
+    plan: GoalPlan;
+    result: ConstructionResult;
+    status: "completed" | "blocked";
 }
 
-}
+export class AutonomousDevelopmentLoop {
+    private readonly planner = new GoalPlanner();
 
+    constructor(private readonly tools: ConstructionTool[]) {}
+
+    execute(goal: any): AutonomousDevelopmentResult {
+        const plan = this.planner.plan(goal);
+        const controller = new ArchitectureDrivenBuildController(this.tools);
+        const result = controller.construct(plan.requirement);
+
+        return {
+            goal,
+            plan,
+            result,
+            status: result.ok ? "completed" : "blocked"
+        };
+    }
+
+    static selfTest(): void {
+        const tools: ConstructionTool[] = [
+            { name: "architecture", execute: () => ({ ok: true }) },
+            { name: "codex", execute: () => ({ ok: true, artifact: { generated: true } }) },
+            { name: "python", execute: () => ({ ok: true }) },
+            { name: "git", execute: () => ({ ok: true }) }
+        ];
+
+        const result = new AutonomousDevelopmentLoop(tools).execute({
+            capabilityId: "autonomous-loop-test",
+            capability: "architecture-driven construction"
+        });
+
+        if (result.status !== "completed" || !result.result.ok) {
+            throw new Error("AutonomousDevelopmentLoop self-test failed");
+        }
+    }
+}
