@@ -20,10 +20,7 @@ export interface Mission {
     directives: string[];
 }
 
-/**
- * Converts the existing repository state into the next autonomous construction mission.
- * It never replaces Architecture Freeze V4; it only derives executable work from it.
- */
+/** Converts the current repository state into the next architecture-driven construction mission. */
 export class AutonomousProjectMission {
     constructor(private readonly root = process.cwd()) {}
 
@@ -56,8 +53,10 @@ export class AutonomousProjectMission {
     nextMission(): Mission {
         const evidence = this.snapshot();
         const architectureText = this.readArchitectureEvidence();
-        const hasAutonomousBuilder = architectureText.includes("AutonomousBuilderLoop");
-        const hasSelfHealing = architectureText.includes("SelfReviewAgent") || architectureText.includes("AutoFixEngine");
+        const hasAutonomousBuilder = existsSync(join(this.root, "Backend", "HBOS", "Autonomous", "Loop", "AutonomousBuilderLoop.ts"))
+            || architectureText.includes("AutonomousBuilderLoop");
+        const hasSelfHealing = existsSync(join(this.root, "Backend", "HBOS", "Architecture", "Repair", "AutoFixEngine.ts"))
+            || architectureText.includes("Self-Healing Construction Mode");
 
         let capability = "continue architecture-driven autonomous construction";
         if (!hasAutonomousBuilder) capability = "activate architecture-driven autonomous builder";
@@ -82,13 +81,11 @@ export class AutonomousProjectMission {
     private readArchitectureEvidence(): string {
         const candidates = [
             join(this.root, "Assistant", "SYSTEM_PROMPT.md"),
+            join(this.root, "Docs", "ARCHITECTURE.md"),
             join(this.root, "ARCHITECTURE.md"),
             join(this.root, "README.md")
         ];
-        return candidates
-            .filter(existsSync)
-            .map(file => readFileSync(file, "utf8"))
-            .join("\n");
+        return candidates.filter(existsSync).map(file => readFileSync(file, "utf8")).join("\n");
     }
 
     private walk(root: string): string[] {
