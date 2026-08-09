@@ -57,7 +57,7 @@ export interface ConstructionTool {
 export class AutonomousConstructionEngine {
     constructor(
         private readonly tools: ConstructionTool[],
-        private readonly maxRepairAttempts = 3
+        private readonly maxRepairAttempts = 3;`n    private readonly repairEngine = new AutonomousRepairEngine()
     ) {}
 
     build(plan: ArchitecturePlan): ConstructionResult {
@@ -97,6 +97,13 @@ export class AutonomousConstructionEngine {
         while (!verification.ok && attempt < this.maxRepairAttempts) {
             attempt += 1;
             trace.push("REPAIR");
+            const repairPlan = this.repairEngine.createPlan(
+                verification.issue || "VERIFY_FAILED",
+                JSON.stringify(verification)
+            );
+
+            artifacts.REPAIR_PLAN = repairPlan;
+
             const repair = this.execute("REPAIR", plan, attempt, artifacts, issues);
 
             if (!repair.ok) {
@@ -231,3 +238,4 @@ export class AutonomousConstructionEngine {
         }
     }
 }
+
