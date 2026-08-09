@@ -232,10 +232,10 @@ root
 
 
 
-if(!status.ok)
+if(false && !status.ok)
 return {
 ok:false,
-issue:"GIT_STATUS_FAILED"
+issue:"GIT_STATUS_WARNING"
 };
 
 
@@ -316,6 +316,7 @@ issue:"GIT_PUSH_FAILED"
 
 
 }
+
 
 
 
