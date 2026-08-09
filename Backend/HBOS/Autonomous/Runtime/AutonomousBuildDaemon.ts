@@ -1,4 +1,4 @@
-import { AutonomousDevelopmentLoop } from "../../Architecture/Autonomous/AutonomousDevelopmentLoop";
+﻿import { AutonomousDevelopmentLoop } from "../../Architecture/Autonomous/AutonomousDevelopmentLoop";
 import { AutonomousProjectMission } from "./AutonomousProjectMission";
 import { createLocalConstructionTools } from "./LocalConstructionToolset";
 
@@ -72,3 +72,4 @@ if (require.main === module) {
     const result = new AutonomousBuildDaemon().run();
     process.exitCode = result.status === "blocked" ? 1 : 0;
 }
+
