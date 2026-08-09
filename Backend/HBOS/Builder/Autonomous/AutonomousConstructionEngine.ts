@@ -120,6 +120,35 @@ if (verification.ok) {
 
             const repair = this.execute("REPAIR", plan, attempt, artifacts, issues);
 
+if (repair.ok) {
+
+    if (repair.artifact !== undefined) {
+        artifacts.REPAIR = repair.artifact;
+    }
+
+    issues.length = 0;
+
+    verification = this.execute(
+        "VERIFY",
+        plan,
+        attempt,
+        artifacts,
+        issues
+    );
+
+    if (verification.ok) {
+
+        trace.push("VERIFY_AFTER_REPAIR_PASS");
+
+        return this.success(
+            "REPAIRED",
+            attempt,
+            artifacts,
+            trace
+        );
+    }
+}
+
             if (!repair.ok) {
                 issues.push(repair.issue || "REPAIR_FAILED");
                 continue;
@@ -277,6 +306,7 @@ if (!verification.ok) {
         }
     }
 }
+
 
 
 
