@@ -1,4 +1,3 @@
-﻿import { AutonomousMemoryEngine } from "../../Engines/AutonomousMemoryEngine";
 import { AutonomousDevelopmentLoop } from "../../Architecture/Autonomous/AutonomousDevelopmentLoop";
 import { AutonomousProjectMission } from "./AutonomousProjectMission";
 import { createLocalConstructionTools } from "./LocalConstructionToolset";
@@ -10,16 +9,13 @@ export interface DaemonOptions {
 }
 
 /**
- * Long-running local construction loop.
- * It observes the repository, derives the next mission, delegates implementation,
- * verifies it, repairs failures, commits/pushes successful work, then replans.
+ * Local autonomous construction entry point.
+ *
+ * It observes the repository, derives the next architecture-driven mission,
+ * executes build/verify/repair/finalize, and repeats after a successful
+ * repository change. The daemon never changes architecture policy itself.
  */
-
 export class AutonomousBuildDaemon {
-
-    private maxCycles=1;
-
-
     private readonly mission: AutonomousProjectMission;
     private readonly development: AutonomousDevelopmentLoop;
     private readonly maxCycles: number;
@@ -30,7 +26,7 @@ export class AutonomousBuildDaemon {
         this.mission = new AutonomousProjectMission(root);
         this.development = new AutonomousDevelopmentLoop(createLocalConstructionTools(root));
         this.maxCycles = options.maxCycles ?? 1000;
-        this.reportEvery = options.reportEvery ?? 50;
+        this.reportEvery = options.reportEvery ?? 1;
     }
 
     run() {
@@ -39,6 +35,15 @@ export class AutonomousBuildDaemon {
         for (let cycle = 1; cycle <= this.maxCycles; cycle += 1) {
             const before = this.mission.snapshot();
             const mission = this.mission.nextMission();
+
+            console.log(JSON.stringify({
+                type: "AUTONOMOUS_MISSION",
+                cycle,
+                commit: before.commit,
+                capability: mission.capability,
+                targetEngine: mission.targetEngine
+            }));
+
             const result = this.development.execute({
                 capabilityId: mission.capabilityId,
                 capability: mission.capability,
@@ -52,7 +57,6 @@ export class AutonomousBuildDaemon {
                 console.log(JSON.stringify({
                     type: "AUTONOMOUS_PROGRESS",
                     cycle,
-                    completedCycles: cycle,
                     latestCommit: this.mission.snapshot().commit,
                     status: result.status
                 }));
@@ -65,10 +69,20 @@ export class AutonomousBuildDaemon {
 
             const after = this.mission.snapshot();
             if (after.commit === before.commit && after.clean) {
-                console.log(JSON.stringify({ type: "AUTONOMOUS_COMPLETE", cycle, commit: after.commit }));
-                return { status: "complete", cycles: cycle, history };
+                console.log(JSON.stringify({
+                    type: "AUTONOMOUS_IDLE",
+                    cycle,
+                    commit: after.commit,
+                    message: "No repository change was produced by the current construction capability."
+                }));
+                return { status: "idle", cycles: cycle, history };
             }
         }
+
+        console.log(JSON.stringify({
+            type: "AUTONOMOUS_CYCLE_LIMIT",
+            cycles: this.maxCycles
+        }));
 
         return { status: "cycle_limit", cycles: this.maxCycles, history };
     }
@@ -78,11 +92,3 @@ if (require.main === module) {
     const result = new AutonomousBuildDaemon().run();
     process.exitCode = result.status === "blocked" ? 1 : 0;
 }
-
-
-
-
-
-
-
-
