@@ -1,14 +1,14 @@
 ﻿export class SelfEvaluationEngine {
 
-evaluate(result:any){
+evaluate(system:any){
 
 return {
 
-score:100,
-
 healthy:true,
 
-result
+score:100,
+
+system
 
 };
 
