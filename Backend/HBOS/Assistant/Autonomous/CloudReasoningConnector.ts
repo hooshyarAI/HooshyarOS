@@ -8,7 +8,7 @@ return {
 
 provider:"cloud-reasoning",
 prompt,
-status:"READY"
+status:"HEALTHY"
 
 };
 
@@ -17,3 +17,4 @@ status:"READY"
 
 
 }
+

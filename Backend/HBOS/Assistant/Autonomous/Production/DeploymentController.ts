@@ -7,7 +7,7 @@ return {
 
 deployment:true,
 
-status:"READY"
+status:"HEALTHY"
 
 };
 
@@ -15,3 +15,4 @@ status:"READY"
 
 
 }
+

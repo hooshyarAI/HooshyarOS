@@ -3,3 +3,4 @@
 reason(prompt:string):Promise<any>;
 
 }
+

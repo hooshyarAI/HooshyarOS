@@ -7,7 +7,7 @@ return {
 
 healthy:true,
 
-status:"READY",
+status:"HEALTHY",
 
 timestamp:new Date().toISOString()
 
@@ -17,3 +17,4 @@ timestamp:new Date().toISOString()
 
 
 }
+
