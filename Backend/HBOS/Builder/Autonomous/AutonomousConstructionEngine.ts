@@ -89,7 +89,9 @@ export class AutonomousConstructionEngine {
         }
 
         
+
 trace.push("VERIFY");
+
 issues.length = 0;
 
 let verification = this.execute(
@@ -275,6 +277,7 @@ if (!verification.ok) {
         }
     }
 }
+
 
 
 
