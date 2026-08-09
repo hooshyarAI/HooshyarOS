@@ -90,14 +90,20 @@ if(stage==="VERIFY"){
 
 const test=run(
     "npx",
-    ["jest","--runInBand","--passWithNoTests"],
+    ["jest","--runInBand","--passWithNoTests","--config","./jest.config.js"],
     root
 );
 
 
 
 
+
 if(test.ok){
+    console.log(JSON.stringify({
+        type:"AUTONOMOUS_VERIFY_PASS",
+        message:"Jest verification passed"
+    }));
+
     console.log(JSON.stringify({
         type:"AUTONOMOUS_VERIFY_PASS",
         message:"Jest verification passed"
@@ -274,6 +280,8 @@ issue:"GIT_PUSH_FAILED"
 
 
 }
+
+
 
 
 

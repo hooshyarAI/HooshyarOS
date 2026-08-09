@@ -88,9 +88,12 @@ export class AutonomousConstructionEngine {
             }
         }
 
-        trace.push("VERIFY");
-        let 
-verification = this.execute(
+        
+trace.push("VERIFY");
+issues.length = 0;
+
+let verification = this.execute(
+
     "VERIFY",
     plan,
     attempt,
@@ -141,8 +144,10 @@ if (verification.ok) {
         }
 
         
+
 if (!verification.ok) {
     issues.push(verification.issue || "VERIFICATION_FAILED");
+
 
 
             return {
@@ -270,6 +275,8 @@ if (!verification.ok) {
         }
     }
 }
+
+
 
 
 
