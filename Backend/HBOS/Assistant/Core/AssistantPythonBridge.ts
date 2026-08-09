@@ -9,10 +9,11 @@
 
             script,
 
-            status:"READY"
+            status:"HEALTHY"
 
         };
 
     }
 
 }
+

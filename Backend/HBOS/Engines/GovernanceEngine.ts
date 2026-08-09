@@ -6,9 +6,10 @@
 
         return {
             name:"GovernanceEngine",
-            status:"READY"
+            status:"HEALTHY"
         };
 
     }
 
 }
+

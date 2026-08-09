@@ -6,9 +6,10 @@
 
         return {
             name:"DecisionIntelligenceEngine",
-            status:"READY"
+            status:"HEALTHY"
         };
 
     }
 
 }
+

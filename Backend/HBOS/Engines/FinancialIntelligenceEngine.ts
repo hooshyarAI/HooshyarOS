@@ -6,9 +6,10 @@
 
         return {
             name:"FinancialIntelligenceEngine",
-            status:"READY"
+            status:"HEALTHY"
         };
 
     }
 
 }
+

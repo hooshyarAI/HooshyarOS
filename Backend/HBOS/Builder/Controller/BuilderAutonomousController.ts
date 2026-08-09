@@ -11,7 +11,7 @@
 
             project:request.project,
 
-            status:"READY"
+            status:"HEALTHY"
 
 
         };
@@ -21,3 +21,4 @@
 
 
 }
+

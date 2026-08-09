@@ -8,7 +8,7 @@ test("BuilderPipeline should connect analyzer and report",()=>{
     const result = pipeline.execute({
 
         projectName:"HooshyarOS",
-        status:"READY",
+        status:"HEALTHY",
         health:"GREEN",
         recommendations:[
             "next capability"
@@ -24,3 +24,4 @@ test("BuilderPipeline should connect analyzer and report",()=>{
 
 
 });
+

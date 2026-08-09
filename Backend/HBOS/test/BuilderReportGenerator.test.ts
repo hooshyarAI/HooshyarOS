@@ -6,7 +6,7 @@ test("BuilderReportGenerator should generate report",()=>{
 
     const report = generator.generate({
         projectName:"HooshyarOS",
-        status:"READY",
+        status:"HEALTHY",
         health:"GREEN",
         recommendations:[
             "continue development"
@@ -17,3 +17,4 @@ test("BuilderReportGenerator should generate report",()=>{
     expect(report.health).toBe("GREEN");
 
 });
+

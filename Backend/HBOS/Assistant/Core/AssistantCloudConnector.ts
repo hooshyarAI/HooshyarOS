@@ -9,10 +9,11 @@
 
             prompt,
 
-            status:"READY"
+            status:"HEALTHY"
 
         };
 
     }
 
 }
+

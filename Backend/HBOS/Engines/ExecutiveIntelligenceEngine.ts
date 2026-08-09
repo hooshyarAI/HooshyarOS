@@ -6,9 +6,10 @@
 
         return {
             name:"ExecutiveIntelligenceEngine",
-            status:"READY"
+            status:"HEALTHY"
         };
 
     }
 
 }
+

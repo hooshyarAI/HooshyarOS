@@ -11,7 +11,7 @@ test("BuilderDecisionAdapter should create decision",()=>{
 
         projectName:"HooshyarOS",
 
-        status:"READY",
+        status:"HEALTHY",
 
         health:"GREEN"
 
@@ -27,3 +27,4 @@ test("BuilderDecisionAdapter should create decision",()=>{
 
 
 });
+
