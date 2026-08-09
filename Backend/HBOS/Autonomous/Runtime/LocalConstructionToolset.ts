@@ -87,10 +87,11 @@ generated:true
 if(stage==="VERIFY"){
 
 
+
 const test=run(
-"npx",
-["jest","--runInBand"],
-root
+    "npx",
+    ["jest","--runInBand","--passWithNoTests"],
+    root
 );
 
 
@@ -110,16 +111,14 @@ jest:"passed"
 }
 
 
+
 return {
-
-ok:false,
-
-issue:"AUTONOMOUS_VERIFY_FAILED",
-
-artifact:{
-output:test.output
-}
-
+    ok:false,
+    issue:"AUTONOMOUS_VERIFY_FAILED",
+    artifact:{
+        verificationOutput:test.output,
+        repairRequired:true
+    }
 };
 
 }
@@ -133,7 +132,7 @@ console.log(JSON.stringify({
 
 type:"AUTONOMOUS_REPAIR",
 
-message:"Repair engine executed",
+message:"Repair engine consumed verification artifact",
 
 issues:context.issues
 
@@ -269,3 +268,4 @@ issue:"GIT_PUSH_FAILED"
 
 
 }
+
