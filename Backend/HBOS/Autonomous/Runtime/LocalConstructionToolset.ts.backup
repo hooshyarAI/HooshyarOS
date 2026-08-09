@@ -273,7 +273,7 @@ return {
 
 ok:false,
 
-issue:"GIT_COMMIT_SKIPPED_NO_CHANGE"
+issue:"GIT_COMMIT_FAILED"
 
 };
 
@@ -316,9 +316,6 @@ issue:"GIT_PUSH_FAILED"
 
 
 }
-
-
-
 
 
 
