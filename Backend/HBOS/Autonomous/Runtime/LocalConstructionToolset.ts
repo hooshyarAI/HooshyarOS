@@ -51,9 +51,15 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                 const python = run("python", ["-m", "compileall", "-q", "Backend"], root, 5 * 60 * 1000);
                 if (!python.ok) return { ok: false, issue: "PYTHON_COMPILE_FAILED" };
                 const tests = run("npx", ["jest", "--runInBand"], root, 15 * 60 * 1000);
-                return tests.ok
-                    ? { ok: true, artifact: { python: "passed", jest: "passed" } }
-                    : { ok: false, issue: "JEST_VERIFICATION_FAILED" };
+                
+return tests.ok
+    ? { ok: true, artifact: { python: "passed", jest: "passed" } }
+    : { 
+        ok: false,
+        issue: "JEST_OUTPUT_FAILURE",
+        artifact: { output: tests.output }
+      };
+
             }
         },
         {
@@ -75,6 +81,7 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
         }
     ];
 }
+
 
 
 
