@@ -1,4 +1,6 @@
-﻿import { AutonomousRepairEngine } from "../../Autonomous/RepairEngine/AutonomousRepairEngine";`r`n`r`nexport type ConstructionStage =
+﻿import { AutonomousRepairEngine } from "../../Autonomous/RepairEngine/AutonomousRepairEngine";`r
+`r
+export type ConstructionStage =
     | "ARCHITECTURE"
     | "PLAN"
     | "GENERATE"
@@ -239,6 +241,7 @@ export class AutonomousConstructionEngine {
         }
     }
 }
+
 
 
 
