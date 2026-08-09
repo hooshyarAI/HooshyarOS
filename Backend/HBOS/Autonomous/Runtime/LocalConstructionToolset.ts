@@ -1,4 +1,4 @@
-﻿import { execSync } from "child_process";
+import { execSync } from "child_process";
 import {
     ConstructionContext,
     ConstructionStage,
@@ -6,368 +6,175 @@ import {
 } from "../../Builder/Autonomous/AutonomousConstructionEngine";
 
 function run(
-    command:string,
-    args:string[],
-    cwd:string,
-    timeout=15*60*1000
-){
-    try{
+    command: string,
+    args: string[],
+    cwd: string,
+    timeout = 15 * 60 * 1000
+) {
+    try {
+        if (process.platform === "win32" && command === "npx") {
+            command = "npx.cmd";
+        }
 
-if(process.platform==="win32" && command==="npx"){
-    command="npx.cmd";
-}
-
-        const output=execSync(command,args,{
+        const output = execSync(command, args, {
             cwd,
-            encoding:"utf8",
+            encoding: "utf8",
             timeout,
-            stdio:["ignore","pipe","pipe"]
+            stdio: ["ignore", "pipe", "pipe"]
         });
 
         return {
-        ok:true,
-        code:0,
-        output:String(output),
-        error:null
-    };
-
-    }catch(error:any){
-
+            ok: true,
+            code: 0,
+            output: String(output),
+            error: null
+        };
+    } catch (error: any) {
         return {
-        ok:false,
-        code:error?.status ?? 1,
-        output:`${error?.stdout || ""}\n${error?.stderr || ""}`,
-        error:error?.message ?? `${command} failed`
-    };
+            ok: false,
+            code: error?.status ?? 1,
+            output: `${error?.stdout || ""}\n${error?.stderr || ""}`,
+            error: error?.message ?? `${command} failed`
+        };
     }
 }
-
 
 export function createLocalConstructionTools(
-    root=process.cwd()
-):ConstructionTool[]{
-
-
-return [
-
-{
-name:"architecture",
-
-execute:(_stage,context)=>({
-
-ok:Boolean(
-context.plan.capabilityId &&
-context.plan.capability &&
-context.plan.targetEngine
-),
-
-artifact:{
-approved:true
-}
-
-})
-
-},
-
-
-{
-name:"python",
-
-execute:(stage,context)=>{
-
-
-if(stage==="GENERATE"){
-
-return {
-
-ok:true,
-
-artifact:{
-generated:true
-}
-
-};
-
-}
-
-
-
-
-if(stage==="VERIFY"){
-
-
-const test=run(
-    "npx",
-    [
-        "jest",
-        "--runInBand",
-        "--config",
-        ".\jest.config.js"
-    ],
-    root
-);
-
-
-
-const verificationArtifact={
-
-    type:"AUTONOMOUS_VERIFY_RESULT",
-
-    command:"jest",
-
-    exitCode:test.code,
-
-    verified:test.code===0,
-
-    timestamp:new Date().toISOString(),
-
-    output:test.output,
-
-    error:test.error
-
-};
-
-
-console.log(
-    JSON.stringify(
-        verificationArtifact,
-        null,
-        2
-    )
-);
-
-
-
-if(test.code===0){
-
-return {
-
-    ok:true,
-
-    artifact:verificationArtifact
-
-};
-
-}
-
-
-
-return {
-
-    ok:false,
-
-    issue:"AUTONOMOUS_VERIFY_FAILED",
-
-    artifact:{
-
-        ...verificationArtifact,
-
-        repairRequired:true
-
-    }
-
-};
-
-}
-
-
-
-
-if(stage==="REPAIR"){
-
-
-console.log(JSON.stringify({
-
-type:"AUTONOMOUS_REPAIR",
-
-message:"Repair engine consumed verification artifact",
-
-issues:context.issues
-
-}));
-
-
-return {
-
-ok:true,
-
-artifact:{
-
-repaired:true
-
-}
-
-};
-
-}
-
-
-
-return {
-ok:true
-};
-
-}
-
-},
-
-
-{
-name:"git",
-
-execute:(stage)=>{
-
-
-if(stage!=="FINALIZE")
-return {
-    ok:true
-};
-
-if(stage==="FINALIZE")
-{
-    return {
-        ok:true,
-        status:"READY_RELEASE",
-        artifact:{
-            git:true,
-            committed:true,
-            pushed:true,
-            changeDetected:false
+    root = process.cwd()
+): ConstructionTool[] {
+    return [
+        {
+            name: "architecture",
+            execute: (_stage, context) => ({
+                ok: Boolean(
+                    context.plan.capabilityId &&
+                    context.plan.capability &&
+                    context.plan.targetEngine
+                ),
+                artifact: { approved: true }
+            })
         },
-        issues:[],
-        trace:[
-            "GIT",
-            "COMMIT",
-            "PUSH",
-            "RELEASE"
-        ]
-    };
+        {
+            name: "python",
+            execute: (stage, context) => {
+                if (stage === "GENERATE") {
+                    return {
+                        ok: true,
+                        artifact: {
+                            generated: true,
+                            capability: context.plan.capability,
+                            targetEngine: context.plan.targetEngine
+                        }
+                    };
+                }
+
+                if (stage === "VERIFY") {
+                    const test = run(
+                        "npx",
+                        ["jest", "--runInBand", "--config", ".\\jest.config.js"],
+                        root
+                    );
+
+                    const verificationArtifact = {
+                        type: "AUTONOMOUS_VERIFY_RESULT",
+                        command: "jest",
+                        exitCode: test.code,
+                        verified: test.code === 0,
+                        timestamp: new Date().toISOString(),
+                        output: test.output,
+                        error: test.error
+                    };
+
+                    console.log(JSON.stringify(verificationArtifact, null, 2));
+
+                    if (test.code === 0) {
+                        return { ok: true, artifact: verificationArtifact };
+                    }
+
+                    return {
+                        ok: false,
+                        issue: "AUTONOMOUS_VERIFY_FAILED",
+                        artifact: {
+                            ...verificationArtifact,
+                            repairRequired: true
+                        }
+                    };
+                }
+
+                if (stage === "REPAIR") {
+                    console.log(JSON.stringify({
+                        type: "AUTONOMOUS_REPAIR",
+                        message: "Repair engine consumed verification artifact",
+                        issues: context.issues
+                    }));
+
+                    return {
+                        ok: true,
+                        artifact: { repaired: true }
+                    };
+                }
+
+                return { ok: true };
+            }
+        },
+        {
+            name: "git",
+            execute: (stage) => {
+                if (stage !== "FINALIZE") {
+                    return { ok: true };
+                }
+
+                const status = run("git", ["status", "--porcelain"], root);
+
+                if (!status.ok) {
+                    return {
+                        ok: false,
+                        issue: "GIT_STATUS_FAILED"
+                    };
+                }
+
+                if (!status.output.trim()) {
+                    return {
+                        ok: true,
+                        artifact: {
+                            clean: true,
+                            committed: false,
+                            pushed: false,
+                            changeDetected: false
+                        }
+                    };
+                }
+
+                const add = run("git", ["add", "-A"], root);
+                if (!add.ok) {
+                    return { ok: false, issue: "GIT_ADD_FAILED" };
+                }
+
+                const commit = run(
+                    "git",
+                    ["commit", "-m", "feat(hbos): autonomous construction progress"],
+                    root
+                );
+
+                if (!commit.ok) {
+                    return { ok: false, issue: "GIT_COMMIT_FAILED" };
+                }
+
+                const push = run("git", ["push", "origin", "main"], root);
+
+                if (!push.ok) {
+                    return { ok: false, issue: "GIT_PUSH_FAILED" };
+                }
+
+                return {
+                    ok: true,
+                    artifact: {
+                        committed: true,
+                        pushed: true,
+                        changeDetected: true
+                    }
+                };
+            }
+        }
+    ];
 }
-
-
-const status=run(
-"git",
-["status","--porcelain"],
-root
-);
-
-
-
-if(false && !status.ok)
-return {
-ok:false,
-issue:"GIT_STATUS_WARNING"
-};
-
-
-
-if(!status.output.trim())
-return {
-
-ok:true,
-
-artifact:{
-clean:true
-}
-
-};
-
-
-
-run("git",["add","-A"],root);
-
-
-const commit=run(
-"git",
-[
-"commit",
-"-m",
-"feat(hbos): autonomous construction progress"
-],
-root
-);
-
-
-
-if(!commit.ok)
-return {
-
-ok:false,
-
-status:"READY_NO_CHANGE",issue:null
-
-};
-
-
-
-const push=run(
-"git",
-[
-"push",
-"origin",
-"main"
-],
-root
-);
-
-
-
-return push.ok
-?
-{
-ok:true,
-artifact:{
-committed:true,
-pushed:true
-}
-}
-:
-{
-ok:false,
-issue:"GIT_PUSH_FAILED"
-};
-
-
-}
-
-}
-
-
-];
-
-
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
