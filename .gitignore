@@ -9,3 +9,10 @@ _Backups/
 # Aider Studio (auto-added)
 REPO_MAP.md
 .aider/
+node_modules/
+.cache/
+.aider.chat.history.md
+.aider.input.history
+.aider.tags.cache.v4/
+.vscode-clean/
+.vscode-extensions-clean/

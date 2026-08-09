@@ -1,4 +1,4 @@
-import { execSync } from "child_process";
+﻿import { execFileSync } from "child_process";
 import {
     ConstructionContext,
     ConstructionStage,
@@ -12,14 +12,32 @@ function run(
     timeout = 15 * 60 * 1000
 ) {
     try {
-        if (process.platform === "win32" && command === "npx") {
-            command = "npx.cmd";
+        let executable = command;
+        let executableArgs = args;
+
+        if (process.platform === "win32") {
+            if (command === "git") {
+                executable = "git.exe";
+            }
+
+            if (command === "npx") {
+                executable = process.env.ComSpec || "cmd.exe";
+                executableArgs = [
+                    "/d",
+                    "/s",
+                    "/c",
+                    "npx.cmd",
+                    ...args
+                ];
+            }
         }
 
-        const output = execSync(command, args, {
+        const output = execFileSync(executable, executableArgs, {
             cwd,
             encoding: "utf8",
             timeout,
+            shell: false,
+            windowsHide: true,
             stdio: ["ignore", "pipe", "pipe"]
         });
 
@@ -30,10 +48,24 @@ function run(
             error: null
         };
     } catch (error: any) {
+        const stdout = String(error?.stdout || "");
+        const stderr = String(error?.stderr || "");
+
+        console.error(JSON.stringify({
+            type: "AUTONOMOUS_TOOL_ERROR",
+            command,
+            args,
+            cwd,
+            exitCode: error?.status ?? 1,
+            stdout,
+            stderr,
+            message: error?.message ?? `${command} failed`
+        }, null, 2));
+
         return {
             ok: false,
             code: error?.status ?? 1,
-            output: `${error?.stdout || ""}\n${error?.stderr || ""}`,
+            output: `${stdout}\n${stderr}`,
             error: error?.message ?? `${command} failed`
         };
     }
@@ -178,3 +210,6 @@ export function createLocalConstructionTools(
         }
     ];
 }
+
+
+
