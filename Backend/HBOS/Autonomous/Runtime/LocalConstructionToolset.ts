@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+﻿import { execFileSync } from "node:child_process";
 import { ConstructionContext, ConstructionStage, ConstructionTool } from "../../Builder/Autonomous/AutonomousConstructionEngine";
 
 function run(command: string, args: string[], cwd: string, timeout = 15 * 60 * 1000): { ok: boolean; output: string; issue?: string } {
@@ -43,16 +43,6 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                 ok: Boolean(context.plan.capabilityId && context.plan.capability && context.plan.targetEngine),
                 artifact: { approved: true }
             })
-        },
-        {
-            name: "codex",
-            execute: (stage: ConstructionStage, context: ConstructionContext) => {
-                if (stage !== "GENERATE" && stage !== "REPAIR") return { ok: true };
-                const result = run("codex", ["exec", prompt(context, stage === "REPAIR" ? "repair" : "generate")], root);
-                return result.ok
-                    ? { ok: true, artifact: { tool: "codex", output: result.output.slice(-4000) } }
-                    : { ok: false, issue: result.issue || "CODEX_EXEC_FAILED" };
-            }
         },
         {
             name: "python",

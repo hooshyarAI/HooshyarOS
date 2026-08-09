@@ -1,4 +1,4 @@
-import {
+﻿import {
     ArchitectureDrivenBuildController
 } from "../../Builder/Autonomous/ArchitectureDrivenBuildController";
 import {
@@ -39,10 +39,6 @@ export class AutonomousBuilderLoop {
         const tools: ConstructionTool[] = [
             {
                 name: "architecture",
-                execute: () => ({ ok: true })
-            },
-            {
-                name: "codex",
                 execute: () => ({ ok: true })
             },
             {

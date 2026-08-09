@@ -1,4 +1,4 @@
-export type ConstructionStage =
+﻿export type ConstructionStage =
     | "ARCHITECTURE"
     | "PLAN"
     | "GENERATE"
@@ -51,8 +51,7 @@ export interface ConstructionTool {
  * ArchitecturePlan, selects an execution tool, verifies the result and
  * performs bounded self-repair when verification reports a failure.
  *
- * External providers such as Python workers, Codex-backed generators,
- * static analyzers and test runners are intentionally injected through
+ * External providers such as Python workers, repository-native generators, * static analyzers and test runners are intentionally injected through
  * ConstructionTool so the control plane remains deterministic and testable.
  */
 export class AutonomousConstructionEngine {
@@ -157,9 +156,9 @@ export class AutonomousConstructionEngine {
         const preferredNames: Record<ConstructionStage, string[]> = {
             ARCHITECTURE: ["architecture"],
             PLAN: ["architecture", "planner"],
-            GENERATE: ["codex", "python", "generator"],
+            GENERATE: ["python", "generator"],
             VERIFY: ["python", "verifier", "test"],
-            REPAIR: ["codex", "python", "repair"],
+            REPAIR: ["python", "repair"],
             FINALIZE: ["git", "finalizer"]
         };
 
@@ -200,13 +199,6 @@ export class AutonomousConstructionEngine {
             {
                 name: "architecture",
                 execute: stage => ({ ok: stage !== "ARCHITECTURE" || true })
-            },
-            {
-                name: "codex",
-                execute: stage =>
-                    stage === "GENERATE" || stage === "REPAIR"
-                        ? { ok: true, artifact: { generated: true } }
-                        : { ok: true }
             },
             {
                 name: "python",

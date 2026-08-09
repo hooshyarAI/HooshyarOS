@@ -1,4 +1,4 @@
-import { AutonomousBuilderLoop, AutonomousBuildRequest } from "./AutonomousBuilderLoop";
+﻿import { AutonomousBuilderLoop, AutonomousBuildRequest } from "./AutonomousBuilderLoop";
 import { ConstructionTool } from "../../Builder/Autonomous/AutonomousConstructionEngine";
 
 export interface BuildSupervisorCycle {
@@ -32,7 +32,6 @@ export class AutonomousBuildSupervisor {
     static selfTest(): void {
         const tools: ConstructionTool[] = [
             { name: "architecture", execute: () => ({ ok: true }) },
-            { name: "codex", execute: () => ({ ok: true }) },
             { name: "python", execute: () => ({ ok: true }) },
             { name: "git", execute: () => ({ ok: true }) }
         ];

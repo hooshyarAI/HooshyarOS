@@ -1,4 +1,4 @@
-# HooshyarOS Development Constitution
+﻿# HooshyarOS Development Constitution
 
 Version: 1.1
 
@@ -21,11 +21,11 @@ Every answer must improve the project.
 Transform:
 
 Data
-→ Knowledge
-→ Insight
-→ Decision
-→ Action
-→ Measurable Value
+â†’ Knowledge
+â†’ Insight
+â†’ Decision
+â†’ Action
+â†’ Measurable Value
 
 ---
 
@@ -130,21 +130,21 @@ The final approved architecture and architecture decisions are the source of tru
 The construction loop is:
 
 Architecture
-→ Decision
-→ Capability Plan
-→ Tool Selection
-→ Generation
-→ Static Validation
-→ Test
-→ Integration Verification
-→ Architecture Compliance
-→ Repair if required
-→ Re-test
-→ Finalize
+â†’ Decision
+â†’ Capability Plan
+â†’ Tool Selection
+â†’ Generation
+â†’ Static Validation
+â†’ Test
+â†’ Integration Verification
+â†’ Architecture Compliance
+â†’ Repair if required
+â†’ Re-test
+â†’ Finalize
 
 The assistant must use the platform's autonomous construction engine whenever the required capability is supported by it.
 
-External construction tools may be used through controlled adapters, including Python workers, Codex-backed generators, test runners, static analyzers and Git tooling. Tool choice is an implementation decision and must remain subordinate to the architecture and governance rules.
+External construction tools may be used through controlled adapters, including Python workers, repository-native generators, test runners, static analyzers and Git tooling. Tool choice is an implementation decision and must remain subordinate to the architecture and governance rules.
 
 The assistant must not create duplicate engines merely because a new file is convenient. It must first determine the correct engine boundary, dependency boundary and existing capability owner.
 
@@ -160,11 +160,11 @@ The Build Assistant must continuously monitor both:
 When verification detects a failure, broken contract, missing dependency, incompatible interface or failed internal connection, the assistant must enter a bounded repair loop:
 
 Detect
-→ Diagnose
-→ Select repair tool
-→ Apply minimal repair
-→ Re-test
-→ Re-verify architecture
+â†’ Diagnose
+â†’ Select repair tool
+â†’ Apply minimal repair
+â†’ Re-test
+â†’ Re-verify architecture
 
 Repairs must be evidence-driven. The assistant must not hide failures by blindly marking components healthy.
 

@@ -1,4 +1,4 @@
-import {
+﻿import {
     ArchitectureDecisionEngine,
     ArchitectureRequirement
 } from "../../Architecture/Decision/ArchitectureDecisionEngine";
@@ -35,10 +35,6 @@ export class ArchitectureDrivenBuildController {
         const controller = new ArchitectureDrivenBuildController([
             {
                 name: "architecture",
-                execute: () => ({ ok: true })
-            },
-            {
-                name: "codex",
                 execute: () => ({ ok: true })
             },
             {

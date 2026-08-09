@@ -1,4 +1,4 @@
-import { ArchitectureDrivenBuildController } from "../../Builder/Autonomous/ArchitectureDrivenBuildController";
+﻿import { ArchitectureDrivenBuildController } from "../../Builder/Autonomous/ArchitectureDrivenBuildController";
 import { ConstructionResult, ConstructionTool } from "../../Builder/Autonomous/AutonomousConstructionEngine";
 import { GoalPlanner, GoalPlan } from "../Planner/GoalPlanner";
 
@@ -30,7 +30,6 @@ export class AutonomousDevelopmentLoop {
     static selfTest(): void {
         const tools: ConstructionTool[] = [
             { name: "architecture", execute: () => ({ ok: true }) },
-            { name: "codex", execute: () => ({ ok: true, artifact: { generated: true } }) },
             { name: "python", execute: () => ({ ok: true }) },
             { name: "git", execute: () => ({ ok: true }) }
         ];

@@ -1,4 +1,4 @@
-import { AutonomousBuildSupervisor, BuildSupervisorCycle } from "./Loop/AutonomousBuildSupervisor";
+﻿import { AutonomousBuildSupervisor, BuildSupervisorCycle } from "./Loop/AutonomousBuildSupervisor";
 import { ConstructionTool } from "../Builder/Autonomous/AutonomousConstructionEngine";
 
 export interface ProjectInventory { files: string[]; capabilities: string[]; }
@@ -26,7 +26,6 @@ export class AutonomousProjectConductor {
     static selfTest(): void {
         const conductor = new AutonomousProjectConductor([
             { name: "architecture", execute: () => ({ ok: true }) },
-            { name: "codex", execute: () => ({ ok: true }) },
             { name: "python", execute: () => ({ ok: true }) },
             { name: "git", execute: () => ({ ok: true }) }
         ]);

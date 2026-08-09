@@ -1,22 +1,22 @@
-# HooshyarOS Autonomous Engineering Contract
+﻿# HooshyarOS Autonomous Engineering Contract
 
 ## Source of truth
-- `Docs/ARCHITECTURE.md` — Architecture Freeze V4.
-- `Assistant/SYSTEM_PROMPT.md` — development constitution and autonomous construction rules.
-- Existing HBOS engines and capability owners — inspect before adding anything.
+- `Docs/ARCHITECTURE.md` â€” Architecture Freeze V4.
+- `Assistant/SYSTEM_PROMPT.md` â€” development constitution and autonomous construction rules.
+- Existing HBOS engines and capability owners â€” inspect before adding anything.
 
 ## Autonomous execution
 When assigned a build task, inspect the repository and existing git history first. Derive the next missing capability from the final architecture and current implementation state. Do not ask the human to provide file-by-file instructions.
 
 Use this loop:
 
-Architecture → Decision → Plan → Tool Selection → Generate → Static Validation → Test → Integration Verification → Architecture Compliance → Repair → Re-test → Finalize
+Architecture â†’ Decision â†’ Plan â†’ Tool Selection â†’ Generate â†’ Static Validation â†’ Test â†’ Integration Verification â†’ Architecture Compliance â†’ Repair â†’ Re-test â†’ Finalize
 
 ## Engineering rules
 1. One capability = one coherent implementation contract + verification evidence.
 2. Never create a duplicate engine when an existing engine owns the capability.
 3. Prefer the smallest complete change that advances the architecture.
-4. Use Python for analysis/verification where useful and Codex for implementation/reasoning-heavy changes.
+4. Use repository-native tooling for implementation and Python for analysis/verification where useful.
 5. Run tests and static validation before finalizing.
 6. If verification fails, diagnose and repair automatically within a bounded budget.
 7. Preserve failure evidence; never fake a healthy result.
