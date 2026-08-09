@@ -1,17 +1,17 @@
 ﻿export class CloudReasoningConnector {
 
 
-ask(prompt:string){
+async reason(prompt:string){
+
 
 return {
 
-provider:"cloud",
-
+provider:"cloud-reasoning",
 prompt,
-
-connected:true
+status:"READY"
 
 };
+
 
 }
 
