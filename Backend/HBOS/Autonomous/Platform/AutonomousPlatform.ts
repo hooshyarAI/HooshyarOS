@@ -3,7 +3,8 @@
     execute(goal:string){
 
         return {
-            status:"HEALTHY",
+            status:"READY",
+        health:"HEALTHY",
             goal,
             pipeline:[
                 "PLAN",
@@ -17,4 +18,5 @@
     }
 
 }
+
 

@@ -6,13 +6,21 @@
 
         return {
 
-
             received:true,
+
+            status:"READY",
+
+            health:"HEALTHY",
 
             project:request.project,
 
-            status:"HEALTHY"
-
+            pipeline:[
+                "PLAN",
+                "BUILD",
+                "VERIFY",
+                "REPAIR",
+                "RELEASE"
+            ]
 
         };
 
@@ -21,4 +29,3 @@
 
 
 }
-

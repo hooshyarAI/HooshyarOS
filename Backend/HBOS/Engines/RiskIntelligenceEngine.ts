@@ -6,10 +6,13 @@
 
         return {
             name:"RiskIntelligenceEngine",
-            status:"HEALTHY"
+            status:"READY",
+        health:"HEALTHY"
         };
 
     }
 
 }
+
+
 

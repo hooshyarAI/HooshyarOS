@@ -48,9 +48,21 @@ this.governance.validate(plan);
 if(!governance.approved){
 
 return {
-
+status:"BLOCKED",
+goal,
+plan,
+decision:{
+input:plan,
+decision:"BLOCKED",
+confidence:0
+},
+execution:{
+status:"NOT_EXECUTED"
+},
+health:{
+healthy:false,
 status:"BLOCKED"
-
+}
 };
 
 }
@@ -97,5 +109,6 @@ return result;
 
 
 }
+
 
 
