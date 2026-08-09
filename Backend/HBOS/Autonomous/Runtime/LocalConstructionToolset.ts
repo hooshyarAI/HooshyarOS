@@ -1,4 +1,4 @@
-import { execFileSync } from "child_process";
+﻿import { execFileSync } from "child_process";
 import {
     ConstructionContext,
     ConstructionStage,
@@ -25,7 +25,7 @@ function run(
 
             if (command === "copilot" || command === "claude") {
                 executable = process.env.ComSpec || "cmd.exe";
-                executableArgs = ["/d", "/s", "/c", `${command}.cmd`, ...args];
+                executableArgs = ["/d", "/s", "/c", `${command}.bat`, ...args];
             }
         }
 
@@ -248,3 +248,4 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
         }
     ];
 }
+

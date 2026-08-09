@@ -231,7 +231,7 @@ if (!verification.ok) {
         const preferredNames: Record<ConstructionStage, string[]> = {
             ARCHITECTURE: ["architecture"],
             PLAN: ["architecture", "planner"],
-            GENERATE: ["python", "generator"],
+            GENERATE: ["generator", "python"],
             VERIFY: ["python", "verifier", "test"],
             REPAIR: ["python", "repair"],
             FINALIZE: ["git", "finalizer"]
@@ -250,6 +250,22 @@ if (!verification.ok) {
         };
     }
 
+    private success(
+        status: "BUILT" | "REPAIRED",
+        attempts: number,
+        artifacts: Record<string, unknown>,
+        trace: ConstructionStage[]
+    ): ConstructionResult {
+        return {
+            ok: true,
+            status,
+            stage: "VERIFY",
+            attempts,
+            selectedTool: this.toolFor("VERIFY").name,
+            issues: [],
+            trace
+        };
+    }
     private blocked(
         stage: ConstructionStage,
         attempts: number,
@@ -306,6 +322,8 @@ if (!verification.ok) {
         }
     }
 }
+
+
 
 
 
