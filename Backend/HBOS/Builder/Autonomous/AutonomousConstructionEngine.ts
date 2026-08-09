@@ -1,14 +1,6 @@
 ﻿import { AutonomousRepairEngine } from "../../Autonomous/RepairEngine/AutonomousRepairEngine";
 
-export type ConstructionStage =
-| "ARCHITECTURE"
-| "PLAN"
-| "GENERATE"
-| "VERIFY"
-| "REPAIR"
-| "FINALIZE";
-
-    | "FINALIZE";
+export type ConstructionStage = "ARCHITECTURE" | "PLAN" | "GENERATE" | "VERIFY" | "REPAIR" | "FINALIZE";
 
 export interface ArchitecturePlan {
     capabilityId: string;
