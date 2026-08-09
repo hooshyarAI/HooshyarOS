@@ -1,11 +1,13 @@
-﻿import { AutonomousRepairEngine } from "../../Autonomous/RepairEngine/AutonomousRepairEngine";`r
-`r
+﻿import { AutonomousRepairEngine } from "../../Autonomous/RepairEngine/AutonomousRepairEngine";
+
 export type ConstructionStage =
-    | "ARCHITECTURE"
-    | "PLAN"
-    | "GENERATE"
-    | "VERIFY"
-    | "REPAIR"
+| "ARCHITECTURE"
+| "PLAN"
+| "GENERATE"
+| "VERIFY"
+| "REPAIR"
+| "FINALIZE";
+
     | "FINALIZE";
 
 export interface ArchitecturePlan {
