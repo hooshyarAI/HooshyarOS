@@ -17,29 +17,46 @@ export class AssistantOrchestrator {
         const text=input.toLowerCase();
 
 
-        if(text.includes("مالی") || text.includes("سود"))
-            return "FinancialFace";
-
-
-        if(text.includes("مالیات"))
+        if(
+            text.includes("tax") ||
+            text.includes("vat") ||
+            text.includes("irs") ||
+            text.includes("مالیات")
+        )
             return "TaxFace";
 
 
-        if(text.includes("ریسک"))
+        if(
+            text.includes("financial") ||
+            text.includes("finance") ||
+            text.includes("money") ||
+            text.includes("مالی")
+        )
+            return "FinancialFace";
+
+
+        if(
+            text.includes("risk")
+        )
             return "RiskFace";
 
 
-        if(text.includes("استراتژی"))
+        if(
+            text.includes("strategy")
+        )
             return "StrategyFace";
 
 
-        if(text.includes("تصمیم"))
+        if(
+            text.includes("decision")
+        )
             return "DecisionFace";
 
 
         return "AssistantFace";
 
     }
+
 
 
     execute(input:string){
@@ -61,4 +78,3 @@ export class AssistantOrchestrator {
     }
 
 }
-
