@@ -20,17 +20,20 @@ function run(
         });
 
         return {
-            ok:true,
-            output:String(output)
-        };
+        ok:true,
+        code:0,
+        output:String(output),
+        error:null
+    };
 
     }catch(error:any){
 
         return {
-            ok:false,
-            output:`${error?.stdout || ""}\n${error?.stderr || ""}`,
-            issue:`${command} failed`
-        };
+        ok:false,
+        code:error?.status ?? 1,
+        output:`${error?.stdout || ""}\n${error?.stderr || ""}`,
+        error:error?.message ?? `${command} failed`
+    };
     }
 }
 
@@ -84,39 +87,59 @@ generated:true
 
 
 
-if(stage==="VERIFY"){
 
+if(stage==="VERIFY"){
 
 
 const test=run(
     "npx",
-    ["jest","--runInBand","--config",".\jest.config.js"],
+    [
+        "jest",
+        "--runInBand",
+        "--config",
+        ".\jest.config.js"
+    ],
     root
 );
 
 
 
+const verificationArtifact={
+
+    type:"AUTONOMOUS_VERIFY_RESULT",
+
+    command:"jest",
+
+    exitCode:test.code,
+
+    verified:test.code===0,
+
+    timestamp:new Date().toISOString(),
+
+    output:test.output,
+
+    error:test.error
+
+};
 
 
-if(test.ok){
-    console.log(JSON.stringify({
-        type:"AUTONOMOUS_VERIFY_PASS",
-        message:"Jest verification passed"
-    }));
+console.log(
+    JSON.stringify(
+        verificationArtifact,
+        null,
+        2
+    )
+);
 
-    console.log(JSON.stringify({
-        type:"AUTONOMOUS_VERIFY_PASS",
-        message:"Jest verification passed"
-    }));
 
+
+if(test.code===0){
 
 return {
 
-ok:true,
+    ok:true,
 
-artifact:{
-jest:"passed"
-}
+    artifact:verificationArtifact
 
 };
 
@@ -125,15 +148,23 @@ jest:"passed"
 
 
 return {
+
     ok:false,
+
     issue:"AUTONOMOUS_VERIFY_FAILED",
+
     artifact:{
-        verificationOutput:test.output,
+
+        ...verificationArtifact,
+
         repairRequired:true
+
     }
+
 };
 
 }
+
 
 
 
@@ -280,6 +311,7 @@ issue:"GIT_PUSH_FAILED"
 
 
 }
+
 
 
 
