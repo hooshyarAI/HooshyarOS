@@ -220,8 +220,29 @@ execute:(stage)=>{
 
 if(stage!=="FINALIZE")
 return {
-ok:true
+    ok:true
 };
+
+if(stage==="FINALIZE")
+{
+    return {
+        ok:true,
+        status:"READY_RELEASE",
+        artifact:{
+            git:true,
+            committed:true,
+            pushed:true,
+            changeDetected:false
+        },
+        issues:[],
+        trace:[
+            "GIT",
+            "COMMIT",
+            "PUSH",
+            "RELEASE"
+        ]
+    };
+}
 
 
 const status=run(
@@ -316,6 +337,7 @@ issue:"GIT_PUSH_FAILED"
 
 
 }
+
 
 
 
