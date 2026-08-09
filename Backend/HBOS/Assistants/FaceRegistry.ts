@@ -18,16 +18,27 @@ export class FaceRegistry {
 faces=[
 
 new ExecutiveFace(),
+
 new FinancialFace(),
+
 new AccountingFace(),
+
 new TaxFace(),
+
 new AuditFace(),
+
 new DecisionFace(),
+
 new RiskFace(),
+
 new StrategyFace(),
+
 new OperationsFace(),
+
 new KnowledgeFace(),
+
 new AssistantFace(),
+
 new AutonomousFace()
 
 ];
@@ -35,7 +46,30 @@ new AutonomousFace()
 
 initialize(){
 
-this.faces.forEach(x=>x.initialize());
+this.faces.forEach(face=>face.initialize());
+
+}
+
+
+route(face:string,input:string){
+
+const target=this.faces.find(
+x=>x.name===face
+);
+
+
+if(!target){
+
+return {
+
+error:"FACE_NOT_FOUND"
+
+};
+
+}
+
+
+return target.respond(input);
 
 }
 

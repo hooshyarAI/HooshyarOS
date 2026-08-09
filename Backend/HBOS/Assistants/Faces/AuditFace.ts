@@ -1,19 +1,28 @@
 ﻿export class AuditFace {
 
-    name="AuditFace";
+name="AuditFace";
 
-    initialize(){
-        console.log("AuditFace Started");
-    }
 
-    respond(input:string){
+initialize(){
 
-        return {
-            face:this.name,
-            input,
-            timestamp:new Date().toISOString()
-        };
-
-    }
+console.log("AuditFace initialized");
 
 }
+
+
+respond(input:string){
+
+return {
+
+face:this.name,
+
+input,
+
+timestamp:new Date().toISOString()
+
+};
+
+}
+
+}
+

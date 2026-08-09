@@ -1,19 +1,28 @@
 ﻿export class RiskFace {
 
-    name="RiskFace";
+name="RiskFace";
 
-    initialize(){
-        console.log("RiskFace Started");
-    }
 
-    respond(input:string){
+initialize(){
 
-        return {
-            face:this.name,
-            input,
-            timestamp:new Date().toISOString()
-        };
-
-    }
+console.log("RiskFace initialized");
 
 }
+
+
+respond(input:string){
+
+return {
+
+face:this.name,
+
+input,
+
+timestamp:new Date().toISOString()
+
+};
+
+}
+
+}
+

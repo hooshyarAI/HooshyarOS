@@ -1,19 +1,28 @@
 ﻿export class DecisionFace {
 
-    name="DecisionFace";
+name="DecisionFace";
 
-    initialize(){
-        console.log("DecisionFace Started");
-    }
 
-    respond(input:string){
+initialize(){
 
-        return {
-            face:this.name,
-            input,
-            timestamp:new Date().toISOString()
-        };
-
-    }
+console.log("DecisionFace initialized");
 
 }
+
+
+respond(input:string){
+
+return {
+
+face:this.name,
+
+input,
+
+timestamp:new Date().toISOString()
+
+};
+
+}
+
+}
+

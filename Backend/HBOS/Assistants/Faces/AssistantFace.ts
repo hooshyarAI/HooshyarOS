@@ -1,19 +1,28 @@
 ﻿export class AssistantFace {
 
-    name="AssistantFace";
+name="AssistantFace";
 
-    initialize(){
-        console.log("AssistantFace Started");
-    }
 
-    respond(input:string){
+initialize(){
 
-        return {
-            face:this.name,
-            input,
-            timestamp:new Date().toISOString()
-        };
-
-    }
+console.log("AssistantFace initialized");
 
 }
+
+
+respond(input:string){
+
+return {
+
+face:this.name,
+
+input,
+
+timestamp:new Date().toISOString()
+
+};
+
+}
+
+}
+

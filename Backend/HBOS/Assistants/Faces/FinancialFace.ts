@@ -1,19 +1,28 @@
 ﻿export class FinancialFace {
 
-    name="FinancialFace";
+name="FinancialFace";
 
-    initialize(){
-        console.log("FinancialFace Started");
-    }
 
-    respond(input:string){
+initialize(){
 
-        return {
-            face:this.name,
-            input,
-            timestamp:new Date().toISOString()
-        };
-
-    }
+console.log("FinancialFace initialized");
 
 }
+
+
+respond(input:string){
+
+return {
+
+face:this.name,
+
+input,
+
+timestamp:new Date().toISOString()
+
+};
+
+}
+
+}
+

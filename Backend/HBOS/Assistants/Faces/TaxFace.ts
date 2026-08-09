@@ -1,19 +1,28 @@
 ﻿export class TaxFace {
 
-    name="TaxFace";
+name="TaxFace";
 
-    initialize(){
-        console.log("TaxFace Started");
-    }
 
-    respond(input:string){
+initialize(){
 
-        return {
-            face:this.name,
-            input,
-            timestamp:new Date().toISOString()
-        };
-
-    }
+console.log("TaxFace initialized");
 
 }
+
+
+respond(input:string){
+
+return {
+
+face:this.name,
+
+input,
+
+timestamp:new Date().toISOString()
+
+};
+
+}
+
+}
+

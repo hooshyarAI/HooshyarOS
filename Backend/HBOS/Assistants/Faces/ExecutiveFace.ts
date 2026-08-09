@@ -1,19 +1,28 @@
 ﻿export class ExecutiveFace {
 
-    name="ExecutiveFace";
+name="ExecutiveFace";
 
-    initialize(){
-        console.log("ExecutiveFace Started");
-    }
 
-    respond(input:string){
+initialize(){
 
-        return {
-            face:this.name,
-            input,
-            timestamp:new Date().toISOString()
-        };
-
-    }
+console.log("ExecutiveFace initialized");
 
 }
+
+
+respond(input:string){
+
+return {
+
+face:this.name,
+
+input,
+
+timestamp:new Date().toISOString()
+
+};
+
+}
+
+}
+

@@ -1,19 +1,28 @@
 ﻿export class AutonomousFace {
 
-    name="AutonomousFace";
+name="AutonomousFace";
 
-    initialize(){
-        console.log("AutonomousFace Started");
-    }
 
-    respond(input:string){
+initialize(){
 
-        return {
-            face:this.name,
-            input,
-            timestamp:new Date().toISOString()
-        };
-
-    }
+console.log("AutonomousFace initialized");
 
 }
+
+
+respond(input:string){
+
+return {
+
+face:this.name,
+
+input,
+
+timestamp:new Date().toISOString()
+
+};
+
+}
+
+}
+

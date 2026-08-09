@@ -1,19 +1,28 @@
 ﻿export class StrategyFace {
 
-    name="StrategyFace";
+name="StrategyFace";
 
-    initialize(){
-        console.log("StrategyFace Started");
-    }
 
-    respond(input:string){
+initialize(){
 
-        return {
-            face:this.name,
-            input,
-            timestamp:new Date().toISOString()
-        };
-
-    }
+console.log("StrategyFace initialized");
 
 }
+
+
+respond(input:string){
+
+return {
+
+face:this.name,
+
+input,
+
+timestamp:new Date().toISOString()
+
+};
+
+}
+
+}
+
