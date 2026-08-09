@@ -57,7 +57,8 @@ export interface ConstructionTool {
 export class AutonomousConstructionEngine {
     constructor(
         private readonly tools: ConstructionTool[],
-        private readonly maxRepairAttempts = 3;`n    private readonly repairEngine = new AutonomousRepairEngine()
+        private readonly maxRepairAttempts = 3,
+    private readonly repairEngine = new AutonomousRepairEngine()
     ) {}
 
     build(plan: ArchitecturePlan): ConstructionResult {
@@ -238,5 +239,6 @@ export class AutonomousConstructionEngine {
         }
     }
 }
+
 
 
