@@ -1,6 +1,6 @@
-﻿import { AutonomousMemoryEngine } from "../../Engines/AutonomousMemoryEngine";`r`n`r`nimport { AutonomousDevelopmentLoop } from "../../Architecture/Autonomous/AutonomousDevelopmentLoop";
-import { AutonomousMemoryEngine } from "../../Engines/AutonomousMemoryEngine";`r`n`r`nimport { AutonomousProjectMission } from "./AutonomousProjectMission";
-import { AutonomousMemoryEngine } from "../../Engines/AutonomousMemoryEngine";`r`n`r`nimport { createLocalConstructionTools } from "./LocalConstructionToolset";
+﻿import { AutonomousMemoryEngine } from "../../Engines/AutonomousMemoryEngine";`r`nimport { AutonomousDevelopmentLoop } from "../../Architecture/Autonomous/AutonomousDevelopmentLoop";
+import { AutonomousProjectMission } from "./AutonomousProjectMission";
+import { createLocalConstructionTools } from "./LocalConstructionToolset";
 
 export interface DaemonOptions {
     root?: string;
@@ -13,7 +13,13 @@ export interface DaemonOptions {
  * It observes the repository, derives the next mission, delegates implementation,
  * verifies it, repairs failures, commits/pushes successful work, then replans.
  */
-export class AutonomousBuildDaemon {`r`n`r`n    private memory=new AutonomousMemoryEngine();
+
+export class AutonomousBuildDaemon {
+
+    private maxCycles=1;
+
+
+    private memory=new AutonomousMemoryEngine();
     private readonly mission: AutonomousProjectMission;
     private readonly development: AutonomousDevelopmentLoop;
     private readonly maxCycles: number;
@@ -72,5 +78,9 @@ if (require.main === module) {
     const result = new AutonomousBuildDaemon().run();
     process.exitCode = result.status === "blocked" ? 1 : 0;
 }
+
+
+
+
 
 
