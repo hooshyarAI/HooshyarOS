@@ -117,8 +117,18 @@ export class AutonomousConstructionEngine {
         }
 
         if (!verification.ok) {
-            issues.push(verification.issue || "VERIFICATION_FAILED");
-            return this.blocked("VERIFY", attempt, issues, trace);
+            
+issues.push(verification.issue || "VERIFICATION_FAILED");
+
+            return {
+                ok:false,
+                status:"BLOCKED",
+                stage:"VERIFY",
+                attempts:attempt,
+                selectedTool:this.toolFor("VERIFY").name,
+                issues,
+                trace
+            };
         }
 
         trace.push("FINALIZE");
@@ -235,6 +245,7 @@ export class AutonomousConstructionEngine {
         }
     }
 }
+
 
 
 

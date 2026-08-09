@@ -84,13 +84,15 @@ execute: (stage: ConstructionStage, context: ConstructionContext) => {
             issues:context.issues
         }));
 
-        return {
-            ok:true,
-            artifact:{
-                repaired:true,
-                action:"retry verification"
-            }
-        };
+        
+return {
+ ok:true,
+ artifact:{
+    repaired:true,
+    action:"repair completed",
+    verificationRetry:true
+ }
+};
     }
 
     return {ok:true};
@@ -115,6 +117,7 @@ execute: (stage: ConstructionStage, context: ConstructionContext) => {
         }
     ];
 }
+
 
 
 
