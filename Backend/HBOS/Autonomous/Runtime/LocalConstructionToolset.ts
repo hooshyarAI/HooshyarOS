@@ -90,7 +90,7 @@ if(stage==="VERIFY"){
 
 const test=run(
     "npx",
-    ["jest","--runInBand","--passWithNoTests","--config","./jest.config.js"],
+    ["jest","--runInBand","--config",".\jest.config.js"],
     root
 );
 
@@ -280,6 +280,7 @@ issue:"GIT_PUSH_FAILED"
 
 
 }
+
 
 
 
