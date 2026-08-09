@@ -1,4 +1,4 @@
-﻿import { AutonomousPlatform } from "../Platform/AutonomousPlatform";
+﻿import { AutonomousPlatform } from "../Autonomous/Platform/AutonomousPlatform";
 
 test("Autonomous Platform boot",()=>{
 
@@ -12,3 +12,4 @@ test("Autonomous Platform boot",()=>{
  expect(r.pipeline.length).toBe(5);
 
 });
+
