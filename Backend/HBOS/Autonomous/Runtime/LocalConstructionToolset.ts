@@ -17,7 +17,7 @@ if(process.platform==="win32" && command==="npx"){
     command="npx.cmd";
 }
 
-        const output=execFileSync(command,args,{
+        const output=execSync(command,args,{
             cwd,
             encoding:"utf8",
             timeout,
@@ -316,6 +316,7 @@ issue:"GIT_PUSH_FAILED"
 
 
 }
+
 
 
 
