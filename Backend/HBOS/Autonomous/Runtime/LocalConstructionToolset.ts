@@ -268,7 +268,7 @@ root
 
 
 
-console.log("HBOS_GIT_COMMIT_DEBUG", JSON.stringify(commit));`n`nif(!commit.ok)
+if(!commit.ok)
 return {
 
 ok:false,
@@ -316,7 +316,6 @@ issue:"GIT_PUSH_FAILED"
 
 
 }
-
 
 
 
