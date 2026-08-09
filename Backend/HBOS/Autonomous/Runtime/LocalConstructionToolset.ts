@@ -12,6 +12,11 @@ function run(
     timeout=15*60*1000
 ){
     try{
+
+if(process.platform==="win32" && command==="npx"){
+    command="npx.cmd";
+}
+
         const output=execFileSync(command,args,{
             cwd,
             encoding:"utf8",
@@ -311,6 +316,7 @@ issue:"GIT_PUSH_FAILED"
 
 
 }
+
 
 
 
