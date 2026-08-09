@@ -1,0 +1,9 @@
+﻿export enum AssistantLifecycle {
+
+BOOTING="BOOTING",
+READY="READY",
+EXECUTING="EXECUTING",
+LEARNING="LEARNING",
+FAILED="FAILED"
+
+}
