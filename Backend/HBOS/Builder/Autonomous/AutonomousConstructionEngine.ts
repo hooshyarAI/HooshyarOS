@@ -89,7 +89,19 @@ export class AutonomousConstructionEngine {
         }
 
         trace.push("VERIFY");
-        let verification = this.execute("VERIFY", plan, attempt, artifacts, issues);
+        let 
+verification = this.execute(
+    "VERIFY",
+    plan,
+    attempt,
+    artifacts,
+    issues
+);
+
+if (verification.ok) {
+    issues.length = 0;
+}
+
 
         while (!verification.ok && attempt < this.maxRepairAttempts) {
             attempt += 1;
@@ -113,12 +125,25 @@ export class AutonomousConstructionEngine {
             }
 
             trace.push("VERIFY");
-            verification = this.execute("VERIFY", plan, attempt, artifacts, issues);
+            
+verification = this.execute(
+    "VERIFY",
+    plan,
+    attempt,
+    artifacts,
+    issues
+);
+
+if (verification.ok) {
+    issues.length = 0;
+}
+
         }
 
-        if (!verification.ok) {
-            
-issues.push(verification.issue || "VERIFICATION_FAILED");
+        
+if (!verification.ok) {
+    issues.push(verification.issue || "VERIFICATION_FAILED");
+
 
             return {
                 ok:false,
@@ -245,6 +270,7 @@ issues.push(verification.issue || "VERIFICATION_FAILED");
         }
     }
 }
+
 
 
 

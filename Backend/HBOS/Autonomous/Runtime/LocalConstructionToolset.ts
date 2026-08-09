@@ -96,7 +96,13 @@ const test=run(
 
 
 
+
 if(test.ok){
+    console.log(JSON.stringify({
+        type:"AUTONOMOUS_VERIFY_PASS",
+        message:"Jest verification passed"
+    }));
+
 
 return {
 
@@ -268,5 +274,6 @@ issue:"GIT_PUSH_FAILED"
 
 
 }
+
 
 
