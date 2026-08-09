@@ -18,9 +18,25 @@ export interface Mission {
     targetEngine: string;
     evidence: ProjectSnapshot;
     directives: string[];
+    dependencies: string[];
+    architectureRules: string[];
 }
 
-/** Converts the current repository state into the next architecture-driven construction mission. */
+interface CapabilityDefinition {
+    id: string;
+    capability: string;
+    targetEngine: string;
+    dependencies: string[];
+    requiredPaths: string[];
+    evidencePaths?: string[];
+}
+
+/**
+ * Converts repository state and Architecture Freeze V4 into one concrete,
+ * implementation-ready capability. The planner is deliberately deterministic:
+ * it never invents an engine and it advances through the canonical architecture
+ * backlog in order, skipping capabilities already present in the repository.
+ */
 export class AutonomousProjectMission {
     constructor(private readonly root = process.cwd()) {}
 
@@ -44,7 +60,7 @@ export class AutonomousProjectMission {
             commit: git(["rev-parse", "--short", "HEAD"]),
             clean: git(["status", "--porcelain"]) === "",
             architectureFiles,
-            engineCount: this.countDirectories(join(this.root, "Backend", "HBOS", "Engine")),
+            engineCount: this.countDirectories(join(this.root, "Backend", "HBOS", "Engines")),
             runtimeFileCount: existsSync(runtimeRoot) ? this.walk(runtimeRoot).length : 0,
             latestCommits: git(["log", "--oneline", "-12"]).split(/\r?\n/).filter(Boolean)
         };
@@ -52,30 +68,126 @@ export class AutonomousProjectMission {
 
     nextMission(): Mission {
         const evidence = this.snapshot();
-        const architectureText = this.readArchitectureEvidence();
-        const hasAutonomousBuilder = existsSync(join(this.root, "Backend", "HBOS", "Autonomous", "Loop", "AutonomousBuilderLoop.ts"))
-            || architectureText.includes("AutonomousBuilderLoop");
-        const hasSelfHealing = existsSync(join(this.root, "Backend", "HBOS", "Architecture", "Repair", "AutoFixEngine.ts"))
-            || architectureText.includes("Self-Healing Construction Mode");
+        const backlog = this.capabilityBacklog();
+        const next = backlog.find(capability => !this.isCapabilityImplemented(capability));
 
-        let capability = "continue architecture-driven autonomous construction";
-        if (!hasAutonomousBuilder) capability = "activate architecture-driven autonomous builder";
-        else if (!hasSelfHealing) capability = "activate autonomous self-healing and verification";
-        else if (!evidence.clean) capability = "repair and verify the current working tree";
+        if (next) {
+            return {
+                capabilityId: next.id,
+                capability: next.capability,
+                targetEngine: next.targetEngine,
+                evidence,
+                dependencies: next.dependencies,
+                architectureRules: this.architectureRules(),
+                directives: this.directives()
+            };
+        }
+
+        if (!evidence.clean) {
+            return {
+                capabilityId: `repair-${evidence.commit || "workspace"}`,
+                capability: "repair and verify the current working tree",
+                targetEngine: "Autonomous Operations Engine",
+                evidence,
+                dependencies: [],
+                architectureRules: this.architectureRules(),
+                directives: this.directives()
+            };
+        }
 
         return {
-            capabilityId: `auto-${evidence.commit || "workspace"}`,
-            capability,
+            capabilityId: `continue-${evidence.commit || "workspace"}`,
+            capability: "continue architecture-driven autonomous platform construction",
             targetEngine: "Autonomous Operations Engine",
             evidence,
+            dependencies: [],
+            architectureRules: this.architectureRules(),
             directives: [
-                "Read the final architecture and existing implementation before changing code",
-                "Reuse existing capabilities; do not create duplicate engines",
-                "Generate, verify, repair and re-verify autonomously",
-                "Preserve Architecture Freeze V4 unless an explicit architecture defect is proven",
-                "Keep the repository buildable after every completed capability"
+                ...this.directives(),
+                "Do not produce an idle cycle: inspect the architecture backlog and identify the next missing concrete capability."
             ]
         };
+    }
+
+    private capabilityBacklog(): CapabilityDefinition[] {
+        return [
+            {
+                id: "engine.reasoning.canonical",
+                capability: "implement the canonical Reasoning Engine for HBOS",
+                targetEngine: "Reasoning Engine",
+                dependencies: ["Memory Engine", "Knowledge Engine", "Decision Engine"],
+                requiredPaths: [join(this.root, "Backend", "HBOS", "Engines", "ReasoningEngine.ts")],
+                evidencePaths: [join(this.root, "Backend", "AI_Runtime", "reasoning", "reasoning_engine.py")]
+            },
+            {
+                id: "engine.organizational.canonical",
+                capability: "implement the canonical Organizational Intelligence Engine for HBOS",
+                targetEngine: "Organizational Intelligence Engine",
+                dependencies: ["Memory Engine", "Knowledge Engine", "Project Pilot Engine"],
+                requiredPaths: [join(this.root, "Backend", "HBOS", "Engines", "OrganizationalIntelligenceEngine.ts")]
+            },
+            {
+                id: "engine.autonomous-operations.canonical",
+                capability: "implement the canonical Autonomous Operations Engine for HBOS",
+                targetEngine: "Autonomous Operations Engine",
+                dependencies: ["Governance Engine", "Decision Engine", "Project Pilot Engine", "Health Monitor Engine"],
+                requiredPaths: [join(this.root, "Backend", "HBOS", "Engines", "AutonomousOperationsEngine.ts")]
+            },
+            {
+                id: "runtime.reasoning.bridge",
+                capability: "integrate the existing Python reasoning runtime with the canonical HBOS Reasoning Engine",
+                targetEngine: "Reasoning Engine",
+                dependencies: ["Reasoning Engine", "AI Runtime"],
+                requiredPaths: [join(this.root, "Backend", "HBOS", "Engines", "ReasoningEngine.ts")]
+            },
+            {
+                id: "runtime.executive.bridge",
+                capability: "integrate KPI and executive intelligence runtime capabilities with Executive Intelligence Engine",
+                targetEngine: "Executive Intelligence Engine",
+                dependencies: ["Executive Intelligence Engine", "AI Runtime", "KPI Intelligence"],
+                requiredPaths: [join(this.root, "Backend", "HBOS", "Engines", "ExecutiveIntelligenceEngine.ts")],
+                evidencePaths: [join(this.root, "Backend", "AI_Runtime", "kpi_engine", "kpi_engine.py")]
+            },
+            {
+                id: "runtime.governance.bridge",
+                capability: "integrate governance, compliance and audit runtime capabilities with Governance Engine",
+                targetEngine: "Governance Engine",
+                dependencies: ["Governance Engine", "Knowledge Engine", "AI Runtime"],
+                requiredPaths: [join(this.root, "Backend", "HBOS", "Engines", "GovernanceEngine.ts")]
+            }
+        ];
+    }
+
+    private isCapabilityImplemented(capability: CapabilityDefinition): boolean {
+        const required = capability.requiredPaths.every(existsSync);
+        if (!required) return false;
+
+        if (!capability.evidencePaths || capability.evidencePaths.length === 0) return true;
+        return capability.evidencePaths.some(existsSync);
+    }
+
+    private architectureRules(): string[] {
+        return [
+            "Architecture Freeze V4",
+            "Five Main Intelligence Engines remain canonical",
+            "Everything is an Engine",
+            "One Capability = One Engine = One Test = One Commit",
+            "Reuse existing capabilities; do not create duplicate engines",
+            "Every completed engine requires identity, lifecycle, health monitoring, test coverage and documentation"
+        ];
+    }
+
+    private directives(): string[] {
+        return [
+            "Read Docs/ARCHITECTURE.md and existing engine implementations before changing code",
+            "Inspect the existing AI Runtime before creating a new implementation",
+            "Implement exactly ONE concrete capability from the canonical backlog",
+            "Create or update the focused implementation, focused test and documentation required by the architecture",
+            "Run focused verification followed by the full Jest suite",
+            "Repair verification failures before finalization",
+            "Do not stop at a plan or report; produce a real repository change when the selected capability is missing",
+            "Do not redesign Architecture Freeze V4"
+        ];
     }
 
     private readArchitectureEvidence(): string {
