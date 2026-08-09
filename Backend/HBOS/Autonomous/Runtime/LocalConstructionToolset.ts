@@ -273,7 +273,7 @@ return {
 
 ok:false,
 
-issue:"GIT_COMMIT_FAILED"
+issue:"GIT_COMMIT_WARNING"
 
 };
 
@@ -316,6 +316,7 @@ issue:"GIT_PUSH_FAILED"
 
 
 }
+
 
 
 
