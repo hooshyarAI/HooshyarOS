@@ -1,17 +1,19 @@
 ﻿export class AssistantHealthMonitor {
 
+
 check(){
 
 return {
 
-assistant:true,
-memory:true,
-reasoning:true,
-governance:true,
-status:"HEALTHY"
+healthy:true,
+
+status:"READY",
+
+timestamp:new Date().toISOString()
 
 };
 
 }
+
 
 }
