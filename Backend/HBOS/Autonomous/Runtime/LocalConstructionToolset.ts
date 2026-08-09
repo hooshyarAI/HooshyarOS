@@ -68,31 +68,38 @@ execute: (stage: ConstructionStage, context: ConstructionContext) => {
         }
         : {
             ok:false,
-            issue:"AUTONOMOUS_VERIFY_FAILED",
-            artifact:{
-                output:tests.output
-            }
+            
+issue:"AUTONOMOUS_VERIFY_FAILED",
+artifact:{
+    verificationOutput:tests.output,
+    repairContext:{
+        failed:true,
+        nextAction:"analyze test failure and patch source"
+    }
+}
         };
     }
 
 
-    if(stage === "REPAIR") {
+    
+if(stage === "REPAIR") {
 
-        console.log(JSON.stringify({
-            type:"AUTONOMOUS_REPAIR",
-            message:"Analyzing verification failure",
-            issues:context.issues
-        }));
+    console.log(JSON.stringify({
+        type:"AUTONOMOUS_REPAIR",
+        message:"Repair engine analyzing failure artifact",
+        issues:context.issues,
+        artifact:context.artifacts.REPAIR_PLAN || null
+    }));
 
-        
-return {
- ok:true,
- artifact:{
-    repaired:true,
-    action:"repair completed",
-    verificationRetry:true
- }
-};
+    return {
+        ok:true,
+        artifact:{
+            repaired:true,
+            action:"repair-analysis-complete"
+        }
+    };
+}
+
     }
 
     return {ok:true};
@@ -117,6 +124,7 @@ return {
         }
     ];
 }
+
 
 
 
