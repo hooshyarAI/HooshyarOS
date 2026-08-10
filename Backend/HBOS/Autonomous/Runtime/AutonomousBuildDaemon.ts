@@ -51,9 +51,6 @@ export class AutonomousBuildDaemon {
                     message: "All current canonical Assistant construction capabilities are present and the repository is clean."
                 }));
 
-                // The completion gate is evidence only. The continuation object
-                // must select the next real platform capability; it is never
-                // submitted to the Builder as a fake capability.
                 const continuation = this.continuation.createMission();
                 const nextPlatform = this.continuation.selectNextCapability(this.mission);
                 if (!nextPlatform) {
@@ -78,19 +75,31 @@ export class AutonomousBuildDaemon {
                 const result = this.development.execute(nextPlatform);
                 history.push({ cycle, commit: before.commit, mission: nextPlatform.capability, assistantGatePassed, result });
 
+                const after = this.mission.snapshot();
+                if (!result.result.ok) {
+                    console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, result }));
+                    return { status: "blocked", cycles: cycle, history };
+                }
+
+                if (after.commit === before.commit && after.clean) {
+                    console.log(JSON.stringify({
+                        type: "AUTONOMOUS_IDLE",
+                        cycle,
+                        commit: after.commit,
+                        capability: nextPlatform.capability,
+                        message: "Continuation produced no repository change; refusing to advance as if the capability were completed."
+                    }));
+                    return { status: "idle", cycles: cycle, history };
+                }
+
                 if (cycle % this.reportEvery === 0) {
                     console.log(JSON.stringify({
                         type: "AUTONOMOUS_PROGRESS",
                         cycle,
-                        latestCommit: this.mission.snapshot().commit,
+                        latestCommit: after.commit,
                         status: result.status,
                         assistantGatePassed
                     }));
-                }
-
-                if (!result.result.ok) {
-                    console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, result }));
-                    return { status: "blocked", cycles: cycle, history };
                 }
 
                 continue;
