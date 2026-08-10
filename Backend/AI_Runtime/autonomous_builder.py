@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import re
 from pathlib import Path
+
 ROOT = Path(__file__).resolve().parents[2]
 
 REASONING_ENGINE = '''import { execFileSync } from "node:child_process";\nimport { Engine } from "../Core/Engine";\nexport interface ReasoningResult { problem: string; status: string; success: boolean; }\nexport class ReasoningEngine implements Engine { name = "ReasoningEngine"; initialize(): void {} health(): boolean { return true; } reason(problem: string): ReasoningResult { if (!problem || !problem.trim()) return { problem, status: "invalid_problem", success: false }; const python = process.env.HOOSHYAR_PYTHON || "python"; const script = ["import json, sys", "from Backend.AI_Runtime.reasoning.reasoning_engine import ReasoningEngine as PythonReasoningEngine", "result = PythonReasoningEngine().reason(sys.argv[1])", "print(json.dumps(result, ensure_ascii=False))"].join("; "); try { const raw = execFileSync(python, ["-c", script, problem], { cwd: process.cwd(), encoding: "utf8", windowsHide: true, stdio: ["ignore", "pipe", "pipe"] }).trim(); const result = JSON.parse(raw) as { problem: string; status: string }; return { problem: result.problem, status: result.status, success: true }; } catch { return { problem, status: "reasoning_failed", success: false }; } } }\n'''
@@ -24,6 +25,12 @@ PLATFORM_CAPABILITIES = {
     "platform.security-layer": "SecurityLayerEngine",
 }
 
+PLATFORM_DEPENDENCIES = {
+    "platform.user-management": [],
+    "platform.organization-model": ["Backend/HBOS/Engines/UserManagementEngine.ts", "Backend/HBOS/test/UserManagementEngine.test.ts", "Docs/Engines/UserManagementEngine.md"],
+    "platform.security-layer": ["Backend/HBOS/Engines/UserManagementEngine.ts", "Backend/HBOS/test/UserManagementEngine.test.ts", "Backend/HBOS/Engines/OrganizationModelEngine.ts", "Backend/HBOS/test/OrganizationModelEngine.test.ts", "Docs/Engines/UserManagementEngine.md", "Docs/Engines/OrganizationModelEngine.md"],
+}
+
 def platform_artifacts(capability_id: str):
     engine = PLATFORM_CAPABILITIES[capability_id]
     method = {"UserManagementEngine":"registerUser","OrganizationModelEngine":"createOrganization","SecurityLayerEngine":"authorize"}[engine]
@@ -35,7 +42,7 @@ def platform_artifacts(capability_id: str):
     }
     engine_code = f'''import {{ Engine }} from "../Core/Engine";\n\nexport class {engine} implements Engine {{\n    name = "{engine}";\n    initialize(): void {{}}\n    health(): boolean {{ return true; }}\n    {method}(value: string): {{ value: string; status: "READY" | "BLOCKED" }} {{\n        const status = value && value.trim() ? "READY" : "BLOCKED";\n        return {{ value, status }};\n    }}\n}}\n'''
     test_code = f'''import {{ {engine} }} from "../Engines/{engine}";\n\ndescribe("{engine}", () => {{\n    it("accepts its canonical minimal operation", () => {{\n        expect(new {engine}().{method}("{test_input}").status).toBe("READY");\n    }});\n    it("blocks an empty operation", () => {{\n        expect(new {engine}().{method}(" ").status).toBe("BLOCKED");\n    }});\n}});\n'''
-    return [(f"Backend/HBOS/Engines/{engine}.ts", engine_code),(f"Backend/HBOS/test/{engine}.test.ts", test_code),(f"Docs/Engines/{engine}.md", capability_docs[engine])]
+    return [(f"Backend/HBOS/Engines/{engine}.ts", engine_code), (f"Backend/HBOS/test/{engine}.test.ts", test_code), (f"Docs/Engines/{engine}.md", capability_docs[engine])]
 
 CAPABILITIES = {
     "engine.reasoning.canonical": [("Backend/HBOS/Engines/ReasoningEngine.ts", REASONING_ENGINE),("Backend/HBOS/test/ReasoningEngine.test.ts", REASONING_TEST)],
@@ -57,17 +64,24 @@ def main() -> int:
     if artifacts is None:
         print(f"Unsupported deterministic capability: {capability_id}")
         return 2
-    generated=[]
+
+    missing_dependencies = [path for path in PLATFORM_DEPENDENCIES.get(capability_id, []) if not (ROOT / path).exists()]
+    if missing_dependencies:
+        print(f"Blocked by unmet dependencies for {capability_id}: {', '.join(missing_dependencies)}")
+        return 3
+
+    generated = []
     for relative_path, content in artifacts:
-        target=ROOT/relative_path
-        if target.exists(): continue
-        target.parent.mkdir(parents=True,exist_ok=True)
-        target.write_text(content,encoding="utf-8")
+        target = ROOT / relative_path
+        if target.exists():
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
         generated.append(relative_path)
     if not generated:
         print(f"Already implemented: {capability_id}")
         return 0
-    print("Generated: "+", ".join(generated))
+    print("Generated: " + ", ".join(generated))
     return 0
 
 if __name__ == "__main__":
