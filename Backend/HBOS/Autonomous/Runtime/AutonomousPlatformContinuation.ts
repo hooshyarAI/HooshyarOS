@@ -7,6 +7,8 @@ export interface PlatformContinuationMission {
     source: "assistant.completion.gate";
 }
 
+export type PlatformCapabilityMission = Omit<Mission, "evidence" | "architectureRules" | "directives">;
+
 /**
  * Canonical handoff from the completed autonomous Assistant to continued
  * HooshyarOS platform construction. The Assistant owns orchestration; the
@@ -26,15 +28,7 @@ export class AutonomousPlatformContinuation {
      * Converts the completion handoff into a real backlog mission. A
      * continuation must never be treated as a build capability itself.
      */
-    selectNextCapability(projectMission: AutonomousProjectMission): Mission | null {
-        const next = projectMission.nextPlatformMission();
-        if (!next) return null;
-
-        return {
-            ...next,
-            evidence: projectMission.snapshot(),
-            architectureRules: [],
-            directives: []
-        };
+    selectNextCapability(projectMission: AutonomousProjectMission): PlatformCapabilityMission | null {
+        return projectMission.nextPlatformMission();
     }
 }
