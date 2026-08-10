@@ -27,22 +27,8 @@ function run(command: string, args: string[], cwd: string, timeout = 15 * 60 * 1
     } catch (error: any) {
         const stdout = String(error?.stdout || "");
         const stderr = String(error?.stderr || "");
-        console.error(JSON.stringify({
-            type: "AUTONOMOUS_TOOL_ERROR",
-            command,
-            args,
-            cwd,
-            exitCode: error?.status ?? 1,
-            stdout,
-            stderr,
-            message: error?.message ?? `${command} failed`
-        }, null, 2));
-        return {
-            ok: false,
-            code: error?.status ?? 1,
-            output: `${stdout}\n${stderr}`,
-            error: error?.message ?? `${command} failed`
-        };
+        console.error(JSON.stringify({ type: "AUTONOMOUS_TOOL_ERROR", command, args, cwd, exitCode: error?.status ?? 1, stdout, stderr, message: error?.message ?? `${command} failed` }, null, 2));
+        return { ok: false, code: error?.status ?? 1, output: `${stdout}\n${stderr}`, error: error?.message ?? `${command} failed` };
     }
 }
 
@@ -58,7 +44,6 @@ function commandExists(command: string, cwd: string): boolean {
 
 export type ImplementationAgent = "python";
 
-/** The only autonomous implementation provider is the repository-owned Python AI Runtime. */
 export function resolveImplementationAgent(root = process.cwd()): ImplementationAgent | null {
     const requested = process.env.HOOSHYAR_AGENT?.trim().toLowerCase();
     if (requested && requested !== "python") return null;
@@ -93,57 +78,23 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
     return [
         {
             name: "architecture",
-            execute: (_stage, context) => ({
-                ok: Boolean(context.plan.capabilityId && context.plan.capability && context.plan.targetEngine),
-                artifact: { approved: true }
-            })
+            execute: (_stage, context) => ({ ok: Boolean(context.plan.capabilityId && context.plan.capability && context.plan.targetEngine), artifact: { approved: true } })
         },
         {
             name: "generator",
             execute: (stage, context) => {
                 if (stage !== "GENERATE") return { ok: true };
-
                 const before = run("git", ["status", "--porcelain=v1"], root);
                 if (!before.ok) return { ok: false, issue: "AUTONOMOUS_REPOSITORY_STATE_UNAVAILABLE", artifact: before };
-                if (before.output.trim()) {
-                    return {
-                        ok: false,
-                        issue: "AUTONOMOUS_WORKTREE_DIRTY",
-                        artifact: { type: "AUTONOMOUS_REPOSITORY_STATE_RESULT", stage: "BEFORE_GENERATION", clean: false, output: before.output }
-                    };
-                }
+                if (before.output.trim()) return { ok: false, issue: "AUTONOMOUS_WORKTREE_DIRTY", artifact: { clean: false, output: before.output } };
 
                 const agent = resolveImplementationAgent(root);
-                if (!agent) {
-                    const artifact = {
-                        type: "AUTONOMOUS_AGENT_GENERATION_RESULT",
-                        provider: null,
-                        capabilityId: context.plan.capabilityId,
-                        changed: false,
-                        output: "",
-                        error: "Repository-owned Python AI Runtime is not available. External coding CLIs are not supported.",
-                        timestamp: new Date().toISOString()
-                    };
-                    console.log(JSON.stringify(artifact, null, 2));
-                    return { ok: false, issue: "AUTONOMOUS_AGENT_UNAVAILABLE", artifact };
-                }
-
+                if (!agent) return { ok: false, issue: "AUTONOMOUS_AGENT_UNAVAILABLE", artifact: { provider: null, changed: false } };
                 const result = run(agent, buildAgentArgs(agent, buildAgentPrompt(context)), root, 30 * 60 * 1000);
                 const after = run("git", ["status", "--porcelain=v1"], root);
                 const changed = after.ok && repositoryStateChanged(before.output, after.output);
-                const artifact = {
-                    type: "AUTONOMOUS_AGENT_GENERATION_RESULT",
-                    provider: agent,
-                    capabilityId: context.plan.capabilityId,
-                    capability: context.plan.capability,
-                    exitCode: result.code,
-                    changed,
-                    output: result.output,
-                    error: result.error,
-                    timestamp: new Date().toISOString()
-                };
+                const artifact = { type: "AUTONOMOUS_AGENT_GENERATION_RESULT", provider: agent, capabilityId: context.plan.capabilityId, capability: context.plan.capability, exitCode: result.code, changed, output: result.output, error: result.error, timestamp: new Date().toISOString() };
                 console.log(JSON.stringify(artifact, null, 2));
-
                 if (!result.ok) return { ok: false, issue: "AUTONOMOUS_AGENT_GENERATION_FAILED", artifact };
                 if (!after.ok) return { ok: false, issue: "AUTONOMOUS_REPOSITORY_STATE_UNAVAILABLE", artifact };
                 if (!changed) return { ok: false, issue: "AUTONOMOUS_AGENT_NO_REPOSITORY_CHANGE", artifact };
@@ -152,52 +103,33 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
         },
         {
             name: "python",
-            execute: (stage) => {
+            execute: (stage, context) => {
                 if (stage === "VERIFY") {
-                    const syntax = run("python", ["-m", "py_compile", "Backend/AI_Runtime/autonomous_builder.py", "Backend/AI_Runtime/reasoning/reasoning_engine.py"], root);
-                    if (!syntax.ok) {
-                        const artifact = {
-                            type: "AUTONOMOUS_PYTHON_VERIFY_RESULT",
-                            syntaxVerified: false,
-                            jestVerified: false,
-                            exitCode: syntax.code,
-                            output: syntax.output,
-                            error: syntax.error,
-                            timestamp: new Date().toISOString()
-                        };
-                        console.log(JSON.stringify(artifact, null, 2));
-                        return { ok: false, issue: "AUTONOMOUS_PYTHON_SYNTAX_VERIFY_FAILED", artifact };
-                    }
+                    const syntax = run("python", ["-m", "compileall", "-q", "Backend/AI_Runtime"], root);
+                    if (!syntax.ok) return { ok: false, issue: "AUTONOMOUS_PYTHON_SYNTAX_VERIFY_FAILED", artifact: { syntaxVerified: false, output: syntax.output, error: syntax.error } };
 
-                    const test = run("npx", ["jest", "--runInBand", "--config", ".\\jest.config.js"], root);
-                    const verificationArtifact = {
+                    const builderTests = run("python", ["-m", "pytest", "Backend/AI_Runtime/tests/test_autonomous_builder_platform.py", "-q"], root);
+                    if (!builderTests.ok) return { ok: false, issue: "AUTONOMOUS_BUILDER_TESTS_FAILED", artifact: { syntaxVerified: true, builderTestsVerified: false, output: builderTests.output, error: builderTests.error } };
+
+                    const jest = run("npx", ["jest", "--runInBand", "--config", ".\\jest.config.js"], root);
+                    const artifact = {
                         type: "AUTONOMOUS_VERIFY_RESULT",
-                        command: "python -m py_compile + jest",
-                        exitCode: test.code,
+                        command: "compileall + pytest autonomous builder + jest",
                         syntaxVerified: true,
-                        jestVerified: test.code === 0,
-                        verified: test.code === 0,
+                        builderTestsVerified: builderTests.code === 0,
+                        jestVerified: jest.code === 0,
+                        verified: jest.code === 0,
                         timestamp: new Date().toISOString(),
-                        output: `${syntax.output}\n${test.output}`,
-                        error: test.error
+                        output: `${syntax.output}\n${builderTests.output}\n${jest.output}`,
+                        error: jest.error
                     };
-                    console.log(JSON.stringify(verificationArtifact, null, 2));
-                    return test.code === 0 ? { ok: true, artifact: verificationArtifact } : { ok: false, issue: "AUTONOMOUS_VERIFY_FAILED", artifact: { ...verificationArtifact, repairRequired: true } };
+                    console.log(JSON.stringify(artifact, null, 2));
+                    return jest.code === 0 ? { ok: true, artifact } : { ok: false, issue: "AUTONOMOUS_VERIFY_FAILED", artifact: { ...artifact, repairRequired: true } };
                 }
 
                 if (stage === "REPAIR") {
-                    return {
-                        ok: false,
-                        issue: "AUTONOMOUS_REPAIR_REQUIRES_REAL_FIX",
-                        artifact: {
-                            type: "AUTONOMOUS_REPAIR_RESULT",
-                            repaired: false,
-                            reason: "The repository-native worker has not produced a verified repair artifact; refusing to claim repair without a real repository change.",
-                            timestamp: new Date().toISOString()
-                        }
-                    };
+                    return { ok: false, issue: "AUTONOMOUS_REPAIR_REQUIRES_REAL_FIX", artifact: { type: "AUTONOMOUS_REPAIR_RESULT", repaired: false, reason: "No verified repair artifact exists; refusing to claim repair without a real repository change.", timestamp: new Date().toISOString() } };
                 }
-
                 return { ok: true };
             }
         },
@@ -208,13 +140,11 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                 const status = run("git", ["status", "--porcelain=v1"], root);
                 if (!status.ok) return { ok: false, issue: "GIT_STATUS_FAILED" };
                 if (!status.output.trim()) return { ok: false, issue: "GIT_NO_REPOSITORY_CHANGE", artifact: { clean: true, committed: false, pushed: false, changeDetected: false } };
-
                 const add = run("git", ["add", "-A"], root);
                 if (!add.ok) return { ok: false, issue: "GIT_ADD_FAILED" };
                 const staged = run("git", ["diff", "--cached", "--quiet"], root);
                 if (!staged.ok && staged.code !== 1) return { ok: false, issue: "GIT_STAGED_DIFF_CHECK_FAILED" };
                 if (staged.code === 0) return { ok: false, issue: "GIT_NO_STAGED_CHANGE", artifact: { clean: true, committed: false, pushed: false, changeDetected: false } };
-
                 const commit = run("git", ["commit", "-m", "feat(hbos): autonomous construction progress"], root);
                 if (!commit.ok) return { ok: false, issue: "GIT_COMMIT_FAILED" };
                 const push = run("git", ["push", "origin", "main"], root);
