@@ -1,5 +1,6 @@
 import { AutonomousDevelopmentLoop } from "../../Architecture/Autonomous/AutonomousDevelopmentLoop";
 import { AutonomousProjectMission } from "./AutonomousProjectMission";
+import { AutonomousPlatformContinuation } from "./AutonomousPlatformContinuation";
 import { createLocalConstructionTools } from "./LocalConstructionToolset";
 
 export interface DaemonOptions {
@@ -11,6 +12,7 @@ export interface DaemonOptions {
 export class AutonomousBuildDaemon {
     private readonly mission: AutonomousProjectMission;
     private readonly development: AutonomousDevelopmentLoop;
+    private readonly continuation = new AutonomousPlatformContinuation();
     private readonly maxCycles: number;
     private readonly reportEvery: number;
 
@@ -45,9 +47,15 @@ export class AutonomousBuildDaemon {
                     status: "PASSED",
                     message: "All current canonical Assistant construction capabilities are present and the repository is clean."
                 };
+                const continuation = this.continuation.createMission();
                 console.log(JSON.stringify(completion));
-                history.push({ cycle, commit: before.commit, mission: mission.capability, completion });
-                return { status: "completed", cycles: cycle, history };
+                console.log(JSON.stringify({
+                    type: "AUTONOMOUS_PLATFORM_CONTINUATION",
+                    cycle,
+                    mission: continuation
+                }));
+                history.push({ cycle, commit: before.commit, mission: mission.capability, completion, continuation });
+                return { status: "completed", cycles: cycle, history, continuation };
             }
 
             const result = this.development.execute({
