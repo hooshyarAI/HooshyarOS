@@ -89,6 +89,22 @@ export class AutonomousProjectMission {
             };
         }
 
+        if (!this.assistantCompletionEvidence()) {
+            return {
+                capabilityId: "assistant.completion.evidence",
+                capability: "complete missing Assistant evidence required by the completion gate",
+                targetEngine: "Autonomous Operations Engine",
+                evidence,
+                dependencies: ["Assistant Runtime", "Mission Controller", "Python Reasoning Adapter"],
+                architectureRules: this.architectureRules(),
+                directives: [
+                    ...this.directives(),
+                    "The completion gate must be evidence-based.",
+                    "Do not report Assistant completion until required implementation and focused tests are present."
+                ]
+            };
+        }
+
         return {
             capabilityId: "assistant.completion.gate",
             capability: "HooshyarOS Autonomous Assistant completion gate",
@@ -152,6 +168,8 @@ export class AutonomousProjectMission {
     private assistantCompletionEvidence(): boolean {
         const requiredPaths = [
             join(this.root, "Backend", "HBOS", "Assistant", "Autonomous", "AutonomousAssistantRuntime.ts"),
+            join(this.root, "Backend", "HBOS", "Assistant", "Autonomous", "AutonomousMissionController.ts"),
+            join(this.root, "Backend", "HBOS", "Assistant", "Autonomous", "HooshyarAutonomousAssistant.ts"),
             join(this.root, "Backend", "HBOS", "Assistant", "Autonomous", "PythonReasoningAdapter.ts"),
             join(this.root, "Backend", "HBOS", "Assistant", "Autonomous", "PersistentArchitectureMemory.ts"),
             join(this.root, "Backend", "HBOS", "Assistant", "Autonomous", "DecisionKnowledgeStore.ts"),
@@ -159,7 +177,10 @@ export class AutonomousProjectMission {
             join(this.root, "Backend", "HBOS", "Assistant", "Autonomous", "LearningFeedbackLoop.ts"),
             join(this.root, "Backend", "Builder", "Autonomous", "AutonomousProjectConductor.ts"),
             join(this.root, "Backend", "HBOS", "Autonomous", "Runtime", "LocalConstructionToolset.ts"),
-            join(this.root, "Backend", "HBOS", "Autonomous", "Runtime", "AutonomousBuildDaemon.ts")
+            join(this.root, "Backend", "HBOS", "Autonomous", "Runtime", "AutonomousBuildDaemon.ts"),
+            join(this.root, "Backend", "HBOS", "test", "AutonomousMissionController.test.ts"),
+            join(this.root, "Backend", "HBOS", "test", "AutonomousAssistantRuntime.test.ts"),
+            join(this.root, "Backend", "HBOS", "test", "HooshyarAutonomousAssistant.test.ts")
         ];
         return requiredPaths.every(existsSync);
     }
@@ -218,5 +239,5 @@ export class AutonomousProjectMission {
 if (require.main === module) {
     const mission = new AutonomousProjectMission();
     const next = mission.nextMission();
-    console.log(JSON.stringify({ ...next, assistantCompletionEvidence: (mission as any).assistantCompletionEvidence() }, null, 2));
+    console.log(JSON.stringify(next, null, 2));
 }
