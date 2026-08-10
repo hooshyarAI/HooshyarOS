@@ -68,7 +68,7 @@ export class AutonomousAssistant {
             executed: true,
             timestamp: new Date().toISOString()
         };
-        this.memory.remember?.(result);
+        this.remember(result);
         return result;
     }
 
