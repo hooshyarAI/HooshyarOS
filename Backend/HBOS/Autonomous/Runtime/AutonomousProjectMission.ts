@@ -192,18 +192,26 @@ export class AutonomousProjectMission {
             join(this.root, "Backend", "HBOS", "Autonomous", "Runtime", "LocalConstructionToolset.ts"),
             "utf8"
         );
-        const daemon = readFileSync(
-            join(this.root, "Backend", "HBOS", "Autonomous", "Runtime", "AutonomousBuildDaemon.ts"),
+        const developmentLoop = readFileSync(
+            join(this.root, "Backend", "HBOS", "Architecture", "Autonomous", "AutonomousDevelopmentLoop.ts"),
+            "utf8"
+        );
+        const controller = readFileSync(
+            join(this.root, "Backend", "Builder", "Autonomous", "ArchitectureDrivenBuildController.ts"),
             "utf8"
         );
 
         const pythonOnly = autonomousRuntime.includes('type ImplementationAgent = "python"')
             && autonomousRuntime.includes("Backend/AI_Runtime/autonomous_builder.py")
             && autonomousRuntime.includes("Do not invoke Copilot, Codex, Claude, or any cloud coding CLI.");
-        const lifecycle = ["ARCHITECTURE", "PLAN", "GENERATE", "VERIFY", "REPAIR", "FINALIZE"]
-            .every(stage => daemon.includes(stage));
+        const constructionLifecycle = ["GENERATE", "VERIFY", "REPAIR", "FINALIZE"]
+            .every(stage => autonomousRuntime.includes(stage));
+        const orchestrationLifecycle = developmentLoop.includes("this.planner.plan(goal)")
+            && developmentLoop.includes("controller.construct(plan.requirement)")
+            && controller.includes("ARCHITECTURE")
+            && controller.includes("PLAN");
 
-        return pythonOnly && lifecycle;
+        return pythonOnly && constructionLifecycle && orchestrationLifecycle;
     }
 
     private architectureRules(): string[] {
