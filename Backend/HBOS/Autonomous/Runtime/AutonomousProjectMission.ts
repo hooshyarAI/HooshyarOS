@@ -100,7 +100,8 @@ export class AutonomousProjectMission {
                 directives: [
                     ...this.directives(),
                     "The completion gate must be evidence-based.",
-                    "Do not report Assistant completion until required implementation and focused tests are present."
+                    "Verify required implementation and focused tests are present.",
+                    "Reject obsolete cloud coding providers from the autonomous construction path."
                 ]
             };
         }
@@ -115,6 +116,7 @@ export class AutonomousProjectMission {
             directives: [
                 ...this.directives(),
                 "All current canonical Assistant construction capabilities are present and the repository is clean.",
+                "The autonomous construction path is repository-native and Python-backed.",
                 "Do not start broad platform construction from this completion gate."
             ]
         };
@@ -184,7 +186,24 @@ export class AutonomousProjectMission {
             join(this.root, "Backend", "HBOS", "test", "HooshyarAutonomousAssistant.test.ts"),
             join(this.root, "Backend", "HBOS", "test", "PythonReasoningAdapter.test.ts")
         ];
-        return requiredPaths.every(existsSync);
+        if (!requiredPaths.every(existsSync)) return false;
+
+        const autonomousRuntime = readFileSync(
+            join(this.root, "Backend", "HBOS", "Autonomous", "Runtime", "LocalConstructionToolset.ts"),
+            "utf8"
+        );
+        const daemon = readFileSync(
+            join(this.root, "Backend", "HBOS", "Autonomous", "Runtime", "AutonomousBuildDaemon.ts"),
+            "utf8"
+        );
+
+        const pythonOnly = autonomousRuntime.includes('type ImplementationAgent = "python"')
+            && autonomousRuntime.includes("Backend/AI_Runtime/autonomous_builder.py")
+            && autonomousRuntime.includes("Do not invoke Copilot, Codex, Claude, or any cloud coding CLI.");
+        const lifecycle = ["ARCHITECTURE", "PLAN", "GENERATE", "VERIFY", "REPAIR", "FINALIZE"]
+            .every(stage => daemon.includes(stage));
+
+        return pythonOnly && lifecycle;
     }
 
     private architectureRules(): string[] {
@@ -209,16 +228,6 @@ export class AutonomousProjectMission {
             "Do not stop at a plan or report; produce a real repository change when the selected capability is missing",
             "Do not redesign Architecture Freeze V4"
         ];
-    }
-
-    private readArchitectureEvidence(): string {
-        const candidates = [
-            join(this.root, "Assistant", "SYSTEM_PROMPT.md"),
-            join(this.root, "Docs", "ARCHITECTURE.md"),
-            join(this.root, "ARCHITECTURE.md"),
-            join(this.root, "README.md")
-        ];
-        return candidates.filter(existsSync).map(file => readFileSync(file, "utf8")).join("\n");
     }
 
     private walk(root: string): string[] {
