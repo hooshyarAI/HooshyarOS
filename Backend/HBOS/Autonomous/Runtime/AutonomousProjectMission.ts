@@ -138,7 +138,10 @@ export class AutonomousProjectMission {
                 capability: "implement the canonical Reasoning Engine for HBOS",
                 targetEngine: "Reasoning Engine",
                 dependencies: ["Memory Engine", "Knowledge Engine", "Decision Engine"],
-                requiredPaths: [join(this.root, "Backend", "HBOS", "Engines", "ReasoningEngine.ts")],
+                requiredPaths: [
+                    join(this.root, "Backend", "HBOS", "Engines", "ReasoningEngine.ts"),
+                    join(this.root, "Backend", "HBOS", "test", "ReasoningEngine.test.ts")
+                ],
                 evidencePaths: [join(this.root, "Backend", "AI_Runtime", "reasoning", "reasoning_engine.py")]
             },
             {
@@ -146,14 +149,20 @@ export class AutonomousProjectMission {
                 capability: "implement the canonical Organizational Intelligence Engine for HBOS",
                 targetEngine: "Organizational Intelligence Engine",
                 dependencies: ["Memory Engine", "Knowledge Engine", "Project Pilot Engine"],
-                requiredPaths: [join(this.root, "Backend", "HBOS", "Engines", "OrganizationalIntelligenceEngine.ts")]
+                requiredPaths: [
+                    join(this.root, "Backend", "HBOS", "Engines", "OrganizationalIntelligenceEngine.ts"),
+                    join(this.root, "Backend", "HBOS", "test", "OrganizationalIntelligenceEngine.test.ts")
+                ]
             },
             {
                 id: "engine.autonomous-operations.canonical",
                 capability: "implement the canonical Autonomous Operations Engine for HBOS",
                 targetEngine: "Autonomous Operations Engine",
                 dependencies: ["Governance Engine", "Decision Engine", "Project Pilot Engine", "Health Monitor Engine"],
-                requiredPaths: [join(this.root, "Backend", "HBOS", "Engines", "AutonomousOperationsEngine.ts")]
+                requiredPaths: [
+                    join(this.root, "Backend", "HBOS", "Engines", "AutonomousOperationsEngine.ts"),
+                    join(this.root, "Backend", "HBOS", "test", "AutonomousOperationsEngine.test.ts")
+                ]
             },
             {
                 id: "runtime.reasoning.bridge",
