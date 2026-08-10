@@ -17,9 +17,10 @@ def test_platform_capability_generation_is_explicit_and_complete(tmp_path: Path,
     monkeypatch.setattr(autonomous_builder, "ROOT", tmp_path)
 
     artifacts = autonomous_builder.CAPABILITIES[capability_id]
-    assert len(artifacts) == 2
+    assert len(artifacts) == 3
     assert artifacts[0][0] == f"Backend/HBOS/Engines/{engine_name}.ts"
     assert artifacts[1][0] == f"Backend/HBOS/test/{engine_name}.test.ts"
+    assert artifacts[2][0] == f"Docs/Engines/{engine_name}.md"
 
     generated = []
     for relative_path, content in artifacts:
@@ -31,6 +32,13 @@ def test_platform_capability_generation_is_explicit_and_complete(tmp_path: Path,
     assert all(path.exists() for path in generated)
     assert f"class {engine_name}" in generated[0].read_text(encoding="utf-8")
     assert f'describe("{engine_name}"' in generated[1].read_text(encoding="utf-8")
+    assert engine_name.split("Engine")[0] in generated[2].read_text(encoding="utf-8")
+
+
+def test_platform_dependencies_block_premature_execution(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(autonomous_builder, "ROOT", tmp_path)
+    missing = [p for p in autonomous_builder.PLATFORM_DEPENDENCIES["platform.organization-model"] if not (tmp_path / p).exists()]
+    assert missing
 
 
 def test_unknown_platform_capability_is_not_invented():
