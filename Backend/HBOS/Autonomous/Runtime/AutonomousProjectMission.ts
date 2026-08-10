@@ -63,10 +63,6 @@ export class AutonomousProjectMission {
     nextMission(): Mission {
         const evidence = this.snapshot();
 
-        // The Assistant must reach its own evidence-based completion gate before
-        // the daemon is allowed to enter platform construction. This prevents a
-        // platform backlog item from accidentally bypassing unfinished Assistant
-        // capabilities.
         if (!this.assistantCompletionEvidence()) {
             const assistantNext = this.nextAssistantCapability();
             if (assistantNext) {
@@ -132,7 +128,6 @@ export class AutonomousProjectMission {
         };
     }
 
-    /** Selects the next real platform capability without manufacturing a placeholder mission. */
     nextPlatformMission(): Omit<Mission, "evidence" | "architectureRules" | "directives"> | null {
         const next = this.capabilityBacklog().find(capability => !this.isCapabilityImplemented(capability));
         if (!next) return null;
@@ -146,9 +141,6 @@ export class AutonomousProjectMission {
     }
 
     private nextAssistantCapability(): Omit<Mission, "evidence" | "architectureRules" | "directives"> | null {
-        // Keep the Assistant completion contract deterministic: if a required
-        // artifact is missing, the existing evidence mission repairs that gap;
-        // otherwise return null so completion evidence can be evaluated.
         const requiredPaths = [
             join(this.root, "Backend", "HBOS", "Assistant", "Autonomous", "AutonomousAssistantRuntime.ts"),
             join(this.root, "Backend", "HBOS", "Assistant", "Autonomous", "AutonomousMissionController.ts"),
@@ -264,10 +256,13 @@ export class AutonomousProjectMission {
             && developmentLoop.includes("controller.construct(plan.requirement)")
             && controller.includes("ARCHITECTURE")
             && controller.includes("PLAN");
+        const canonicalBacklog = this.capabilityBacklog().map(capability => capability.id);
+        const builderCoverage = canonicalBacklog.every(capabilityId => builder.includes(`\"${capabilityId}\"`));
         const localBuilderContract = builder.includes("argparse")
             && builder.includes("CAPABILITIES")
             && builder.includes("Capability ID:")
             && builder.includes("if not generated:")
+            && builderCoverage
             && !builder.includes("subprocess.run([\"copilot\"")
             && !builder.includes("subprocess.run([\"codex\"")
             && !builder.includes("subprocess.run([\"claude\"");
