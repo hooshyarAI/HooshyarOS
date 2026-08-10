@@ -58,7 +58,10 @@ export class AutonomousBuildDaemon {
             }
 
             const after = this.mission.snapshot();
-            if (after.commit === before.commit && after.clean) {
+            // A completion gate is a decision checkpoint, not a construction step.
+            // If it successfully selected a real platform capability, the absence of
+            // a commit at the gate must not be mistaken for an idle/finished state.
+            if (after.commit === before.commit && after.clean && !platformContinuation) {
                 console.log(JSON.stringify({ type: "AUTONOMOUS_IDLE", cycle, commit: after.commit, capability: mission.capability, message: "No repository change was produced; refusing to advance as completed." }));
                 return { status: "idle", cycles: cycle, history };
             }
