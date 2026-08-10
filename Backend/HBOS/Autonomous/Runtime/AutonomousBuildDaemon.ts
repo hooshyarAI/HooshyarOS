@@ -32,92 +32,7 @@ export class AutonomousBuildDaemon {
         for (let cycle = 1; cycle <= this.maxCycles; cycle += 1) {
             const before = this.mission.snapshot();
             const mission = this.mission.nextMission();
-
-            console.log(JSON.stringify({
-                type: "AUTONOMOUS_MISSION",
-                cycle,
-                commit: before.commit,
-                capability: mission.capability,
-                targetEngine: mission.targetEngine
-            }));
-
-            if (mission.capabilityId === "assistant.completion.gate") {
-                const gate = this.development.execute({
-                    capabilityId: mission.capabilityId,
-                    capability: mission.capability,
-                    targetEngine: mission.targetEngine,
-                    dependencies: mission.dependencies
-                });
-
-                history.push({ cycle, commit: before.commit, mission: mission.capability, assistantGatePassed, result: gate });
-
-                if (!gate.result.ok) {
-                    console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, stage: "assistant-completion-gate", result: gate }));
-                    return { status: "blocked", cycles: cycle, history };
-                }
-
-                assistantGatePassed = true;
-                console.log(JSON.stringify({
-                    type: "ASSISTANT_COMPLETION_GATE",
-                    cycle,
-                    commit: before.commit,
-                    status: "PASSED",
-                    message: "Assistant completion evidence verified; platform continuation is now unlocked."
-                }));
-
-                const continuation = this.continuation.createMission();
-                const nextPlatform = this.continuation.selectNextCapability(this.mission);
-                if (!nextPlatform) {
-                    console.log(JSON.stringify({
-                        type: "AUTONOMOUS_PLATFORM_COMPLETE",
-                        cycle,
-                        commit: before.commit,
-                        status: "completed",
-                        continuation,
-                        message: "Assistant completion gate passed and the canonical platform backlog is exhausted."
-                    }));
-                    return { status: "completed", cycles: cycle, history };
-                }
-
-                console.log(JSON.stringify({
-                    type: "AUTONOMOUS_PLATFORM_CONTINUATION",
-                    cycle,
-                    continuation,
-                    mission: nextPlatform
-                }));
-
-                const result = this.development.execute(nextPlatform);
-                history.push({ cycle, commit: before.commit, mission: nextPlatform.capability, assistantGatePassed, result });
-
-                const after = this.mission.snapshot();
-                if (!result.result.ok) {
-                    console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, result }));
-                    return { status: "blocked", cycles: cycle, history };
-                }
-
-                if (after.commit === before.commit && after.clean) {
-                    console.log(JSON.stringify({
-                        type: "AUTONOMOUS_IDLE",
-                        cycle,
-                        commit: after.commit,
-                        capability: nextPlatform.capability,
-                        message: "Continuation produced no repository change; refusing to advance as if the capability were completed."
-                    }));
-                    return { status: "idle", cycles: cycle, history };
-                }
-
-                if (cycle % this.reportEvery === 0) {
-                    console.log(JSON.stringify({
-                        type: "AUTONOMOUS_PROGRESS",
-                        cycle,
-                        latestCommit: after.commit,
-                        status: result.status,
-                        assistantGatePassed
-                    }));
-                }
-
-                continue;
-            }
+            console.log(JSON.stringify({ type: "AUTONOMOUS_MISSION", cycle, commit: before.commit, capability: mission.capability, targetEngine: mission.targetEngine }));
 
             const result = this.development.execute({
                 capabilityId: mission.capabilityId,
@@ -125,39 +40,39 @@ export class AutonomousBuildDaemon {
                 targetEngine: mission.targetEngine,
                 dependencies: mission.dependencies
             });
-
-            history.push({
-                cycle,
-                commit: before.commit,
-                mission: mission.capability,
-                assistantGatePassed,
-                result
-            });
-
-            if (cycle % this.reportEvery === 0) {
-                console.log(JSON.stringify({
-                    type: "AUTONOMOUS_PROGRESS",
-                    cycle,
-                    latestCommit: this.mission.snapshot().commit,
-                    status: result.status,
-                    assistantGatePassed
-                }));
-            }
+            history.push({ cycle, commit: before.commit, mission: mission.capability, assistantGatePassed, result });
 
             if (!result.result.ok) {
                 console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, result }));
                 return { status: "blocked", cycles: cycle, history };
             }
 
+            try {
+                AutonomousDevelopmentLoop.verifyCompletionEvidence(result);
+            } catch (error) {
+                console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, stage: "completion-evidence", error: String(error) }));
+                return { status: "blocked", cycles: cycle, history };
+            }
+
+            if (mission.capabilityId === "assistant.completion.gate") {
+                assistantGatePassed = true;
+                const continuation = this.continuation.createMission();
+                const nextPlatform = this.continuation.selectNextCapability(this.mission);
+                if (!nextPlatform) {
+                    console.log(JSON.stringify({ type: "AUTONOMOUS_PLATFORM_COMPLETE", cycle, status: "completed", continuation }));
+                    return { status: "completed", cycles: cycle, history };
+                }
+                console.log(JSON.stringify({ type: "AUTONOMOUS_PLATFORM_CONTINUATION", cycle, continuation, mission: nextPlatform }));
+            }
+
             const after = this.mission.snapshot();
             if (after.commit === before.commit && after.clean) {
-                console.log(JSON.stringify({
-                    type: "AUTONOMOUS_IDLE",
-                    cycle,
-                    commit: after.commit,
-                    message: "No repository change was produced by the selected construction capability."
-                }));
+                console.log(JSON.stringify({ type: "AUTONOMOUS_IDLE", cycle, commit: after.commit, capability: mission.capability, message: "No repository change was produced; refusing to advance as completed." }));
                 return { status: "idle", cycles: cycle, history };
+            }
+
+            if (cycle % this.reportEvery === 0) {
+                console.log(JSON.stringify({ type: "AUTONOMOUS_PROGRESS", cycle, latestCommit: after.commit, status: result.status, assistantGatePassed }));
             }
         }
 
