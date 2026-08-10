@@ -1,4 +1,4 @@
-﻿import { ArchitectureDrivenBuildController } from "../../Builder/Autonomous/ArchitectureDrivenBuildController";
+import { ArchitectureDrivenBuildController } from "../../Builder/Autonomous/ArchitectureDrivenBuildController";
 import { ConstructionResult, ConstructionTool } from "../../Builder/Autonomous/AutonomousConstructionEngine";
 import { GoalPlanner, GoalPlan } from "../Planner/GoalPlanner";
 
@@ -24,11 +24,9 @@ export class AutonomousDevelopmentLoop {
             result,
             status: result.ok ? "completed" : "blocked"
         };
-
         if (outcome.status === "completed") {
             AutonomousDevelopmentLoop.verifyCompletionEvidence(outcome);
         }
-
         return outcome;
     }
 
@@ -38,16 +36,13 @@ export class AutonomousDevelopmentLoop {
             { name: "python", execute: () => ({ ok: true }) },
             { name: "git", execute: () => ({ ok: true }) }
         ];
-
         const result = new AutonomousDevelopmentLoop(tools).execute({
             capabilityId: "autonomous-loop-test",
             capability: "architecture-driven construction"
         });
-
         if (result.status !== "completed" || !result.result.ok) {
             throw new Error("AutonomousDevelopmentLoop self-test failed");
         }
-
         AutonomousDevelopmentLoop.verifyCompletionEvidence(result);
     }
 
@@ -57,6 +52,9 @@ export class AutonomousDevelopmentLoop {
         }
         if (!result.plan || !result.plan.requirement) {
             throw new Error("Completion evidence is invalid: no canonical plan was produced");
+        }
+        if (!result.result.details || !result.result.details.trim()) {
+            throw new Error("Completion evidence is invalid: construction produced no verification details");
         }
     }
 }
