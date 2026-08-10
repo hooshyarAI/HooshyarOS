@@ -16,6 +16,7 @@ export interface MissionRecord {
     completed: boolean;
     progress: number;
     tasks: any[];
+    execution: any[];
     failure?: { stage: MissionStage; reason: string; isolated: true; completed: false };
 }
 
@@ -35,6 +36,7 @@ export class AutonomousMissionController {
             return {
                 status: "FAILED" as const,
                 goal,
+                execution: [],
                 failure: { stage: "OBSERVE" as const, reason: "Mission goal is empty", isolated: true as const, completed: false as const }
             };
         }
@@ -48,7 +50,7 @@ export class AutonomousMissionController {
 
         if (!approval.approved) {
             const failure: MissionRecord = {
-                goal, status: "BLOCKED", stage: "DECIDE", completed: false, progress: 0, tasks,
+                goal, status: "BLOCKED", stage: "DECIDE", completed: false, progress: 0, tasks, execution: [],
                 failure: { stage: "DECIDE", reason: "Governance rejected mission", isolated: true, completed: false }
             };
             this.memory.store(failure);
@@ -60,7 +62,7 @@ export class AutonomousMissionController {
             execution = this.executor.execute(tasks);
         } catch (error: any) {
             const failure: MissionRecord = {
-                goal, status: "FAILED", stage: "EXECUTE", completed: false, progress: 0, tasks,
+                goal, status: "FAILED", stage: "EXECUTE", completed: false, progress: 0, tasks, execution: [],
                 failure: { stage: "EXECUTE", reason: error?.message || "Mission execution failed", isolated: true, completed: false }
             };
             this.memory.store(failure);
@@ -75,7 +77,7 @@ export class AutonomousMissionController {
             const failure: MissionRecord = {
                 goal, status: "FAILED", stage: "VERIFY", completed: false,
                 progress: tasks.length === 0 ? 0 : Math.floor((execution.length / tasks.length) * 100),
-                tasks: execution,
+                tasks: execution, execution,
                 failure: { stage: "VERIFY", reason: "Execution verification failed", isolated: true, completed: false }
             };
             this.memory.store(failure);
@@ -89,10 +91,10 @@ export class AutonomousMissionController {
             completed: true,
             progress: 100,
             tasks: execution,
+            execution,
             architecture,
             plan,
             decision,
-            execution,
             lifecycle
         };
 
