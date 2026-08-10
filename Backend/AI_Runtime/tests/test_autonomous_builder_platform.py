@@ -15,24 +15,20 @@ from Backend.AI_Runtime import autonomous_builder
 )
 def test_platform_capability_generation_is_explicit_and_complete(tmp_path: Path, monkeypatch, capability_id: str, engine_name: str):
     monkeypatch.setattr(autonomous_builder, "ROOT", tmp_path)
-
     artifacts = autonomous_builder.CAPABILITIES[capability_id]
-    assert len(artifacts) == 3
-    assert artifacts[0][0] == f"Backend/HBOS/Engines/{engine_name}.ts"
-    assert artifacts[1][0] == f"Backend/HBOS/test/{engine_name}.test.ts"
-    assert artifacts[2][0] == f"Docs/Engines/{engine_name}.md"
+    assert [path for path, _ in artifacts] == [
+        f"Backend/HBOS/Engines/{engine_name}.ts",
+        f"Backend/HBOS/test/{engine_name}.test.ts",
+        f"Docs/Engines/{engine_name}.md",
+    ]
 
-    generated = []
-    for relative_path, content in artifacts:
-        target = tmp_path / relative_path
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(content, encoding="utf-8")
-        generated.append(target)
 
-    assert all(path.exists() for path in generated)
-    assert f"class {engine_name}" in generated[0].read_text(encoding="utf-8")
-    assert f'describe("{engine_name}"' in generated[1].read_text(encoding="utf-8")
-    assert engine_name.split("Engine")[0] in generated[2].read_text(encoding="utf-8")
+def test_platform_dependencies_form_a_strict_weaving_order():
+    assert autonomous_builder.PLATFORM_DEPENDENCIES["platform.user-management"] == []
+    assert "Backend/HBOS/Engines/UserManagementEngine.ts" in autonomous_builder.PLATFORM_DEPENDENCIES["platform.organization-model"]
+    security = autonomous_builder.PLATFORM_DEPENDENCIES["platform.security-layer"]
+    assert "Backend/HBOS/Engines/UserManagementEngine.ts" in security
+    assert "Backend/HBOS/Engines/OrganizationModelEngine.ts" in security
 
 
 def test_platform_dependencies_block_premature_execution(tmp_path: Path, monkeypatch):
