@@ -133,24 +133,11 @@ export class AutonomousProjectMission {
                 capability: "integrate the existing Python reasoning runtime with the canonical HBOS Reasoning Engine",
                 targetEngine: "Reasoning Engine",
                 dependencies: ["Reasoning Engine", "AI Runtime"],
-                requiredPaths: [join(this.root, "Backend", "HBOS", "Engines", "ReasoningEngine.ts")]
-            },
-            {
-                id: "runtime.executive.bridge",
-                capability: "integrate KPI and executive intelligence runtime capabilities with Executive Intelligence Engine",
-                targetEngine: "Executive Intelligence Engine",
-                dependencies: ["Executive Intelligence Engine", "AI Runtime", "Executive Intelligence Runtime"],
-                requiredPaths: [join(this.root, "Backend", "HBOS", "Engines", "ExecutiveIntelligenceEngine.ts")],
-                evidencePaths: [
-                    join(this.root, "Backend", "AI_Runtime", "executive_memory", "executive_intelligence_orchestrator.py")
-                ]
-            },
-            {
-                id: "runtime.governance.bridge",
-                capability: "integrate governance, compliance and audit runtime capabilities with Governance Engine",
-                targetEngine: "Governance Engine",
-                dependencies: ["Governance Engine", "Knowledge Engine", "AI Runtime"],
-                requiredPaths: [join(this.root, "Backend", "HBOS", "Engines", "GovernanceEngine.ts")]
+                requiredPaths: [
+                    join(this.root, "Backend", "HBOS", "Engines", "ReasoningEngine.ts"),
+                    join(this.root, "Backend", "HBOS", "Assistant", "Autonomous", "PythonReasoningAdapter.ts")
+                ],
+                evidencePaths: [join(this.root, "Backend", "AI_Runtime", "reasoning", "reasoning_engine.py")]
             }
         ];
     }
@@ -160,6 +147,21 @@ export class AutonomousProjectMission {
         if (!required) return false;
         if (!capability.evidencePaths || capability.evidencePaths.length === 0) return true;
         return capability.evidencePaths.some(existsSync);
+    }
+
+    private assistantCompletionEvidence(): boolean {
+        const requiredPaths = [
+            join(this.root, "Backend", "HBOS", "Assistant", "Autonomous", "AutonomousAssistantRuntime.ts"),
+            join(this.root, "Backend", "HBOS", "Assistant", "Autonomous", "PythonReasoningAdapter.ts"),
+            join(this.root, "Backend", "HBOS", "Assistant", "Autonomous", "PersistentArchitectureMemory.ts"),
+            join(this.root, "Backend", "HBOS", "Assistant", "Autonomous", "DecisionKnowledgeStore.ts"),
+            join(this.root, "Backend", "HBOS", "Assistant", "Autonomous", "ContextRetrievalEngine.ts"),
+            join(this.root, "Backend", "HBOS", "Assistant", "Autonomous", "LearningFeedbackLoop.ts"),
+            join(this.root, "Backend", "Builder", "Autonomous", "AutonomousProjectConductor.ts"),
+            join(this.root, "Backend", "HBOS", "Autonomous", "Runtime", "LocalConstructionToolset.ts"),
+            join(this.root, "Backend", "HBOS", "Autonomous", "Runtime", "AutonomousBuildDaemon.ts")
+        ];
+        return requiredPaths.every(existsSync);
     }
 
     private architectureRules(): string[] {
@@ -214,5 +216,7 @@ export class AutonomousProjectMission {
 }
 
 if (require.main === module) {
-    console.log(JSON.stringify(new AutonomousProjectMission().nextMission(), null, 2));
+    const mission = new AutonomousProjectMission();
+    const next = mission.nextMission();
+    console.log(JSON.stringify({ ...next, assistantCompletionEvidence: (mission as any).assistantCompletionEvidence() }, null, 2));
 }
