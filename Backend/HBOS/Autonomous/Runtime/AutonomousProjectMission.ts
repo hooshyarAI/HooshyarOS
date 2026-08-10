@@ -96,7 +96,7 @@ export class AutonomousProjectMission {
                 directives: [
                     ...this.directives(),
                     "The completion gate must be evidence-based.",
-                    "Verify required implementation and focused tests are present.",
+                    "Verify required implementation, focused tests, local builder and runtime are present.",
                     "Reject obsolete cloud coding providers from the autonomous construction path."
                 ]
             };
@@ -202,13 +202,17 @@ export class AutonomousProjectMission {
             join(this.root, "Backend", "HBOS", "test", "AutonomousMissionController.test.ts"),
             join(this.root, "Backend", "HBOS", "test", "AutonomousAssistantRuntime.test.ts"),
             join(this.root, "Backend", "HBOS", "test", "HooshyarAutonomousAssistant.test.ts"),
-            join(this.root, "Backend", "HBOS", "test", "PythonReasoningAdapter.test.ts")
+            join(this.root, "Backend", "HBOS", "test", "PythonReasoningAdapter.test.ts"),
+            join(this.root, "Backend", "AI_Runtime", "autonomous_builder.py"),
+            join(this.root, "Backend", "AI_Runtime", "reasoning", "reasoning_engine.py")
         ];
         if (!requiredPaths.every(existsSync)) return false;
 
         const autonomousRuntime = readFileSync(join(this.root, "Backend", "HBOS", "Autonomous", "Runtime", "LocalConstructionToolset.ts"), "utf8");
         const developmentLoop = readFileSync(join(this.root, "Backend", "HBOS", "Architecture", "Autonomous", "AutonomousDevelopmentLoop.ts"), "utf8");
         const controller = readFileSync(join(this.root, "Backend", "Builder", "Autonomous", "ArchitectureDrivenBuildController.ts"), "utf8");
+        const builder = readFileSync(join(this.root, "Backend", "AI_Runtime", "autonomous_builder.py"), "utf8");
+        const reasoningRuntime = readFileSync(join(this.root, "Backend", "AI_Runtime", "reasoning", "reasoning_engine.py"), "utf8");
 
         const pythonOnly = autonomousRuntime.includes('type ImplementationAgent = "python"')
             && autonomousRuntime.includes("Backend/AI_Runtime/autonomous_builder.py")
@@ -218,8 +222,18 @@ export class AutonomousProjectMission {
             && developmentLoop.includes("controller.construct(plan.requirement)")
             && controller.includes("ARCHITECTURE")
             && controller.includes("PLAN");
+        const localBuilderContract = builder.includes("argparse")
+            && builder.includes("CAPABILITIES")
+            && builder.includes("Capability ID:")
+            && builder.includes("if not generated:")
+            && !builder.includes("subprocess.run([\"copilot\"")
+            && !builder.includes("subprocess.run([\"codex\"")
+            && !builder.includes("subprocess.run([\"claude\"");
+        const reasoningContract = reasoningRuntime.includes("class ReasoningEngine")
+            && reasoningRuntime.includes("def reason")
+            && reasoningRuntime.includes('"status": "reasoned"');
 
-        return pythonOnly && constructionLifecycle && orchestrationLifecycle;
+        return pythonOnly && constructionLifecycle && orchestrationLifecycle && localBuilderContract && reasoningContract;
     }
 
     private architectureRules(): string[] {
