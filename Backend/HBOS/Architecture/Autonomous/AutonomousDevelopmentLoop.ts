@@ -18,13 +18,18 @@ export class AutonomousDevelopmentLoop {
         const plan = this.planner.plan(goal);
         const controller = new ArchitectureDrivenBuildController(this.tools);
         const result = controller.construct(plan.requirement);
-
-        return {
+        const outcome: AutonomousDevelopmentResult = {
             goal,
             plan,
             result,
             status: result.ok ? "completed" : "blocked"
         };
+
+        if (outcome.status === "completed") {
+            AutonomousDevelopmentLoop.verifyCompletionEvidence(outcome);
+        }
+
+        return outcome;
     }
 
     static selfTest(): void {
@@ -42,6 +47,8 @@ export class AutonomousDevelopmentLoop {
         if (result.status !== "completed" || !result.result.ok) {
             throw new Error("AutonomousDevelopmentLoop self-test failed");
         }
+
+        AutonomousDevelopmentLoop.verifyCompletionEvidence(result);
     }
 
     static verifyCompletionEvidence(result: AutonomousDevelopmentResult): void {
