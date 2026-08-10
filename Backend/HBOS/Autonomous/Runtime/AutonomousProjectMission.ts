@@ -139,9 +139,11 @@ export class AutonomousProjectMission {
                 id: "runtime.executive.bridge",
                 capability: "integrate KPI and executive intelligence runtime capabilities with Executive Intelligence Engine",
                 targetEngine: "Executive Intelligence Engine",
-                dependencies: ["Executive Intelligence Engine", "AI Runtime", "KPI Intelligence"],
+                dependencies: ["Executive Intelligence Engine", "AI Runtime", "Executive Intelligence Runtime"],
                 requiredPaths: [join(this.root, "Backend", "HBOS", "Engines", "ExecutiveIntelligenceEngine.ts")],
-                evidencePaths: [join(this.root, "Backend", "AI_Runtime", "kpi_engine", "kpi_engine.py")]
+                evidencePaths: [
+                    join(this.root, "Backend", "AI_Runtime", "executive_memory", "executive_intelligence_orchestrator.py")
+                ]
             },
             {
                 id: "runtime.governance.bridge",
