@@ -43,4 +43,13 @@ export class AutonomousDevelopmentLoop {
             throw new Error("AutonomousDevelopmentLoop self-test failed");
         }
     }
+
+    static verifyCompletionEvidence(result: AutonomousDevelopmentResult): void {
+        if (!result.result.ok || result.status !== "completed") {
+            throw new Error("Completion evidence is invalid: construction did not complete successfully");
+        }
+        if (!result.plan || !result.plan.requirement) {
+            throw new Error("Completion evidence is invalid: no canonical plan was produced");
+        }
+    }
 }
