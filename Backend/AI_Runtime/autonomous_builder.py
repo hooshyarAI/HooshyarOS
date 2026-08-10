@@ -1,8 +1,8 @@
 """Repository-native autonomous construction worker.
 
-No Copilot, Codex, Claude, or cloud coding CLI is used. Unknown capabilities are
-rejected. Phase 2 platform capabilities are generated as real Engine + focused
-Test + documentation pairs so the autonomous loop can be validated end-to-end.
+The builder follows the canonical roadmap like a weaver follows a carpet map:
+one capability at a time, in dependency order, with evidence before advancing.
+Unknown capabilities are rejected rather than invented.
 """
 from __future__ import annotations
 import argparse
@@ -23,10 +23,11 @@ PLATFORM_DEPENDENCIES = {
     "platform.security-layer": ["Backend/HBOS/Engines/UserManagementEngine.ts", "Backend/HBOS/test/UserManagementEngine.test.ts", "Backend/HBOS/Engines/OrganizationModelEngine.ts", "Backend/HBOS/test/OrganizationModelEngine.test.ts", "Docs/Engines/UserManagementEngine.md", "Docs/Engines/OrganizationModelEngine.md"],
 }
 
+
 def platform_artifacts(capability_id: str):
     engine = PLATFORM_CAPABILITIES[capability_id]
-    method = {"UserManagementEngine":"registerUser","OrganizationModelEngine":"createOrganization","SecurityLayerEngine":"authorize"}[engine]
-    test_input = {"UserManagementEngine":"ali","OrganizationModelEngine":"hooshyar","SecurityLayerEngine":"admin"}[engine]
+    method = {"UserManagementEngine": "registerUser", "OrganizationModelEngine": "createOrganization", "SecurityLayerEngine": "authorize"}[engine]
+    test_input = {"UserManagementEngine": "ali", "OrganizationModelEngine": "hooshyar", "SecurityLayerEngine": "admin"}[engine]
     docs = {
         "UserManagementEngine": "# User Management Engine\n\nCanonical Phase 2 capability. Owns the minimal user-management contract and remains governed by HBOS Core and Governance Engine.\n",
         "OrganizationModelEngine": "# Organization Model Engine\n\nCanonical Phase 2 capability. Owns the minimal organization model contract and depends on User Management.\n",
@@ -36,7 +37,9 @@ def platform_artifacts(capability_id: str):
     test_code = f'''import {{ {engine} }} from "../Engines/{engine}";\n\ndescribe("{engine}", () => {{\n    it("accepts its canonical minimal operation", () => {{\n        expect(new {engine}().{method}("{test_input}").status).toBe("READY");\n    }});\n    it("blocks an empty operation", () => {{\n        expect(new {engine}().{method}(" ").status).toBe("BLOCKED");\n    }});\n}});\n'''
     return [(f"Backend/HBOS/Engines/{engine}.ts", engine_code), (f"Backend/HBOS/test/{engine}.test.ts", test_code), (f"Docs/Engines/{engine}.md", docs[engine])]
 
-CAPABILITIES = {"platform.user-management": platform_artifacts("platform.user-management"), "platform.organization-model": platform_artifacts("platform.organization-model"), "platform.security-layer": platform_artifacts("platform.security-layer")}
+
+CAPABILITIES = {key: platform_artifacts(key) for key in PLATFORM_CAPABILITIES}
+
 
 def main() -> int:
     parser = argparse.ArgumentParser()
@@ -65,6 +68,7 @@ def main() -> int:
         return 0
     print("Generated: " + ", ".join(generated))
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())
