@@ -1,4 +1,4 @@
-import { execFileSync } from "child_process";
+import { ReasoningEngine } from "../../Engines/ReasoningEngine";
 import { ReasoningProvider } from "./ReasoningProvider";
 
 export interface PythonReasoningResult {
@@ -8,28 +8,21 @@ export interface PythonReasoningResult {
     success: boolean;
 }
 
-/** Adapter to the repository-owned Python Reasoning Engine. */
+/**
+ * Assistant-facing adapter for the canonical HBOS Reasoning Engine.
+ * Python remains the repository-owned execution runtime; this adapter does
+ * not duplicate Python process invocation or reasoning ownership.
+ */
 export class PythonReasoningAdapter implements ReasoningProvider {
-    async reason(prompt: string): Promise<PythonReasoningResult> {
-        const python = process.env.HOOSHYAR_PYTHON || "python";
-        const script = [
-            "import json, sys",
-            "from Backend.AI_Runtime.reasoning.reasoning_engine import ReasoningEngine",
-            "result = ReasoningEngine().reason(sys.argv[1])",
-            "print(json.dumps(result, ensure_ascii=False))"
-        ].join("; ");
+    private readonly engine = new ReasoningEngine();
 
-        try {
-            const raw = execFileSync(python, ["-c", script, prompt], {
-                cwd: process.cwd(),
-                encoding: "utf8",
-                windowsHide: true,
-                stdio: ["ignore", "pipe", "pipe"]
-            }).trim();
-            const result = JSON.parse(raw) as { problem: string; status: string };
-            return { provider: "python", problem: result.problem, status: result.status, success: true };
-        } catch (error: any) {
-            return { provider: "python", problem: prompt, status: `reasoning_failed: ${error?.message || "unknown error"}`, success: false };
-        }
+    async reason(prompt: string): Promise<PythonReasoningResult> {
+        const result = this.engine.reason(prompt);
+        return {
+            provider: "python",
+            problem: result.problem,
+            status: result.status,
+            success: result.success
+        };
     }
 }
