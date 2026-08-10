@@ -154,14 +154,31 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
             name: "python",
             execute: (stage) => {
                 if (stage === "VERIFY") {
+                    const syntax = run("python", ["-m", "py_compile", "Backend/AI_Runtime/autonomous_builder.py", "Backend/AI_Runtime/reasoning/reasoning_engine.py"], root);
+                    if (!syntax.ok) {
+                        const artifact = {
+                            type: "AUTONOMOUS_PYTHON_VERIFY_RESULT",
+                            syntaxVerified: false,
+                            jestVerified: false,
+                            exitCode: syntax.code,
+                            output: syntax.output,
+                            error: syntax.error,
+                            timestamp: new Date().toISOString()
+                        };
+                        console.log(JSON.stringify(artifact, null, 2));
+                        return { ok: false, issue: "AUTONOMOUS_PYTHON_SYNTAX_VERIFY_FAILED", artifact };
+                    }
+
                     const test = run("npx", ["jest", "--runInBand", "--config", ".\\jest.config.js"], root);
                     const verificationArtifact = {
                         type: "AUTONOMOUS_VERIFY_RESULT",
-                        command: "jest",
+                        command: "python -m py_compile + jest",
                         exitCode: test.code,
+                        syntaxVerified: true,
+                        jestVerified: test.code === 0,
                         verified: test.code === 0,
                         timestamp: new Date().toISOString(),
-                        output: test.output,
+                        output: `${syntax.output}\n${test.output}`,
                         error: test.error
                     };
                     console.log(JSON.stringify(verificationArtifact, null, 2));
