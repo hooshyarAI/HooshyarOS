@@ -1,7 +1,7 @@
 """Repository-native autonomous construction worker.
 
 This worker intentionally uses no Copilot, Codex, Claude, or cloud coding CLI.
-It applies only the deterministic capabilities declared by the HBOS mission
+It applies only deterministic capabilities declared by the HBOS mission
 backlog and refuses unknown capabilities instead of inventing architecture.
 """
 
@@ -102,10 +102,38 @@ export class AutonomousOperationsEngine implements Engine {
 }
 '''
 
+PYTHON_REASONING_ADAPTER_TEST = '''import { execFileSync } from "node:child_process";
+import { PythonReasoningAdapter } from "../Assistant/Autonomous/PythonReasoningAdapter";
+
+jest.mock("node:child_process", () => ({
+    execFileSync: jest.fn()
+}));
+
+describe("PythonReasoningAdapter", () => {
+    it("uses the repository-owned Python reasoning runtime", async () => {
+        const mockedExec = execFileSync as jest.MockedFunction<typeof execFileSync>;
+        mockedExec.mockReturnValue(JSON.stringify({ problem: "test problem", status: "reasoned" }) as never);
+
+        const result = await new PythonReasoningAdapter().reason("test problem");
+
+        expect(result).toEqual({
+            provider: "python",
+            problem: "test problem",
+            status: "reasoned",
+            success: true
+        });
+        expect(mockedExec).toHaveBeenCalledTimes(1);
+        expect(String(mockedExec.mock.calls[0][0])).toBe(process.env.HOOSHYAR_PYTHON || "python");
+        expect(mockedExec.mock.calls[0][1]).toEqual(expect.arrayContaining(["-c", expect.stringContaining("Backend.AI_Runtime.reasoning.reasoning_engine")]));
+    });
+});
+'''
+
 CAPABILITIES = {
     "engine.reasoning.canonical": ("Backend/HBOS/Engines/ReasoningEngine.ts", REASONING_ENGINE),
     "engine.organizational.canonical": ("Backend/HBOS/Engines/OrganizationalIntelligenceEngine.ts", ORGANIZATIONAL_ENGINE),
     "engine.autonomous-operations.canonical": ("Backend/HBOS/Engines/AutonomousOperationsEngine.ts", AUTONOMOUS_ENGINE),
+    "runtime.reasoning.bridge": ("Backend/HBOS/test/PythonReasoningAdapter.test.ts", PYTHON_REASONING_ADAPTER_TEST),
 }
 
 
