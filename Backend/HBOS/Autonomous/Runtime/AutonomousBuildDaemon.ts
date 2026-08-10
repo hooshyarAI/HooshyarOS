@@ -8,13 +8,6 @@ export interface DaemonOptions {
     reportEvery?: number;
 }
 
-/**
- * Local autonomous construction entry point.
- *
- * It observes the repository, derives the next architecture-driven mission,
- * executes build/verify/repair/finalize, and repeats after a successful
- * repository change. The daemon never changes architecture policy itself.
- */
 export class AutonomousBuildDaemon {
     private readonly mission: AutonomousProjectMission;
     private readonly development: AutonomousDevelopmentLoop;
@@ -44,11 +37,24 @@ export class AutonomousBuildDaemon {
                 targetEngine: mission.targetEngine
             }));
 
+            if (mission.capabilityId === "assistant.completion.gate") {
+                const completion = {
+                    type: "ASSISTANT_COMPLETION_GATE",
+                    cycle,
+                    commit: before.commit,
+                    status: "PASSED",
+                    message: "All current canonical Assistant construction capabilities are present and the repository is clean."
+                };
+                console.log(JSON.stringify(completion));
+                history.push({ cycle, commit: before.commit, mission: mission.capability, completion });
+                return { status: "completed", cycles: cycle, history };
+            }
+
             const result = this.development.execute({
                 capabilityId: mission.capabilityId,
                 capability: mission.capability,
                 targetEngine: mission.targetEngine,
-                dependencies: []
+                dependencies: mission.dependencies
             });
 
             history.push({ cycle, commit: before.commit, mission: mission.capability, result });

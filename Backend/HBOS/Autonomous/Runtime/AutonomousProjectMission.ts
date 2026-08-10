@@ -31,12 +31,6 @@ interface CapabilityDefinition {
     evidencePaths?: string[];
 }
 
-/**
- * Converts repository state and Architecture Freeze V4 into one concrete,
- * implementation-ready capability. The planner is deliberately deterministic:
- * it never invents an engine and it advances through the canonical architecture
- * backlog in order, skipping capabilities already present in the repository.
- */
 export class AutonomousProjectMission {
     constructor(private readonly root = process.cwd()) {}
 
@@ -96,15 +90,16 @@ export class AutonomousProjectMission {
         }
 
         return {
-            capabilityId: `continue-${evidence.commit || "workspace"}`,
-            capability: "continue architecture-driven autonomous platform construction",
+            capabilityId: "assistant.completion.gate",
+            capability: "HooshyarOS Autonomous Assistant completion gate",
             targetEngine: "Autonomous Operations Engine",
             evidence,
             dependencies: [],
             architectureRules: this.architectureRules(),
             directives: [
                 ...this.directives(),
-                "Do not produce an idle cycle: inspect the architecture backlog and identify the next missing concrete capability."
+                "All current canonical Assistant construction capabilities are present and the repository is clean.",
+                "Do not start broad platform construction from this completion gate."
             ]
         };
     }
@@ -161,7 +156,6 @@ export class AutonomousProjectMission {
     private isCapabilityImplemented(capability: CapabilityDefinition): boolean {
         const required = capability.requiredPaths.every(existsSync);
         if (!required) return false;
-
         if (!capability.evidencePaths || capability.evidencePaths.length === 0) return true;
         return capability.evidencePaths.some(existsSync);
     }

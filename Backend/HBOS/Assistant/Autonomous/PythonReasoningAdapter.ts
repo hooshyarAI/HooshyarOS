@@ -1,20 +1,16 @@
 import { execFileSync } from "child_process";
 import { ReasoningProvider } from "./ReasoningProvider";
 
-export interface CanonicalReasoningResult {
-    provider: "canonical";
+export interface PythonReasoningResult {
+    provider: "python";
     problem: string;
     status: string;
     success: boolean;
 }
 
-/**
- * Adapter to the repository-owned canonical Reasoning Engine.
- * HBOS does not implement a second reasoning engine; it delegates ownership
- * to Backend/AI_Runtime/reasoning/reasoning_engine.py.
- */
-export class CloudReasoningAdapter implements ReasoningProvider {
-    async reason(prompt: string): Promise<CanonicalReasoningResult> {
+/** Adapter to the repository-owned Python Reasoning Engine. */
+export class PythonReasoningAdapter implements ReasoningProvider {
+    async reason(prompt: string): Promise<PythonReasoningResult> {
         const python = process.env.HOOSHYAR_PYTHON || "python";
         const script = [
             "import json, sys",
@@ -30,21 +26,10 @@ export class CloudReasoningAdapter implements ReasoningProvider {
                 windowsHide: true,
                 stdio: ["ignore", "pipe", "pipe"]
             }).trim();
-
             const result = JSON.parse(raw) as { problem: string; status: string };
-            return {
-                provider: "canonical",
-                problem: result.problem,
-                status: result.status,
-                success: true
-            };
+            return { provider: "python", problem: result.problem, status: result.status, success: true };
         } catch (error: any) {
-            return {
-                provider: "canonical",
-                problem: prompt,
-                status: `reasoning_failed: ${error?.message || "unknown error"}`,
-                success: false
-            };
+            return { provider: "python", problem: prompt, status: `reasoning_failed: ${error?.message || "unknown error"}`, success: false };
         }
     }
 }
