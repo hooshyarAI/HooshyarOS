@@ -169,8 +169,16 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                 }
 
                 if (stage === "REPAIR") {
-                    console.log(JSON.stringify({ type: "AUTONOMOUS_REPAIR", message: "Repair engine consumed verification artifact", issues: [] }));
-                    return { ok: true, artifact: { repaired: true } };
+                    return {
+                        ok: false,
+                        issue: "AUTONOMOUS_REPAIR_REQUIRES_REAL_FIX",
+                        artifact: {
+                            type: "AUTONOMOUS_REPAIR_RESULT",
+                            repaired: false,
+                            reason: "The repository-native worker has not produced a verified repair artifact; refusing to claim repair without a real repository change.",
+                            timestamp: new Date().toISOString()
+                        }
+                    };
                 }
 
                 return { ok: true };
