@@ -1,11 +1,12 @@
 import { AutonomousProjectMission } from "../Autonomous/Runtime/AutonomousProjectMission";
 
 describe("AutonomousProjectMission", () => {
-    it("does not manufacture a platform capability when the canonical backlog is exhausted", () => {
+    it("selects the first genuinely missing canonical platform capability", () => {
         const mission = new AutonomousProjectMission(process.cwd());
         const next = mission.nextPlatformMission();
 
-        expect(next).toBeNull();
+        expect(next?.capabilityId).toBe("platform.user-management");
+        expect(next?.targetEngine).toBe("User Management Engine");
     });
 
     it("keeps the completion gate separate from real platform capabilities", () => {
