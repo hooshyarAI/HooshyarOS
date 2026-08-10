@@ -4,16 +4,9 @@ import { DecisionContextEngine } from "./DecisionContextEngine";
 import { TaskDecomposer } from "./TaskDecomposer";
 import { AutonomousExecutionLoop } from "./AutonomousExecutionLoop";
 import { GovernanceGate } from "./GovernanceGate";
+import { AutonomousProjectConductor, ProjectInventory, ProjectGap } from "../../Autonomous/AutonomousProjectConductor";
 
-export type MissionStage =
-    | "OBSERVE"
-    | "REASON"
-    | "DECIDE"
-    | "PLAN"
-    | "EXECUTE"
-    | "VERIFY"
-    | "LEARN";
-
+export type MissionStage = "OBSERVE" | "REASON" | "DECIDE" | "PLAN" | "EXECUTE" | "VERIFY" | "LEARN";
 export type MissionStatus = "RUNNING" | "COMPLETED" | "BLOCKED" | "FAILED";
 
 export interface MissionRecord {
@@ -23,60 +16,30 @@ export interface MissionRecord {
     completed: boolean;
     progress: number;
     tasks: any[];
-    failure?: {
-        stage: MissionStage;
-        reason: string;
-        isolated: true;
-        completed: false;
-    };
+    failure?: { stage: MissionStage; reason: string; isolated: true; completed: false };
 }
 
-/**
- * Autonomous Assistant mission orchestration boundary.
- * Existing engines remain the owners of planning, context, governance,
- * execution and memory; this controller coordinates their lifecycle.
- */
+/** Assistant orchestration boundary; existing engines remain canonical owners. */
 export class AutonomousMissionController {
-    private planner: MasterPlanner;
-    private memory: ArchitectureMemory;
-    private context: DecisionContextEngine;
-    private decomposer: TaskDecomposer;
-    private executor: AutonomousExecutionLoop;
-    private governance: GovernanceGate;
+    private planner = new MasterPlanner();
+    private memory = new ArchitectureMemory();
+    private context = new DecisionContextEngine();
+    private decomposer = new TaskDecomposer();
+    private executor = new AutonomousExecutionLoop();
+    private governance = new GovernanceGate();
 
-    constructor() {
-        this.planner = new MasterPlanner();
-        this.memory = new ArchitectureMemory();
-        this.context = new DecisionContextEngine();
-        this.decomposer = new TaskDecomposer();
-        this.executor = new AutonomousExecutionLoop();
-        this.governance = new GovernanceGate();
-    }
+    constructor(private readonly conductor?: AutonomousProjectConductor) {}
 
     executeMission(goal: string) {
         if (!goal || !goal.trim()) {
             return {
                 status: "FAILED" as const,
                 goal,
-                failure: {
-                    stage: "OBSERVE" as const,
-                    reason: "Mission goal is empty",
-                    isolated: true as const,
-                    completed: false as const
-                }
+                failure: { stage: "OBSERVE" as const, reason: "Mission goal is empty", isolated: true as const, completed: false as const }
             };
         }
 
-        const lifecycle: MissionStage[] = [
-            "OBSERVE",
-            "REASON",
-            "DECIDE",
-            "PLAN",
-            "EXECUTE",
-            "VERIFY",
-            "LEARN"
-        ];
-
+        const lifecycle: MissionStage[] = ["OBSERVE", "REASON", "DECIDE", "PLAN", "EXECUTE", "VERIFY", "LEARN"];
         const architecture = this.memory.load();
         const plan = this.planner.plan(goal);
         const decision = this.context.analyze(goal);
@@ -85,18 +48,8 @@ export class AutonomousMissionController {
 
         if (!approval.approved) {
             const failure: MissionRecord = {
-                goal,
-                status: "BLOCKED",
-                stage: "DECIDE",
-                completed: false,
-                progress: 0,
-                tasks,
-                failure: {
-                    stage: "DECIDE",
-                    reason: "Governance rejected mission",
-                    isolated: true,
-                    completed: false
-                }
+                goal, status: "BLOCKED", stage: "DECIDE", completed: false, progress: 0, tasks,
+                failure: { stage: "DECIDE", reason: "Governance rejected mission", isolated: true, completed: false }
             };
             this.memory.store(failure);
             return failure;
@@ -107,18 +60,8 @@ export class AutonomousMissionController {
             execution = this.executor.execute(tasks);
         } catch (error: any) {
             const failure: MissionRecord = {
-                goal,
-                status: "FAILED",
-                stage: "EXECUTE",
-                completed: false,
-                progress: 0,
-                tasks,
-                failure: {
-                    stage: "EXECUTE",
-                    reason: error?.message || "Mission execution failed",
-                    isolated: true,
-                    completed: false
-                }
+                goal, status: "FAILED", stage: "EXECUTE", completed: false, progress: 0, tasks,
+                failure: { stage: "EXECUTE", reason: error?.message || "Mission execution failed", isolated: true, completed: false }
             };
             this.memory.store(failure);
             return failure;
@@ -130,33 +73,19 @@ export class AutonomousMissionController {
 
         if (!verified) {
             const failure: MissionRecord = {
-                goal,
-                status: "FAILED",
-                stage: "VERIFY",
-                completed: false,
+                goal, status: "FAILED", stage: "VERIFY", completed: false,
                 progress: tasks.length === 0 ? 0 : Math.floor((execution.length / tasks.length) * 100),
                 tasks: execution,
-                failure: {
-                    stage: "VERIFY",
-                    reason: "Execution verification failed",
-                    isolated: true,
-                    completed: false
-                }
+                failure: { stage: "VERIFY", reason: "Execution verification failed", isolated: true, completed: false }
             };
             this.memory.store(failure);
             return failure;
         }
 
-        const result: MissionRecord & {
-            architecture: any;
-            plan: any;
-            decision: any;
-            execution: any[];
-            lifecycle: MissionStage[];
-        } = {
-            status: "COMPLETED",
+        const result = {
+            status: "COMPLETED" as const,
             goal,
-            stage: "LEARN",
+            stage: "LEARN" as const,
             completed: true,
             progress: 100,
             tasks: execution,
@@ -167,11 +96,23 @@ export class AutonomousMissionController {
             lifecycle
         };
 
-        this.memory.store({
-            ...result,
-            outcome: "SUCCESS"
-        });
-
+        this.memory.store({ ...result, outcome: "SUCCESS" });
         return result;
+    }
+
+    /** Audit remaining platform gaps through the canonical construction conductor. */
+    auditPlatform(inventory: ProjectInventory): ProjectGap[] {
+        this.requireConductor();
+        return this.conductor!.inspect(inventory);
+    }
+
+    /** Delegate audited gaps to the existing Autonomous Construction workflow. */
+    constructPlatform(inventory: ProjectInventory) {
+        this.requireConductor();
+        return this.conductor!.execute(inventory);
+    }
+
+    private requireConductor(): void {
+        if (!this.conductor) throw new Error("CONSTRUCTION_CONDUCTOR_REQUIRED");
     }
 }
