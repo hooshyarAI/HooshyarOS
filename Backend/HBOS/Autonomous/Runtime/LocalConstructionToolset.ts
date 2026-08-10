@@ -1,4 +1,4 @@
-﻿import { execFileSync } from "child_process";
+import { execFileSync } from "child_process";
 import {
     ConstructionContext,
     ConstructionStage,
@@ -93,6 +93,14 @@ export function resolveImplementationAgent(root = process.cwd()): Implementation
     return null;
 }
 
+/**
+ * Reports whether an implementation agent produced a repository state change.
+ * This is deliberately based on Git working-tree state, not process exit code.
+ */
+export function repositoryStateChanged(before: string, after: string): boolean {
+    return before.trim() !== after.trim();
+}
+
 function buildAgentArgs(agent: ImplementationAgent, prompt: string): string[] {
     if (agent === "copilot") {
         return [
@@ -148,6 +156,36 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
             execute: (stage, context) => {
                 if (stage !== "GENERATE") return { ok: true };
 
+                const before = run("git", ["status", "--porcelain=v1"], root);
+                if (!before.ok) {
+                    return {
+                        ok: false,
+                        issue: "AUTONOMOUS_REPOSITORY_STATE_UNAVAILABLE",
+                        artifact: {
+                            type: "AUTONOMOUS_REPOSITORY_STATE_RESULT",
+                            stage: "BEFORE_GENERATION",
+                            exitCode: before.code,
+                            output: before.output,
+                            error: before.error,
+                            timestamp: new Date().toISOString()
+                        }
+                    };
+                }
+
+                if (before.output.trim()) {
+                    return {
+                        ok: false,
+                        issue: "AUTONOMOUS_WORKTREE_DIRTY",
+                        artifact: {
+                            type: "AUTONOMOUS_REPOSITORY_STATE_RESULT",
+                            stage: "BEFORE_GENERATION",
+                            clean: false,
+                            output: before.output,
+                            timestamp: new Date().toISOString()
+                        }
+                    };
+                }
+
                 const agent = resolveImplementationAgent(root);
                 if (!agent) {
                     const artifact = {
@@ -166,20 +204,38 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                 }
 
                 const result = run(agent, buildAgentArgs(agent, buildAgentPrompt(context)), root, 30 * 60 * 1000);
+                const after = run("git", ["status", "--porcelain=v1"], root);
+                const changed = after.ok && repositoryStateChanged(before.output, after.output);
                 const artifact = {
                     type: "AUTONOMOUS_AGENT_GENERATION_RESULT",
                     provider: agent,
                     capabilityId: context.plan.capabilityId,
                     capability: context.plan.capability,
                     exitCode: result.code,
-                    changed: result.ok,
+                    changed,
                     output: result.output,
                     error: result.error,
                     timestamp: new Date().toISOString()
                 };
 
                 console.log(JSON.stringify(artifact, null, 2));
-                if (!result.ok) return { ok: false, issue: "AUTONOMOUS_AGENT_GENERATION_FAILED", artifact };
+
+                if (!result.ok) {
+                    return { ok: false, issue: "AUTONOMOUS_AGENT_GENERATION_FAILED", artifact };
+                }
+
+                if (!after.ok) {
+                    return { ok: false, issue: "AUTONOMOUS_REPOSITORY_STATE_UNAVAILABLE", artifact };
+                }
+
+                if (!changed) {
+                    return {
+                        ok: false,
+                        issue: "AUTONOMOUS_AGENT_NO_REPOSITORY_CHANGE",
+                        artifact
+                    };
+                }
+
                 return { ok: true, artifact };
             }
         },
@@ -224,18 +280,29 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
             execute: (stage) => {
                 if (stage !== "FINALIZE") return { ok: true };
 
-                const status = run("git", ["status", "--porcelain"], root);
+                const status = run("git", ["status", "--porcelain=v1"], root);
                 if (!status.ok) return { ok: false, issue: "GIT_STATUS_FAILED" };
 
                 if (!status.output.trim()) {
                     return {
-                        ok: true,
+                        ok: false,
+                        issue: "GIT_NO_REPOSITORY_CHANGE",
                         artifact: { clean: true, committed: false, pushed: false, changeDetected: false }
                     };
                 }
 
                 const add = run("git", ["add", "-A"], root);
                 if (!add.ok) return { ok: false, issue: "GIT_ADD_FAILED" };
+
+                const staged = run("git", ["diff", "--cached", "--quiet"], root);
+                if (!staged.ok && staged.code !== 1) return { ok: false, issue: "GIT_STAGED_DIFF_CHECK_FAILED" };
+                if (staged.code === 0) {
+                    return {
+                        ok: false,
+                        issue: "GIT_NO_STAGED_CHANGE",
+                        artifact: { clean: true, committed: false, pushed: false, changeDetected: false }
+                    };
+                }
 
                 const commit = run("git", ["commit", "-m", "feat(hbos): autonomous construction progress"], root);
                 if (!commit.ok) return { ok: false, issue: "GIT_COMMIT_FAILED" };
@@ -248,4 +315,3 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
         }
     ];
 }
-
