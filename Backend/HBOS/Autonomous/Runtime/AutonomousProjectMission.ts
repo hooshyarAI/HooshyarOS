@@ -62,16 +62,12 @@ export class AutonomousProjectMission {
 
     nextMission(): Mission {
         const evidence = this.snapshot();
-        const backlog = this.capabilityBacklog();
-        const next = backlog.find(capability => !this.isCapabilityImplemented(capability));
+        const next = this.nextPlatformMission();
 
         if (next) {
             return {
-                capabilityId: next.id,
-                capability: next.capability,
-                targetEngine: next.targetEngine,
+                ...next,
                 evidence,
-                dependencies: next.dependencies,
                 architectureRules: this.architectureRules(),
                 directives: this.directives()
             };
@@ -119,6 +115,19 @@ export class AutonomousProjectMission {
                 "The autonomous construction path is repository-native and Python-backed.",
                 "Do not start broad platform construction from this completion gate."
             ]
+        };
+    }
+
+    /** Selects the next real platform capability without manufacturing a placeholder mission. */
+    nextPlatformMission(): Omit<Mission, "evidence" | "architectureRules" | "directives"> | null {
+        const next = this.capabilityBacklog().find(capability => !this.isCapabilityImplemented(capability));
+        if (!next) return null;
+
+        return {
+            capabilityId: next.id,
+            capability: next.capability,
+            targetEngine: next.targetEngine,
+            dependencies: next.dependencies
         };
     }
 
@@ -188,24 +197,14 @@ export class AutonomousProjectMission {
         ];
         if (!requiredPaths.every(existsSync)) return false;
 
-        const autonomousRuntime = readFileSync(
-            join(this.root, "Backend", "HBOS", "Autonomous", "Runtime", "LocalConstructionToolset.ts"),
-            "utf8"
-        );
-        const developmentLoop = readFileSync(
-            join(this.root, "Backend", "HBOS", "Architecture", "Autonomous", "AutonomousDevelopmentLoop.ts"),
-            "utf8"
-        );
-        const controller = readFileSync(
-            join(this.root, "Backend", "Builder", "Autonomous", "ArchitectureDrivenBuildController.ts"),
-            "utf8"
-        );
+        const autonomousRuntime = readFileSync(join(this.root, "Backend", "HBOS", "Autonomous", "Runtime", "LocalConstructionToolset.ts"), "utf8");
+        const developmentLoop = readFileSync(join(this.root, "Backend", "HBOS", "Architecture", "Autonomous", "AutonomousDevelopmentLoop.ts"), "utf8");
+        const controller = readFileSync(join(this.root, "Backend", "Builder", "Autonomous", "ArchitectureDrivenBuildController.ts"), "utf8");
 
         const pythonOnly = autonomousRuntime.includes('type ImplementationAgent = "python"')
             && autonomousRuntime.includes("Backend/AI_Runtime/autonomous_builder.py")
             && autonomousRuntime.includes("Do not invoke Copilot, Codex, Claude, or any cloud coding CLI.");
-        const constructionLifecycle = ["GENERATE", "VERIFY", "REPAIR", "FINALIZE"]
-            .every(stage => autonomousRuntime.includes(stage));
+        const constructionLifecycle = ["GENERATE", "VERIFY", "REPAIR", "FINALIZE"].every(stage => autonomousRuntime.includes(stage));
         const orchestrationLifecycle = developmentLoop.includes("this.planner.plan(goal)")
             && developmentLoop.includes("controller.construct(plan.requirement)")
             && controller.includes("ARCHITECTURE")
