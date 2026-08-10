@@ -26,6 +26,7 @@ export interface ConstructionResult {
     selectedTool: string;
     issues: string[];
     trace: ConstructionStage[];
+    details: string;
 }
 
 export interface ConstructionTool {
@@ -40,21 +41,12 @@ export interface ConstructionTool {
     };
 }
 
-/**
- * Architecture-driven construction control plane.
- *
- * The engine does not invent architecture. It consumes an approved
- * ArchitecturePlan, selects an execution tool, verifies the result and
- * performs bounded self-repair when verification reports a failure.
- *
- * External providers such as Python workers, repository-native generators, * static analyzers and test runners are intentionally injected through
- * ConstructionTool so the control plane remains deterministic and testable.
- */
+/** Architecture-driven construction control plane. */
 export class AutonomousConstructionEngine {
     constructor(
         private readonly tools: ConstructionTool[],
         private readonly maxRepairAttempts = 3,
-    private readonly repairEngine = new AutonomousRepairEngine()
+        private readonly repairEngine = new AutonomousRepairEngine()
     ) {}
 
     build(plan: ArchitecturePlan): ConstructionResult {
@@ -63,19 +55,10 @@ export class AutonomousConstructionEngine {
         const artifacts: Record<string, unknown> = {};
 
         if (!plan.capabilityId || !plan.capability || !plan.targetEngine) {
-            return {
-                ok: false,
-                status: "BLOCKED",
-                stage: "ARCHITECTURE",
-                attempts: 0,
-                selectedTool: "none",
-                issues: ["INVALID_ARCHITECTURE_PLAN"],
-                trace
-            };
+            return this.blocked("ARCHITECTURE", 0, ["INVALID_ARCHITECTURE_PLAN"], trace);
         }
 
         let attempt = 0;
-
         for (const stage of ["ARCHITECTURE", "PLAN", "GENERATE"] as ConstructionStage[]) {
             trace.push(stage);
             const result = this.execute(stage, plan, attempt, artifacts, issues);
@@ -83,113 +66,40 @@ export class AutonomousConstructionEngine {
                 issues.push(result.issue || `${stage}_FAILED`);
                 return this.blocked(stage, attempt, issues, trace);
             }
-            if (result.artifact !== undefined) {
-                artifacts[stage] = result.artifact;
-            }
+            if (result.artifact !== undefined) artifacts[stage] = result.artifact;
         }
 
-        
-
-trace.push("VERIFY");
-
-issues.length = 0;
-
-let verification = this.execute(
-
-    "VERIFY",
-    plan,
-    attempt,
-    artifacts,
-    issues
-);
-
-if (verification.ok) {
-    issues.length = 0;
-}
-
+        trace.push("VERIFY");
+        issues.length = 0;
+        let verification = this.execute("VERIFY", plan, attempt, artifacts, issues);
 
         while (!verification.ok && attempt < this.maxRepairAttempts) {
             attempt += 1;
             trace.push("REPAIR");
-            const repairPlan = this.repairEngine.createPlan(
+            artifacts.REPAIR_PLAN = this.repairEngine.createPlan(
                 verification.issue || "VERIFY_FAILED",
                 JSON.stringify(verification)
             );
 
-            artifacts.REPAIR_PLAN = repairPlan;
-
             const repair = this.execute("REPAIR", plan, attempt, artifacts, issues);
-
-if (repair.ok) {
-
-    if (repair.artifact !== undefined) {
-        artifacts.REPAIR = repair.artifact;
-    }
-
-    issues.length = 0;
-
-    verification = this.execute(
-        "VERIFY",
-        plan,
-        attempt,
-        artifacts,
-        issues
-    );
-
-    if (verification.ok) {
-
-        trace.push("VERIFY_AFTER_REPAIR_PASS");
-
-        return this.success(
-            "REPAIRED",
-            attempt,
-            artifacts,
-            trace
-        );
-    }
-}
-
+            if (repair.artifact !== undefined) artifacts.REPAIR = repair.artifact;
             if (!repair.ok) {
                 issues.push(repair.issue || "REPAIR_FAILED");
                 continue;
             }
 
-            if (repair.artifact !== undefined) {
-                artifacts.REPAIR = repair.artifact;
-            }
-
             trace.push("VERIFY");
-            
-verification = this.execute(
-    "VERIFY",
-    plan,
-    attempt,
-    artifacts,
-    issues
-);
-
-if (verification.ok) {
-    issues.length = 0;
-}
-
+            issues.length = 0;
+            verification = this.execute("VERIFY", plan, attempt, artifacts, issues);
+            if (verification.ok) {
+                trace.push("VERIFY_AFTER_REPAIR_PASS");
+                return this.success("REPAIRED", attempt, trace);
+            }
         }
 
-        
-
-if (!verification.ok) {
-    issues.push(verification.issue || "VERIFICATION_FAILED");
-
-
-
-            return {
-                ok:false,
-                status:"BLOCKED",
-                stage:"VERIFY",
-                attempts:attempt,
-                selectedTool:this.toolFor("VERIFY").name,
-                issues,
-                trace
-            };
+        if (!verification.ok) {
+            issues.push(verification.issue || "VERIFICATION_FAILED");
+            return this.blocked("VERIFY", attempt, issues, trace);
         }
 
         trace.push("FINALIZE");
@@ -199,79 +109,40 @@ if (!verification.ok) {
             return this.blocked("FINALIZE", attempt, issues, trace);
         }
 
-        return {
-            ok: true,
-            status: attempt > 0 ? "REPAIRED" : "BUILT",
-            stage: "FINALIZE",
-            attempts: attempt,
-            selectedTool: this.toolFor("FINALIZE").name,
-            issues,
-            trace
-        };
+        return this.success(attempt > 0 ? "REPAIRED" : "BUILT", attempt, trace);
     }
 
-    private execute(
-        stage: ConstructionStage,
-        plan: ArchitecturePlan,
-        attempt: number,
-        artifacts: Record<string, unknown>,
-        issues: string[]
-    ) {
-        const tool = this.toolFor(stage);
-        return tool.execute(stage, {
-            plan,
-            stage,
-            attempt,
-            artifacts,
-            issues
-        });
+    private execute(stage: ConstructionStage, plan: ArchitecturePlan, attempt: number, artifacts: Record<string, unknown>, issues: string[]) {
+        return this.toolFor(stage).execute(stage, { plan, stage, attempt, artifacts, issues });
     }
 
     private toolFor(stage: ConstructionStage): ConstructionTool {
         const preferredNames: Record<ConstructionStage, string[]> = {
-            ARCHITECTURE: ["architecture"],
-            PLAN: ["architecture", "planner"],
-            GENERATE: ["generator", "python"],
-            VERIFY: ["python", "verifier", "test"],
-            REPAIR: ["python", "repair"],
-            FINALIZE: ["git", "finalizer"]
+            ARCHITECTURE: ["architecture"], PLAN: ["architecture", "planner"],
+            GENERATE: ["generator", "python"], VERIFY: ["python", "verifier", "test"],
+            REPAIR: ["python", "repair"], FINALIZE: ["git", "finalizer"]
         };
-
         for (const name of preferredNames[stage]) {
             const tool = this.tools.find(candidate => candidate.name === name);
-            if (tool) {
-                return tool;
-            }
+            if (tool) return tool;
         }
-
-        return this.tools[0] || {
-            name: "unavailable",
-            execute: () => ({ ok: false, issue: "NO_CONSTRUCTION_TOOL" })
-        };
+        return this.tools[0] || { name: "unavailable", execute: () => ({ ok: false, issue: "NO_CONSTRUCTION_TOOL" }) };
     }
 
-    private success(
-        status: "BUILT" | "REPAIRED",
-        attempts: number,
-        artifacts: Record<string, unknown>,
-        trace: ConstructionStage[]
-    ): ConstructionResult {
+    private success(status: "BUILT" | "REPAIRED", attempts: number, trace: ConstructionStage[]): ConstructionResult {
         return {
             ok: true,
             status,
-            stage: "VERIFY",
+            stage: "FINALIZE",
             attempts,
-            selectedTool: this.toolFor("VERIFY").name,
+            selectedTool: this.toolFor("FINALIZE").name,
             issues: [],
-            trace
+            trace,
+            details: `Construction verified and finalized; trace=${trace.join(" -> ")}`
         };
     }
-    private blocked(
-        stage: ConstructionStage,
-        attempts: number,
-        issues: string[],
-        trace: ConstructionStage[]
-    ): ConstructionResult {
+
+    private blocked(stage: ConstructionStage, attempts: number, issues: string[], trace: ConstructionStage[]): ConstructionResult {
         return {
             ok: false,
             status: "BLOCKED",
@@ -279,66 +150,31 @@ if (!verification.ok) {
             attempts,
             selectedTool: this.toolFor(stage).name,
             issues,
-            trace
+            trace,
+            details: `Construction blocked at ${stage}; trace=${trace.join(" -> ")}`
         };
     }
 
-    /** Minimal executable contract test kept beside the capability. */
     static selfTest(): void {
         let verificationCalls = 0;
         const tools: ConstructionTool[] = [
-            {
-                name: "architecture",
-                execute: stage => ({ ok: stage !== "ARCHITECTURE" || true })
-            },
-            {
-                name: "python",
-                execute: stage => {
-                    if (stage === "VERIFY") {
-                        verificationCalls += 1;
-                        return verificationCalls === 1
-                            ? { ok: false, issue: "INTERNAL_CONNECTION_FAILURE" }
-                            : { ok: true };
-                    }
-                    return { ok: true };
+            { name: "architecture", execute: () => ({ ok: true }) },
+            { name: "python", execute: stage => {
+                if (stage === "VERIFY") {
+                    verificationCalls += 1;
+                    return verificationCalls === 1 ? { ok: false, issue: "INTERNAL_CONNECTION_FAILURE" } : { ok: true };
                 }
-            },
-            {
-                name: "git",
-                execute: () => ({ ok: true })
-            }
+                return { ok: true };
+            } },
+            { name: "git", execute: () => ({ ok: true }) }
         ];
-
         const result = new AutonomousConstructionEngine(tools, 2).build({
-            capabilityId: "construction-001",
-            capability: "architecture-driven autonomous construction",
-            targetEngine: "Autonomous Operations Engine",
-            dependencies: ["Architecture Brain", "Governance Engine"],
+            capabilityId: "construction-001", capability: "architecture-driven autonomous construction",
+            targetEngine: "Autonomous Operations Engine", dependencies: ["Architecture Brain", "Governance Engine"],
             architectureRules: ["Architecture Freeze V4", "One Capability = One Engine"]
         });
-
-        if (!result.ok || result.status !== "REPAIRED" || result.attempts !== 1) {
+        if (!result.ok || result.status !== "REPAIRED" || result.attempts !== 1 || !result.details) {
             throw new Error("AutonomousConstructionEngine self-test failed");
         }
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
