@@ -23,9 +23,9 @@ function run(
                 executableArgs = ["/d", "/s", "/c", "npx.cmd", ...args];
             }
 
-            if (command === "copilot" || command === "claude") {
+            if (command === "claude") {
                 executable = process.env.ComSpec || "cmd.exe";
-                executableArgs = ["/d", "/s", "/c", `${command}.bat`, ...args];
+                executableArgs = ["/d", "/s", "/c", "claude.bat", ...args];
             }
         }
 
@@ -78,19 +78,19 @@ function commandExists(command: string, cwd: string): boolean {
     }
 }
 
-export type ImplementationAgent = "copilot" | "claude";
+export type ImplementationAgent = "claude";
 
+/**
+ * Resolves the single supported external implementation provider for the
+ * autonomous construction path. GitHub Copilot and Codex are deliberately
+ * excluded from this execution path.
+ */
 export function resolveImplementationAgent(root = process.cwd()): ImplementationAgent | null {
     const requested = process.env.HOOSHYAR_AGENT?.trim().toLowerCase();
 
-    if (requested) {
-        if (requested !== "copilot" && requested !== "claude") return null;
-        return commandExists(requested, root) ? requested : null;
-    }
+    if (requested && requested !== "claude") return null;
 
-    if (commandExists("copilot", root)) return "copilot";
-    if (commandExists("claude", root)) return "claude";
-    return null;
+    return commandExists("claude", root) ? "claude" : null;
 }
 
 /**
@@ -101,18 +101,7 @@ export function repositoryStateChanged(before: string, after: string): boolean {
     return before.trim() !== after.trim();
 }
 
-function buildAgentArgs(agent: ImplementationAgent, prompt: string): string[] {
-    if (agent === "copilot") {
-        return [
-            "-p", prompt,
-            "-s",
-            "--allow-all-tools",
-            "--allow-all-paths",
-            "--no-ask-user",
-            "--no-auto-update"
-        ];
-    }
-
+export function buildAgentArgs(_agent: ImplementationAgent, prompt: string): string[] {
     return [
         "-p", prompt,
         "--dangerously-skip-permissions",
@@ -196,7 +185,7 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                         exitCode: 127,
                         changed: false,
                         output: "",
-                        error: "No supported implementation agent found. Install/login to GitHub Copilot CLI or Claude Code, or set HOOSHYAR_AGENT to copilot or claude.",
+                        error: "Claude Code is not available. GitHub Copilot and Codex are not supported execution providers.",
                         timestamp: new Date().toISOString()
                     };
                     console.log(JSON.stringify(artifact, null, 2));
