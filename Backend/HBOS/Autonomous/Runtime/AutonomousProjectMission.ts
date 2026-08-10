@@ -62,30 +62,34 @@ export class AutonomousProjectMission {
 
     nextMission(): Mission {
         const evidence = this.snapshot();
-        const next = this.nextPlatformMission();
 
-        if (next) {
-            return {
-                ...next,
-                evidence,
-                architectureRules: this.architectureRules(),
-                directives: this.directives()
-            };
-        }
-
-        if (!evidence.clean) {
-            return {
-                capabilityId: `repair-${evidence.commit || "workspace"}`,
-                capability: "repair and verify the current working tree",
-                targetEngine: "Autonomous Operations Engine",
-                evidence,
-                dependencies: [],
-                architectureRules: this.architectureRules(),
-                directives: this.directives()
-            };
-        }
-
+        // The Assistant must reach its own evidence-based completion gate before
+        // the daemon is allowed to enter platform construction. This prevents a
+        // platform backlog item from accidentally bypassing unfinished Assistant
+        // capabilities.
         if (!this.assistantCompletionEvidence()) {
+            const assistantNext = this.nextAssistantCapability();
+            if (assistantNext) {
+                return {
+                    ...assistantNext,
+                    evidence,
+                    architectureRules: this.architectureRules(),
+                    directives: this.directives()
+                };
+            }
+
+            if (!evidence.clean) {
+                return {
+                    capabilityId: `repair-${evidence.commit || "workspace"}`,
+                    capability: "repair and verify the current working tree",
+                    targetEngine: "Autonomous Operations Engine",
+                    evidence,
+                    dependencies: [],
+                    architectureRules: this.architectureRules(),
+                    directives: this.directives()
+                };
+            }
+
             return {
                 capabilityId: "assistant.completion.evidence",
                 capability: "complete missing Assistant evidence required by the completion gate",
@@ -99,6 +103,16 @@ export class AutonomousProjectMission {
                     "Verify required implementation, focused tests, local builder and runtime are present.",
                     "Reject obsolete cloud coding providers from the autonomous construction path."
                 ]
+            };
+        }
+
+        const next = this.nextPlatformMission();
+        if (next) {
+            return {
+                ...next,
+                evidence,
+                architectureRules: this.architectureRules(),
+                directives: this.directives()
             };
         }
 
@@ -128,6 +142,34 @@ export class AutonomousProjectMission {
             capability: next.capability,
             targetEngine: next.targetEngine,
             dependencies: next.dependencies
+        };
+    }
+
+    private nextAssistantCapability(): Omit<Mission, "evidence" | "architectureRules" | "directives"> | null {
+        // Keep the Assistant completion contract deterministic: if a required
+        // artifact is missing, the existing evidence mission repairs that gap;
+        // otherwise return null so completion evidence can be evaluated.
+        const requiredPaths = [
+            join(this.root, "Backend", "HBOS", "Assistant", "Autonomous", "AutonomousAssistantRuntime.ts"),
+            join(this.root, "Backend", "HBOS", "Assistant", "Autonomous", "AutonomousMissionController.ts"),
+            join(this.root, "Backend", "HBOS", "Assistant", "Autonomous", "HooshyarAutonomousAssistant.ts"),
+            join(this.root, "Backend", "HBOS", "Assistant", "Autonomous", "PythonReasoningAdapter.ts"),
+            join(this.root, "Backend", "HBOS", "Assistant", "Autonomous", "PersistentArchitectureMemory.ts"),
+            join(this.root, "Backend", "HBOS", "Assistant", "Autonomous", "DecisionKnowledgeStore.ts"),
+            join(this.root, "Backend", "HBOS", "Assistant", "Autonomous", "ContextRetrievalEngine.ts"),
+            join(this.root, "Backend", "HBOS", "Assistant", "Autonomous", "LearningFeedbackLoop.ts"),
+            join(this.root, "Backend", "Builder", "Autonomous", "AutonomousProjectConductor.ts"),
+            join(this.root, "Backend", "HBOS", "Autonomous", "Runtime", "LocalConstructionToolset.ts"),
+            join(this.root, "Backend", "HBOS", "Autonomous", "Runtime", "AutonomousBuildDaemon.ts")
+        ];
+        const missing = requiredPaths.find(path => !existsSync(path));
+        if (!missing) return null;
+
+        return {
+            capabilityId: "assistant.completion.evidence",
+            capability: `complete missing Assistant evidence artifact: ${missing.replace(this.root, "").replace(/^[/\\]+/, "")}`,
+            targetEngine: "Autonomous Operations Engine",
+            dependencies: ["Assistant Runtime", "Mission Controller", "Python Reasoning Adapter"]
         };
     }
 
