@@ -1,31 +1,16 @@
 import { execFileSync } from "child_process";
-import {
-    ConstructionContext,
-    ConstructionStage,
-    ConstructionTool
-} from "../../Builder/Autonomous/AutonomousConstructionEngine";
+import { ConstructionContext, ConstructionTool } from "../../Builder/Autonomous/AutonomousConstructionEngine";
 
-function run(
-    command: string,
-    args: string[],
-    cwd: string,
-    timeout = 15 * 60 * 1000
-) {
+function run(command: string, args: string[], cwd: string, timeout = 15 * 60 * 1000) {
     try {
         let executable = command;
         let executableArgs = args;
 
         if (process.platform === "win32") {
             if (command === "git") executable = "git.exe";
-
             if (command === "npx") {
                 executable = process.env.ComSpec || "cmd.exe";
                 executableArgs = ["/d", "/s", "/c", "npx.cmd", ...args];
-            }
-
-            if (command === "claude") {
-                executable = process.env.ComSpec || "cmd.exe";
-                executableArgs = ["/d", "/s", "/c", "claude.bat", ...args];
             }
         }
 
@@ -42,7 +27,6 @@ function run(
     } catch (error: any) {
         const stdout = String(error?.stdout || "");
         const stderr = String(error?.stderr || "");
-
         console.error(JSON.stringify({
             type: "AUTONOMOUS_TOOL_ERROR",
             command,
@@ -53,7 +37,6 @@ function run(
             stderr,
             message: error?.message ?? `${command} failed`
         }, null, 2));
-
         return {
             ok: false,
             code: error?.status ?? 1,
@@ -66,52 +49,33 @@ function run(
 function commandExists(command: string, cwd: string): boolean {
     try {
         const locator = process.platform === "win32" ? "where.exe" : "which";
-        execFileSync(locator, [command], {
-            cwd,
-            encoding: "utf8",
-            windowsHide: true,
-            stdio: ["ignore", "pipe", "ignore"]
-        });
+        execFileSync(locator, [command], { cwd, encoding: "utf8", windowsHide: true, stdio: ["ignore", "pipe", "ignore"] });
         return true;
     } catch {
         return false;
     }
 }
 
-export type ImplementationAgent = "claude";
+export type ImplementationAgent = "python";
 
-/**
- * Resolves the single supported external implementation provider for the
- * autonomous construction path. GitHub Copilot and Codex are deliberately
- * excluded from this execution path.
- */
+/** The only autonomous implementation provider is the repository-owned Python AI Runtime. */
 export function resolveImplementationAgent(root = process.cwd()): ImplementationAgent | null {
     const requested = process.env.HOOSHYAR_AGENT?.trim().toLowerCase();
-
-    if (requested && requested !== "claude") return null;
-
-    return commandExists("claude", root) ? "claude" : null;
+    if (requested && requested !== "python") return null;
+    return commandExists("python", root) ? "python" : null;
 }
 
-/**
- * Reports whether an implementation agent produced a repository state change.
- * This is deliberately based on Git working-tree state, not process exit code.
- */
 export function repositoryStateChanged(before: string, after: string): boolean {
     return before.trim() !== after.trim();
 }
 
 export function buildAgentArgs(_agent: ImplementationAgent, prompt: string): string[] {
-    return [
-        "-p", prompt,
-        "--dangerously-skip-permissions",
-        "--output-format", "text"
-    ];
+    return ["Backend/AI_Runtime/autonomous_builder.py", "--prompt", prompt];
 }
 
 function buildAgentPrompt(context: ConstructionContext): string {
     return [
-        "You are the implementation agent inside HooshyarOS Autonomous Operations Engine.",
+        "You are the repository-native Python implementation worker inside HooshyarOS Autonomous Operations Engine.",
         "Read AGENTS.md, Docs/ARCHITECTURE.md, and Assistant/SYSTEM_PROMPT.md before changing code.",
         "Architecture Freeze V4 is authoritative; do not redesign or duplicate existing engines.",
         "Implement exactly ONE capability for this mission:",
@@ -120,14 +84,8 @@ function buildAgentPrompt(context: ConstructionContext): string {
         `Target Engine: ${context.plan.targetEngine}`,
         `Dependencies: ${context.plan.dependencies.join(", ") || "none"}`,
         `Architecture rules: ${context.plan.architectureRules.join(" ; ") || "preserve existing rules"}`,
-        "Use the smallest complete repository-native implementation.",
-        "Follow one capability = one coherent implementation contract + focused verification evidence.",
-        "Inspect existing implementation and git history first; reuse existing owners.",
-        "Create or update the implementation and its focused test, then run relevant tests/static validation.",
-        "Do NOT commit or push; the HooshyarOS finalize stage owns Git commit/push.",
-        "Do not stop at a plan or a generated artifact: produce a real repository change when the capability is missing.",
-        "If the capability is already truly implemented, verify that fact and make no duplicate implementation.",
-        "Return a concise completion summary and verification result."
+        "Use only repository-native Python construction. Do not invoke Copilot, Codex, Claude, or any cloud coding CLI.",
+        "Produce a real repository change when the selected deterministic capability is missing."
     ].join("\n");
 }
 
@@ -146,32 +104,12 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                 if (stage !== "GENERATE") return { ok: true };
 
                 const before = run("git", ["status", "--porcelain=v1"], root);
-                if (!before.ok) {
-                    return {
-                        ok: false,
-                        issue: "AUTONOMOUS_REPOSITORY_STATE_UNAVAILABLE",
-                        artifact: {
-                            type: "AUTONOMOUS_REPOSITORY_STATE_RESULT",
-                            stage: "BEFORE_GENERATION",
-                            exitCode: before.code,
-                            output: before.output,
-                            error: before.error,
-                            timestamp: new Date().toISOString()
-                        }
-                    };
-                }
-
+                if (!before.ok) return { ok: false, issue: "AUTONOMOUS_REPOSITORY_STATE_UNAVAILABLE", artifact: before };
                 if (before.output.trim()) {
                     return {
                         ok: false,
                         issue: "AUTONOMOUS_WORKTREE_DIRTY",
-                        artifact: {
-                            type: "AUTONOMOUS_REPOSITORY_STATE_RESULT",
-                            stage: "BEFORE_GENERATION",
-                            clean: false,
-                            output: before.output,
-                            timestamp: new Date().toISOString()
-                        }
+                        artifact: { type: "AUTONOMOUS_REPOSITORY_STATE_RESULT", stage: "BEFORE_GENERATION", clean: false, output: before.output }
                     };
                 }
 
@@ -181,11 +119,9 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                         type: "AUTONOMOUS_AGENT_GENERATION_RESULT",
                         provider: null,
                         capabilityId: context.plan.capabilityId,
-                        capability: context.plan.capability,
-                        exitCode: 127,
                         changed: false,
                         output: "",
-                        error: "Claude Code is not available. GitHub Copilot and Codex are not supported execution providers.",
+                        error: "Repository-owned Python AI Runtime is not available. External coding CLIs are not supported.",
                         timestamp: new Date().toISOString()
                     };
                     console.log(JSON.stringify(artifact, null, 2));
@@ -206,25 +142,11 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                     error: result.error,
                     timestamp: new Date().toISOString()
                 };
-
                 console.log(JSON.stringify(artifact, null, 2));
 
-                if (!result.ok) {
-                    return { ok: false, issue: "AUTONOMOUS_AGENT_GENERATION_FAILED", artifact };
-                }
-
-                if (!after.ok) {
-                    return { ok: false, issue: "AUTONOMOUS_REPOSITORY_STATE_UNAVAILABLE", artifact };
-                }
-
-                if (!changed) {
-                    return {
-                        ok: false,
-                        issue: "AUTONOMOUS_AGENT_NO_REPOSITORY_CHANGE",
-                        artifact
-                    };
-                }
-
+                if (!result.ok) return { ok: false, issue: "AUTONOMOUS_AGENT_GENERATION_FAILED", artifact };
+                if (!after.ok) return { ok: false, issue: "AUTONOMOUS_REPOSITORY_STATE_UNAVAILABLE", artifact };
+                if (!changed) return { ok: false, issue: "AUTONOMOUS_AGENT_NO_REPOSITORY_CHANGE", artifact };
                 return { ok: true, artifact };
             }
         },
@@ -242,22 +164,12 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                         output: test.output,
                         error: test.error
                     };
-
                     console.log(JSON.stringify(verificationArtifact, null, 2));
-                    if (test.code === 0) return { ok: true, artifact: verificationArtifact };
-                    return {
-                        ok: false,
-                        issue: "AUTONOMOUS_VERIFY_FAILED",
-                        artifact: { ...verificationArtifact, repairRequired: true }
-                    };
+                    return test.code === 0 ? { ok: true, artifact: verificationArtifact } : { ok: false, issue: "AUTONOMOUS_VERIFY_FAILED", artifact: { ...verificationArtifact, repairRequired: true } };
                 }
 
                 if (stage === "REPAIR") {
-                    console.log(JSON.stringify({
-                        type: "AUTONOMOUS_REPAIR",
-                        message: "Repair engine consumed verification artifact",
-                        issues: []
-                    }));
+                    console.log(JSON.stringify({ type: "AUTONOMOUS_REPAIR", message: "Repair engine consumed verification artifact", issues: [] }));
                     return { ok: true, artifact: { repaired: true } };
                 }
 
@@ -268,37 +180,20 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
             name: "git",
             execute: (stage) => {
                 if (stage !== "FINALIZE") return { ok: true };
-
                 const status = run("git", ["status", "--porcelain=v1"], root);
                 if (!status.ok) return { ok: false, issue: "GIT_STATUS_FAILED" };
-
-                if (!status.output.trim()) {
-                    return {
-                        ok: false,
-                        issue: "GIT_NO_REPOSITORY_CHANGE",
-                        artifact: { clean: true, committed: false, pushed: false, changeDetected: false }
-                    };
-                }
+                if (!status.output.trim()) return { ok: false, issue: "GIT_NO_REPOSITORY_CHANGE", artifact: { clean: true, committed: false, pushed: false, changeDetected: false } };
 
                 const add = run("git", ["add", "-A"], root);
                 if (!add.ok) return { ok: false, issue: "GIT_ADD_FAILED" };
-
                 const staged = run("git", ["diff", "--cached", "--quiet"], root);
                 if (!staged.ok && staged.code !== 1) return { ok: false, issue: "GIT_STAGED_DIFF_CHECK_FAILED" };
-                if (staged.code === 0) {
-                    return {
-                        ok: false,
-                        issue: "GIT_NO_STAGED_CHANGE",
-                        artifact: { clean: true, committed: false, pushed: false, changeDetected: false }
-                    };
-                }
+                if (staged.code === 0) return { ok: false, issue: "GIT_NO_STAGED_CHANGE", artifact: { clean: true, committed: false, pushed: false, changeDetected: false } };
 
                 const commit = run("git", ["commit", "-m", "feat(hbos): autonomous construction progress"], root);
                 if (!commit.ok) return { ok: false, issue: "GIT_COMMIT_FAILED" };
-
                 const push = run("git", ["push", "origin", "main"], root);
                 if (!push.ok) return { ok: false, issue: "GIT_PUSH_FAILED" };
-
                 return { ok: true, artifact: { committed: true, pushed: true, changeDetected: true } };
             }
         }
