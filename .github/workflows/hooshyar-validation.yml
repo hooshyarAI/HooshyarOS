@@ -33,7 +33,7 @@ jobs:
           cache: npm
 
       - name: Install Node dependencies
-        run: npm ci
+        run: npm install
 
       - name: Run Jest
         run: npm test -- --runInBand
