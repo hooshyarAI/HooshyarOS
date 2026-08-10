@@ -42,13 +42,27 @@ export class AutonomousBuildDaemon {
             }));
 
             if (mission.capabilityId === "assistant.completion.gate") {
+                const gate = this.development.execute({
+                    capabilityId: mission.capabilityId,
+                    capability: mission.capability,
+                    targetEngine: mission.targetEngine,
+                    dependencies: mission.dependencies
+                });
+
+                history.push({ cycle, commit: before.commit, mission: mission.capability, assistantGatePassed, result: gate });
+
+                if (!gate.result.ok) {
+                    console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, stage: "assistant-completion-gate", result: gate }));
+                    return { status: "blocked", cycles: cycle, history };
+                }
+
                 assistantGatePassed = true;
                 console.log(JSON.stringify({
                     type: "ASSISTANT_COMPLETION_GATE",
                     cycle,
                     commit: before.commit,
                     status: "PASSED",
-                    message: "All current canonical Assistant construction capabilities are present and the repository is clean."
+                    message: "Assistant completion evidence verified; platform continuation is now unlocked."
                 }));
 
                 const continuation = this.continuation.createMission();
