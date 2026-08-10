@@ -23,6 +23,16 @@ def test_platform_capability_generation_is_explicit_and_complete(tmp_path: Path,
     ]
 
 
+def test_generated_engine_contract_matches_hbos_core_interface():
+    engine_code = dict(autonomous_builder.CAPABILITIES["platform.user-management"])[
+        "Backend/HBOS/Engines/UserManagementEngine.ts"
+    ]
+    assert 'import { Engine } from "../Core/Engine";' in engine_code
+    assert "implements Engine" in engine_code
+    assert "initialize(): void" in engine_code
+    assert "health(): boolean" in engine_code
+
+
 def test_platform_dependencies_form_a_strict_weaving_order():
     assert autonomous_builder.PLATFORM_DEPENDENCIES["platform.user-management"] == []
     assert "Backend/HBOS/Engines/UserManagementEngine.ts" in autonomous_builder.PLATFORM_DEPENDENCIES["platform.organization-model"]
