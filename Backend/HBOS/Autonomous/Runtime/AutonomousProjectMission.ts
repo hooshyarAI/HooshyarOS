@@ -151,7 +151,8 @@ export class AutonomousProjectMission {
                 dependencies: ["Reasoning Engine", "AI Runtime"],
                 requiredPaths: [
                     join(this.root, "Backend", "HBOS", "Engines", "ReasoningEngine.ts"),
-                    join(this.root, "Backend", "HBOS", "Assistant", "Autonomous", "PythonReasoningAdapter.ts")
+                    join(this.root, "Backend", "HBOS", "Assistant", "Autonomous", "PythonReasoningAdapter.ts"),
+                    join(this.root, "Backend", "HBOS", "test", "PythonReasoningAdapter.test.ts")
                 ],
                 evidencePaths: [join(this.root, "Backend", "AI_Runtime", "reasoning", "reasoning_engine.py")]
             }
@@ -180,7 +181,8 @@ export class AutonomousProjectMission {
             join(this.root, "Backend", "HBOS", "Autonomous", "Runtime", "AutonomousBuildDaemon.ts"),
             join(this.root, "Backend", "HBOS", "test", "AutonomousMissionController.test.ts"),
             join(this.root, "Backend", "HBOS", "test", "AutonomousAssistantRuntime.test.ts"),
-            join(this.root, "Backend", "HBOS", "test", "HooshyarAutonomousAssistant.test.ts")
+            join(this.root, "Backend", "HBOS", "test", "HooshyarAutonomousAssistant.test.ts"),
+            join(this.root, "Backend", "HBOS", "test", "PythonReasoningAdapter.test.ts")
         ];
         return requiredPaths.every(existsSync);
     }
