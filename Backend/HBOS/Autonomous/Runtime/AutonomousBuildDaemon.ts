@@ -26,6 +26,7 @@ export class AutonomousBuildDaemon {
 
     run() {
         const history: unknown[] = [];
+        let assistantGatePassed = false;
 
         for (let cycle = 1; cycle <= this.maxCycles; cycle += 1) {
             const before = this.mission.snapshot();
@@ -39,6 +40,8 @@ export class AutonomousBuildDaemon {
                 targetEngine: mission.targetEngine
             }));
 
+            let goal = mission;
+
             if (mission.capabilityId === "assistant.completion.gate") {
                 const completion = {
                     type: "ASSISTANT_COMPLETION_GATE",
@@ -48,31 +51,49 @@ export class AutonomousBuildDaemon {
                     message: "All current canonical Assistant construction capabilities are present and the repository is clean."
                 };
                 const continuation = this.continuation.createMission();
+                assistantGatePassed = true;
+
                 console.log(JSON.stringify(completion));
                 console.log(JSON.stringify({
                     type: "AUTONOMOUS_PLATFORM_CONTINUATION",
                     cycle,
                     mission: continuation
                 }));
-                history.push({ cycle, commit: before.commit, mission: mission.capability, completion, continuation });
-                return { status: "completed", cycles: cycle, history, continuation };
+
+                // The completion gate is a handoff, not a terminal state. Execute
+                // the canonical continuation mission through the same repository-
+                // native construction loop so the Assistant can keep building.
+                goal = {
+                    ...mission,
+                    capabilityId: continuation.capabilityId,
+                    capability: continuation.capability,
+                    targetEngine: "Autonomous Operations Engine",
+                    dependencies: []
+                };
             }
 
             const result = this.development.execute({
-                capabilityId: mission.capabilityId,
-                capability: mission.capability,
-                targetEngine: mission.targetEngine,
-                dependencies: mission.dependencies
+                capabilityId: goal.capabilityId,
+                capability: goal.capability,
+                targetEngine: goal.targetEngine,
+                dependencies: goal.dependencies
             });
 
-            history.push({ cycle, commit: before.commit, mission: mission.capability, result });
+            history.push({
+                cycle,
+                commit: before.commit,
+                mission: goal.capability,
+                assistantGatePassed,
+                result
+            });
 
             if (cycle % this.reportEvery === 0) {
                 console.log(JSON.stringify({
                     type: "AUTONOMOUS_PROGRESS",
                     cycle,
                     latestCommit: this.mission.snapshot().commit,
-                    status: result.status
+                    status: result.status,
+                    assistantGatePassed
                 }));
             }
 
@@ -87,7 +108,9 @@ export class AutonomousBuildDaemon {
                     type: "AUTONOMOUS_IDLE",
                     cycle,
                     commit: after.commit,
-                    message: "No repository change was produced by the current construction capability."
+                    message: assistantGatePassed
+                        ? "Platform continuation produced no repository change. The autonomous builder requires a concrete missing capability before continuing."
+                        : "No repository change was produced by the current construction capability."
                 }));
                 return { status: "idle", cycles: cycle, history };
             }
