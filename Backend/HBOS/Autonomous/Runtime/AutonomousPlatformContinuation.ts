@@ -1,3 +1,5 @@
+import { AutonomousProjectMission, Mission } from "./AutonomousProjectMission";
+
 export interface PlatformContinuationMission {
     capabilityId: "platform.continuation";
     capability: string;
@@ -17,6 +19,22 @@ export class AutonomousPlatformContinuation {
             capability: "continue autonomous construction of HooshyarOS platform capabilities",
             instruction: "AUDIT → SELECT NEXT GENUINELY MISSING CAPABILITY → IMPLEMENT → TEST → INTEGRATE → VERIFY → COMMIT → PUSH → AUDIT AGAIN",
             source: "assistant.completion.gate"
+        };
+    }
+
+    /**
+     * Converts the completion handoff into a real backlog mission. A
+     * continuation must never be treated as a build capability itself.
+     */
+    selectNextCapability(projectMission: AutonomousProjectMission): Mission | null {
+        const next = projectMission.nextPlatformMission();
+        if (!next) return null;
+
+        return {
+            ...next,
+            evidence: projectMission.snapshot(),
+            architectureRules: [],
+            directives: []
         };
     }
 }
