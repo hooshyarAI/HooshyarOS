@@ -21,4 +21,12 @@ describe("AutonomousPlatformContinuation", () => {
         expect(selected === null || selected.capabilityId).toBeTruthy();
         expect(selected?.capabilityId).not.toBe("platform.continuation");
     });
+
+    it("does not turn an exhausted backlog into a fake continuation capability", () => {
+        const projectMission = {
+            nextPlatformMission: () => null
+        } as AutonomousProjectMission;
+
+        expect(new AutonomousPlatformContinuation().selectNextCapability(projectMission)).toBeNull();
+    });
 });
