@@ -1,5 +1,6 @@
 import { AutonomousDevelopmentLoop } from "../../Architecture/Autonomous/AutonomousDevelopmentLoop";
 import { AutonomousProjectMission } from "./AutonomousProjectMission";
+import { AutonomousPlatformContinuation } from "./AutonomousPlatformContinuation";
 import { createLocalConstructionTools } from "./LocalConstructionToolset";
 
 export interface DaemonOptions {
@@ -10,6 +11,7 @@ export interface DaemonOptions {
 
 export class AutonomousBuildDaemon {
     private readonly mission: AutonomousProjectMission;
+    private readonly continuation: AutonomousPlatformContinuation;
     private readonly development: AutonomousDevelopmentLoop;
     private readonly maxCycles: number;
     private readonly reportEvery: number;
@@ -17,6 +19,7 @@ export class AutonomousBuildDaemon {
     constructor(options: DaemonOptions = {}) {
         const root = options.root || process.cwd();
         this.mission = new AutonomousProjectMission(root);
+        this.continuation = new AutonomousPlatformContinuation();
         this.development = new AutonomousDevelopmentLoop(createLocalConstructionTools(root));
         this.maxCycles = options.maxCycles ?? 1000;
         this.reportEvery = options.reportEvery ?? 1;
@@ -48,15 +51,18 @@ export class AutonomousBuildDaemon {
                     message: "All current canonical Assistant construction capabilities are present and the repository is clean."
                 }));
 
-                // A completion gate must not become a fake build capability. Re-audit
-                // the canonical platform backlog and execute only a real missing item.
-                const nextPlatform = this.mission.nextPlatformMission();
+                // The completion gate is evidence only. The continuation object
+                // must select the next real platform capability; it is never
+                // submitted to the Builder as a fake capability.
+                const continuation = this.continuation.createMission();
+                const nextPlatform = this.continuation.selectNextCapability(this.mission);
                 if (!nextPlatform) {
                     console.log(JSON.stringify({
                         type: "AUTONOMOUS_PLATFORM_COMPLETE",
                         cycle,
                         commit: before.commit,
                         status: "completed",
+                        continuation,
                         message: "Assistant completion gate passed and the canonical platform backlog is exhausted."
                     }));
                     return { status: "completed", cycles: cycle, history };
@@ -65,6 +71,7 @@ export class AutonomousBuildDaemon {
                 console.log(JSON.stringify({
                     type: "AUTONOMOUS_PLATFORM_CONTINUATION",
                     cycle,
+                    continuation,
                     mission: nextPlatform
                 }));
 
