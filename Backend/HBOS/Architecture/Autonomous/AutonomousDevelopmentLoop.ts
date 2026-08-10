@@ -1,4 +1,4 @@
-import { ArchitectureDrivenBuildController } from "../../Builder/Autonomous/ArchitectureDrivenBuildController";
+﻿import { ArchitectureDrivenBuildController } from "../../Builder/Autonomous/ArchitectureDrivenBuildController";
 import { ConstructionResult, ConstructionTool } from "../../Builder/Autonomous/AutonomousConstructionEngine";
 import { GoalPlanner, GoalPlan } from "../Planner/GoalPlanner";
 
@@ -53,8 +53,17 @@ export class AutonomousDevelopmentLoop {
         if (!result.plan || !result.plan.requirement) {
             throw new Error("Completion evidence is invalid: no canonical plan was produced");
         }
+        const trace = result.result.trace;
+        const requiredStages = ["ARCHITECTURE", "PLAN", "GENERATE", "VERIFY", "FINALIZE"] as const;
+        const missingStages = requiredStages.filter(stage => !trace.includes(stage));
+        if (missingStages.length > 0) {
+            throw new Error(`Completion evidence is invalid: missing construction stages ${missingStages.join(", ")}`);
+        }
         if (!result.result.details || !result.result.details.trim()) {
             throw new Error("Completion evidence is invalid: construction produced no verification details");
+        }
+        if (result.result.stage !== "FINALIZE") {
+            throw new Error("Completion evidence is invalid: construction did not reach FINALIZE");
         }
     }
 }
