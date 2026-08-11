@@ -18,6 +18,12 @@ jest.mock("./AutonomousProjectMission", () => ({
             capability: "HooshyarOS Autonomous Assistant completion gate",
             targetEngine: "Autonomous Operations Engine",
             dependencies: []
+        })),
+        nextPlatformMission: jest.fn(() => ({
+            capabilityId: "platform.user-management",
+            capability: "implement the Phase 2 User Management capability",
+            targetEngine: "User Management Engine",
+            dependencies: ["HBOS Core", "Governance Engine"]
         }))
     }))
 }));
@@ -38,8 +44,8 @@ describe("AutonomousBuildDaemon", () => {
         expect(AutonomousDevelopmentLoop).toHaveBeenCalledTimes(1);
         expect(AutonomousDevelopmentLoop.mock.results[0].value.execute).toHaveBeenCalledWith(
             expect.objectContaining({
-                capabilityId: "platform.continuation",
-                capability: expect.stringContaining("continue autonomous construction")
+                capabilityId: "platform.user-management",
+                capability: expect.stringContaining("User Management")
             })
         );
     });
