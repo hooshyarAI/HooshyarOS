@@ -24,12 +24,27 @@ export class AutonomousBuildDaemon {
     run() {
         const history: unknown[] = [];
         let assistantGatePassed = false;
-        let platformContinuation: any = null;
 
         for (let cycle = 1; cycle <= this.maxCycles; cycle += 1) {
             const before = this.mission.snapshot();
-            const mission = platformContinuation ?? this.mission.nextMission();
-            platformContinuation = null;
+            const selected = this.mission.nextMission();
+            let mission = selected;
+
+            // Completion of the Assistant is a handoff checkpoint, not a reason
+            // to invoke the construction loop on the gate itself. Resolve the
+            // handoff to the next concrete platform capability before execution.
+            if (selected.capabilityId === "assistant.completion.gate") {
+                assistantGatePassed = true;
+                const continuation = this.continuation.createMission();
+                const nextPlatformMission = this.continuation.selectNextCapability(this.mission);
+                if (!nextPlatformMission) {
+                    console.log(JSON.stringify({ type: "AUTONOMOUS_PLATFORM_COMPLETE", cycle, status: "completed", continuation }));
+                    return { status: "completed", cycles: cycle, history };
+                }
+                mission = nextPlatformMission;
+                console.log(JSON.stringify({ type: "AUTONOMOUS_PLATFORM_CONTINUATION", cycle, continuation, mission }));
+            }
+
             console.log(JSON.stringify({ type: "AUTONOMOUS_MISSION", cycle, commit: before.commit, capability: mission.capability, targetEngine: mission.targetEngine }));
 
             const result = this.development.execute({ capabilityId: mission.capabilityId, capability: mission.capability, targetEngine: mission.targetEngine, dependencies: mission.dependencies });
@@ -40,26 +55,8 @@ export class AutonomousBuildDaemon {
                 return { status: "blocked", cycles: cycle, history };
             }
 
-            // AutonomousDevelopmentLoop.execute() owns construction verification.
-            // Do not invoke the static verifier a second time here: besides duplicating
-            // work, that breaks consumers/tests that provide a minimal loop mock.
-
-            if (mission.capabilityId === "assistant.completion.gate") {
-                assistantGatePassed = true;
-                const continuation = this.continuation.createMission();
-                platformContinuation = this.continuation.selectNextCapability(this.mission);
-                if (!platformContinuation) {
-                    console.log(JSON.stringify({ type: "AUTONOMOUS_PLATFORM_COMPLETE", cycle, status: "completed", continuation }));
-                    return { status: "completed", cycles: cycle, history };
-                }
-                console.log(JSON.stringify({ type: "AUTONOMOUS_PLATFORM_CONTINUATION", cycle, continuation, mission: platformContinuation }));
-            }
-
             const after = this.mission.snapshot();
-            // A completion gate is a decision checkpoint, not a construction step.
-            // If it successfully selected a real platform capability, the absence of
-            // a commit at the gate must not be mistaken for an idle/finished state.
-            if (after.commit === before.commit && after.clean && !platformContinuation) {
+            if (after.commit === before.commit && after.clean && cycle < this.maxCycles) {
                 console.log(JSON.stringify({ type: "AUTONOMOUS_IDLE", cycle, commit: after.commit, capability: mission.capability, message: "No repository change was produced; refusing to advance as completed." }));
                 return { status: "idle", cycles: cycle, history };
             }
