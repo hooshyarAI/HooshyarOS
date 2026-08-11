@@ -42,7 +42,15 @@ export class HooshyarAutonomousAssistant {
         const evaluation=this.evaluation.evaluate(runtime);
         const improvement=this.improvement.improve(evaluation);
         const tool=this.tools.execute("internal_reasoning");
-        const result={identity,mission,lifecycle,runtime,evaluation,improvement,tool};
+
+        // The Assistant is autonomous construction intelligence, not a human
+        // executive advisor. Once its own lifecycle is complete, construction
+        // ownership must pass automatically to the governed platform daemon so
+        // the Assistant can continue building the repository without requiring
+        // a second manual command or a cloud coding provider.
+        const construction=this.continuePlatformConstruction();
+
+        const result={identity,mission,lifecycle,runtime,evaluation,improvement,tool,construction};
         this.memory.record(result);
         return result;
     }
