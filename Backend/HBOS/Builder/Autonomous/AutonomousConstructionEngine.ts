@@ -92,7 +92,6 @@ export class AutonomousConstructionEngine {
             issues.length = 0;
             verification = this.execute("VERIFY", plan, attempt, artifacts, issues);
             if (verification.ok) {
-                trace.push("VERIFY_AFTER_REPAIR_PASS");
                 return this.success("REPAIRED", attempt, trace);
             }
         }
