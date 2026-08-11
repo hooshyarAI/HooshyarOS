@@ -43,7 +43,7 @@ function seedCanonicalAssistantEvidence(root: string): void {
     writeFileSync(conductor, "autonomous-self-healing", "utf8");
 
     const daemon = join(root, "Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts");
-    writeFileSync(daemon, "platform-continuation AUTONOMOUS_PLATFORM_COMPLETE", "utf8");
+    writeFileSync(daemon, "platform-continuation AUTONOMOUS_PLATFORM_BACKLOG_EXHAUSTED", "utf8");
 
     const builder = join(root, "Backend/AI_Runtime/autonomous_builder.py");
     mkdirSync(join(builder, ".."), { recursive: true });
