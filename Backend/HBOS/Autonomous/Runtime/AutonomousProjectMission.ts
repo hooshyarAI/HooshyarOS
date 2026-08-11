@@ -26,15 +26,16 @@ export class AutonomousProjectMission {
             return { capabilityId: "assistant.completion.evidence", capability: "complete missing Assistant evidence required by the completion gate", targetEngine: "Autonomous Operations Engine", evidence, dependencies: ["Assistant Runtime", "Mission Controller", "Python Reasoning Adapter"], architectureRules: this.architectureRules(), directives: [...this.directives(), "The completion gate must be evidence-based.", "Verify required implementation, focused tests, local builder and runtime are present.", "Reject obsolete cloud coding providers from the autonomous construction path."] };
         }
 
-        // nextMission() is the canonical Assistant lifecycle decision point.
-        // Platform construction is deliberately delegated to nextPlatformMission()
-        // after the completion gate has passed.
         return { capabilityId: "assistant.completion.gate", capability: "HooshyarOS Autonomous Assistant completion gate", targetEngine: "Autonomous Operations Engine", evidence, dependencies: [], architectureRules: this.architectureRules(), directives: [...this.directives(), "All current canonical Assistant construction capabilities are present and the repository is clean.", "The autonomous construction path is repository-native and Python-backed.", "Do not start broad platform construction from this completion gate."] };
     }
 
     nextPlatformMission(): Omit<Mission, "evidence" | "architectureRules" | "directives"> | null {
-        const phaseTwo = this.capabilityBacklog().slice(0, 3);
-        const next = phaseTwo.find(capability => !this.isCapabilityImplemented(capability) && this.dependenciesSatisfied(capability));
+        // The continuation must weave the entire canonical backlog, not only
+        // the first Phase 2 trio. Once those three capabilities are complete,
+        // the autonomous worker must continue into the canonical engines and
+        // runtime bridge instead of falsely declaring the platform complete.
+        const backlog = this.capabilityBacklog();
+        const next = backlog.find(capability => !this.isCapabilityImplemented(capability) && this.dependenciesSatisfied(capability));
         return next ? { capabilityId: next.id, capability: next.capability, targetEngine: next.targetEngine, dependencies: next.dependencies } : null;
     }
 
@@ -68,7 +69,7 @@ export class AutonomousProjectMission {
     private assistantCompletionEvidence(): boolean {
         const required=["Backend/HBOS/Assistant/Autonomous/AutonomousAssistantRuntime.ts","Backend/HBOS/Assistant/Autonomous/AutonomousMissionController.ts","Backend/HBOS/Assistant/Autonomous/HooshyarAutonomousAssistant.ts","Backend/HBOS/Assistant/Autonomous/PythonReasoningAdapter.ts","Backend/HBOS/Assistant/Autonomous/PersistentArchitectureMemory.ts","Backend/HBOS/Assistant/Autonomous/DecisionKnowledgeStore.ts","Backend/HBOS/Assistant/Autonomous/ContextRetrievalEngine.ts","Backend/HBOS/Assistant/Autonomous/LearningFeedbackLoop.ts","Backend/Builder/Autonomous/AutonomousProjectConductor.ts","Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.ts","Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts","Backend/HBOS/test/AutonomousMissionController.test.ts","Backend/HBOS/test/AutonomousAssistantRuntime.test.ts","Backend/HBOS/test/HooshyarAutonomousAssistant.test.ts","Backend/HBOS/test/PythonReasoningAdapter.test.ts","Backend/AI_Runtime/autonomous_builder.py","Backend/AI_Runtime/reasoning/reasoning_engine.py"].map(path=>join(this.root,path));
         if(!required.every(existsSync))return false;
-        const runtime=readFileSync(join(this.root,"Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.ts"),"utf8"), loop=readFileSync(join(this.root,"Backend/HBOS/Architecture/Autonomous/AutonomousDevelopmentLoop.ts"),"utf8"), controller=readFileSync(join(this.root,"Backend/Builder/Autonomous/ArchitectureDrivenBuildController.ts"),"utf8"), builder=readFileSync(join(this.root,"Backend/AI_Runtime/autonomous_builder.py"),"utf8"), reasoning=readFileSync(join(this.root,"Backend/AI_Runtime/reasoning/reasoning_engine.py"),"utf8");
+        const runtime=readFileSync(join(this.root,"Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.ts"),"utf8), loop=readFileSync(join(this.root,"Backend/HBOS/Architecture/Autonomous/AutonomousDevelopmentLoop.ts"),"utf8), controller=readFileSync(join(this.root,"Backend/HBOS/Builder/Autonomous/ArchitectureDrivenBuildController.ts"),"utf8), builder=readFileSync(join(this.root,"Backend/AI_Runtime/autonomous_builder.py"),"utf8), reasoning=readFileSync(join(this.root,"Backend/AI_Runtime/reasoning/reasoning_engine.py"),"utf8);
         const pythonOnly=runtime.includes('ImplementationAgent = "python"');
         const lifecycle=["GENERATE","VERIFY","REPAIR","FINALIZE"].every(stage=>runtime.includes(stage));
         const orchestration=loop.includes("this.planner.plan(goal)")&&loop.includes("controller.construct(plan.requirement)")&&controller.includes("ARCHITECTURE")&&controller.includes("PLAN");
