@@ -106,7 +106,7 @@ export class AutonomousProjectMission {
         const pythonOnly = runtime.includes('ImplementationAgent = "python"');
         const lifecycle = ["GENERATE", "VERIFY", "REPAIR", "FINALIZE"].every(stage => runtime.includes(stage));
         const orchestration = loop.includes("this.planner.plan(goal)") && loop.includes("controller.construct(plan.requirement)") && controller.includes("ARCHITECTURE") && controller.includes("PLAN");
-        const autonomousHandoff = conductor.includes("autonomous-self-healing") && daemon.includes("platform-continuation") && daemon.includes("AUTONOMOUS_PLATFORM_COMPLETE");
+        const autonomousHandoff = conductor.includes("autonomous-self-healing") && daemon.includes("platform-continuation") && daemon.includes("AUTONOMOUS_PLATFORM_BACKLOG_EXHAUSTED");
         const local = builder.includes("argparse") && builder.includes("CAPABILITIES") && builder.includes("Capability ID:") && builder.includes("if not generated:") && !builder.includes("subprocess.run([\"copilot\"") && !builder.includes("subprocess.run([\"codex\"") && !builder.includes("subprocess.run([\"claude\"");
         const supportedPlatformCapabilities = ["platform.user-management", "platform.organization-model", "platform.security-layer"].every(id => builder.includes(id));
         const reasoningContract = reasoning.includes("class ReasoningEngine") && reasoning.includes("def reason") && reasoning.includes('"status": "reasoned"');
