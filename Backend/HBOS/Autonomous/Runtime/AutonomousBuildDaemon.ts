@@ -1,6 +1,6 @@
 import { AutonomousDevelopmentLoop, AutonomousDevelopmentResult } from "../../Architecture/Autonomous/AutonomousDevelopmentLoop";
 import { AutonomousProjectMission, Mission } from "./AutonomousProjectMission";
-import { AutonomousPlatformContinuation, PlatformCapabilityMission } from "./AutonomousPlatformContinuation";
+import { AutonomousPlatformContinuation, PlatformCapabilityMission, PlatformContinuationMission } from "./AutonomousPlatformContinuation";
 import { createLocalConstructionTools } from "./LocalConstructionToolset";
 
 export interface DaemonOptions {
@@ -11,6 +11,26 @@ export interface DaemonOptions {
     continuation?: AutonomousPlatformContinuation;
     development?: AutonomousDevelopmentLoop;
 }
+
+type MissionDecision =
+    | {
+        kind: "mission";
+        mission: Mission;
+        assistantGatePassed: false;
+        continuation?: undefined;
+    }
+    | {
+        kind: "platform-continuation";
+        mission: PlatformCapabilityMission;
+        assistantGatePassed: true;
+        continuation: PlatformContinuationMission;
+    }
+    | {
+        kind: "platform-complete";
+        mission: Mission;
+        assistantGatePassed: true;
+        continuation: PlatformContinuationMission;
+    };
 
 export class AutonomousBuildDaemon {
     private readonly mission: AutonomousProjectMission;
@@ -29,23 +49,43 @@ export class AutonomousBuildDaemon {
     }
 
     /**
-     * Decision boundary: the daemon orchestrates, but never invents a
-     * capability. The canonical mission and continuation contracts decide
-     * what happens next; execution is delegated afterwards.
+     * Single autonomous decision boundary.
+     *
+     * Reasoning/mission selection stays in AutonomousProjectMission,
+     * continuation policy stays in AutonomousPlatformContinuation, and the
+     * daemon only executes the resulting decision. This prevents the
+     * completion gate from ever being executed as if it were a platform
+     * capability.
      */
-    private selectMission(): { mission: Mission | PlatformCapabilityMission; assistantGatePassed: boolean; continuation?: unknown } {
+    private selectMission(): MissionDecision {
         const selected = this.mission.nextMission();
+
         if (selected.capabilityId !== "assistant.completion.gate") {
-            return { mission: selected, assistantGatePassed: false };
+            return {
+                kind: "mission",
+                mission: selected,
+                assistantGatePassed: false
+            };
         }
 
         const continuation = this.continuation.createMission();
         const nextPlatformMission = this.continuation.selectNextCapability(this.mission);
-        if (!nextPlatformMission) {
-            return { mission: selected, assistantGatePassed: true, continuation };
+
+        if (nextPlatformMission) {
+            return {
+                kind: "platform-continuation",
+                mission: nextPlatformMission,
+                assistantGatePassed: true,
+                continuation
+            };
         }
 
-        return { mission: nextPlatformMission, assistantGatePassed: true, continuation };
+        return {
+            kind: "platform-complete",
+            mission: selected,
+            assistantGatePassed: true,
+            continuation
+        };
     }
 
     run() {
@@ -54,19 +94,20 @@ export class AutonomousBuildDaemon {
         for (let cycle = 1; cycle <= this.maxCycles; cycle += 1) {
             const before = this.mission.snapshot();
             const decision = this.selectMission();
+
+            if (decision.kind === "platform-complete") {
+                console.log(JSON.stringify({
+                    type: "AUTONOMOUS_PLATFORM_COMPLETE",
+                    cycle,
+                    status: "completed",
+                    continuation: decision.continuation
+                }));
+                return { status: "completed", cycles: cycle, history };
+            }
+
             const mission = decision.mission;
 
-            if (decision.continuation) {
-                if (mission.capabilityId === "assistant.completion.gate") {
-                    console.log(JSON.stringify({
-                        type: "AUTONOMOUS_PLATFORM_COMPLETE",
-                        cycle,
-                        status: "completed",
-                        continuation: decision.continuation
-                    }));
-                    return { status: "completed", cycles: cycle, history };
-                }
-
+            if (decision.kind === "platform-continuation") {
                 console.log(JSON.stringify({
                     type: "AUTONOMOUS_PLATFORM_CONTINUATION",
                     cycle,
@@ -83,18 +124,22 @@ export class AutonomousBuildDaemon {
                 targetEngine: mission.targetEngine
             }));
 
-            const result: AutonomousDevelopmentResult = this.development.execute({
+            const goal = {
                 capabilityId: mission.capabilityId,
                 capability: mission.capability,
                 targetEngine: mission.targetEngine,
                 dependencies: mission.dependencies
-            });
+            };
+            const result: AutonomousDevelopmentResult = this.development.execute(goal);
 
             history.push({
                 cycle,
                 commit: before.commit,
                 mission: mission.capability,
+                capabilityId: mission.capabilityId,
+                targetEngine: mission.targetEngine,
                 assistantGatePassed: decision.assistantGatePassed,
+                handoff: decision.kind === "platform-continuation" ? decision.continuation : undefined,
                 result
             });
 
