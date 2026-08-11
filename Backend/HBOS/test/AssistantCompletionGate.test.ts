@@ -53,12 +53,11 @@ function seedCanonicalAssistantEvidence(root: string): void {
     mkdirSync(join(reasoning, ".."), { recursive: true });
     writeFileSync(reasoning, 'class ReasoningEngine:\n    def reason(self): return {"status": "reasoned"}\n', "utf8");
 
-    const agents = join(root, "AGENTS.md");
-    writeFileSync(agents, "Architecture Freeze V4", "utf8");
+    writeFileSync(join(root, "AGENTS.md"), "Architecture Freeze V4", "utf8");
 
     const prompt = join(root, "Assistant/SYSTEM_PROMPT.md");
     mkdirSync(join(prompt, ".."), { recursive: true });
-    writeFileSync(prompt, "strategic advisor financial managerial autonomous construction", "utf8");
+    writeFileSync(prompt, "autonomous construction intelligence; not a human executive's financial, managerial or commercial advisor", "utf8");
 }
 
 describe("Assistant completion gate", () => {
@@ -72,6 +71,20 @@ describe("Assistant completion gate", () => {
             expect(next.capabilityId).toBe("assistant.completion.gate");
             expect(next.targetEngine).toBe("Autonomous Operations Engine");
             expect(next.evidence.clean).toBe(true);
+        } finally {
+            rmSync(root, { recursive: true, force: true });
+        }
+    });
+
+    it("rejects the legacy advisor-only identity even when structural evidence exists", () => {
+        const root = mkdtempSync(join(tmpdir(), "hooshyar-assistant-gate-legacy-"));
+        try {
+            seedCanonicalAssistantEvidence(root);
+            writeFileSync(join(root, "Assistant/SYSTEM_PROMPT.md"), "strategic advisor financial managerial autonomous construction", "utf8");
+            const mission = new AutonomousProjectMission(root);
+            const next = mission.nextMission();
+
+            expect(next.capabilityId).toBe("assistant.completion.evidence");
         } finally {
             rmSync(root, { recursive: true, force: true });
         }
