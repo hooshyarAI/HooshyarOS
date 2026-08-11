@@ -104,7 +104,9 @@ describe("AutonomousBuildDaemon", () => {
             selectNextCapability: jest.fn(() => null)
         } as unknown as AutonomousPlatformContinuation;
 
-        const execute = jest.fn((_goal: any): never => { throw new Error("completion must not execute without evidence"); });
+        const execute = jest.fn((goal: any): AutonomousDevelopmentResult => {
+            throw new Error(`completion must not execute without evidence: ${goal.capabilityId}`);
+        });
         const development = { execute } as unknown as AutonomousDevelopmentLoop;
         const daemon = new AutonomousBuildDaemon({ maxCycles: 1, mission, continuation, development });
 
@@ -113,7 +115,8 @@ describe("AutonomousBuildDaemon", () => {
         expect(result.status).toBe("cycle_limit");
         expect(result.history).toHaveLength(1);
         expect(execute).toHaveBeenCalledTimes(1);
-        expect((execute.mock.calls[0]?.[0] as any).capabilityId).toBe("assistant.completion.evidence");
-        expect((execute.mock.calls[0]?.[0] as any).capability).toContain("documentation");
+        const executedGoal = (execute.mock.calls[0]?.[0] as any);
+        expect(executedGoal.capabilityId).toBe("assistant.completion.evidence");
+        expect(executedGoal.capability).toContain("documentation");
     });
 });
