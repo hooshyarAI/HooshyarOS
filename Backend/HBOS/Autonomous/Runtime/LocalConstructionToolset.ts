@@ -134,10 +134,14 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                     const builderTests = run("python", ["-m", "pytest", "Backend/AI_Runtime/tests/test_autonomous_builder_platform.py", "Backend/AI_Runtime/tests/test_autonomous_spec.py", "-q"], root);
                     if (!builderTests.ok) return { ok: false, issue: "AUTONOMOUS_BUILDER_TESTS_FAILED", artifact: { syntaxVerified: true, builderTestsVerified: false, output: builderTests.output, error: builderTests.error } };
 
-                    const jest = run("node", ["./node_modules/jest/bin/jest.js", "--runInBand", "--config", ".\\jest.config.js"], root);
+                    // Keep the mandatory full Jest verification, but do not serialize
+                    // independent test workers with --runInBand. GitHub runners have
+                    // multiple cores; parallel Jest execution materially reduces the
+                    // time spent repeating the full suite for each autonomous knot.
+                    const jest = run("node", ["./node_modules/jest/bin/jest.js", "--config", ".\\jest.config.js", "--maxWorkers=50%"], root);
                     const artifact = {
                         type: "AUTONOMOUS_VERIFY_RESULT",
-                        command: "compileall + pytest autonomous builder/spec + jest",
+                        command: "compileall + pytest autonomous builder/spec + parallel Jest",
                         syntaxVerified: true,
                         builderTestsVerified: builderTests.code === 0,
                         jestVerified: jest.code === 0,
