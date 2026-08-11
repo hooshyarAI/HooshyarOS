@@ -1,4 +1,4 @@
-﻿import { execFileSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { CapabilityEvidenceAudit } from "./CapabilityEvidenceAudit";
@@ -12,7 +12,7 @@ export class AutonomousProjectMission {
     constructor(private readonly root = process.cwd()) {}
 
     snapshot(): ProjectSnapshot {
-        const git = (args: string[]) => { try { return execFileSync("git", args, { cwd: this.root, encoding: "utf8" }).trim(); } catch { return ""; } };
+        const git = (args: string[]) => { try { return execFileSync("git", args, { cwd: this.root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch { return ""; } };
         const architectureRoot = join(this.root, "Backend", "HBOS", "Architecture");
         const runtimeRoot = join(this.root, "Backend", "AI_Runtime");
         const architectureFiles = existsSync(architectureRoot) ? this.walk(architectureRoot).filter(file => /Architecture|Decision|Planner|Registry|Review|Repair/i.test(file)) : [];
@@ -62,7 +62,7 @@ export class AutonomousProjectMission {
             { id: "engine.organizational.canonical", capability: "implement the canonical Organizational Intelligence Engine for HBOS", targetEngine: "Organizational Intelligence Engine", dependencies: ["Memory Engine", "Knowledge Engine", "Project Pilot Engine"], requiredPaths: [p("Backend/HBOS/Engines/OrganizationalIntelligenceEngine.ts"),p("Backend/HBOS/test/OrganizationalIntelligenceEngine.test.ts")], verificationPaths: focused("Backend/HBOS/test/OrganizationalIntelligenceEngine.test.ts") },
             { id: "engine.autonomous-operations.canonical", capability: "implement the canonical Autonomous Operations Engine for HBOS", targetEngine: "Autonomous Operations Engine", dependencies: ["Governance Engine", "Decision Engine", "Project Pilot Engine", "Health Monitor Engine"], requiredPaths: [p("Backend/HBOS/Engines/AutonomousOperationsEngine.ts"),p("Backend/HBOS/test/AutonomousOperationsEngine.test.ts")], verificationPaths: focused("Backend/HBOS/test/AutonomousOperationsEngine.test.ts") },
             { id: "runtime.reasoning.bridge", capability: "integrate the existing Python reasoning runtime with the canonical HBOS Reasoning Engine", targetEngine: "ReasoningEngine", dependencies: ["Reasoning Engine", "AI Runtime"], requiredPaths: [p("Backend/HBOS/Engines/ReasoningEngine.ts"),p("Backend/HBOS/Assistant/Autonomous/PythonReasoningAdapter.ts"),p("Backend/HBOS/test/PythonReasoningAdapter.test.ts")], evidencePaths: [p("Backend/AI_Runtime/reasoning/reasoning_engine.py")], verificationPaths: focused("Backend/HBOS/test/PythonReasoningAdapter.test.ts") },
-{ id: "platform.budget-intelligence", capability: "implement Budget Intelligence", targetEngine: "Budget Intelligence Engine", dependencies: ["Financial Intelligence Engine"], requiredPaths: [p("Backend/HBOS/Engines/BudgetIntelligenceEngine.ts"),p("Backend/HBOS/test/BudgetIntelligenceEngine.test.ts"),p("Docs/Engines/BudgetIntelligenceEngine.md")], verificationPaths: focused("Backend/HBOS/test/BudgetIntelligenceEngine.test.ts") },
+            { id: "platform.budget-intelligence", capability: "implement Budget Intelligence", targetEngine: "Budget Intelligence Engine", dependencies: ["Financial Intelligence Engine"], requiredPaths: [p("Backend/HBOS/Engines/BudgetIntelligenceEngine.ts"),p("Backend/HBOS/test/BudgetIntelligenceEngine.test.ts"),p("Docs/Engines/BudgetIntelligenceEngine.md")], verificationPaths: focused("Backend/HBOS/test/BudgetIntelligenceEngine.test.ts") },
             { id: "platform.tax-intelligence", capability: "implement Tax Intelligence", targetEngine: "Tax Intelligence Engine", dependencies: ["Financial Intelligence Engine"], requiredPaths: [p("Backend/HBOS/Engines/TaxIntelligenceEngine.ts"),p("Backend/HBOS/test/TaxIntelligenceEngine.test.ts"),p("Docs/Engines/TaxIntelligenceEngine.md")], verificationPaths: focused("Backend/HBOS/test/TaxIntelligenceEngine.test.ts") },
             { id: "platform.dashboard", capability: "implement Dashboard capability", targetEngine: "Dashboard Engine", dependencies: ["Executive Intelligence Engine"], requiredPaths: [p("Backend/HBOS/Engines/DashboardEngine.ts"),p("Backend/HBOS/test/DashboardEngine.test.ts"),p("Docs/Engines/DashboardEngine.md")], verificationPaths: focused("Backend/HBOS/test/DashboardEngine.test.ts") },
             { id: "platform.reports", capability: "implement Reports capability", targetEngine: "Reports Engine", dependencies: ["Dashboard Engine"], requiredPaths: [p("Backend/HBOS/Engines/ReportsEngine.ts"),p("Backend/HBOS/test/ReportsEngine.test.ts"),p("Docs/Engines/ReportsEngine.md")], verificationPaths: focused("Backend/HBOS/test/ReportsEngine.test.ts") },
@@ -119,4 +119,3 @@ export class AutonomousProjectMission {
     private walk(root: string): string[] { const out:string[]=[]; for(const entry of readdirSync(root,{withFileTypes:true})){const full=join(root,entry.name); if(entry.name==="__pycache__"||entry.name==="node_modules")continue; if(entry.isDirectory())out.push(...this.walk(full)); else out.push(full);} return out; }
     private countDirectories(root: string): number { if(!existsSync(root))return 0; return readdirSync(root,{withFileTypes:true}).filter(entry=>entry.isDirectory()).length; }
 }
-
