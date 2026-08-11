@@ -134,8 +134,6 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                     const builderTests = run("python", ["-m", "pytest", "Backend/AI_Runtime/tests/test_autonomous_builder_platform.py", "Backend/AI_Runtime/tests/test_autonomous_spec.py", "-q"], root);
                     if (!builderTests.ok) return { ok: false, issue: "AUTONOMOUS_BUILDER_TESTS_FAILED", artifact: { syntaxVerified: true, builderTestsVerified: false, output: builderTests.output, error: builderTests.error } };
 
-                    // Use POSIX paths in the Linux GitHub runner. Windows remains
-                    // supported because Node resolves ./jest.config.js on Windows too.
                     const jest = run("node", ["./node_modules/jest/bin/jest.js", "--config", "./jest.config.js", "--maxWorkers=50%"], root);
                     const artifact = {
                         type: "AUTONOMOUS_VERIFY_RESULT",
@@ -183,17 +181,21 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
             execute: (stage) => {
                 if (stage !== "FINALIZE") return { ok: true };
                 const status = run("git", REPOSITORY_STATUS_ARGS, root);
-                if (!status.ok) return { ok: false, issue: "GIT_STATUS_FAILED" };
+                if (!status.ok) return { ok: false, issue: "GIT_STATUS_FAILED", artifact: { output: status.output, error: status.error } };
                 if (!status.output.trim()) return { ok: false, issue: "GIT_NO_REPOSITORY_CHANGE", artifact: { clean: true, committed: false, pushed: false, changeDetected: false } };
-                const add = run("git", ["add", "-A", "--", ".", ":(exclude)node_modules"], root);
-                if (!add.ok) return { ok: false, issue: "GIT_ADD_FAILED" };
+
+                // Stage the entire repository using Git's native recursive add.
+                // The previous pathspec/exclusion form could fail in some
+                // environments even though git status worked correctly.
+                const add = run("git", ["add", "-A"], root);
+                if (!add.ok) return { ok: false, issue: "GIT_ADD_FAILED", artifact: { output: add.output, error: add.error } };
                 const staged = run("git", ["diff", "--cached", "--quiet"], root);
-                if (!staged.ok && staged.code !== 1) return { ok: false, issue: "GIT_STAGED_DIFF_CHECK_FAILED" };
+                if (!staged.ok && staged.code !== 1) return { ok: false, issue: "GIT_STAGED_DIFF_CHECK_FAILED", artifact: { output: staged.output, error: staged.error } };
                 if (staged.code === 0) return { ok: false, issue: "GIT_NO_STAGED_CHANGE", artifact: { clean: true, committed: false, pushed: false, changeDetected: false } };
                 const commit = run("git", ["commit", "-m", "feat(hbos): autonomous construction progress"], root);
-                if (!commit.ok) return { ok: false, issue: "GIT_COMMIT_FAILED" };
+                if (!commit.ok) return { ok: false, issue: "GIT_COMMIT_FAILED", artifact: { output: commit.output, error: commit.error } };
                 const push = run("git", ["push", "origin", "main"], root);
-                if (!push.ok) return { ok: false, issue: "GIT_PUSH_FAILED" };
+                if (!push.ok) return { ok: false, issue: "GIT_PUSH_FAILED", artifact: { output: push.output, error: push.error } };
                 return { ok: true, artifact: { committed: true, pushed: true, changeDetected: true } };
             }
         }
