@@ -58,6 +58,14 @@ export function buildAgentArgs(_agent: ImplementationAgent, prompt: string): str
     return ["Backend/AI_Runtime/autonomous_builder.py", "--prompt", prompt];
 }
 
+const DEFAULT_DIRECTIVES = [
+    "Implement exactly one concrete capability from the canonical mission.",
+    "Create or update the focused implementation, focused test and documentation required by the architecture.",
+    "Run focused verification followed by the full Jest suite.",
+    "Repair verification failures before finalization.",
+    "Do not redesign Architecture Freeze V4."
+];
+
 function buildAgentPrompt(context: ConstructionContext): string {
     return [
         "You are the repository-native Python implementation worker inside HooshyarOS Autonomous Operations Engine.",
@@ -70,7 +78,7 @@ function buildAgentPrompt(context: ConstructionContext): string {
         `Target Engine: ${context.plan.targetEngine}`,
         `Dependencies: ${context.plan.dependencies.join(", ") || "none"}`,
         `Architecture rules: ${context.plan.architectureRules.join(" ; ") || "preserve existing rules"}`,
-        `Directives: ${context.plan.directives.join(" ; ") || "implement exactly one capability, verify it, and repair before finalization"}`,
+        `Directives: ${DEFAULT_DIRECTIVES.join(" ; ")}`,
         "Use only repository-native Python construction. Do not invoke Copilot, Codex, Claude, or any cloud coding CLI.",
         "Reuse existing capabilities and engine boundaries; never invent business semantics that are absent from repository architecture or evidence.",
         "Produce a real repository change when the selected deterministic capability is missing."
@@ -88,7 +96,7 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                     capabilityId: context.plan.capabilityId,
                     targetEngine: context.plan.targetEngine,
                     architectureRules: context.plan.architectureRules,
-                    directives: context.plan.directives
+                    directives: DEFAULT_DIRECTIVES
                 }
             })
         },
