@@ -17,6 +17,7 @@ export interface MissionRecord {
     progress: number;
     tasks: any[];
     execution: any[];
+    lifecycle?: MissionStage[];
     failure?: { stage: MissionStage; reason: string; isolated: true; completed: false };
 }
 
@@ -31,13 +32,17 @@ export class AutonomousMissionController {
 
     constructor(private readonly conductor?: AutonomousProjectConductor) {}
 
-    executeMission(goal: string) {
+    executeMission(goal: string): MissionRecord {
         if (!goal || !goal.trim()) {
             return {
-                status: "FAILED" as const,
+                status: "FAILED",
                 goal,
+                stage: "OBSERVE",
+                completed: false,
+                progress: 0,
+                tasks: [],
                 execution: [],
-                failure: { stage: "OBSERVE" as const, reason: "Mission goal is empty", isolated: true as const, completed: false as const }
+                failure: { stage: "OBSERVE", reason: "Mission goal is empty", isolated: true, completed: false }
             };
         }
 
@@ -84,10 +89,10 @@ export class AutonomousMissionController {
             return failure;
         }
 
-        const result = {
-            status: "COMPLETED" as const,
+        const result: MissionRecord = {
+            status: "COMPLETED",
             goal,
-            stage: "LEARN" as const,
+            stage: "LEARN",
             completed: true,
             progress: 100,
             tasks: execution,
@@ -96,7 +101,7 @@ export class AutonomousMissionController {
             plan,
             decision,
             lifecycle
-        };
+        } as MissionRecord;
 
         this.memory.store({ ...result, outcome: "SUCCESS" });
         return result;
