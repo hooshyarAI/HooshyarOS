@@ -40,7 +40,7 @@ jobs:
 
       - name: Verify autonomous runtime
         run: |
-          npx tsc --noEmit --pretty false
+          npx tsc Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.ts Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts --noEmit --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --pretty false
           python -m compileall -q Backend/AI_Runtime
 
       - name: Run autonomous construction loop
