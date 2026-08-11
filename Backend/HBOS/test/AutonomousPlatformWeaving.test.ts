@@ -79,41 +79,48 @@ describe("AutonomousPlatformWeaving", () => {
         ]);
         expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.budget-intelligence");
 
-    complete(root, [
-        "Backend/HBOS/Engines/BudgetIntelligenceEngine.ts",
-        "Backend/HBOS/test/BudgetIntelligenceEngine.test.ts",
-        "Docs/Engines/BudgetIntelligenceEngine.md"
-    ]);
-    expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.tax-intelligence");
+        complete(root, [
+            "Backend/HBOS/Engines/BudgetIntelligenceEngine.ts",
+            "Backend/HBOS/test/BudgetIntelligenceEngine.test.ts",
+            "Docs/Engines/BudgetIntelligenceEngine.md"
+        ]);
+        expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.tax-intelligence");
 
-    complete(root, [
-        "Backend/HBOS/Engines/TaxIntelligenceEngine.ts",
-        "Backend/HBOS/test/TaxIntelligenceEngine.test.ts",
-        "Docs/Engines/TaxIntelligenceEngine.md"
-    ]);
-    expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.dashboard");
+        complete(root, [
+            "Backend/HBOS/Engines/TaxIntelligenceEngine.ts",
+            "Backend/HBOS/test/TaxIntelligenceEngine.test.ts",
+            "Docs/Engines/TaxIntelligenceEngine.md"
+        ]);
+        expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.dashboard");
 
-    complete(root, [
-        "Backend/HBOS/Engines/DashboardEngine.ts",
-        "Backend/HBOS/test/DashboardEngine.test.ts",
-        "Docs/Engines/DashboardEngine.md"
-    ]);
-    expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.reports");
+        complete(root, [
+            "Backend/HBOS/Engines/DashboardEngine.ts",
+            "Backend/HBOS/test/DashboardEngine.test.ts",
+            "Docs/Engines/DashboardEngine.md"
+        ]);
+        expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.reports");
 
-    complete(root, [
-        "Backend/HBOS/Engines/ReportsEngine.ts",
-        "Backend/HBOS/test/ReportsEngine.test.ts",
-        "Docs/Engines/ReportsEngine.md"
-    ]);
-    expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.alerts");
+        complete(root, [
+            "Backend/HBOS/Engines/ReportsEngine.ts",
+            "Backend/HBOS/test/ReportsEngine.test.ts",
+            "Docs/Engines/ReportsEngine.md"
+        ]);
+        expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.alerts");
 
-    complete(root, [
-        "Backend/HBOS/Engines/AlertsEngine.ts",
-        "Backend/HBOS/test/AlertsEngine.test.ts",
-        "Docs/Engines/AlertsEngine.md"
-    ]);
+        complete(root, [
+            "Backend/HBOS/Engines/AlertsEngine.ts",
+            "Backend/HBOS/test/AlertsEngine.test.ts",
+            "Docs/Engines/AlertsEngine.md"
+        ]);
+        expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.production-readiness");
 
-    expect(mission.nextPlatformMission()).toBeNull();
+        complete(root, [
+            "Backend/HBOS/Engines/ProductionReadinessEngine.ts",
+            "Backend/HBOS/test/ProductionReadinessEngine.test.ts",
+            "Docs/Engines/ProductionReadinessEngine.md"
+        ]);
+
+        expect(mission.nextPlatformMission()).toBeNull();
     });
 
     it("does not skip a later capability when an earlier capability is blocked", () => {
