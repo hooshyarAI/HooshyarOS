@@ -31,6 +31,11 @@ jobs:
           git config user.name "hooshyarAI autonomous builder"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+      - name: Assert clean worktree before dependency installation
+        run: |
+          git status --short
+          test -z "$(git status --porcelain)"
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -46,11 +51,6 @@ jobs:
         run: |
           npm ci
           python -m pip install --upgrade pip pytest
-
-      - name: Assert clean worktree before autonomous construction
-        run: |
-          git status --short
-          test -z "$(git status --porcelain)"
 
       - name: Run autonomous construction loop
         env:
