@@ -1,4 +1,4 @@
-﻿import {
+import {
     ArchitectureDecisionEngine,
     ArchitectureRequirement
 } from "../../Architecture/Decision/ArchitectureDecisionEngine";
@@ -29,7 +29,10 @@ export class ArchitectureDrivenBuildController {
             };
         }
 
-        return new AutonomousConstructionEngine(this.tools).build(decision.plan);
+        // PLAN is an explicit governed stage: the approved architecture decision
+        // becomes the concrete construction requirement before generation.
+        const PLAN = decision.plan;
+        return new AutonomousConstructionEngine(this.tools).build(PLAN);
     }
 
     static selfTest(): void {
