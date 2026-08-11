@@ -31,7 +31,7 @@ jobs:
         run: >-
           npx tsc
           Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.ts
-          --noEmit --target ES2022 --module commonjs --moduleResolution node
+          --noEmit --target ES2022 --module Node16 --moduleResolution Node16
           --esModuleInterop --skipLibCheck --pretty false
 
       - name: Focused autonomous tests
