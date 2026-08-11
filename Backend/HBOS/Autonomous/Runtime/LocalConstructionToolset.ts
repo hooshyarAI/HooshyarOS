@@ -148,7 +148,27 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                 }
 
                 if (stage === "REPAIR") {
-                    return { ok: false, issue: "AUTONOMOUS_REPAIR_REQUIRES_REAL_FIX", artifact: { type: "AUTONOMOUS_REPAIR_RESULT", repaired: false, reason: "No verified repair artifact exists; refusing to claim repair without a real repository change.", timestamp: new Date().toISOString() } };
+                    const agent = resolveImplementationAgent(root);
+                    if (!agent) return { ok: false, issue: "AUTONOMOUS_REPAIR_AGENT_UNAVAILABLE", artifact: { repaired: false, provider: null } };
+                    const plan = context.artifacts.REPAIR_PLAN;
+                    const issue = typeof plan === "object" && plan !== null && "issue" in plan ? String((plan as { issue?: unknown }).issue ?? "VERIFY_FAILED") : "VERIFY_FAILED";
+                    const prompt = `${buildAgentPrompt(context)}\nRepair mode: regenerate only the deterministic artifacts owned by this capability.\nRepair issue: ${issue}`;
+                    const result = run(agent, ["Backend/AI_Runtime/autonomous_builder.py", "--repair", "--prompt", prompt, "--issue", issue], root, 30 * 60 * 1000);
+                    const changed = result.ok && result.output.includes("Repaired:");
+                    const artifact = {
+                        type: "AUTONOMOUS_REPAIR_RESULT",
+                        provider: agent,
+                        capabilityId: context.plan.capabilityId,
+                        repaired: result.ok && changed,
+                        exitCode: result.code,
+                        output: result.output,
+                        error: result.error,
+                        timestamp: new Date().toISOString()
+                    };
+                    console.log(JSON.stringify(artifact, null, 2));
+                    return result.ok && changed
+                        ? { ok: true, artifact }
+                        : { ok: false, issue: "AUTONOMOUS_REPAIR_FAILED", artifact };
                 }
                 return { ok: true };
             }
