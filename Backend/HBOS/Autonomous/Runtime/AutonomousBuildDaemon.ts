@@ -30,13 +30,13 @@ export class AutonomousBuildDaemon {
             const selected = this.mission.nextMission();
             let mission = selected;
 
-            // The Assistant completion gate is a handoff checkpoint. The daemon
-            // must resolve that checkpoint to the canonical platform backlog and
-            // execute the concrete platform capability, never the gate itself.
+            // The Assistant completion gate is a handoff checkpoint. Resolve it
+            // through the canonical continuation boundary so the continuation
+            // policy, rather than the daemon, owns platform-backlog selection.
             if (selected.capabilityId === "assistant.completion.gate") {
                 assistantGatePassed = true;
                 const continuation = this.continuation.createMission();
-                const nextPlatformMission = this.mission.nextPlatformMission();
+                const nextPlatformMission = this.continuation.selectNextCapability(this.mission);
 
                 if (!nextPlatformMission) {
                     console.log(JSON.stringify({ type: "AUTONOMOUS_PLATFORM_COMPLETE", cycle, status: "completed", continuation }));
