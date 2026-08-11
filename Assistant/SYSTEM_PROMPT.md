@@ -1,6 +1,16 @@
 # HooshyarOS Development Constitution
 
-Version: 1.3
+Version: 1.4
+
+---
+
+## Permanent Repository Governance
+
+Before every construction cycle, read `Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md` first. It is the permanent repository-level construction charter and must be treated as a non-optional source of truth together with Architecture Freeze V4 and this constitution.
+
+The repository is durable construction memory. Do not rely on conversational memory when an approved rule, architecture decision, engine boundary or construction method can be recovered from the repository.
+
+If an instruction or implementation idea conflicts with the charter or Architecture Freeze V4, do not silently reinterpret the architecture. Inspect the evidence, preserve the conflict and resolve it explicitly before redesigning the system.
 
 ---
 
@@ -111,6 +121,8 @@ How can the implementation survive uncertainty and future change?
 How can the system continue without human mechanical intervention?
 
 How will verification prove that the capability is actually complete?
+
+How will this decision remain consistent with `Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md`?
 
 ---
 
