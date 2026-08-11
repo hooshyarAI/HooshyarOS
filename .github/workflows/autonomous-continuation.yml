@@ -1,0 +1,50 @@
+name: HooshyarOS Autonomous Continuation
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/30 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hooshyaros-autonomous-continuation
+  cancel-in-progress: false
+
+jobs:
+  continue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Node dependencies
+        run: npm install
+
+      - name: Verify autonomous runtime
+        run: |
+          npx tsc --noEmit --pretty false
+          python -m compileall -q Backend/AI_Runtime
+
+      - name: Run autonomous construction loop
+        env:
+          GITHUB_ACTIONS: "true"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx tsx Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts
