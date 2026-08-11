@@ -67,6 +67,8 @@ const DEFAULT_DIRECTIVES = [
     "Do not redesign Architecture Freeze V4."
 ];
 
+const REPOSITORY_STATUS_ARGS = ["status", "--porcelain=v1", "--", ".", ":(exclude)node_modules"];
+
 function buildAgentPrompt(context: ConstructionContext): string {
     return [
         "You are the repository-native Python implementation worker inside HooshyarOS Autonomous Operations Engine.",
@@ -105,14 +107,14 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
             name: "generator",
             execute: (stage, context) => {
                 if (stage !== "GENERATE") return { ok: true };
-                const before = run("git", ["status", "--porcelain=v1"], root);
+                const before = run("git", REPOSITORY_STATUS_ARGS, root);
                 if (!before.ok) return { ok: false, issue: "AUTONOMOUS_REPOSITORY_STATE_UNAVAILABLE", artifact: before };
                 if (before.output.trim()) return { ok: false, issue: "AUTONOMOUS_WORKTREE_DIRTY", artifact: { clean: false, output: before.output } };
 
                 const agent = resolveImplementationAgent(root);
                 if (!agent) return { ok: false, issue: "AUTONOMOUS_AGENT_UNAVAILABLE", artifact: { provider: null, changed: false } };
                 const result = run(agent, buildAgentArgs(agent, buildAgentPrompt(context)), root, 30 * 60 * 1000);
-                const after = run("git", ["status", "--porcelain=v1"], root);
+                const after = run("git", REPOSITORY_STATUS_ARGS, root);
                 const changed = after.ok && repositoryStateChanged(before.output, after.output);
                 const artifact = { type: "AUTONOMOUS_AGENT_GENERATION_RESULT", provider: agent, capabilityId: context.plan.capabilityId, capability: context.plan.capability, exitCode: result.code, changed, output: result.output, error: result.error, timestamp: new Date().toISOString() };
                 console.log(JSON.stringify(artifact, null, 2));
@@ -178,10 +180,10 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
             name: "git",
             execute: (stage) => {
                 if (stage !== "FINALIZE") return { ok: true };
-                const status = run("git", ["status", "--porcelain=v1"], root);
+                const status = run("git", REPOSITORY_STATUS_ARGS, root);
                 if (!status.ok) return { ok: false, issue: "GIT_STATUS_FAILED" };
                 if (!status.output.trim()) return { ok: false, issue: "GIT_NO_REPOSITORY_CHANGE", artifact: { clean: true, committed: false, pushed: false, changeDetected: false } };
-                const add = run("git", ["add", "-A"], root);
+                const add = run("git", ["add", "-A", "--", ".", ":(exclude)node_modules"], root);
                 if (!add.ok) return { ok: false, issue: "GIT_ADD_FAILED" };
                 const staged = run("git", ["diff", "--cached", "--quiet"], root);
                 if (!staged.ok && staged.code !== 1) return { ok: false, issue: "GIT_STAGED_DIFF_CHECK_FAILED" };
