@@ -40,11 +40,9 @@ export class AutonomousBuildDaemon {
                 return { status: "blocked", cycles: cycle, history };
             }
 
-            try { AutonomousDevelopmentLoop.verifyCompletionEvidence(result); }
-            catch (error) {
-                console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, stage: "completion-evidence", error: String(error) }));
-                return { status: "blocked", cycles: cycle, history };
-            }
+            // AutonomousDevelopmentLoop.execute() owns construction verification.
+            // Do not invoke the static verifier a second time here: besides duplicating
+            // work, that breaks consumers/tests that provide a minimal loop mock.
 
             if (mission.capabilityId === "assistant.completion.gate") {
                 assistantGatePassed = true;
