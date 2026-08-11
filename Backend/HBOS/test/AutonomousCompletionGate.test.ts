@@ -33,7 +33,7 @@ function seedCanonicalAssistantEvidence(root: string): void {
     ];
     files.forEach(file => writeEvidence(root, file));
 
-    writeEvidence(root, "Assistant/SYSTEM_PROMPT.md", "strategic advisor financial managerial autonomous construction");
+    writeEvidence(root, "Assistant/SYSTEM_PROMPT.md", "You are the autonomous construction intelligence of HooshyarOS. You are not a human executive's financial, managerial or commercial advisor.");
     writeEvidence(root, "Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.ts", 'ImplementationAgent = "python" GENERATE VERIFY REPAIR FINALIZE');
     writeEvidence(root, "Backend/HBOS/Architecture/Autonomous/AutonomousDevelopmentLoop.ts", "this.planner.plan(goal) controller.construct(plan.requirement)");
     writeEvidence(root, "Backend/HBOS/Builder/Autonomous/ArchitectureDrivenBuildController.ts", "ARCHITECTURE PLAN");
