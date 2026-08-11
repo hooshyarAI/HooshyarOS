@@ -33,6 +33,18 @@ jest.mock("./AutonomousProjectMission", () => ({
     }))
 }));
 
+jest.mock("./AutonomousPlatformContinuation", () => ({
+    AutonomousPlatformContinuation: jest.fn().mockImplementation(() => ({
+        createMission: jest.fn(() => ({
+            capabilityId: "platform.continuation",
+            capability: "continue autonomous construction of HooshyarOS platform capabilities",
+            instruction: "AUDIT → SELECT NEXT GENUINELY MISSING CAPABILITY → IMPLEMENT → TEST → INTEGRATE → VERIFY → COMMIT → PUSH → AUDIT AGAIN",
+            source: "assistant.completion.gate"
+        })),
+        selectNextCapability: jest.fn((projectMission: { nextPlatformMission: () => unknown }) => projectMission.nextPlatformMission())
+    }))
+}));
+
 jest.mock("./LocalConstructionToolset", () => ({
     createLocalConstructionTools: jest.fn(() => [])
 }));
