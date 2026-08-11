@@ -1,13 +1,13 @@
 import { AutonomousBuildDaemon } from "./AutonomousBuildDaemon";
-import { AutonomousDevelopmentLoop } from "../../Architecture/Autonomous/AutonomousDevelopmentLoop";
+import { AutonomousDevelopmentLoop, AutonomousDevelopmentResult } from "../../Architecture/Autonomous/AutonomousDevelopmentLoop";
 import { AutonomousProjectMission } from "./AutonomousProjectMission";
 import { AutonomousPlatformContinuation } from "./AutonomousPlatformContinuation";
 
 describe("AutonomousBuildDaemon", () => {
     it("executes the first real platform capability at the assistant completion handoff", () => {
-        const developmentExecute = jest.fn(() => ({
-            status: "completed" as const,
-            goal: {},
+        const developmentExecute = jest.fn((goal: any): AutonomousDevelopmentResult => ({
+            status: "completed",
+            goal,
             plan: { requirement: {} } as any,
             result: {
                 ok: true,
@@ -75,7 +75,9 @@ describe("AutonomousBuildDaemon", () => {
         expect(continuation.selectNextCapability).toHaveBeenCalledTimes(1);
         expect(mission.nextPlatformMission).toHaveBeenCalledTimes(1);
         expect(developmentExecute).toHaveBeenCalledTimes(1);
-        expect(developmentExecute.mock.calls[0][0]).toEqual(expect.objectContaining({
+
+        const executedGoal = developmentExecute.mock.calls[0]?.[0];
+        expect(executedGoal).toEqual(expect.objectContaining({
             capabilityId: "platform.user-management",
             capability: expect.stringContaining("User Management"),
             targetEngine: "User Management Engine",
