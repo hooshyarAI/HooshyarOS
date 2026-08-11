@@ -30,10 +30,6 @@ export class AutonomousProjectMission {
     }
 
     nextPlatformMission(): Omit<Mission, "evidence" | "architectureRules" | "directives"> | null {
-        // The continuation must weave the entire canonical backlog, not only
-        // the first Phase 2 trio. Once those three capabilities are complete,
-        // the autonomous worker must continue into the canonical engines and
-        // runtime bridge instead of falsely declaring the platform complete.
         const backlog = this.capabilityBacklog();
         const next = backlog.find(capability => !this.isCapabilityImplemented(capability) && this.dependenciesSatisfied(capability));
         return next ? { capabilityId: next.id, capability: next.capability, targetEngine: next.targetEngine, dependencies: next.dependencies } : null;
@@ -47,7 +43,10 @@ export class AutonomousProjectMission {
     }
 
     private nextAssistantCapability(): Omit<Mission, "evidence" | "architectureRules" | "directives"> | null {
-        const requiredPaths = ["Backend/HBOS/Assistant/Autonomous/AutonomousAssistantRuntime.ts","Backend/HBOS/Assistant/Autonomous/AutonomousMissionController.ts","Backend/HBOS/Assistant/Autonomous/HooshyarAutonomousAssistant.ts","Backend/HBOS/Assistant/Autonomous/PythonReasoningAdapter.ts","Backend/HBOS/Assistant/Autonomous/PersistentArchitectureMemory.ts","Backend/HBOS/Assistant/Autonomous/DecisionKnowledgeStore.ts","Backend/HBOS/Assistant/Autonomous/ContextRetrievalEngine.ts","Backend/HBOS/Assistant/Autonomous/LearningFeedbackLoop.ts","Backend/Builder/Autonomous/AutonomousProjectConductor.ts","Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.ts","Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts"].map(path => join(this.root, path));
+        // Canonical Builder lives under HBOS. Keep this path aligned with the
+        // actual repository boundary so the completion gate cannot remain
+        // permanently blocked by a stale legacy path.
+        const requiredPaths = ["Backend/HBOS/Assistant/Autonomous/AutonomousAssistantRuntime.ts","Backend/HBOS/Assistant/Autonomous/AutonomousMissionController.ts","Backend/HBOS/Assistant/Autonomous/HooshyarAutonomousAssistant.ts","Backend/HBOS/Assistant/Autonomous/PythonReasoningAdapter.ts","Backend/HBOS/Assistant/Autonomous/PersistentArchitectureMemory.ts","Backend/HBOS/Assistant/Autonomous/DecisionKnowledgeStore.ts","Backend/HBOS/Assistant/Autonomous/ContextRetrievalEngine.ts","Backend/HBOS/Assistant/Autonomous/LearningFeedbackLoop.ts","Backend/HBOS/Builder/Autonomous/AutonomousProjectConductor.ts","Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.ts","Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts"].map(path => join(this.root, path));
         const missing = requiredPaths.find(path => !existsSync(path));
         return missing ? { capabilityId: "assistant.completion.evidence", capability: `complete missing Assistant evidence artifact: ${missing.replace(this.root, "").replace(/^[/\\]+/, "")}`, targetEngine: "Autonomous Operations Engine", dependencies: ["Assistant Runtime", "Mission Controller", "Python Reasoning Adapter"] } : null;
     }
@@ -67,7 +66,7 @@ export class AutonomousProjectMission {
     private isCapabilityImplemented(capability: CapabilityDefinition): boolean { return capability.requiredPaths.every(existsSync) && (!capability.evidencePaths || capability.evidencePaths.length === 0 || capability.evidencePaths.some(existsSync)); }
 
     private assistantCompletionEvidence(): boolean {
-        const required=["Backend/HBOS/Assistant/Autonomous/AutonomousAssistantRuntime.ts","Backend/HBOS/Assistant/Autonomous/AutonomousMissionController.ts","Backend/HBOS/Assistant/Autonomous/HooshyarAutonomousAssistant.ts","Backend/HBOS/Assistant/Autonomous/PythonReasoningAdapter.ts","Backend/HBOS/Assistant/Autonomous/PersistentArchitectureMemory.ts","Backend/HBOS/Assistant/Autonomous/DecisionKnowledgeStore.ts","Backend/HBOS/Assistant/Autonomous/ContextRetrievalEngine.ts","Backend/HBOS/Assistant/Autonomous/LearningFeedbackLoop.ts","Backend/Builder/Autonomous/AutonomousProjectConductor.ts","Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.ts","Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts","Backend/HBOS/test/AutonomousMissionController.test.ts","Backend/HBOS/test/AutonomousAssistantRuntime.test.ts","Backend/HBOS/test/HooshyarAutonomousAssistant.test.ts","Backend/HBOS/test/PythonReasoningAdapter.test.ts","Backend/AI_Runtime/autonomous_builder.py","Backend/AI_Runtime/reasoning/reasoning_engine.py"].map(path=>join(this.root,path));
+        const required=["Backend/HBOS/Assistant/Autonomous/AutonomousAssistantRuntime.ts","Backend/HBOS/Assistant/Autonomous/AutonomousMissionController.ts","Backend/HBOS/Assistant/Autonomous/HooshyarAutonomousAssistant.ts","Backend/HBOS/Assistant/Autonomous/PythonReasoningAdapter.ts","Backend/HBOS/Assistant/Autonomous/PersistentArchitectureMemory.ts","Backend/HBOS/Assistant/Autonomous/DecisionKnowledgeStore.ts","Backend/HBOS/Assistant/Autonomous/ContextRetrievalEngine.ts","Backend/HBOS/Assistant/Autonomous/LearningFeedbackLoop.ts","Backend/HBOS/Builder/Autonomous/AutonomousProjectConductor.ts","Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.ts","Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts","Backend/HBOS/test/AutonomousMissionController.test.ts","Backend/HBOS/test/AutonomousAssistantRuntime.test.ts","Backend/HBOS/test/HooshyarAutonomousAssistant.test.ts","Backend/HBOS/test/PythonReasoningAdapter.test.ts","Backend/AI_Runtime/autonomous_builder.py","Backend/AI_Runtime/reasoning/reasoning_engine.py"].map(path=>join(this.root,path));
         if(!required.every(existsSync))return false;
         const runtime=readFileSync(join(this.root,"Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.ts"),"utf8), loop=readFileSync(join(this.root,"Backend/HBOS/Architecture/Autonomous/AutonomousDevelopmentLoop.ts"),"utf8), controller=readFileSync(join(this.root,"Backend/HBOS/Builder/Autonomous/ArchitectureDrivenBuildController.ts"),"utf8), builder=readFileSync(join(this.root,"Backend/AI_Runtime/autonomous_builder.py"),"utf8), reasoning=readFileSync(join(this.root,"Backend/AI_Runtime/reasoning/reasoning_engine.py"),"utf8);
         const pythonOnly=runtime.includes('ImplementationAgent = "python"');
