@@ -27,7 +27,7 @@ jobs:
 
       - name: Configure Git identity
         run: |
-          git config user.name "hooshyyarAI autonomous builder"
+          git config user.name "hooshyarAI autonomous builder"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Assert clean worktree before dependency installation
@@ -53,13 +53,13 @@ jobs:
 
       - name: Diagnose autonomous mission boundary
         run: |
-          npx tsx -e 'import { AutonomousProjectMission } from "./Backend/HBOS/Autonomous/Runtime/AutonomousProjectMission"; const m=new AutonomousProjectMission(process.cwd()); console.log(JSON.stringify({next:m.nextMission(),platform:m.nextPlatformMission()},null,2));' > autonomous-mission-diagnostic.json
+          npx tsx -e 'import { AutonomousProjectMission } from "./Backend/HBOS/Autonomous/Runtime/AutonomousProjectMission"; const m=new AutonomousProjectMission(process.cwd()); console.log(JSON.stringify({next:m.nextMission(),platform:m.nextPlatformMission()},null,2));' > /tmp/autonomous-mission-diagnostic.json
 
       - name: Upload autonomous mission diagnostic
         uses: actions/upload-artifact@v4
         with:
           name: autonomous-mission-diagnostic
-          path: autonomous-mission-diagnostic.json
+          path: /tmp/autonomous-mission-diagnostic.json
           if-no-files-found: error
 
       - name: Run autonomous construction loop
