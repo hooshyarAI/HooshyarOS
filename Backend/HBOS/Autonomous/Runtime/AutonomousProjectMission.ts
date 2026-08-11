@@ -30,8 +30,7 @@ export class AutonomousProjectMission {
     }
 
     nextPlatformMission(): Omit<Mission, "evidence" | "architectureRules" | "directives"> | null {
-        const backlog = this.capabilityBacklog();
-        const next = backlog.find(capability => !this.isCapabilityImplemented(capability) && this.dependenciesSatisfied(capability));
+        const next = this.capabilityBacklog().find(capability => !this.isCapabilityImplemented(capability) && this.dependenciesSatisfied(capability));
         return next ? { capabilityId: next.id, capability: next.capability, targetEngine: next.targetEngine, dependencies: next.dependencies } : null;
     }
 
@@ -43,10 +42,26 @@ export class AutonomousProjectMission {
     }
 
     private nextAssistantCapability(): Omit<Mission, "evidence" | "architectureRules" | "directives"> | null {
-        // Canonical Builder lives under HBOS. Keep this path aligned with the
-        // actual repository boundary so the completion gate cannot remain
-        // permanently blocked by a stale legacy path.
-        const requiredPaths = ["Backend/HBOS/Assistant/Autonomous/AutonomousAssistantRuntime.ts","Backend/HBOS/Assistant/Autonomous/AutonomousMissionController.ts","Backend/HBOS/Assistant/Autonomous/HooshyarAutonomousAssistant.ts","Backend/HBOS/Assistant/Autonomous/PythonReasoningAdapter.ts","Backend/HBOS/Assistant/Autonomous/PersistentArchitectureMemory.ts","Backend/HBOS/Assistant/Autonomous/DecisionKnowledgeStore.ts","Backend/HBOS/Assistant/Autonomous/ContextRetrievalEngine.ts","Backend/HBOS/Assistant/Autonomous/LearningFeedbackLoop.ts","Backend/HBOS/Builder/Autonomous/AutonomousProjectConductor.ts","Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.ts","Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts"].map(path => join(this.root, path));
+        const requiredPaths = [
+            "Backend/HBOS/Assistant/Autonomous/AutonomousAssistantRuntime.ts",
+            "Backend/HBOS/Assistant/Autonomous/AutonomousMissionController.ts",
+            "Backend/HBOS/Assistant/Autonomous/HooshyarAutonomousAssistant.ts",
+            "Backend/HBOS/Assistant/Autonomous/PythonReasoningAdapter.ts",
+            "Backend/HBOS/Assistant/Autonomous/PersistentArchitectureMemory.ts",
+            "Backend/HBOS/Assistant/Autonomous/DecisionKnowledgeStore.ts",
+            "Backend/HBOS/Assistant/Autonomous/ContextRetrievalEngine.ts",
+            "Backend/HBOS/Assistant/Autonomous/LearningFeedbackLoop.ts",
+            "Backend/HBOS/Autonomous/AutonomousProjectConductor.ts",
+            "Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.ts",
+            "Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts",
+            "Backend/HBOS/Architecture/Autonomous/AutonomousDevelopmentLoop.ts",
+            "Backend/HBOS/Builder/Autonomous/ArchitectureDrivenBuildController.ts",
+            "Backend/HBOS/Builder/Autonomous/AutonomousConstructionEngine.ts",
+            "Backend/AI_Runtime/autonomous_builder.py",
+            "Backend/AI_Runtime/reasoning/reasoning_engine.py",
+            "AGENTS.md",
+            "Assistant/SYSTEM_PROMPT.md"
+        ].map(path => join(this.root, path));
         const missing = requiredPaths.find(path => !existsSync(path));
         return missing ? { capabilityId: "assistant.completion.evidence", capability: `complete missing Assistant evidence artifact: ${missing.replace(this.root, "").replace(/^[/\\]+/, "")}`, targetEngine: "Autonomous Operations Engine", dependencies: ["Assistant Runtime", "Mission Controller", "Python Reasoning Adapter"] } : null;
     }
@@ -63,23 +78,60 @@ export class AutonomousProjectMission {
         ];
     }
 
-    private isCapabilityImplemented(capability: CapabilityDefinition): boolean { return capability.requiredPaths.every(existsSync) && (!capability.evidencePaths || capability.evidencePaths.length === 0 || capability.evidencePaths.some(existsSync)); }
+    private isCapabilityImplemented(capability: CapabilityDefinition): boolean {
+        return capability.requiredPaths.every(existsSync)
+            && (!capability.evidencePaths || capability.evidencePaths.length === 0 || capability.evidencePaths.some(existsSync));
+    }
 
     private assistantCompletionEvidence(): boolean {
-        const required=["Backend/HBOS/Assistant/Autonomous/AutonomousAssistantRuntime.ts","Backend/HBOS/Assistant/Autonomous/AutonomousMissionController.ts","Backend/HBOS/Assistant/Autonomous/HooshyarAutonomousAssistant.ts","Backend/HBOS/Assistant/Autonomous/PythonReasoningAdapter.ts","Backend/HBOS/Assistant/Autonomous/PersistentArchitectureMemory.ts","Backend/HBOS/Assistant/Autonomous/DecisionKnowledgeStore.ts","Backend/HBOS/Assistant/Autonomous/ContextRetrievalEngine.ts","Backend/HBOS/Assistant/Autonomous/LearningFeedbackLoop.ts","Backend/HBOS/Builder/Autonomous/AutonomousProjectConductor.ts","Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.ts","Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts","Backend/HBOS/test/AutonomousMissionController.test.ts","Backend/HBOS/test/AutonomousAssistantRuntime.test.ts","Backend/HBOS/test/HooshyarAutonomousAssistant.test.ts","Backend/HBOS/test/PythonReasoningAdapter.test.ts","Backend/AI_Runtime/autonomous_builder.py","Backend/AI_Runtime/reasoning/reasoning_engine.py"].map(path=>join(this.root,path));
-        if(!required.every(existsSync))return false;
-        const runtime=readFileSync(join(this.root,"Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.ts"),"utf8), loop=readFileSync(join(this.root,"Backend/HBOS/Architecture/Autonomous/AutonomousDevelopmentLoop.ts"),"utf8), controller=readFileSync(join(this.root,"Backend/HBOS/Builder/Autonomous/ArchitectureDrivenBuildController.ts"),"utf8), builder=readFileSync(join(this.root,"Backend/AI_Runtime/autonomous_builder.py"),"utf8), reasoning=readFileSync(join(this.root,"Backend/AI_Runtime/reasoning/reasoning_engine.py"),"utf8);
-        const pythonOnly=runtime.includes('ImplementationAgent = "python"');
-        const lifecycle=["GENERATE","VERIFY","REPAIR","FINALIZE"].every(stage=>runtime.includes(stage));
-        const orchestration=loop.includes("this.planner.plan(goal)")&&loop.includes("controller.construct(plan.requirement)")&&controller.includes("ARCHITECTURE")&&controller.includes("PLAN");
-        const local=builder.includes("argparse")&&builder.includes("CAPABILITIES")&&builder.includes("Capability ID:")&&builder.includes("if not generated:")&&!builder.includes("subprocess.run([\"copilot\"")&&!builder.includes("subprocess.run([\"codex\"")&&!builder.includes("subprocess.run([\"claude\"");
-        const supportedPlatformCapabilities=["platform.user-management","platform.organization-model","platform.security-layer"].every(id=>builder.includes(id));
-        const reasoningContract=reasoning.includes("class ReasoningEngine")&&reasoning.includes("def reason")&&reasoning.includes('"status": "reasoned"');
-        return pythonOnly&&lifecycle&&orchestration&&local&&supportedPlatformCapabilities&&reasoningContract;
+        const required = [
+            "Backend/HBOS/Assistant/Autonomous/AutonomousAssistantRuntime.ts",
+            "Backend/HBOS/Assistant/Autonomous/AutonomousMissionController.ts",
+            "Backend/HBOS/Assistant/Autonomous/HooshyarAutonomousAssistant.ts",
+            "Backend/HBOS/Assistant/Autonomous/PythonReasoningAdapter.ts",
+            "Backend/HBOS/Assistant/Autonomous/PersistentArchitectureMemory.ts",
+            "Backend/HBOS/Assistant/Autonomous/DecisionKnowledgeStore.ts",
+            "Backend/HBOS/Assistant/Autonomous/ContextRetrievalEngine.ts",
+            "Backend/HBOS/Assistant/Autonomous/LearningFeedbackLoop.ts",
+            "Backend/HBOS/Autonomous/AutonomousProjectConductor.ts",
+            "Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.ts",
+            "Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts",
+            "Backend/HBOS/Architecture/Autonomous/AutonomousDevelopmentLoop.ts",
+            "Backend/HBOS/Builder/Autonomous/ArchitectureDrivenBuildController.ts",
+            "Backend/HBOS/Builder/Autonomous/AutonomousConstructionEngine.ts",
+            "Backend/HBOS/test/AutonomousMissionController.test.ts",
+            "Backend/HBOS/test/AutonomousAssistantRuntime.test.ts",
+            "Backend/HBOS/test/HooshyarAutonomousAssistant.test.ts",
+            "Backend/HBOS/test/PythonReasoningAdapter.test.ts",
+            "Backend/AI_Runtime/autonomous_builder.py",
+            "Backend/AI_Runtime/reasoning/reasoning_engine.py",
+            "AGENTS.md",
+            "Assistant/SYSTEM_PROMPT.md"
+        ].map(path => join(this.root, path));
+        if (!required.every(existsSync)) return false;
+
+        const runtime = readFileSync(join(this.root, "Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.ts"), "utf8");
+        const loop = readFileSync(join(this.root, "Backend/HBOS/Architecture/Autonomous/AutonomousDevelopmentLoop.ts"), "utf8");
+        const controller = readFileSync(join(this.root, "Backend/HBOS/Builder/Autonomous/ArchitectureDrivenBuildController.ts"), "utf8");
+        const conductor = readFileSync(join(this.root, "Backend/HBOS/Autonomous/AutonomousProjectConductor.ts"), "utf8");
+        const daemon = readFileSync(join(this.root, "Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts"), "utf8");
+        const builder = readFileSync(join(this.root, "Backend/AI_Runtime/autonomous_builder.py"), "utf8");
+        const reasoning = readFileSync(join(this.root, "Backend/AI_Runtime/reasoning/reasoning_engine.py"), "utf8");
+        const constitution = readFileSync(join(this.root, "Assistant/SYSTEM_PROMPT.md"), "utf8");
+
+        const pythonOnly = runtime.includes('ImplementationAgent = "python"');
+        const lifecycle = ["GENERATE", "VERIFY", "REPAIR", "FINALIZE"].every(stage => runtime.includes(stage));
+        const orchestration = loop.includes("this.planner.plan(goal)") && loop.includes("controller.construct(plan.requirement)") && controller.includes("ARCHITECTURE") && controller.includes("PLAN");
+        const autonomousHandoff = conductor.includes("autonomous-self-healing") && daemon.includes("platform-continuation") && daemon.includes("AUTONOMOUS_PLATFORM_COMPLETE");
+        const local = builder.includes("argparse") && builder.includes("CAPABILITIES") && builder.includes("Capability ID:") && builder.includes("if not generated:") && !builder.includes("subprocess.run([\"copilot\"") && !builder.includes("subprocess.run([\"codex\"") && !builder.includes("subprocess.run([\"claude\"");
+        const supportedPlatformCapabilities = ["platform.user-management", "platform.organization-model", "platform.security-layer"].every(id => builder.includes(id));
+        const reasoningContract = reasoning.includes("class ReasoningEngine") && reasoning.includes("def reason") && reasoning.includes('"status": "reasoned"');
+        const advisoryContract = constitution.includes("strategic advisor") && constitution.includes("financial") && constitution.includes("managerial") && constitution.includes("autonomous construction");
+        return pythonOnly && lifecycle && orchestration && autonomousHandoff && local && supportedPlatformCapabilities && reasoningContract && advisoryContract;
     }
 
     private architectureRules(): string[] { return ["Architecture Freeze V4","Five Main Intelligence Engines remain canonical","Everything is an Engine","One Capability = One Engine = One Test = One Commit","Reuse existing capabilities; do not create duplicate engines","Every completed engine requires identity, lifecycle, health monitoring, test coverage and documentation"]; }
-    private directives(): string[] { return ["Read Docs/ARCHITECTURE.md and existing engine implementations before changing code","Inspect the existing AI Runtime before creating a new implementation","Implement exactly ONE concrete capability from the canonical backlog","Create or update the focused implementation, focused test and documentation required by the architecture","Run focused verification followed by the full Jest suite","Repair verification failures before finalization","Do not stop at a plan or report; produce a real repository change when the selected capability is missing","Do not redesign Architecture Freeze V4"]; }
+    private directives(): string[] { return ["Read Docs/ARCHITECTURE.md and existing engine implementations before changing code","Read Assistant/SYSTEM_PROMPT.md as the development constitution","Inspect the existing AI Runtime before creating a new implementation","Implement exactly ONE concrete capability from the canonical backlog","Create or update the focused implementation, focused test and documentation required by the architecture","Run focused verification followed by the full Jest suite","Repair verification failures before finalization","Do not stop at a plan or report; produce a real repository change when the selected capability is missing","Do not redesign Architecture Freeze V4"]; }
     private walk(root: string): string[] { const out:string[]=[]; for(const entry of readdirSync(root,{withFileTypes:true})){const full=join(root,entry.name); if(entry.name==="__pycache__"||entry.name==="node_modules")continue; if(entry.isDirectory())out.push(...this.walk(full)); else out.push(full);} return out; }
     private countDirectories(root: string): number { if(!existsSync(root))return 0; return readdirSync(root,{withFileTypes:true}).filter(entry=>entry.isDirectory()).length; }
 }
