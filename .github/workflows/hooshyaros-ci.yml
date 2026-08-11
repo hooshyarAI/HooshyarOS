@@ -1,0 +1,43 @@
+name: HooshyarOS CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Node dependencies
+        run: npm install
+
+      - name: TypeScript verification
+        run: npx tsc --noEmit --pretty false
+
+      - name: Focused autonomous tests
+        run: >-
+          npx jest --runInBand
+          Backend/HBOS/test/AutonomousProjectMission.test.ts
+          Backend/HBOS/test/AutonomousProjectMission.platform-order.test.ts
+          Backend/HBOS/test/AutonomousPlatformWeaving.test.ts
+          Backend/HBOS/test/AutonomousCompletionGate.test.ts
+          Backend/HBOS/test/AutonomousBuildDaemon.test.ts
+
+      - name: Full Jest suite
+        run: npm test -- --runInBand
