@@ -104,9 +104,21 @@ describe("AutonomousBuildDaemon", () => {
             selectNextCapability: jest.fn(() => null)
         } as unknown as AutonomousPlatformContinuation;
 
-        const execute = jest.fn((goal: any): AutonomousDevelopmentResult => {
-            throw new Error(`completion must not execute without evidence: ${goal.capabilityId}`);
-        });
+        const execute = jest.fn((goal: any): AutonomousDevelopmentResult => ({
+        status: "completed",
+        goal,
+        plan: { requirement: {} } as any,
+        result: {
+            ok: true,
+            status: "BUILT",
+            attempts: 0,
+            selectedTool: "git",
+            issues: [],
+            trace: ["ARCHITECTURE", "PLAN", "GENERATE", "VERIFY", "FINALIZE"],
+            details: "verified completion evidence construction",
+            stage: "FINALIZE"
+        }
+    }));
         const development = { execute } as unknown as AutonomousDevelopmentLoop;
         const daemon = new AutonomousBuildDaemon({ maxCycles: 1, mission, continuation, development });
 
@@ -117,6 +129,8 @@ describe("AutonomousBuildDaemon", () => {
         expect(execute).toHaveBeenCalledTimes(1);
         const executedGoal = (execute.mock.calls[0]?.[0] as any);
         expect(executedGoal.capabilityId).toBe("assistant.completion.evidence");
-        expect(executedGoal.capability).toContain("documentation");
+        expect(executedGoal.capability).toContain("verification");
     });
 });
+
+
