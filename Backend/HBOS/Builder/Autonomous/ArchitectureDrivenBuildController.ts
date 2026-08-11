@@ -24,7 +24,8 @@ export class ArchitectureDrivenBuildController {
                 attempts: 0,
                 selectedTool: "architecture-brain",
                 issues: decision.reasons,
-                trace: ["ARCHITECTURE"]
+                trace: ["ARCHITECTURE"],
+                details: `Construction blocked at ARCHITECTURE; reasons=${decision.reasons.join(" | ")}`
             };
         }
 
