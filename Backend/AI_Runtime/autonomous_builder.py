@@ -11,7 +11,7 @@ import argparse
 import re
 from pathlib import Path
 
-from Backend.AI_Runtime.autonomous_spec import generic_artifacts, spec_from_prompt, write_missing
+from Backend.AI_Runtime.autonomous_spec import generic_artifacts, spec_from_prompt, write_missing, write_overwrite
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -270,6 +270,8 @@ CAPABILITY_DEPENDENCIES = {
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--prompt", required=True)
+    parser.add_argument("--repair", action="store_true")
+    parser.add_argument("--issue", default="")
     args = parser.parse_args()
     match = re.search(r"Capability ID:\s*([^\n]+)", args.prompt)
     capability_id = match.group(1).strip() if match else ""
@@ -291,6 +293,13 @@ def main() -> int:
     if missing:
         print(f"Blocked by unmet dependencies for {capability_id}: {', '.join(missing)}")
         return 3
+
+    if args.repair:
+        repaired = write_overwrite(ROOT, artifacts)
+        print("Repaired: " + ", ".join(repaired))
+        if args.issue:
+            print(f"Repair reason: {args.issue}")
+        return 0
 
     generated = write_missing(ROOT, artifacts)
     if not generated:
