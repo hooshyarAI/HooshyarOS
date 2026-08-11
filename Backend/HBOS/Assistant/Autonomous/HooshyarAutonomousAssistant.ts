@@ -6,6 +6,7 @@ import {AutonomousToolManager} from "./AutonomousToolManager";
 import {ProjectExecutionMemory} from "./ProjectExecutionMemory";
 import {AutonomousAssistantRuntime} from "./AutonomousAssistantRuntime";
 import {AutonomousMissionController} from "./AutonomousMissionController";
+import {AutonomousBuildDaemon} from "../../Autonomous/Runtime/AutonomousBuildDaemon";
 
 export class HooshyarAutonomousAssistant {
     identity=new AutonomousIdentityCore();
@@ -16,6 +17,8 @@ export class HooshyarAutonomousAssistant {
     memory=new ProjectExecutionMemory();
     runtime=new AutonomousAssistantRuntime();
     missionController=new AutonomousMissionController();
+
+    constructor(private readonly buildDaemon: Pick<AutonomousBuildDaemon, "run"> = new AutonomousBuildDaemon()) {}
 
     async execute(goal:string){
         const identity=this.identity.identify();
@@ -42,5 +45,14 @@ export class HooshyarAutonomousAssistant {
         const result={identity,mission,lifecycle,runtime,evaluation,improvement,tool};
         this.memory.record(result);
         return result;
+    }
+
+    /**
+     * Explicitly hand the completed Assistant layer to the governed platform
+     * continuation daemon. The daemon owns audit, capability selection,
+     * construction, verification, commit/push and re-planning.
+     */
+    continuePlatformConstruction() {
+        return this.buildDaemon.run();
     }
 }
