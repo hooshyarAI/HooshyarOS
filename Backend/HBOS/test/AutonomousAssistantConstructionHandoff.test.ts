@@ -30,8 +30,10 @@ describe("Autonomous Assistant construction handoff", () => {
         assistant.memory = { record: () => undefined } as any;
 
         const result = await assistant.execute("build HooshyarOS");
+        const construction = result.construction;
 
         expect(calls).toBe(1);
-        expect(result.construction.status).toBe("completed");
+        expect(construction).not.toBeNull();
+        expect(construction!.status).toBe("completed");
     });
 });
