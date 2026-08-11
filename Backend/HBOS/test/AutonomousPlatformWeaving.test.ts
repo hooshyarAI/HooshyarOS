@@ -43,6 +43,13 @@ describe("AutonomousPlatformWeaving", () => {
             "Backend/HBOS/test/SecurityLayerEngine.test.ts",
             "Docs/Engines/SecurityLayerEngine.md"
         ]);
+        expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.api-gateway");
+
+        complete(root, [
+            "Backend/HBOS/Engines/APIGatewayEngine.ts",
+            "Backend/HBOS/test/APIGatewayEngine.test.ts",
+            "Docs/Engines/APIGatewayEngine.md"
+        ]);
         expect(mission.nextPlatformMission()?.capabilityId).toBe("engine.reasoning.canonical");
 
         complete(root, [
@@ -89,6 +96,6 @@ describe("AutonomousPlatformWeaving", () => {
             "Docs/Engines/SecurityLayerEngine.md"
         ]);
 
-        expect(mission.nextPlatformMission()?.capabilityId).toBe("engine.reasoning.canonical");
+        expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.api-gateway");
     });
 });
