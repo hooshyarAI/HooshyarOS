@@ -42,8 +42,12 @@ jobs:
 
       - name: Verify autonomous runtime
         run: |
-          npx tsc Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.ts Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts --noEmit --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --pretty false
+          npx tsc Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.ts Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts Backend/HBOS/Autonomous/Runtime/AutonomousProjectMission.ts --noEmit --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --pretty false
           python -m compileall -q Backend/AI_Runtime
+
+      - name: Verify Assistant completion gate
+        run: |
+          npx jest --runInBand Backend/HBOS/test/AssistantCompletionGate.test.ts Backend/HBOS/test/AutonomousCompletionGate.test.ts Backend/HBOS/test/HooshyarAutonomousAssistant.test.ts
 
       - name: Run autonomous construction loop
         env:
