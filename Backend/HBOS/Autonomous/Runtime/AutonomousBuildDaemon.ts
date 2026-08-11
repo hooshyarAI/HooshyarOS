@@ -4,6 +4,7 @@ import { AutonomousDevelopmentLoop, AutonomousDevelopmentResult } from "../../Ar
 import { AutonomousProjectMission, Mission } from "./AutonomousProjectMission";
 import { AutonomousPlatformContinuation, PlatformCapabilityMission, PlatformContinuationMission } from "./AutonomousPlatformContinuation";
 import { CapabilityEvidenceAudit } from "./CapabilityEvidenceAudit";
+import { CanonicalCapabilityAudit } from "./CanonicalCapabilityAudit";
 import { createLocalConstructionTools } from "./LocalConstructionToolset";
 
 export interface DaemonOptions {
@@ -18,7 +19,8 @@ export interface DaemonOptions {
 type MissionDecision =
     | { kind: "mission"; mission: Mission; assistantGatePassed: false; continuation?: undefined }
     | { kind: "platform-continuation"; mission: PlatformCapabilityMission; assistantGatePassed: true; continuation: PlatformContinuationMission }
-    | { kind: "platform-complete"; mission: Mission; assistantGatePassed: true; continuation: PlatformContinuationMission };
+    | { kind: "platform-complete"; mission: Mission; assistantGatePassed: true; continuation: PlatformContinuationMission }
+    | { kind: "platform-audit-blocked"; mission: Mission; assistantGatePassed: true; continuation: PlatformContinuationMission; reason: string; details: unknown };
 
 export class AutonomousBuildDaemon {
     private readonly root: string;
@@ -26,6 +28,7 @@ export class AutonomousBuildDaemon {
     private readonly continuation: AutonomousPlatformContinuation;
     private readonly development: AutonomousDevelopmentLoop;
     private readonly evidenceAudit = new CapabilityEvidenceAudit();
+    private readonly canonicalAudit = new CanonicalCapabilityAudit();
     private readonly maxCycles: number;
     private readonly reportEvery: number;
 
@@ -108,6 +111,22 @@ export class AutonomousBuildDaemon {
             };
         }
 
+        const audit = this.canonicalAudit.audit(this.root, this.mission);
+        if (!audit.complete) {
+            return {
+                kind: "platform-audit-blocked",
+                mission: selected,
+                assistantGatePassed: true,
+                continuation,
+                reason: audit.missingArtifacts.length > 0
+                    ? "CANONICAL_CAPABILITY_AUDIT_MISSING_ARTIFACTS"
+                    : audit.roadmapPresent
+                        ? "CANONICAL_CAPABILITY_AUDIT_BACKLOG_NOT_EXHAUSTED"
+                        : "CANONICAL_CAPABILITY_AUDIT_ROADMAP_MISSING",
+                details: audit
+            };
+        }
+
         return { kind: "platform-complete", mission: selected, assistantGatePassed: true, continuation };
     }
 
@@ -120,6 +139,30 @@ export class AutonomousBuildDaemon {
             if (decision.kind === "platform-complete") {
                 console.log(JSON.stringify({ type: "AUTONOMOUS_PLATFORM_COMPLETE", cycle, status: "completed", continuation: decision.continuation }));
                 return { status: "completed", cycles: cycle, history };
+            }
+
+            if (decision.kind === "platform-audit-blocked") {
+                const result = {
+                    goal: {
+                        capabilityId: "platform.continuation.audit",
+                        capability: decision.reason,
+                        targetEngine: "Autonomous Operations Engine",
+                        dependencies: []
+                    },
+                    result: {
+                        ok: false,
+                        status: "BLOCKED",
+                        attempts: 0,
+                        selectedTool: "audit",
+                        issues: [decision.reason],
+                        trace: ["ARCHITECTURE", "AUDIT", "FINALIZE"],
+                        details: JSON.stringify(decision.details),
+                        stage: "FINALIZE"
+                    },
+                    status: "blocked"
+                };
+                console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, result }));
+                return { status: "blocked", cycles: cycle, history: [...history, { cycle, audit: decision.details, status: "blocked" }] };
             }
 
             const mission = decision.mission;
