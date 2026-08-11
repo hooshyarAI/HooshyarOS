@@ -11,6 +11,10 @@ describe("AutonomousBuildDaemon", () => {
             plan: { requirement: {} } as any,
             result: {
                 ok: true,
+                status: "BUILT",
+                attempts: 0,
+                selectedTool: "git",
+                issues: [],
                 trace: ["ARCHITECTURE", "PLAN", "GENERATE", "VERIFY", "FINALIZE"],
                 details: "verified construction evidence",
                 stage: "FINALIZE"
