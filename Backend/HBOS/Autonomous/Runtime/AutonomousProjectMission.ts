@@ -126,8 +126,9 @@ export class AutonomousProjectMission {
         const local = builder.includes("argparse") && builder.includes("CAPABILITIES") && builder.includes("Capability ID:") && builder.includes("if not generated:") && !builder.includes("subprocess.run([\"copilot\"") && !builder.includes("subprocess.run([\"codex\"") && !builder.includes("subprocess.run([\"claude\"");
         const supportedPlatformCapabilities = ["platform.user-management", "platform.organization-model", "platform.security-layer"].every(id => builder.includes(id));
         const reasoningContract = reasoning.includes("class ReasoningEngine") && reasoning.includes("def reason") && reasoning.includes('"status": "reasoned"');
-        const advisoryContract = constitution.includes("strategic advisor") && constitution.includes("financial") && constitution.includes("managerial") && constitution.includes("autonomous construction");
-        return pythonOnly && lifecycle && orchestration && autonomousHandoff && local && supportedPlatformCapabilities && reasoningContract && advisoryContract;
+        const constructionIdentity = constitution.includes("autonomous construction intelligence") && constitution.includes("not a human executive's financial, managerial or commercial advisor");
+        const continuationContract = constitution.includes("AUDIT") && constitution.includes("SELECT NEXT GENUINELY MISSING CAPABILITY") && constitution.includes("COMMIT") && constitution.includes("PUSH");
+        return pythonOnly && lifecycle && orchestration && autonomousHandoff && local && supportedPlatformCapabilities && reasoningContract && constructionIdentity && continuationContract;
     }
 
     private architectureRules(): string[] { return ["Architecture Freeze V4","Five Main Intelligence Engines remain canonical","Everything is an Engine","One Capability = One Engine = One Test = One Commit","Reuse existing capabilities; do not create duplicate engines","Every completed engine requires identity, lifecycle, health monitoring, test coverage and documentation"]; }
@@ -135,4 +136,5 @@ export class AutonomousProjectMission {
     private walk(root: string): string[] { const out:string[]=[]; for(const entry of readdirSync(root,{withFileTypes:true})){const full=join(root,entry.name); if(entry.name==="__pycache__"||entry.name==="node_modules")continue; if(entry.isDirectory())out.push(...this.walk(full)); else out.push(full);} return out; }
     private countDirectories(root: string): number { if(!existsSync(root))return 0; return readdirSync(root,{withFileTypes:true}).filter(entry=>entry.isDirectory()).length; }
 }
+
 if (require.main === module) console.log(JSON.stringify(new AutonomousProjectMission().nextMission(),null,2));
