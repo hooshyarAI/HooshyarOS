@@ -50,7 +50,7 @@ describe("AutonomousProjectMission platform order", () => {
         seedAssistantEvidence(root);
         const mission = new AutonomousProjectMission(root);
 
-        expect(mission.nextMission().capabilityId).toBe("platform.user-management");
+        expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.user-management");
 
         for (const path of [
             "Backend/HBOS/Engines/UserManagementEngine.ts",
@@ -61,7 +61,7 @@ describe("AutonomousProjectMission platform order", () => {
             mkdirSync(join(target, ".."), { recursive: true });
             writeFileSync(target, "implemented", "utf8");
         }
-        expect(mission.nextMission().capabilityId).toBe("platform.organization-model");
+        expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.organization-model");
 
         for (const path of [
             "Backend/HBOS/Engines/OrganizationModelEngine.ts",
@@ -72,6 +72,6 @@ describe("AutonomousProjectMission platform order", () => {
             mkdirSync(join(target, ".."), { recursive: true });
             writeFileSync(target, "implemented", "utf8");
         }
-        expect(mission.nextMission().capabilityId).toBe("platform.security-layer");
+        expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.security-layer");
     });
 });
