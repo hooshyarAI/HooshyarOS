@@ -20,4 +20,4 @@ jobs:
       - name: Run TypeScript autonomous tests
         run: |
           npm ci
-          npx jest --runInBand Backend/HBOS
+          node ./node_modules/jest/bin/jest.js --runInBand Backend/HBOS

@@ -78,10 +78,8 @@ def validate_spec(spec: CapabilitySpec) -> list[str]:
 
     rules = " ".join(spec.architecture_rules).lower()
     if "one capability" in rules and "one engine" in rules and "one test" in rules:
-        # The generic worker is allowed to create exactly one engine/test/docs boundary.
         pass
     if any("duplicate" in rule.lower() and "engine" in rule.lower() for rule in spec.architecture_rules):
-        # Duplicate prevention is enforced by write_missing; this records the rule in the spec.
         pass
     return errors
 
@@ -165,3 +163,14 @@ def write_missing(root: Path, artifacts: list[tuple[str, str]]) -> list[str]:
         target.write_text(content, encoding="utf-8")
         generated.append(relative_path)
     return generated
+
+
+def write_overwrite(root: Path, artifacts: list[tuple[str, str]]) -> list[str]:
+    """Repair only the exact deterministic artifacts owned by this capability."""
+    repaired: list[str] = []
+    for relative_path, content in artifacts:
+        target = root / relative_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
+        repaired.append(relative_path)
+    return repaired

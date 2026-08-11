@@ -36,7 +36,7 @@ jobs:
 
       - name: Focused autonomous tests
         run: >-
-          npx jest --runInBand
+          node ./node_modules/jest/bin/jest.js --runInBand
           Backend/HBOS/test/AutonomousProjectMission.test.ts
           Backend/HBOS/test/AutonomousProjectMission.platform-order.test.ts
           Backend/HBOS/test/AutonomousPlatformWeaving.test.ts
@@ -44,4 +44,4 @@ jobs:
           Backend/HBOS/test/AutonomousBuildDaemon.test.ts
 
       - name: Full Jest suite
-        run: npm test -- --runInBand
+        run: node ./node_modules/jest/bin/jest.js --runInBand

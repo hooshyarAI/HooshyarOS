@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import { execFileSync } from "child_process";
 import { ConstructionContext, ConstructionTool } from "../../Builder/Autonomous/AutonomousConstructionEngine";
 
@@ -131,7 +132,7 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                     const builderTests = run("python", ["-m", "pytest", "Backend/AI_Runtime/tests/test_autonomous_builder_platform.py", "Backend/AI_Runtime/tests/test_autonomous_spec.py", "-q"], root);
                     if (!builderTests.ok) return { ok: false, issue: "AUTONOMOUS_BUILDER_TESTS_FAILED", artifact: { syntaxVerified: true, builderTestsVerified: false, output: builderTests.output, error: builderTests.error } };
 
-                    const jest = run("npx", ["jest", "--runInBand", "--config", ".\\jest.config.js"], root);
+                    const jest = run("node", ["./node_modules/jest/bin/jest.js", "--runInBand", "--config", ".\\jest.config.js"], root);
                     const artifact = {
                         type: "AUTONOMOUS_VERIFY_RESULT",
                         command: "compileall + pytest autonomous builder/spec + jest",
@@ -148,7 +149,27 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                 }
 
                 if (stage === "REPAIR") {
-                    return { ok: false, issue: "AUTONOMOUS_REPAIR_REQUIRES_REAL_FIX", artifact: { type: "AUTONOMOUS_REPAIR_RESULT", repaired: false, reason: "No verified repair artifact exists; refusing to claim repair without a real repository change.", timestamp: new Date().toISOString() } };
+                    const agent = resolveImplementationAgent(root);
+                    if (!agent) return { ok: false, issue: "AUTONOMOUS_REPAIR_AGENT_UNAVAILABLE", artifact: { repaired: false, provider: null } };
+                    const plan = context.artifacts.REPAIR_PLAN;
+                    const issue = typeof plan === "object" && plan !== null && "issue" in plan ? String((plan as { issue?: unknown }).issue ?? "VERIFY_FAILED") : "VERIFY_FAILED";
+                    const prompt = `${buildAgentPrompt(context)}\nRepair mode: regenerate only the deterministic artifacts owned by this capability.\nRepair issue: ${issue}`;
+                    const result = run(agent, ["Backend/AI_Runtime/autonomous_builder.py", "--repair", "--prompt", prompt, "--issue", issue], root, 30 * 60 * 1000);
+                    const changed = result.ok && result.output.includes("Repaired:");
+                    const artifact = {
+                        type: "AUTONOMOUS_REPAIR_RESULT",
+                        provider: agent,
+                        capabilityId: context.plan.capabilityId,
+                        repaired: result.ok && changed,
+                        exitCode: result.code,
+                        output: result.output,
+                        error: result.error,
+                        timestamp: new Date().toISOString()
+                    };
+                    console.log(JSON.stringify(artifact, null, 2));
+                    return result.ok && changed
+                        ? { ok: true, artifact }
+                        : { ok: false, issue: "AUTONOMOUS_REPAIR_FAILED", artifact };
                 }
                 return { ok: true };
             }
