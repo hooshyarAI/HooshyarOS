@@ -1,10 +1,11 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { AutonomousProjectMission } from "../Autonomous/Runtime/AutonomousProjectMission";
 
 describe("AutonomousProjectMission", () => {
     it("selects the first genuinely missing canonical platform capability", () => {
-        const root = mkdtempSync(tmpdir());
+        const root = mkdtempSync(join(tmpdir(), "hooshyar-mission-"));
         try {
             const mission = new AutonomousProjectMission(root);
             const next = mission.nextPlatformMission();

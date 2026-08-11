@@ -13,9 +13,10 @@ function seedCanonicalAssistantEvidence(root: string): void {
         "Backend/HBOS/Assistant/Autonomous/DecisionKnowledgeStore.ts",
         "Backend/HBOS/Assistant/Autonomous/ContextRetrievalEngine.ts",
         "Backend/HBOS/Assistant/Autonomous/LearningFeedbackLoop.ts",
-        "Backend/HBOS/Builder/Autonomous/AutonomousProjectConductor.ts",
+        "Backend/HBOS/Autonomous/AutonomousProjectConductor.ts",
         "Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.ts",
         "Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts",
+        "Backend/HBOS/Builder/Autonomous/AutonomousConstructionEngine.ts",
         "Backend/HBOS/test/AutonomousMissionController.test.ts",
         "Backend/HBOS/test/AutonomousAssistantRuntime.test.ts",
         "Backend/HBOS/test/HooshyarAutonomousAssistant.test.ts",
@@ -40,6 +41,11 @@ function seedCanonicalAssistantEvidence(root: string): void {
     const reasoning = join(root, "Backend/AI_Runtime/reasoning/reasoning_engine.py");
     mkdirSync(join(reasoning, ".."), { recursive: true });
     writeFileSync(reasoning, 'class ReasoningEngine:\n    def reason(self): return {"status": "reasoned"}\n', "utf8");
+    const agents = join(root, "AGENTS.md");
+    writeFileSync(agents, "Architecture Freeze V4", "utf8");
+    const prompt = join(root, "Assistant/SYSTEM_PROMPT.md");
+    mkdirSync(join(prompt, ".."), { recursive: true });
+    writeFileSync(prompt, "strategic advisor financial managerial autonomous construction", "utf8");
 }
 
 describe("Assistant completion gate", () => {
