@@ -13,7 +13,7 @@ export class AutonomousProjectMission {
         const architectureRoot = join(this.root, "Backend", "HBOS", "Architecture");
         const runtimeRoot = join(this.root, "Backend", "AI_Runtime");
         const architectureFiles = existsSync(architectureRoot) ? this.walk(architectureRoot).filter(file => /Architecture|Decision|Planner|Registry|Review|Repair/i.test(file)) : [];
-        return { root: this.root, commit: git(["rev-parse", "--short", "HEAD"]), clean: git(["status", "--porcelain"]) === "", architectureFiles, engineCount: this.countDirectories(join(this.root, "Backend", "HBOS", "Engines")), runtimeFileCount: existsSync(runtimeRoot) ? this.walk(runtimeRoot).length : 0, latestCommits: git(["log", "--oneline", "-12"]).split(/\r?\n/).filter(Boolean) };
+        return { root: this.root, commit: git(["rev-parse", "--short", "HEAD"]), clean: git(["status", "--porcelain", "--", ".", ":(exclude)node_modules"]) === "", architectureFiles, engineCount: this.countDirectories(join(this.root, "Backend", "HBOS", "Engines")), runtimeFileCount: existsSync(runtimeRoot) ? this.walk(runtimeRoot).length : 0, latestCommits: git(["log", "--oneline", "-12"]).split(/\r?\n/).filter(Boolean) };
     }
     nextMission(): Mission {
         const evidence = this.snapshot();
