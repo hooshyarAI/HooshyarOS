@@ -28,10 +28,16 @@ function seedAssistantEvidence(root: string): void {
         mkdirSync(join(path, ".."), { recursive: true });
         writeFileSync(path, file.endsWith(".py") ? "class ReasoningEngine:\n    def reason(self): return {\"status\": \"reasoned\"}\n" : "", "utf8");
     }
+    const architectureLoop = join(root, "Backend/HBOS/Architecture/Autonomous/AutonomousDevelopmentLoop.ts");
+    mkdirSync(join(architectureLoop, ".."), { recursive: true });
+    writeFileSync(architectureLoop, "this.planner.plan(goal); controller.construct(plan.requirement)", "utf8");
+
+    const controller = join(root, "Backend/Builder/Autonomous/ArchitectureDrivenBuildController.ts");
+    mkdirSync(join(controller, ".."), { recursive: true });
+    writeFileSync(controller, "ARCHITECTURE PLAN", "utf8");
+
     writeFileSync(join(root, "Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.ts"), 'type ImplementationAgent = "python"; Backend/AI_Runtime/autonomous_builder.py GENERATE VERIFY REPAIR FINALIZE', "utf8");
-    writeFileSync(join(root, "Backend/HBOS/Architecture/Autonomous/AutonomousDevelopmentLoop.ts"), "this.planner.plan(goal); controller.construct(plan.requirement)", "utf8");
-    writeFileSync(join(root, "Backend/Builder/Autonomous/ArchitectureDrivenBuildController.ts"), "ARCHITECTURE PLAN", "utf8");
-    writeFileSync(join(root, "Backend/AI_Runtime/autonomous_builder.py"), "CAPABILITIES\nCapability ID:\nplatform.user-management\nplatform.organization-model\nplatform.security-layer", "utf8");
+    writeFileSync(join(root, "Backend/AI_Runtime/autonomous_builder.py"), "CAPABILITIES\nCapability ID:\nplatform.user-management\nplatform.organization-model\nplatform.security-layer\nif not generated:", "utf8");
     writeFileSync(join(root, "Backend/AI_Runtime/reasoning/reasoning_engine.py"), 'class ReasoningEngine:\n    def reason(self): return {"status": "reasoned"}\n', "utf8");
 }
 
