@@ -13,7 +13,6 @@ function seedCanonicalAssistantEvidence(root: string): void {
         "Backend/HBOS/Assistant/Autonomous/DecisionKnowledgeStore.ts",
         "Backend/HBOS/Assistant/Autonomous/ContextRetrievalEngine.ts",
         "Backend/HBOS/Assistant/Autonomous/LearningFeedbackLoop.ts",
-        "Backend/HBOS/Autonomous/AutonomousProjectConductor.ts",
         "Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.ts",
         "Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts",
         "Backend/HBOS/Builder/Autonomous/AutonomousConstructionEngine.ts",
@@ -27,22 +26,36 @@ function seedCanonicalAssistantEvidence(root: string): void {
         mkdirSync(join(path, ".."), { recursive: true });
         writeFileSync(path, "evidence", "utf8");
     }
+
     const runtime = join(root, "Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.ts");
     writeFileSync(runtime, 'type ImplementationAgent = "python"; GENERATE VERIFY REPAIR FINALIZE', "utf8");
+
     const loop = join(root, "Backend/HBOS/Architecture/Autonomous/AutonomousDevelopmentLoop.ts");
     mkdirSync(join(loop, ".."), { recursive: true });
     writeFileSync(loop, "this.planner.plan(goal); controller.construct(plan.requirement)", "utf8");
+
     const controller = join(root, "Backend/HBOS/Builder/Autonomous/ArchitectureDrivenBuildController.ts");
     mkdirSync(join(controller, ".."), { recursive: true });
     writeFileSync(controller, "ARCHITECTURE PLAN", "utf8");
+
+    const conductor = join(root, "Backend/HBOS/Autonomous/AutonomousProjectConductor.ts");
+    mkdirSync(join(conductor, ".."), { recursive: true });
+    writeFileSync(conductor, "autonomous-self-healing", "utf8");
+
+    const daemon = join(root, "Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts");
+    writeFileSync(daemon, "platform-continuation AUTONOMOUS_PLATFORM_COMPLETE", "utf8");
+
     const builder = join(root, "Backend/AI_Runtime/autonomous_builder.py");
     mkdirSync(join(builder, ".."), { recursive: true });
     writeFileSync(builder, "argparse CAPABILITIES Capability ID: if not generated: platform.user-management platform.organization-model platform.security-layer", "utf8");
+
     const reasoning = join(root, "Backend/AI_Runtime/reasoning/reasoning_engine.py");
     mkdirSync(join(reasoning, ".."), { recursive: true });
     writeFileSync(reasoning, 'class ReasoningEngine:\n    def reason(self): return {"status": "reasoned"}\n', "utf8");
+
     const agents = join(root, "AGENTS.md");
     writeFileSync(agents, "Architecture Freeze V4", "utf8");
+
     const prompt = join(root, "Assistant/SYSTEM_PROMPT.md");
     mkdirSync(join(prompt, ".."), { recursive: true });
     writeFileSync(prompt, "strategic advisor financial managerial autonomous construction", "utf8");
