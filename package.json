@@ -4,7 +4,7 @@
   "description": "HooshyarOS HBOS Core",
   "main": "index.js",
   "scripts": {
-    "test": "jest",
+    "test": "node ./node_modules/jest/bin/jest.js",
     "autonomous:build": "tsx Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts"
   },
   "devDependencies": {
