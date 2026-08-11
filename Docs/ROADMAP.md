@@ -81,6 +81,7 @@ Features:
 - Alerts
 
 - AI Assistant
+- Repository Production Readiness
 
 
 
