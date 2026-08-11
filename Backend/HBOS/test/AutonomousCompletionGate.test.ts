@@ -38,7 +38,7 @@ function seedCanonicalAssistantEvidence(root: string): void {
     writeEvidence(root, "Backend/HBOS/Architecture/Autonomous/AutonomousDevelopmentLoop.ts", "this.planner.plan(goal) controller.construct(plan.requirement)");
     writeEvidence(root, "Backend/HBOS/Builder/Autonomous/ArchitectureDrivenBuildController.ts", "ARCHITECTURE PLAN");
     writeEvidence(root, "Backend/HBOS/Autonomous/AutonomousProjectConductor.ts", "autonomous-self-healing");
-    writeEvidence(root, "Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts", "platform-continuation AUTONOMOUS_PLATFORM_COMPLETE");
+    writeEvidence(root, "Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts", "platform-continuation AUTONOMOUS_PLATFORM_BACKLOG_EXHAUSTED");
     writeEvidence(root, "Backend/AI_Runtime/autonomous_builder.py", "argparse CAPABILITIES Capability ID: if not generated: platform.user-management platform.organization-model platform.security-layer");
     writeEvidence(root, "Backend/AI_Runtime/reasoning/reasoning_engine.py", 'class ReasoningEngine:\n    def reason(self): return {"status": "reasoned"}\n');
 }
