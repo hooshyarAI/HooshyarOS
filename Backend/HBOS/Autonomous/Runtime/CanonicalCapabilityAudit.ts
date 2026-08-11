@@ -42,7 +42,8 @@ export class CanonicalCapabilityAudit {
             ["Dashboard", "Backend/HBOS/Engines/DashboardEngine.ts", "Backend/HBOS/test/DashboardEngine.test.ts", "Docs/Engines/DashboardEngine.md"],
             ["Reports", "Backend/HBOS/Engines/ReportsEngine.ts", "Backend/HBOS/test/ReportsEngine.test.ts", "Docs/Engines/ReportsEngine.md"],
             ["Alerts", "Backend/HBOS/Engines/AlertsEngine.ts", "Backend/HBOS/test/AlertsEngine.test.ts", "Docs/Engines/AlertsEngine.md"],
-            ["AI Assistant", "Backend/HBOS/Assistant/Autonomous/HooshyarAutonomousAssistant.ts", "Backend/HBOS/test/HooshyarAutonomousAssistant.test.ts"]
+            ["AI Assistant", "Backend/HBOS/Assistant/Autonomous/HooshyarAutonomousAssistant.ts", "Backend/HBOS/test/HooshyarAutonomousAssistant.test.ts"],
+            ["Repository Production Readiness", "Backend/HBOS/Engines/ProductionReadinessEngine.ts", "Backend/HBOS/test/ProductionReadinessEngine.test.ts", "Docs/Engines/ProductionReadinessEngine.md"]
         ];
 
         const missingArtifacts: string[] = [];
