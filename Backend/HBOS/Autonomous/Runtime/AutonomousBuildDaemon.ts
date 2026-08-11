@@ -1,6 +1,7 @@
 import { AutonomousDevelopmentLoop, AutonomousDevelopmentResult } from "../../Architecture/Autonomous/AutonomousDevelopmentLoop";
 import { AutonomousProjectMission, Mission } from "./AutonomousProjectMission";
 import { AutonomousPlatformContinuation, PlatformCapabilityMission, PlatformContinuationMission } from "./AutonomousPlatformContinuation";
+import { CapabilityEvidenceAudit } from "./CapabilityEvidenceAudit";
 import { createLocalConstructionTools } from "./LocalConstructionToolset";
 
 export interface DaemonOptions {
@@ -36,6 +37,7 @@ export class AutonomousBuildDaemon {
     private readonly mission: AutonomousProjectMission;
     private readonly continuation: AutonomousPlatformContinuation;
     private readonly development: AutonomousDevelopmentLoop;
+    private readonly evidenceAudit = new CapabilityEvidenceAudit();
     private readonly maxCycles: number;
     private readonly reportEvery: number;
 
@@ -51,11 +53,11 @@ export class AutonomousBuildDaemon {
     /**
      * Single autonomous decision boundary.
      *
-     * Reasoning/mission selection stays in AutonomousProjectMission,
-     * continuation policy stays in AutonomousPlatformContinuation, and the
-     * daemon only executes the resulting decision. This prevents the
-     * completion gate from ever being executed as if it were a platform
-     * capability.
+     * Completion is permitted only after the platform backlog audit reports no
+     * genuinely missing capability and the repository snapshot is clean. The
+     * evidence gate is deliberately evaluated here as a second, final guard so
+     * completion cannot depend on a single file-existence check buried in the
+     * mission selector.
      */
     private selectMission(): MissionDecision {
         const selected = this.mission.nextMission();
@@ -77,6 +79,27 @@ export class AutonomousBuildDaemon {
                 mission: nextPlatformMission,
                 assistantGatePassed: true,
                 continuation
+            };
+        }
+
+        const snapshot = this.mission.snapshot();
+        const finalEvidence = this.evidenceAudit.evaluate({
+            implementation: selected.capabilityId === "assistant.completion.gate",
+            test: selected.evidence.clean,
+            documentation: selected.architectureRules.length > 0,
+            dependenciesSatisfied: selected.dependencies.length === 0,
+            verified: snapshot.clean && snapshot.commit.length > 0
+        });
+
+        if (!finalEvidence.complete) {
+            return {
+                kind: "mission",
+                mission: {
+                    ...selected,
+                    capabilityId: "assistant.completion.evidence",
+                    capability: `complete missing final completion evidence: ${finalEvidence.missing.join(", ")}`
+                },
+                assistantGatePassed: false
             };
         }
 
