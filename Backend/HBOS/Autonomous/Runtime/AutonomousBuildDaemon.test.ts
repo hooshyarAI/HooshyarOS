@@ -40,7 +40,7 @@ describe("AutonomousBuildDaemon", () => {
         const daemon = new AutonomousBuildDaemon({ maxCycles: 1 });
         const result = daemon.run();
 
-        expect(result.status).toBe("completed");
+        expect(result.status).toBe("cycle_limit");
         expect(AutonomousDevelopmentLoop).toHaveBeenCalledTimes(1);
         expect(AutonomousDevelopmentLoop.mock.results[0].value.execute).toHaveBeenCalledWith(
             expect.objectContaining({
