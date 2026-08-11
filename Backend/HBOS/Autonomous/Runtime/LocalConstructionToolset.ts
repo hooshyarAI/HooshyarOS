@@ -62,6 +62,7 @@ function buildAgentPrompt(context: ConstructionContext): string {
     return [
         "You are the repository-native Python implementation worker inside HooshyarOS Autonomous Operations Engine.",
         "Read AGENTS.md, Docs/ARCHITECTURE.md, and Assistant/SYSTEM_PROMPT.md before changing code.",
+        "The frozen platform architecture, its Engines, decision logic, lifecycle, governance and autonomous construction rules are authoritative inputs to this mission.",
         "Architecture Freeze V4 is authoritative; do not redesign or duplicate existing engines.",
         "Implement exactly ONE capability for this mission:",
         `Capability ID: ${context.plan.capabilityId}`,
@@ -69,7 +70,9 @@ function buildAgentPrompt(context: ConstructionContext): string {
         `Target Engine: ${context.plan.targetEngine}`,
         `Dependencies: ${context.plan.dependencies.join(", ") || "none"}`,
         `Architecture rules: ${context.plan.architectureRules.join(" ; ") || "preserve existing rules"}`,
+        `Directives: ${context.plan.directives.join(" ; ") || "implement exactly one capability, verify it, and repair before finalization"}`,
         "Use only repository-native Python construction. Do not invoke Copilot, Codex, Claude, or any cloud coding CLI.",
+        "Reuse existing capabilities and engine boundaries; never invent business semantics that are absent from repository architecture or evidence.",
         "Produce a real repository change when the selected deterministic capability is missing."
     ].join("\n");
 }
@@ -78,7 +81,16 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
     return [
         {
             name: "architecture",
-            execute: (_stage, context) => ({ ok: Boolean(context.plan.capabilityId && context.plan.capability && context.plan.targetEngine), artifact: { approved: true } })
+            execute: (_stage, context) => ({
+                ok: Boolean(context.plan.capabilityId && context.plan.capability && context.plan.targetEngine),
+                artifact: {
+                    approved: true,
+                    capabilityId: context.plan.capabilityId,
+                    targetEngine: context.plan.targetEngine,
+                    architectureRules: context.plan.architectureRules,
+                    directives: context.plan.directives
+                }
+            })
         },
         {
             name: "generator",
@@ -108,13 +120,13 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                     const syntax = run("python", ["-m", "compileall", "-q", "Backend/AI_Runtime"], root);
                     if (!syntax.ok) return { ok: false, issue: "AUTONOMOUS_PYTHON_SYNTAX_VERIFY_FAILED", artifact: { syntaxVerified: false, output: syntax.output, error: syntax.error } };
 
-                    const builderTests = run("python", ["-m", "pytest", "Backend/AI_Runtime/tests/test_autonomous_builder_platform.py", "-q"], root);
+                    const builderTests = run("python", ["-m", "pytest", "Backend/AI_Runtime/tests/test_autonomous_builder_platform.py", "Backend/AI_Runtime/tests/test_autonomous_spec.py", "-q"], root);
                     if (!builderTests.ok) return { ok: false, issue: "AUTONOMOUS_BUILDER_TESTS_FAILED", artifact: { syntaxVerified: true, builderTestsVerified: false, output: builderTests.output, error: builderTests.error } };
 
                     const jest = run("npx", ["jest", "--runInBand", "--config", ".\\jest.config.js"], root);
                     const artifact = {
                         type: "AUTONOMOUS_VERIFY_RESULT",
-                        command: "compileall + pytest autonomous builder + jest",
+                        command: "compileall + pytest autonomous builder/spec + jest",
                         syntaxVerified: true,
                         builderTestsVerified: builderTests.code === 0,
                         jestVerified: jest.code === 0,
