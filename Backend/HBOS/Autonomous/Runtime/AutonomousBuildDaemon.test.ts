@@ -3,7 +3,12 @@ jest.mock("../../Architecture/Autonomous/AutonomousDevelopmentLoop", () => ({
         execute: jest.fn(() => ({
             status: "completed",
             plan: { requirement: {} },
-            result: { ok: true }
+            result: {
+                ok: true,
+                trace: ["ARCHITECTURE", "PLAN", "GENERATE", "VERIFY", "FINALIZE"],
+                details: "verified construction evidence",
+                stage: "FINALIZE"
+            }
         }))
     }))
 }));
