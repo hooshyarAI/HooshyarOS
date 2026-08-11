@@ -1,53 +1,65 @@
-jest.mock("../../Architecture/Autonomous/AutonomousDevelopmentLoop", () => ({
-    AutonomousDevelopmentLoop: jest.fn().mockImplementation(() => ({
-        execute: jest.fn(() => ({
-            status: "completed",
-            plan: { requirement: {} },
-            result: { ok: true, trace: ["ARCHITECTURE", "PLAN", "GENERATE", "VERIFY", "FINALIZE"], details: "verified construction evidence", stage: "FINALIZE" }
-        }))
-    }))
-}));
-
-jest.mock("./AutonomousProjectMission", () => ({
-    AutonomousProjectMission: jest.fn().mockImplementation(() => ({
-        snapshot: jest.fn()
-            .mockReturnValueOnce({ commit: "before", clean: true })
-            .mockReturnValue({ commit: "after", clean: true }),
-        nextMission: jest.fn(() => ({
-            capabilityId: "assistant.completion.gate",
-            capability: "HooshyarOS Autonomous Assistant completion gate",
-            targetEngine: "Autonomous Operations Engine",
-            dependencies: []
-        })),
-        nextPlatformMission: jest.fn(() => ({
-            capabilityId: "platform.user-management",
-            capability: "implement the Phase 2 User Management capability",
-            targetEngine: "User Management Engine",
-            dependencies: ["HBOS Core", "Governance Engine"]
-        }))
-    }))
-}));
-
-jest.mock("./AutonomousPlatformContinuation", () => ({
-    AutonomousPlatformContinuation: jest.fn().mockImplementation(() => ({
-        createMission: jest.fn(() => ({
-            capabilityId: "platform.continuation",
-            capability: "continue autonomous construction of HooshyarOS platform capabilities",
-            instruction: "AUDIT → SELECT NEXT GENUINELY MISSING CAPABILITY → IMPLEMENT → TEST → INTEGRATE → VERIFY → COMMIT → PUSH → AUDIT AGAIN",
-            source: "assistant.completion.gate"
-        })),
-        selectNextCapability: jest.fn((projectMission: { nextPlatformMission: () => unknown }) => projectMission.nextPlatformMission())
-    }))
-}));
-
-jest.mock("./LocalConstructionToolset", () => ({ createLocalConstructionTools: jest.fn(() => []) }));
+import { AutonomousBuildDaemon } from "./AutonomousBuildDaemon";
+import { AutonomousDevelopmentLoop } from "../../Architecture/Autonomous/AutonomousDevelopmentLoop";
+import { AutonomousProjectMission } from "./AutonomousProjectMission";
+import { AutonomousPlatformContinuation } from "./AutonomousPlatformContinuation";
 
 describe("AutonomousBuildDaemon", () => {
     it("executes the first real platform capability at the assistant completion handoff", () => {
-        const { AutonomousBuildDaemon } = require("./AutonomousBuildDaemon");
-        const { AutonomousDevelopmentLoop } = require("../../Architecture/Autonomous/AutonomousDevelopmentLoop");
+        const developmentExecute = jest.fn(() => ({
+            status: "completed" as const,
+            goal: {},
+            plan: { requirement: {} } as any,
+            result: {
+                ok: true,
+                trace: ["ARCHITECTURE", "PLAN", "GENERATE", "VERIFY", "FINALIZE"],
+                details: "verified construction evidence",
+                stage: "FINALIZE"
+            }
+        }));
 
-        const daemon = new AutonomousBuildDaemon({ maxCycles: 1 });
+        const mission = {
+            snapshot: jest
+                .fn()
+                .mockReturnValueOnce({ commit: "before", clean: true })
+                .mockReturnValue({ commit: "after", clean: true }),
+            nextMission: jest.fn(() => ({
+                capabilityId: "assistant.completion.gate",
+                capability: "HooshyarOS Autonomous Assistant completion gate",
+                targetEngine: "Autonomous Operations Engine",
+                dependencies: [],
+                evidence: {} as any,
+                directives: [],
+                architectureRules: []
+            })),
+            nextPlatformMission: jest.fn(() => ({
+                capabilityId: "platform.user-management",
+                capability: "implement the Phase 2 User Management capability",
+                targetEngine: "User Management Engine",
+                dependencies: ["HBOS Core", "Governance Engine"]
+            }))
+        } as unknown as AutonomousProjectMission;
+
+        const continuation = {
+            createMission: jest.fn(() => ({
+                capabilityId: "platform.continuation" as const,
+                capability: "continue autonomous construction of HooshyarOS platform capabilities",
+                instruction: "AUDIT → SELECT NEXT GENUINELY MISSING CAPABILITY → IMPLEMENT → TEST → INTEGRATE → VERIFY → COMMIT → PUSH → AUDIT AGAIN",
+                source: "assistant.completion.gate" as const
+            })),
+            selectNextCapability: jest.fn((projectMission: AutonomousProjectMission) => projectMission.nextPlatformMission())
+        } as unknown as AutonomousPlatformContinuation;
+
+        const development = {
+            execute: developmentExecute
+        } as unknown as AutonomousDevelopmentLoop;
+
+        const daemon = new AutonomousBuildDaemon({
+            maxCycles: 1,
+            mission,
+            continuation,
+            development
+        });
+
         const result = daemon.run();
 
         expect(result.status).toBe("cycle_limit");
@@ -59,10 +71,11 @@ describe("AutonomousBuildDaemon", () => {
             assistantGatePassed: true
         }));
 
-        expect(AutonomousDevelopmentLoop).toHaveBeenCalledTimes(1);
-        const development = AutonomousDevelopmentLoop.mock.results[0].value;
-        expect(development.execute).toHaveBeenCalledTimes(1);
-        expect(development.execute.mock.calls[0][0]).toEqual(expect.objectContaining({
+        expect(continuation.createMission).toHaveBeenCalledTimes(1);
+        expect(continuation.selectNextCapability).toHaveBeenCalledTimes(1);
+        expect(mission.nextPlatformMission).toHaveBeenCalledTimes(1);
+        expect(developmentExecute).toHaveBeenCalledTimes(1);
+        expect(developmentExecute.mock.calls[0][0]).toEqual(expect.objectContaining({
             capabilityId: "platform.user-management",
             capability: expect.stringContaining("User Management"),
             targetEngine: "User Management Engine",
