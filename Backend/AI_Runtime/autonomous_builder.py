@@ -1,14 +1,17 @@
 """Repository-native autonomous construction worker.
 
-The builder follows the canonical roadmap like a weaver follows a carpet map:
-one capability at a time, in dependency order, with evidence before advancing.
-Unknown capabilities are rejected rather than invented.
+Known canonical capabilities retain explicit architecture-aware generators.
+Unknown capabilities are no longer rejected: the worker derives a minimal
+engine/test/documentation scaffold from the mission contract, while keeping
+business semantics deliberately out of the generator.
 """
 from __future__ import annotations
 
 import argparse
 import re
 from pathlib import Path
+
+from Backend.AI_Runtime.autonomous_spec import generic_artifacts, spec_from_prompt, write_missing
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -115,10 +118,7 @@ describe("ReasoningEngine", () => {
     });
 });
 '''
-    return [
-        ("Backend/HBOS/Engines/ReasoningEngine.ts", engine),
-        ("Backend/HBOS/test/ReasoningEngine.test.ts", test),
-    ]
+    return [("Backend/HBOS/Engines/ReasoningEngine.ts", engine), ("Backend/HBOS/test/ReasoningEngine.test.ts", test)]
 
 
 def organizational_artifacts():
@@ -164,10 +164,7 @@ describe("OrganizationalIntelligenceEngine", () => {
     });
 });
 '''
-    return [
-        ("Backend/HBOS/Engines/OrganizationalIntelligenceEngine.ts", engine),
-        ("Backend/HBOS/test/OrganizationalIntelligenceEngine.test.ts", test),
-    ]
+    return [("Backend/HBOS/Engines/OrganizationalIntelligenceEngine.ts", engine), ("Backend/HBOS/test/OrganizationalIntelligenceEngine.test.ts", test)]
 
 
 def autonomous_operations_artifacts():
@@ -197,9 +194,7 @@ export class AutonomousOperationsEngine implements Engine {
     health(): boolean { return true; }
 
     execute(operation: string): OperationResult {
-        if (!operation || !operation.trim()) {
-            return { operation, status: "BLOCKED", projectCount: this.projects.getProjects().length };
-        }
+        if (!operation || !operation.trim()) return { operation, status: "BLOCKED", projectCount: this.projects.getProjects().length };
         return { operation, status: this.health() ? "READY" : "BLOCKED", projectCount: this.projects.getProjects().length };
     }
 }
@@ -213,32 +208,22 @@ describe("AutonomousOperationsEngine", () => {
         expect(engine.health()).toBe(true);
         expect(engine.execute("continue mission").status).toBe("READY");
     });
-
     it("blocks an empty operation", () => {
         expect(new AutonomousOperationsEngine().execute(" ").status).toBe("BLOCKED");
     });
 });
 '''
-    return [
-        ("Backend/HBOS/Engines/AutonomousOperationsEngine.ts", engine),
-        ("Backend/HBOS/test/AutonomousOperationsEngine.test.ts", test),
-    ]
+    return [("Backend/HBOS/Engines/AutonomousOperationsEngine.ts", engine), ("Backend/HBOS/test/AutonomousOperationsEngine.test.ts", test)]
 
 
 def reasoning_bridge_artifacts():
     adapter = '''import { ReasoningEngine } from "../../Engines/ReasoningEngine";
 import { ReasoningProvider } from "./ReasoningProvider";
 
-export interface PythonReasoningResult {
-    provider: "python";
-    problem: string;
-    status: string;
-    success: boolean;
-}
+export interface PythonReasoningResult { provider: "python"; problem: string; status: string; success: boolean; }
 
 export class PythonReasoningAdapter implements ReasoningProvider {
     private readonly engine = new ReasoningEngine();
-
     async reason(prompt: string): Promise<PythonReasoningResult> {
         const result = this.engine.reason(prompt);
         return { provider: "python", problem: result.problem, status: result.status, success: result.success };
@@ -255,10 +240,7 @@ test("PythonReasoningAdapter uses the repository-owned Python reasoning runtime"
     expect(result.success).toBe(true);
 });
 '''
-    return [
-        ("Backend/HBOS/Assistant/Autonomous/PythonReasoningAdapter.ts", adapter),
-        ("Backend/HBOS/test/PythonReasoningAdapter.test.ts", test),
-    ]
+    return [("Backend/HBOS/Assistant/Autonomous/PythonReasoningAdapter.ts", adapter), ("Backend/HBOS/test/PythonReasoningAdapter.test.ts", test)]
 
 
 CAPABILITIES = {
@@ -292,24 +274,25 @@ def main() -> int:
     match = re.search(r"Capability ID:\s*([^\n]+)", args.prompt)
     capability_id = match.group(1).strip() if match else ""
     artifacts = CAPABILITIES.get(capability_id)
-    if artifacts is None:
-        print(f"Unsupported deterministic capability: {capability_id}")
-        return 2
 
-    missing = [p for p in CAPABILITY_DEPENDENCIES.get(capability_id, []) if not (ROOT / p).exists()]
+    # The explicit generators remain authoritative for frozen canonical work.
+    # The generic path is the escape hatch that makes the worker capable of
+    # constructing a new engine boundary without a new hard-coded branch.
+    if artifacts is None:
+        spec = spec_from_prompt(args.prompt)
+        if spec is None:
+            print("Invalid autonomous capability contract")
+            return 2
+        artifacts = generic_artifacts(spec)
+
+    missing = []
+    if capability_id in CAPABILITY_DEPENDENCIES:
+        missing = [p for p in CAPABILITY_DEPENDENCIES[capability_id] if not (ROOT / p).exists()]
     if missing:
         print(f"Blocked by unmet dependencies for {capability_id}: {', '.join(missing)}")
         return 3
 
-    generated = []
-    for relative_path, content in artifacts:
-        target = ROOT / relative_path
-        if target.exists():
-            continue
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(content, encoding="utf-8")
-        generated.append(relative_path)
-
+    generated = write_missing(ROOT, artifacts)
     if not generated:
         print(f"Already implemented: {capability_id}")
         return 0
