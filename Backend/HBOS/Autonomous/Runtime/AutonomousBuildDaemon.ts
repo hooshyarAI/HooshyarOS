@@ -19,7 +19,7 @@ export interface DaemonOptions {
 type MissionDecision =
     | { kind: "mission"; mission: Mission; assistantGatePassed: false; continuation?: undefined }
     | { kind: "platform-continuation"; mission: PlatformCapabilityMission; assistantGatePassed: true; continuation: PlatformContinuationMission }
-    | { kind: "platform-complete"; mission: Mission; assistantGatePassed: true; continuation: PlatformContinuationMission }
+    | { kind: "platform-complete"; mission: Mission; assistantGatePassed: true; continuation: PlatformContinuationMission; audit: ReturnType<CanonicalCapabilityAudit["audit"]> }
     | { kind: "platform-audit-blocked"; mission: Mission; assistantGatePassed: true; continuation: PlatformContinuationMission; reason: string; details: unknown };
 
 export class AutonomousBuildDaemon {
@@ -127,7 +127,7 @@ export class AutonomousBuildDaemon {
             };
         }
 
-        return { kind: "platform-complete", mission: selected, assistantGatePassed: true, continuation };
+        return { kind: "platform-complete", mission: selected, assistantGatePassed: true, continuation, audit };
     }
 
     run() {
@@ -137,7 +137,16 @@ export class AutonomousBuildDaemon {
             const decision = this.selectMission();
 
             if (decision.kind === "platform-complete") {
-                console.log(JSON.stringify({ type: "AUTONOMOUS_PLATFORM_COMPLETE", cycle, status: "completed", continuation: decision.continuation }));
+                console.log(JSON.stringify({
+                    type: "AUTONOMOUS_PLATFORM_BACKLOG_EXHAUSTED",
+                    cycle,
+                    status: "completed",
+                    productComplete: false,
+                    backlogExhausted: decision.audit.backlogExhausted,
+                    nonAutonomousProductionItems: decision.audit.nonAutonomousProductionItems,
+                    continuation: decision.continuation,
+                    message: "Canonical autonomous construction backlog is exhausted; this does not assert full product completion."
+                }));
                 return { status: "completed", cycles: cycle, history };
             }
 
