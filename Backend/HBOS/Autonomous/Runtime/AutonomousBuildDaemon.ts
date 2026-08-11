@@ -30,24 +30,31 @@ export class AutonomousBuildDaemon {
             const selected = this.mission.nextMission();
             let mission = selected;
 
-            // Completion of the Assistant is a handoff checkpoint, not a reason
-            // to invoke the construction loop on the gate itself. Resolve the
-            // handoff to the next concrete platform capability before execution.
+            // The Assistant completion gate is a handoff checkpoint. The daemon
+            // must resolve that checkpoint to the canonical platform backlog and
+            // execute the concrete platform capability, never the gate itself.
             if (selected.capabilityId === "assistant.completion.gate") {
                 assistantGatePassed = true;
                 const continuation = this.continuation.createMission();
-                const nextPlatformMission = this.continuation.selectNextCapability(this.mission);
+                const nextPlatformMission = this.mission.nextPlatformMission();
+
                 if (!nextPlatformMission) {
                     console.log(JSON.stringify({ type: "AUTONOMOUS_PLATFORM_COMPLETE", cycle, status: "completed", continuation }));
                     return { status: "completed", cycles: cycle, history };
                 }
+
                 mission = nextPlatformMission;
                 console.log(JSON.stringify({ type: "AUTONOMOUS_PLATFORM_CONTINUATION", cycle, continuation, mission }));
             }
 
             console.log(JSON.stringify({ type: "AUTONOMOUS_MISSION", cycle, commit: before.commit, capability: mission.capability, targetEngine: mission.targetEngine }));
 
-            const result = this.development.execute({ capabilityId: mission.capabilityId, capability: mission.capability, targetEngine: mission.targetEngine, dependencies: mission.dependencies });
+            const result = this.development.execute({
+                capabilityId: mission.capabilityId,
+                capability: mission.capability,
+                targetEngine: mission.targetEngine,
+                dependencies: mission.dependencies
+            });
             history.push({ cycle, commit: before.commit, mission: mission.capability, assistantGatePassed, result });
 
             if (!result.result.ok) {
@@ -57,11 +64,27 @@ export class AutonomousBuildDaemon {
 
             const after = this.mission.snapshot();
             if (after.commit === before.commit && after.clean && cycle < this.maxCycles) {
-                console.log(JSON.stringify({ type: "AUTONOMOUS_IDLE", cycle, commit: after.commit, capability: mission.capability, message: "No repository change was produced; refusing to advance as completed." }));
+                console.log(JSON.stringify({
+                    type: "AUTONOMOUS_IDLE",
+                    cycle,
+                    commit: after.commit,
+                    capability: mission.capability,
+                    message: "No repository change was produced; refusing to advance as completed."
+                }));
                 return { status: "idle", cycles: cycle, history };
             }
-            if (cycle % this.reportEvery === 0) console.log(JSON.stringify({ type: "AUTONOMOUS_PROGRESS", cycle, latestCommit: after.commit, status: result.status, assistantGatePassed }));
+
+            if (cycle % this.reportEvery === 0) {
+                console.log(JSON.stringify({
+                    type: "AUTONOMOUS_PROGRESS",
+                    cycle,
+                    latestCommit: after.commit,
+                    status: result.status,
+                    assistantGatePassed
+                }));
+            }
         }
+
         console.log(JSON.stringify({ type: "AUTONOMOUS_CYCLE_LIMIT", cycles: this.maxCycles }));
         return { status: "cycle_limit", cycles: this.maxCycles, history };
     }
