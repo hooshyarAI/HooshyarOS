@@ -21,6 +21,7 @@ type MissionDecision =
     | { kind: "platform-complete"; mission: Mission; assistantGatePassed: true; continuation: PlatformContinuationMission };
 
 export class AutonomousBuildDaemon {
+    private readonly root: string;
     private readonly mission: AutonomousProjectMission;
     private readonly continuation: AutonomousPlatformContinuation;
     private readonly development: AutonomousDevelopmentLoop;
@@ -29,16 +30,16 @@ export class AutonomousBuildDaemon {
     private readonly reportEvery: number;
 
     constructor(options: DaemonOptions = {}) {
-        const root = options.root || process.cwd();
-        this.mission = options.mission ?? new AutonomousProjectMission(root);
+        this.root = options.root || process.cwd();
+        this.mission = options.mission ?? new AutonomousProjectMission(this.root);
         this.continuation = options.continuation ?? new AutonomousPlatformContinuation();
-        this.development = options.development ?? new AutonomousDevelopmentLoop(createLocalConstructionTools(root));
+        this.development = options.development ?? new AutonomousDevelopmentLoop(createLocalConstructionTools(this.root));
         this.maxCycles = options.maxCycles ?? 1000;
         this.reportEvery = options.reportEvery ?? 1;
     }
 
     private finalCompletionEvidence(selected: Mission): ReturnType<CapabilityEvidenceAudit["evaluate"]> {
-        const root = selected.evidence.root;
+        const root = selected.evidence?.root || this.root;
         const exists = (path: string) => existsSync(join(root, path));
         const implementationPaths = [
             "Backend/HBOS/Assistant/Autonomous/AutonomousAssistantRuntime.ts",
