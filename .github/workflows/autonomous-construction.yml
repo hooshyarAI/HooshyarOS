@@ -44,8 +44,13 @@ jobs:
 
       - name: Install dependencies
         run: |
-          npm install
+          npm ci
           python -m pip install --upgrade pip pytest
+
+      - name: Assert clean worktree before autonomous construction
+        run: |
+          git status --short
+          test -z "$(git status --porcelain)"
 
       - name: Run autonomous construction loop
         env:
