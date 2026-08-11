@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import { execFileSync } from "child_process";
 import { ConstructionContext, ConstructionTool } from "../../Builder/Autonomous/AutonomousConstructionEngine";
 
