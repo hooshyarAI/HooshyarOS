@@ -43,6 +43,13 @@ describe("AutonomousBuildDaemon", () => {
             }))
         } as unknown as AutonomousProjectMission;
 
+        const platformMission = {
+            capabilityId: "platform.user-management",
+            capability: "implement the Phase 2 User Management capability",
+            targetEngine: "User Management Engine",
+            dependencies: ["HBOS Core", "Governance Engine"]
+        };
+
         const continuation = {
             createMission: jest.fn(() => ({
                 capabilityId: "platform.continuation" as const,
@@ -50,7 +57,7 @@ describe("AutonomousBuildDaemon", () => {
                 instruction: "AUDIT → SELECT NEXT GENUINELY MISSING CAPABILITY → IMPLEMENT → TEST → INTEGRATE → VERIFY → COMMIT → PUSH → AUDIT AGAIN",
                 source: "assistant.completion.gate" as const
             })),
-            selectNextCapability: jest.fn((projectMission: AutonomousProjectMission) => projectMission.nextPlatformMission())
+            selectNextCapability: jest.fn(() => platformMission)
         } as unknown as AutonomousPlatformContinuation;
 
         const development = {
@@ -72,20 +79,16 @@ describe("AutonomousBuildDaemon", () => {
         expect(result.history[0]).toEqual(expect.objectContaining({
             cycle: 1,
             mission: expect.stringContaining("User Management"),
+            capabilityId: "platform.user-management",
+            targetEngine: "User Management Engine",
             assistantGatePassed: true
         }));
 
         expect(continuation.createMission).toHaveBeenCalledTimes(1);
         expect(continuation.selectNextCapability).toHaveBeenCalledTimes(1);
-        expect(mission.nextPlatformMission).toHaveBeenCalledTimes(1);
         expect(developmentExecute).toHaveBeenCalledTimes(1);
 
         const executedGoal = developmentExecute.mock.calls[0]?.[0];
-        expect(executedGoal).toEqual(expect.objectContaining({
-            capabilityId: "platform.user-management",
-            capability: expect.stringContaining("User Management"),
-            targetEngine: "User Management Engine",
-            dependencies: ["HBOS Core", "Governance Engine"]
-        }));
+        expect(executedGoal).toEqual(expect.objectContaining(platformMission));
     });
 });
