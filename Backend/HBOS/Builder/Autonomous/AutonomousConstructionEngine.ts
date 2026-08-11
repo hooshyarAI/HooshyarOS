@@ -92,7 +92,10 @@ export class AutonomousConstructionEngine {
             issues.length = 0;
             verification = this.execute("VERIFY", plan, attempt, artifacts, issues);
             if (verification.ok) {
-                return this.success("REPAIRED", attempt, trace);
+                // A repaired build is still required to pass FINALIZE. Returning
+                // here used to skip git finalization and made completion evidence
+                // claim a success without a FINALIZE stage.
+                break;
             }
         }
 
@@ -172,7 +175,7 @@ export class AutonomousConstructionEngine {
             targetEngine: "Autonomous Operations Engine", dependencies: ["Architecture Brain", "Governance Engine"],
             architectureRules: ["Architecture Freeze V4", "One Capability = One Engine"]
         });
-        if (!result.ok || result.status !== "REPAIRED" || result.attempts !== 1 || !result.details) {
+        if (!result.ok || result.status !== "REPAIRED" || result.attempts !== 1 || !result.details || !result.trace.includes("FINALIZE")) {
             throw new Error("AutonomousConstructionEngine self-test failed");
         }
     }
