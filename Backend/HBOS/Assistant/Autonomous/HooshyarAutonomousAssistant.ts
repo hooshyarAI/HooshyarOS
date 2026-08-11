@@ -35,6 +35,7 @@ export class HooshyarAutonomousAssistant {
                 evaluation: { healthy: false },
                 improvement: { improved: false },
                 tool: { executed: false },
+                construction: null,
             };
         }
 
