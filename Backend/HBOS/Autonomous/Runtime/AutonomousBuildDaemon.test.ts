@@ -104,7 +104,7 @@ describe("AutonomousBuildDaemon", () => {
             selectNextCapability: jest.fn(() => null)
         } as unknown as AutonomousPlatformContinuation;
 
-        const execute = jest.fn((): never => { throw new Error("completion must not execute without evidence"); });
+        const execute = jest.fn((_goal: any): never => { throw new Error("completion must not execute without evidence"); });
         const development = { execute } as unknown as AutonomousDevelopmentLoop;
         const daemon = new AutonomousBuildDaemon({ maxCycles: 1, mission, continuation, development });
 
