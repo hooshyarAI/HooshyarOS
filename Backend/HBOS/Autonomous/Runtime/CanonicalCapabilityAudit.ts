@@ -12,8 +12,8 @@ export interface CanonicalCapabilityAuditResult {
 
 /**
  * Independent completion audit for the governed platform continuation loop.
- * Roadmap entries that belong to production operations are intentionally not
- * treated as repository construction capabilities.
+ * Repository-native production controls are treated as autonomous capabilities;
+ * external operational activities remain explicitly non-autonomous.
  */
 export class CanonicalCapabilityAudit {
     audit(root: string, mission: AutonomousProjectMission): CanonicalCapabilityAuditResult {
@@ -43,7 +43,8 @@ export class CanonicalCapabilityAudit {
             ["Reports", "Backend/HBOS/Engines/ReportsEngine.ts", "Backend/HBOS/test/ReportsEngine.test.ts", "Docs/Engines/ReportsEngine.md"],
             ["Alerts", "Backend/HBOS/Engines/AlertsEngine.ts", "Backend/HBOS/test/AlertsEngine.test.ts", "Docs/Engines/AlertsEngine.md"],
             ["AI Assistant", "Backend/HBOS/Assistant/Autonomous/HooshyarAutonomousAssistant.ts", "Backend/HBOS/test/HooshyarAutonomousAssistant.test.ts"],
-            ["Repository Production Readiness", "Backend/HBOS/Engines/ProductionReadinessEngine.ts", "Backend/HBOS/test/ProductionReadinessEngine.test.ts", "Docs/Engines/ProductionReadinessEngine.md"]
+            ["Repository Production Readiness", "Backend/HBOS/Engines/ProductionReadinessEngine.ts", "Backend/HBOS/test/ProductionReadinessEngine.test.ts", "Docs/Engines/ProductionReadinessEngine.md"],
+            ["Security Audit", "Backend/HBOS/Engines/SecurityAuditEngine.ts", "Backend/HBOS/test/SecurityAuditEngine.test.ts", "Docs/Engines/SecurityAuditEngine.md"]
         ];
 
         const missingArtifacts: string[] = [];
@@ -57,7 +58,6 @@ export class CanonicalCapabilityAudit {
         const backlogExhausted = mission.nextPlatformMission() === null;
         const nonAutonomousProductionItems = [
             "Cloud Deployment",
-            "Security Audit",
             "Performance Testing",
             "Customer Testing"
         ].filter(item => roadmap.includes(item));

@@ -27,9 +27,10 @@ function seedRoadmap(root: string): void {
         "Reports",
         "Alerts",
         "AI Assistant",
+        "Repository Production Readiness",
+        "Security Audit",
         "## Phase 5",
         "Cloud Deployment",
-        "Security Audit",
         "Performance Testing",
         "Customer Testing"
     ].join("\n"));
@@ -74,7 +75,13 @@ describe("CanonicalCapabilityAudit", () => {
                 "Backend/HBOS/test/AlertsEngine.test.ts",
                 "Docs/Engines/AlertsEngine.md",
                 "Backend/HBOS/Assistant/Autonomous/HooshyarAutonomousAssistant.ts",
-                "Backend/HBOS/test/HooshyarAutonomousAssistant.test.ts"
+                "Backend/HBOS/test/HooshyarAutonomousAssistant.test.ts",
+                "Backend/HBOS/Engines/ProductionReadinessEngine.ts",
+                "Backend/HBOS/test/ProductionReadinessEngine.test.ts",
+                "Docs/Engines/ProductionReadinessEngine.md",
+                "Backend/HBOS/Engines/SecurityAuditEngine.ts",
+                "Backend/HBOS/test/SecurityAuditEngine.test.ts",
+                "Docs/Engines/SecurityAuditEngine.md"
             ];
             artifacts.forEach(file => write(root, file));
             const mission = { nextPlatformMission: () => null } as unknown as AutonomousProjectMission;
@@ -84,7 +91,6 @@ describe("CanonicalCapabilityAudit", () => {
             expect(result.missingArtifacts).toEqual([]);
             expect(result.nonAutonomousProductionItems).toEqual([
                 "Cloud Deployment",
-                "Security Audit",
                 "Performance Testing",
                 "Customer Testing"
             ]);
