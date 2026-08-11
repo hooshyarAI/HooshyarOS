@@ -132,7 +132,7 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                     const builderTests = run("python", ["-m", "pytest", "Backend/AI_Runtime/tests/test_autonomous_builder_platform.py", "Backend/AI_Runtime/tests/test_autonomous_spec.py", "-q"], root);
                     if (!builderTests.ok) return { ok: false, issue: "AUTONOMOUS_BUILDER_TESTS_FAILED", artifact: { syntaxVerified: true, builderTestsVerified: false, output: builderTests.output, error: builderTests.error } };
 
-                    const jest = run("npx", ["jest", "--runInBand", "--config", ".\\jest.config.js"], root);
+                    const jest = run("node", ["./node_modules/jest/bin/jest.js", "--runInBand", "--config", ".\\jest.config.js"], root);
                     const artifact = {
                         type: "AUTONOMOUS_VERIFY_RESULT",
                         command: "compileall + pytest autonomous builder/spec + jest",
