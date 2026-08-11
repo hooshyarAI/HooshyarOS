@@ -13,7 +13,7 @@ function seedCanonicalAssistantEvidence(root: string): void {
         "Backend/HBOS/Assistant/Autonomous/DecisionKnowledgeStore.ts",
         "Backend/HBOS/Assistant/Autonomous/ContextRetrievalEngine.ts",
         "Backend/HBOS/Assistant/Autonomous/LearningFeedbackLoop.ts",
-        "Backend/Builder/Autonomous/AutonomousProjectConductor.ts",
+        "Backend/HBOS/Builder/Autonomous/AutonomousProjectConductor.ts",
         "Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.ts",
         "Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts",
         "Backend/HBOS/test/AutonomousMissionController.test.ts",
@@ -31,7 +31,7 @@ function seedCanonicalAssistantEvidence(root: string): void {
     const loop = join(root, "Backend/HBOS/Architecture/Autonomous/AutonomousDevelopmentLoop.ts");
     mkdirSync(join(loop, ".."), { recursive: true });
     writeFileSync(loop, "this.planner.plan(goal); controller.construct(plan.requirement)", "utf8");
-    const controller = join(root, "Backend/Builder/Autonomous/ArchitectureDrivenBuildController.ts");
+    const controller = join(root, "Backend/HBOS/Builder/Autonomous/ArchitectureDrivenBuildController.ts");
     mkdirSync(join(controller, ".."), { recursive: true });
     writeFileSync(controller, "ARCHITECTURE PLAN", "utf8");
     const builder = join(root, "Backend/AI_Runtime/autonomous_builder.py");
