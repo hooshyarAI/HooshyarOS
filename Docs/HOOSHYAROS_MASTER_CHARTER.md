@@ -166,7 +166,7 @@ The Assistant is complete only when its construction fabric can reliably:
 2. audit repository state;
 3. derive the next missing canonical capability;
 4. select the correct existing engine boundary;
-5. select an appropriate construction tool;
+5. select an appropriate construction tool from the mandatory construction toolchain;
 6. generate or modify the implementation;
 7. run static validation;
 8. run focused tests;
@@ -180,13 +180,13 @@ The Assistant is complete only when its construction fabric can reliably:
 16. re-plan from the new repository state;
 17. hand off automatically from Assistant completion into platform construction.
 
-The Assistant must be provider-independent. External coding providers are optional tools at most and must never be hidden architectural dependencies.
+The Assistant construction fabric is deliberately constrained to the approved Python/GitHub/Assistant toolchain and must not depend on external coding agents.
 
 ---
 
 ## 8. Python-First Construction Fabric
 
-Python is the preferred repository-native worker/orchestration language for autonomous construction where appropriate.
+Python is the canonical repository-native worker/orchestration language for autonomous construction where appropriate.
 
 Python may be used for:
 
@@ -205,9 +205,19 @@ Python may be used for:
 
 TypeScript remains the canonical implementation language where the platform architecture requires TypeScript/Node components. Python is an orchestration and intelligence worker, not a license to duplicate the TypeScript architecture.
 
-The construction fabric must prefer deterministic, inspectable, repository-native tools over opaque external agents.
+### Mandatory construction toolchain
 
-**Codex, Copilot and Claude must not be required runtime dependencies and must not be treated as mandatory construction infrastructure.**
+Only these three participants are permitted in the HooshyarOS construction process:
+
+1. **Python** — autonomous worker, generator, analyzer, verifier, repair and orchestration layer.
+2. **GitHub** — repository, source control, synchronization, commits, review and publication.
+3. **This Assistant** — architecture reasoning, critical review, expert choice and construction orchestration.
+
+External coding assistants, cloud coding agents and alternative code-generation providers are prohibited from the construction path. They must not be invoked, installed, configured or depended upon for autonomous construction.
+
+This includes Codex, GitHub Copilot, Claude and equivalent coding agents.
+
+Provider-facing abstractions may exist inside the finished product where an approved runtime architecture requires them, but such providers must never become dependencies of the autonomous construction fabric.
 
 ---
 
@@ -267,8 +277,8 @@ The construction system must never:
 - invent a new engine when an existing engine owns the capability;
 - create duplicate capability owners;
 - turn the construction Assistant into the platform's end-user advisor;
-- make Codex/Copilot/Claude a hidden dependency;
-- require the human to perform mechanical construction that the repository-native fabric can safely automate;
+- introduce external coding agents or alternative coding providers into the construction path;
+- require the human to perform mechanical construction that the approved Python/GitHub/Assistant fabric can safely automate;
 - skip validation or integration evidence;
 - declare completion from file existence;
 - silently weaken governance, security, explainability or resilience;
@@ -341,7 +351,7 @@ Never solve uncertainty by inventing a new architecture.
 
 **Automate mechanical work.**
 
-**Prefer Python workers where they accelerate deterministic construction.**
+**Use only Python, GitHub and the Assistant for construction.**
 
 **Verify before claiming completion.**
 
@@ -386,7 +396,11 @@ When a more specific technical contract defines an implementation detail, follow
 
 **PYTHON-FIRST CONSTRUCTION WORKERS: APPROVED**
 
+**GITHUB-BASED REPOSITORY CONTROL: REQUIRED**
+
 **PROVIDER-INDEPENDENT CONSTRUCTION: REQUIRED**
+
+**EXTERNAL CODING AGENTS IN CONSTRUCTION: PROHIBITED**
 
 **ASSISTANT ROLE: CONSTRUCTION INTELLIGENCE ONLY**
 
