@@ -15,11 +15,12 @@ export class AutonomousDevelopmentLoop {
     constructor(private readonly tools: ConstructionTool[]) {}
 
     execute(goal: any): AutonomousDevelopmentResult {
-        const plan = this.planner.plan(goal);
+        const canonicalGoal = AutonomousDevelopmentLoop.canonicalizeGoal(goal);
+        const plan = this.planner.plan(canonicalGoal);
         const controller = new ArchitectureDrivenBuildController(this.tools);
         const result = controller.construct(plan.requirement);
         const outcome: AutonomousDevelopmentResult = {
-            goal,
+            goal: canonicalGoal,
             plan,
             result,
             status: result.ok ? "completed" : "blocked"
@@ -28,6 +29,16 @@ export class AutonomousDevelopmentLoop {
             AutonomousDevelopmentLoop.verifyCompletionEvidence(outcome);
         }
         return outcome;
+    }
+
+    static canonicalizeGoal(goal: any): any {
+        if (!goal || typeof goal !== "object") return goal;
+        const capabilityId = typeof goal.capabilityId === "string" ? goal.capabilityId : "";
+        if (!capabilityId.startsWith("repair-")) return goal;
+        return {
+            ...goal,
+            capabilityId: capabilityId.slice("repair-".length)
+        };
     }
 
     static selfTest(): void {
