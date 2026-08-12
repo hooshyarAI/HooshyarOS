@@ -29,6 +29,12 @@ const deploymentReadinessFiles = [
     "Docs/Engines/DeploymentReadinessEngine.md"
 ];
 
+const deploymentContractFiles = [
+    "Backend/HBOS/Engines/DeploymentContractEngine.ts",
+    "Backend/HBOS/test/DeploymentContractEngine.test.ts",
+    "Docs/Engines/DeploymentContractEngine.md"
+];
+
 describe("AutonomousPlatformContinuation", () => {
     it("creates the canonical post-Assistant platform continuation mission", () => {
         const mission = new AutonomousPlatformContinuation().createMission();
@@ -100,10 +106,27 @@ describe("AutonomousPlatformContinuation", () => {
         }
     });
 
+    it("selects deployment contract after deployment readiness is complete", () => {
+        const root = mkdtempSync(join(process.cwd(), "tmp-deployment-contract-continuation-"));
+        try {
+            seedFiles(root, [...performanceFiles, ...customerFiles, ...deploymentReadinessFiles]);
+            const projectMission = {
+                nextPlatformMission: () => null,
+                snapshot: () => ({ root })
+            } as unknown as AutonomousProjectMission;
+            const selected = new AutonomousPlatformContinuation().selectNextCapability(projectMission);
+
+            expect(selected?.capabilityId).toBe("platform.deployment-contract");
+            expect(selected?.targetEngine).toBe("Deployment Contract Engine");
+        } finally {
+            rmSync(root, { recursive: true, force: true });
+        }
+    });
+
     it("returns null when the production extension chain is exhausted", () => {
         const root = mkdtempSync(join(process.cwd(), "tmp-production-complete-"));
         try {
-            seedFiles(root, [...performanceFiles, ...customerFiles, ...deploymentReadinessFiles]);
+            seedFiles(root, [...performanceFiles, ...customerFiles, ...deploymentReadinessFiles, ...deploymentContractFiles]);
             const projectMission = {
                 nextPlatformMission: () => null,
                 snapshot: () => ({ root })
