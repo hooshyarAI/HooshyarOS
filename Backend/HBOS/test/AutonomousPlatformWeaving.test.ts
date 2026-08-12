@@ -77,6 +77,13 @@ describe("AutonomousPlatformWeaving", () => {
             "Backend/HBOS/test/PythonReasoningAdapter.test.ts",
             "Backend/AI_Runtime/reasoning/reasoning_engine.py"
         ]);
+        expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.financial-intelligence");
+
+        complete(root, [
+            "Backend/HBOS/Engines/FinancialIntelligenceEngine.ts",
+            "Backend/HBOS/test/FinancialIntelligenceEngine.test.ts",
+            "Docs/Engines/FinancialIntelligenceEngine.md"
+        ]);
         expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.budget-intelligence");
 
         complete(root, [
@@ -125,6 +132,41 @@ describe("AutonomousPlatformWeaving", () => {
             "Backend/HBOS/Engines/SecurityAuditEngine.ts",
             "Backend/HBOS/test/SecurityAuditEngine.test.ts",
             "Docs/Engines/SecurityAuditEngine.md"
+        ]);
+        expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.performance-testing");
+
+        complete(root, [
+            "Backend/HBOS/Engines/PerformanceTestingEngine.ts",
+            "Backend/HBOS/test/PerformanceTestingEngine.test.ts",
+            "Docs/Engines/PerformanceTestingEngine.md"
+        ]);
+        expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.customer-testing");
+
+        complete(root, [
+            "Backend/HBOS/Engines/CustomerTestingEngine.ts",
+            "Backend/HBOS/test/CustomerTestingEngine.test.ts",
+            "Docs/Engines/CustomerTestingEngine.md"
+        ]);
+        expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.deployment-readiness");
+
+        complete(root, [
+            "Backend/HBOS/Engines/DeploymentReadinessEngine.ts",
+            "Backend/HBOS/test/DeploymentReadinessEngine.test.ts",
+            "Docs/Engines/DeploymentReadinessEngine.md"
+        ]);
+        expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.deployment-contract");
+
+        complete(root, [
+            "Backend/HBOS/Engines/DeploymentContractEngine.ts",
+            "Backend/HBOS/test/DeploymentContractEngine.test.ts",
+            "Docs/Engines/DeploymentContractEngine.md"
+        ]);
+        expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.cloud-deployment");
+
+        complete(root, [
+            "Backend/HBOS/Engines/CloudDeploymentEngine.ts",
+            "Backend/HBOS/test/CloudDeploymentEngine.test.ts",
+            "Docs/Engines/CloudDeploymentEngine.md"
         ]);
         expect(mission.nextPlatformMission()).toBeNull();
     });
