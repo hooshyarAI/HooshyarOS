@@ -59,6 +59,17 @@ export class AutonomousPlatformContinuation {
                     p("Backend/HBOS/test/CustomerTestingEngine.test.ts"),
                     p("Docs/Engines/CustomerTestingEngine.md")
                 ]
+            },
+            {
+                capabilityId: "platform.deployment-readiness",
+                capability: "implement repository-native Deployment Readiness capability",
+                targetEngine: "Deployment Readiness Engine",
+                dependencies: ["Production Readiness Engine", "Customer Testing Engine"],
+                requiredPaths: [
+                    p("Backend/HBOS/Engines/DeploymentReadinessEngine.ts"),
+                    p("Backend/HBOS/test/DeploymentReadinessEngine.test.ts"),
+                    p("Docs/Engines/DeploymentReadinessEngine.md")
+                ]
             }
         ];
 
