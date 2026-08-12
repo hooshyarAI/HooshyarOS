@@ -14,4 +14,10 @@ describe("BudgetIntelligenceEngine", () => {
         expect(result.variance).toBe(-200);
         expect(result.utilization).toBeCloseTo(0.8);
     });
+
+    it("keeps the canonical evidence alias on the same analysis contract", () => {
+        expect(new BudgetIntelligenceEngine().analyzeBudget({ planned: 1000, actual: 800 })).toEqual(
+            new BudgetIntelligenceEngine().analyze({ planned: 1000, actual: 800 })
+        );
+    });
 });
