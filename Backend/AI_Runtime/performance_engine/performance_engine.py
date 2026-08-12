@@ -1,7 +1,6 @@
-﻿class PerformanceEngine:
+"""Compatibility performance evidence adapter for HooshyarOS."""
+from __future__ import annotations
 
-    def evaluate(self, performance):
-        return {
-            "performance": performance,
-            "status": "performance_evaluated"
-        }
+from Backend.AI_Runtime.performance.performance_engine import PerformanceSample, benchmark, evaluate, measure
+
+__all__ = ["PerformanceSample", "benchmark", "evaluate", "measure"]
