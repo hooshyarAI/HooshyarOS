@@ -5,6 +5,7 @@ import { AutonomousProjectMission, Mission } from "./AutonomousProjectMission";
 import { AutonomousPlatformContinuation, PlatformCapabilityMission, PlatformContinuationMission } from "./AutonomousPlatformContinuation";
 import { CapabilityEvidenceAudit } from "./CapabilityEvidenceAudit";
 import { CanonicalCapabilityAudit } from "./CanonicalCapabilityAudit";
+import { AutonomousWeavingPlanner } from "./AutonomousWeavingPlanner";
 import { createLocalConstructionTools } from "./LocalConstructionToolset";
 
 export interface DaemonOptions {
@@ -29,6 +30,7 @@ export class AutonomousBuildDaemon {
     private readonly development: AutonomousDevelopmentLoop;
     private readonly evidenceAudit = new CapabilityEvidenceAudit();
     private readonly canonicalAudit = new CanonicalCapabilityAudit();
+    private readonly weavingPlanner = new AutonomousWeavingPlanner();
     private readonly maxCycles: number;
     private readonly reportEvery: number;
 
@@ -177,6 +179,28 @@ export class AutonomousBuildDaemon {
             }
 
             const mission = decision.mission;
+            const weavingPlan = this.weavingPlanner.plan(mission, before.clean);
+            console.log(JSON.stringify({ type: "AUTONOMOUS_WEAVING_PLAN", cycle, plan: weavingPlan }));
+
+            if (!weavingPlan.safe) {
+                const blocked = {
+                    goal: { capabilityId: weavingPlan.capabilityId, capability: mission.capability, targetEngine: mission.targetEngine, dependencies: mission.dependencies },
+                    result: {
+                        ok: false,
+                        status: "BLOCKED",
+                        attempts: 0,
+                        selectedTool: "weaving-planner",
+                        issues: ["WEAVING_PRECONDITION_FAILED"],
+                        trace: ["ARCHITECTURE", "PLAN"],
+                        details: weavingPlan.rationale,
+                        stage: "PLAN"
+                    },
+                    status: "blocked"
+                };
+                console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, result: blocked }));
+                return { status: "blocked", cycles: cycle, history: [...history, { cycle, weavingPlan, status: "blocked" }] };
+            }
+
             if (decision.kind === "platform-continuation") {
                 console.log(JSON.stringify({ type: "AUTONOMOUS_PLATFORM_CONTINUATION", cycle, continuation: decision.continuation, mission }));
             }
@@ -184,7 +208,7 @@ export class AutonomousBuildDaemon {
 
             const goal = { capabilityId: mission.capabilityId, capability: mission.capability, targetEngine: mission.targetEngine, dependencies: mission.dependencies };
             const result: AutonomousDevelopmentResult = this.development.execute(goal);
-            history.push({ cycle, commit: before.commit, mission: mission.capability, capabilityId: mission.capabilityId, targetEngine: mission.targetEngine, assistantGatePassed: decision.assistantGatePassed, handoff: decision.kind === "platform-continuation" ? decision.continuation : undefined, result });
+            history.push({ cycle, commit: before.commit, mission: mission.capability, capabilityId: mission.capabilityId, targetEngine: mission.targetEngine, assistantGatePassed: decision.assistantGatePassed, handoff: decision.kind === "platform-continuation" ? decision.continuation : undefined, weavingPlan, result });
 
             if (!result.result.ok) {
                 console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, result }));
