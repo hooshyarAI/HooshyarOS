@@ -96,6 +96,6 @@ Tasks:
 
 - Cloud Deployment
 
-- Performance Testing
+- Performance Testing (repository-native readiness and evidence)
 
 - Customer Testing
