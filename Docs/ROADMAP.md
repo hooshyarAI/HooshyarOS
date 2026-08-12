@@ -79,10 +79,9 @@ Features:
 - Reports
 
 - Alerts
-
 - AI Assistant
 - Repository Production Readiness
-
+- Security Audit
 
 
 ---
@@ -96,8 +95,6 @@ Tasks:
 
 
 - Cloud Deployment
-
-- Security Audit
 
 - Performance Testing
 
