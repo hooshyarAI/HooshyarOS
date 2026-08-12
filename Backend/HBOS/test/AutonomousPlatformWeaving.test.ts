@@ -19,7 +19,7 @@ describe("AutonomousPlatformWeaving", () => {
         OrganizationalIntelligenceEngine: "assess(",
         AutonomousOperationsEngine: "execute(",
         FinancialIntelligenceEngine: "analyze(",
-        BudgetIntelligenceEngine: "analyzeBudget(",
+        BudgetIntelligenceEngine: "analyze(",
         TaxIntelligenceEngine: "estimate(",
         RiskIntelligenceEngine: "assess(",
         DashboardEngine: "snapshot(",
@@ -27,9 +27,9 @@ describe("AutonomousPlatformWeaving", () => {
         AlertsEngine: "evaluate(",
         ProductionReadinessEngine: "audit(",
         SecurityAuditEngine: "audit(",
-        PerformanceTestingEngine: "run(",
-        CustomerTestingEngine: "run(",
-        DeploymentReadinessEngine: "assess(",
+        PerformanceTestingEngine: "audit(",
+        CustomerTestingEngine: "audit(",
+        DeploymentReadinessEngine: "audit(",
         DeploymentContractEngine: "validate(",
         CloudDeploymentEngine: "deploy("
     };
@@ -41,7 +41,7 @@ describe("AutonomousPlatformWeaving", () => {
         const className = match?.[1] ? `${match[1]}Engine` : "";
         const behavior = behaviorByEngine[className] ?? "verified";
         const isTest = /[\\/]test[\\/]/.test(path);
-        writeFileSync(target, isTest ? `describe("behavior", () => { test("works", () => { ${behavior} expect(true).toBe(true); }); });\n` : `${behavior} // verified implementation evidence\n`, "utf8");
+        writeFileSync(target, isTest ? `describe("behavior", () => { test("works", () => { const engine = new ${className}(); ${behavior} expect(true).toBe(true); }); });\n` : `class ${className} { ${behavior} } // verified implementation evidence\n`, "utf8");
     };
 
     const complete = (root: string, paths: string[]) => paths.forEach(path => artifact(root, path));
@@ -131,5 +131,18 @@ describe("AutonomousPlatformWeaving", () => {
         ]);
 
         expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.api-gateway");
+    });
+
+    it("accepts audit-based evidence for performance, customer and deployment readiness capabilities", () => {
+        const root = createProject();
+        const mission = new AutonomousProjectMission(root);
+
+        complete(root, [
+            "Backend/HBOS/Engines/PerformanceTestingEngine.ts", "Backend/HBOS/test/PerformanceTestingEngine.test.ts", "Docs/Engines/PerformanceTestingEngine.md",
+            "Backend/HBOS/Engines/CustomerTestingEngine.ts", "Backend/HBOS/test/CustomerTestingEngine.test.ts", "Docs/Engines/CustomerTestingEngine.md",
+            "Backend/HBOS/Engines/DeploymentReadinessEngine.ts", "Backend/HBOS/test/DeploymentReadinessEngine.test.ts", "Docs/Engines/DeploymentReadinessEngine.md"
+        ]);
+
+        expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.performance-testing");
     });
 });
