@@ -3,41 +3,33 @@ import { join } from "node:path";
 import { CanonicalCapabilityAudit } from "../Autonomous/Runtime/CanonicalCapabilityAudit";
 import { AutonomousProjectMission } from "../Autonomous/Runtime/AutonomousProjectMission";
 
-function write(root: string, relative: string, content = "ok"): void {
+const behaviorByEngine: Record<string, string> = {
+    UserManagementEngine: "registerUser(", OrganizationModelEngine: "createOrganization(", SecurityLayerEngine: "authorize(", APIGatewayEngine: "route(",
+    FinancialIntelligenceEngine: "analyze(", BudgetIntelligenceEngine: "analyze(", TaxIntelligenceEngine: "estimate(", RiskIntelligenceEngine: "assess(",
+    DashboardEngine: "snapshot(", ReportsEngine: "build(", AlertsEngine: "evaluate("
+};
+
+function write(root: string, relative: string, content?: string): void {
     const path = join(root, relative);
     mkdirSync(join(path, ".."), { recursive: true });
-    writeFileSync(path, content, "utf8");
+    const engineMatch = relative.match(/Engines[\\/]([^\\/]+)\.ts$/);
+    const engine = engineMatch?.[1] ?? "";
+    const behavior = behaviorByEngine[engine] ?? "ok";
+    writeFileSync(path, content ?? `${behavior}\n`, "utf8");
 }
 
 function seedRoadmap(root: string): void {
     write(root, "Docs/ROADMAP.md", [
         "# HooshyarOS Roadmap",
-        "## Phase 2",
-        "User Management",
-        "Organization Model",
-        "Security Layer",
-        "API Gateway",
-        "## Phase 3",
-        "Financial Analysis",
-        "Budget Intelligence",
-        "Tax Intelligence",
-        "Risk Intelligence",
-        "## Phase 4",
-        "Dashboard",
-        "Reports",
-        "Alerts",
-        "AI Assistant",
-        "Repository Production Readiness",
-        "Security Audit",
-        "## Phase 5",
-        "Cloud Deployment",
-        "Performance Testing",
-        "Customer Testing"
+        "## Phase 2", "User Management", "Organization Model", "Security Layer", "API Gateway",
+        "## Phase 3", "Financial Analysis", "Budget Intelligence", "Tax Intelligence", "Risk Intelligence",
+        "## Phase 4", "Dashboard", "Reports", "Alerts", "AI Assistant", "Repository Production Readiness", "Security Audit",
+        "## Phase 5", "Cloud Deployment", "Performance Testing", "Customer Testing"
     ].join("\n"));
 }
 
 describe("CanonicalCapabilityAudit", () => {
-    it("accepts an exhausted roadmap when every repository artifact exists", () => {
+    it("accepts an exhausted roadmap when every repository artifact and semantic behavior exists", () => {
         const root = mkdtempSync(join(process.cwd(), "tmp-canonical-audit-"));
         try {
             seedRoadmap(root);
