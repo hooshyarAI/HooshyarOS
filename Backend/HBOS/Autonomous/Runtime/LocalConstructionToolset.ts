@@ -1,5 +1,7 @@
 /// <reference types="node" />
 import { execFileSync } from "child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join, normalize, relative } from "node:path";
 import { ConstructionContext, ConstructionTool } from "../../Builder/Autonomous/AutonomousConstructionEngine";
 import { ensurePytest } from "./PythonVerificationBootstrap";
 
@@ -82,7 +84,9 @@ const DEFAULT_DIRECTIVES = [
     "Create or update the focused implementation, focused test and documentation required by the architecture.",
     "Run focused verification for the selected knot; run Autonomous Builder tests periodically; run the full Jest suite only at the periodic integration checkpoint.",
     "Repair verification failures before finalization.",
-    "Do not redesign Architecture Freeze V4."
+    "Do not redesign Architecture Freeze V4.",
+    "Never modify an existing dependency, engine, test or document merely to make the selected capability appear implemented.",
+    "For a product capability, implement the product artifact paths declared by the durable product roadmap; do not substitute the target engine as the implementation artifact."
 ];
 
 const REPOSITORY_STATUS_ARGS = ["status", "--porcelain=v1", "--", ".", ":(exclude)node_modules"];
@@ -116,7 +120,42 @@ function focusedTestFor(capabilityId: string): string | null {
     return known[capabilityId] || null;
 }
 
+function productRoadmapPaths(root: string, capabilityId: string): string[] {
+    const roadmapPath = join(root, "Docs", "Product", "PRODUCT_CONSTRUCTION_ROADMAP.json");
+    if (!existsSync(roadmapPath)) return [];
+    try {
+        const roadmap = JSON.parse(readFileSync(roadmapPath, "utf8")) as {
+            capabilities?: Array<{ capabilityId?: string; implementationPath?: string; testPath?: string; documentationPath?: string }>;
+        };
+        const capability = roadmap.capabilities?.find(item => item.capabilityId === capabilityId);
+        if (!capability) return [];
+        return [capability.implementationPath, capability.testPath, capability.documentationPath]
+            .filter(Boolean)
+            .map(path => join(root, path!));
+    } catch {
+        return [];
+    }
+}
+
+function declaredArtifactPaths(root: string, capabilityId: string, targetEngine: string): string[] {
+    const roadmapPaths = productRoadmapPaths(root, capabilityId);
+    if (roadmapPaths.length > 0) return roadmapPaths;
+    return [
+        join(root, "Backend", "HBOS", "Engines", `${targetEngine.replace(/[^A-Za-z0-9]/g, "")}.ts`),
+        join(root, "Backend", "HBOS", "test", `${targetEngine.replace(/[^A-Za-z0-9]/g, "")}.test.ts`),
+        join(root, "Docs", "Engines", `${targetEngine.replace(/[^A-Za-z0-9]/g, "")}.md`)
+    ];
+}
+
+function relativeStatusPaths(statusOutput: string, root: string): string[] {
+    return statusOutput.split(/\r?\n/)
+        .map(line => line.slice(3).trim())
+        .filter(Boolean)
+        .map(path => normalize(join(root, path)));
+}
+
 function buildAgentPrompt(context: ConstructionContext): string {
+    const requiredPaths = declaredArtifactPaths(process.cwd(), context.plan.capabilityId, context.plan.targetEngine);
     return [
         "You are the repository-native Python implementation worker inside HooshyarOS Autonomous Operations Engine.",
         "Read AGENTS.md, Docs/ARCHITECTURE.md, and Assistant/SYSTEM_PROMPT.md before changing code.",
@@ -127,8 +166,10 @@ function buildAgentPrompt(context: ConstructionContext): string {
         `Capability: ${context.plan.capability}`,
         `Target Engine: ${context.plan.targetEngine}`,
         `Dependencies: ${context.plan.dependencies.join(", ") || "none"}`,
+        `Required artifact paths: ${requiredPaths.join(" ; ")}`,
         `Architecture rules: ${context.plan.architectureRules.join(" ; ") || "preserve existing rules"}`,
         `Directives: ${DEFAULT_DIRECTIVES.join(" ; ")}`,
+        "For product capabilities, the required artifact paths above are the authoritative product boundary. Do not implement the capability by rewriting an existing engine unless one of those paths is that engine path.",
         "Use only repository-native Python construction. Do not invoke Copilot, Codex, Claude, or any cloud coding CLI.",
         "Reuse existing capabilities and engine boundaries; never invent business semantics that are absent from repository architecture or evidence.",
         "Produce a real repository change when the selected deterministic capability is missing."
@@ -147,7 +188,8 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                     capabilityId: context.plan.capabilityId,
                     targetEngine: context.plan.targetEngine,
                     architectureRules: context.plan.architectureRules,
-                    directives: DEFAULT_DIRECTIVES
+                    directives: DEFAULT_DIRECTIVES,
+                    requiredPaths: declaredArtifactPaths(root, context.plan.capabilityId, context.plan.targetEngine)
                 }
             })
         },
@@ -160,14 +202,23 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                 if (before.output.trim()) return { ok: false, issue: "AUTONOMOUS_WORKTREE_DIRTY", artifact: { clean: false, output: before.output } };
                 const agent = resolveImplementationAgent(root);
                 if (!agent) return { ok: false, issue: "AUTONOMOUS_AGENT_UNAVAILABLE", artifact: { provider: null, changed: false } };
+                const requiredPaths = declaredArtifactPaths(root, context.plan.capabilityId, context.plan.targetEngine);
                 const result = run(agent, buildAgentArgs(agent, buildAgentPrompt(context)), root, 30 * 60 * 1000);
                 const after = run("git", REPOSITORY_STATUS_ARGS, root);
                 const changed = after.ok && repositoryStateChanged(before.output, after.output);
+                const changedPaths = after.ok ? relativeStatusPaths(after.output, root) : [];
+                const allowed = requiredPaths.map(path => normalize(path));
+                const unexpectedPaths = changedPaths.filter(path => !allowed.includes(path));
+                const touchesDeclaredArtifact = changedPaths.some(path => allowed.includes(path));
                 const artifact = {
                     type: "AUTONOMOUS_AGENT_GENERATION_RESULT",
                     provider: agent,
                     capabilityId: context.plan.capabilityId,
                     capability: context.plan.capability,
+                    targetEngine: context.plan.targetEngine,
+                    requiredPaths,
+                    changedPaths,
+                    unexpectedPaths,
                     exitCode: result.code,
                     changed,
                     elapsedMs: result.elapsedMs,
@@ -179,6 +230,9 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                 if (!result.ok) return { ok: false, issue: "AUTONOMOUS_AGENT_GENERATION_FAILED", artifact };
                 if (!after.ok) return { ok: false, issue: "AUTONOMOUS_REPOSITORY_STATE_UNAVAILABLE", artifact };
                 if (!changed) return { ok: false, issue: "AUTONOMOUS_AGENT_NO_REPOSITORY_CHANGE", artifact };
+                if (!touchesDeclaredArtifact || unexpectedPaths.length > 0) {
+                    return { ok: false, issue: "AUTONOMOUS_ARTIFACT_BOUNDARY_VIOLATION", artifact };
+                }
                 return { ok: true, artifact };
             }
         },
