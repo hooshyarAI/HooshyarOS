@@ -14,9 +14,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install JavaScript dependencies
+        run: npm ci
       - name: Install test dependencies
         run: python -m pip install --upgrade pip pytest
       - name: Run autonomous builder tests
-        run: python -m pytest Backend/AI_Runtime/tests/test_autonomous_builder_platform.py -q
-      - name: Compile autonomous builder
-        run: python -m py_compile Backend/AI_Runtime/autonomous_builder.py
+        run: python -m pytest Backend/AI_Runtime/tests/test_autonomous_builder_platform.py Backend/AI_Runtime/tests/test_hooshyar_build.py -q
+      - name: Compile autonomous Python workers
+        run: python -m py_compile Backend/AI_Runtime/autonomous_builder.py Backend/AI_Runtime/hooshyar_build.py
+      - name: Verify package build commands
+        run: npm run autonomous:assistant -- --help
