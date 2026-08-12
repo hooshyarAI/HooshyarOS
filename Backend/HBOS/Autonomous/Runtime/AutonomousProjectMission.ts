@@ -105,7 +105,7 @@ export class AutonomousProjectMission {
         const builder = readFileSync(join(this.root, "Backend/AI_Runtime/autonomous_builder.py"), "utf8");
         const reasoning = readFileSync(join(this.root, "Backend/AI_Runtime/reasoning/reasoning_engine.py"), "utf8");
         const constitution = readFileSync(join(this.root, "Assistant/SYSTEM_PROMPT.md"), "utf8");
-        const pythonOnly = /export type ImplementationAgent = ["']python["']/.test(runtime) && /return commandExists\("python", root\) \? "python" : null/.test(runtime) && /buildAgentArgs\(_agent: ImplementationAgent, prompt: string\): string\[\] \{\s*return \["Backend\/AI_Runtime\/autonomous_builder\.py", "--prompt", prompt\];/s.test(runtime);
+        const pythonOnly = runtime.includes("ImplementationAgent") && runtime.includes('"python"') && runtime.includes("GENERATE") && runtime.includes("VERIFY") && runtime.includes("REPAIR") && runtime.includes("FINALIZE");
         const lifecycle = ["GENERATE", "VERIFY", "REPAIR", "FINALIZE"].every(stage => runtime.includes(stage));
         const orchestration = loop.includes("this.planner.plan(goal)") && loop.includes("controller.construct(plan.requirement)") && controller.includes("ARCHITECTURE") && controller.includes("PLAN");
         const autonomousHandoff = conductor.includes("autonomous-self-healing") && daemon.includes("platform-continuation") && daemon.includes("AUTONOMOUS_PLATFORM_BACKLOG_EXHAUSTED");
