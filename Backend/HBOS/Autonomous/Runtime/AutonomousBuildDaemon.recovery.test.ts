@@ -38,14 +38,14 @@ describe("AutonomousBuildDaemon knot recovery", () => {
 
         const mission = {
             snapshot: jest.fn()
-                .mockReturnValueOnce({ root: process.cwd(), commit: "checkpoint", clean: true })
+                .mockReturnValueOnce({ root: process.cwd(), commit: "HEAD", clean: true })
                 .mockReturnValueOnce({ root: process.cwd(), commit: "repaired", clean: true }),
             nextMission: jest.fn(() => ({
                 capabilityId: "platform.user-management",
                 capability: "implement User Management",
                 targetEngine: "User Management Engine",
                 dependencies: [],
-                evidence: { root: process.cwd(), commit: "checkpoint", clean: true, architectureFiles: [], engineCount: 1, runtimeFileCount: 1, latestCommits: [] },
+                evidence: { root: process.cwd(), commit: "HEAD", clean: true, architectureFiles: [], engineCount: 1, runtimeFileCount: 1, latestCommits: [] },
                 directives: [],
                 architectureRules: []
             }))
