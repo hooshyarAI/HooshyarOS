@@ -1,4 +1,4 @@
-﻿import { AutonomousRepairEngine } from "../../Autonomous/RepairEngine/AutonomousRepairEngine";
+import { AutonomousRepairEngine } from "../../Autonomous/RepairEngine/AutonomousRepairEngine";
 
 export type ConstructionStage = "ARCHITECTURE" | "PLAN" | "GENERATE" | "VERIFY" | "REPAIR" | "FINALIZE";
 
@@ -27,6 +27,7 @@ export interface ConstructionResult {
     issues: string[];
     trace: ConstructionStage[];
     details: string;
+    idempotent?: boolean;
 }
 
 export interface ConstructionTool {
@@ -122,7 +123,7 @@ export class AutonomousConstructionEngine {
             artifacts.FINALIZE = finalize.artifact;
         }
 
-        return this.success(attempt > 0 ? "REPAIRED" : "BUILT", attempt, trace);
+        return this.success(attempt > 0 ? "REPAIRED" : "BUILT", attempt, trace, artifacts.GENERATE !== undefined && this.recordArtifact(artifacts.GENERATE)?.idempotentNoOp === true);
     }
 
     private isIdempotentGenerationNoOp(result: { ok: boolean; artifact?: unknown; issue?: string }): boolean {
@@ -163,7 +164,7 @@ export class AutonomousConstructionEngine {
         return this.tools[0] || { name: "unavailable", execute: () => ({ ok: false, issue: "NO_CONSTRUCTION_TOOL" }) };
     }
 
-    private success(status: "BUILT" | "REPAIRED", attempts: number, trace: ConstructionStage[]): ConstructionResult {
+    private success(status: "BUILT" | "REPAIRED", attempts: number, trace: ConstructionStage[], idempotent = false): ConstructionResult {
         return {
             ok: true,
             status,
@@ -172,7 +173,10 @@ export class AutonomousConstructionEngine {
             selectedTool: this.toolFor("FINALIZE").name,
             issues: [],
             trace,
-            details: `Construction verified and finalized; trace=${trace.join(" -> ")}`
+            details: idempotent
+                ? `Construction verified as idempotent and finalized; trace=${trace.join(" -> ")}`
+                : `Construction verified and finalized; trace=${trace.join(" -> ")}`,
+            idempotent
         };
     }
 
