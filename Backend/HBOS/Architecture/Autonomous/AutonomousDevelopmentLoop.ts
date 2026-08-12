@@ -15,15 +15,12 @@ export class AutonomousDevelopmentLoop {
     constructor(private readonly tools: ConstructionTool[]) {}
 
     static canonicalizeGoal(goal: any): any {
+        if (!goal || typeof goal !== "object") return goal;
         const capabilityId = String(goal?.capabilityId || goal?.id || "autonomous-capability");
-
-        // Repair intents are first-class construction intents. Never collapse
-        // `repair-<capabilityId>` into the base capability before generation.
-        if (capabilityId.startsWith("repair-")) {
-            return { ...goal, capabilityId };
-        }
-
-        return { ...goal, capabilityId };
+        const canonicalCapabilityId = capabilityId.startsWith("repair-")
+            ? capabilityId.slice("repair-".length)
+            : capabilityId;
+        return { ...goal, capabilityId: canonicalCapabilityId };
     }
 
     execute(goal: any): AutonomousDevelopmentResult {
