@@ -17,10 +17,9 @@ export class AutonomousDevelopmentLoop {
     static canonicalizeGoal(goal: any): any {
         if (!goal || typeof goal !== "object") return goal;
         const capabilityId = String(goal?.capabilityId || goal?.id || "autonomous-capability");
-        const canonicalCapabilityId = capabilityId.startsWith("repair-")
-            ? capabilityId.slice("repair-".length)
-            : capabilityId;
-        return { ...goal, capabilityId: canonicalCapabilityId };
+        // Repair intents are first-class intents. Preserve their identity so
+        // the repair path remains distinguishable from the base capability.
+        return { ...goal, capabilityId };
     }
 
     execute(goal: any): AutonomousDevelopmentResult {
