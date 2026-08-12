@@ -24,8 +24,9 @@ describe("AutonomousPlatformContinuation", () => {
 
     it("does not turn an exhausted backlog into a fake continuation capability", () => {
         const projectMission = {
-            nextPlatformMission: () => null
-        } as AutonomousProjectMission;
+            nextPlatformMission: () => null,
+            snapshot: () => ({ root: process.cwd() })
+        } as unknown as AutonomousProjectMission;
 
         expect(new AutonomousPlatformContinuation().selectNextCapability(projectMission)).toBeNull();
     });
