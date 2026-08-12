@@ -166,14 +166,31 @@ describe("AutonomousBuildDaemon", () => {
         } as unknown as AutonomousPlatformContinuation;
 
         const daemon = new AutonomousBuildDaemon({ maxCycles: 1, mission, continuation });
-        const audit = {
+        const finalEvidence = {
+            complete: true,
+            missing: [],
+            implementation: true,
+            test: true,
+            documentation: true,
+            dependenciesSatisfied: true,
+            verified: true
+        };
+        const canonicalAudit = {
             complete: true,
             roadmapPresent: true,
             backlogExhausted: true,
             missingArtifacts: [],
             nonAutonomousProductionItems: []
         };
-        (daemon as any).canonicalAudit = { audit: jest.fn(() => audit) };
+        const commercialAudit = {
+            complete: true,
+            contractPresent: true,
+            missingLayers: [],
+            blockedExternalDependencies: []
+        };
+        (daemon as any).finalCompletionEvidence = jest.fn(() => finalEvidence);
+        (daemon as any).canonicalAudit = { audit: jest.fn(() => canonicalAudit) };
+        (daemon as any).commercialAudit = { audit: jest.fn(() => commercialAudit) };
 
         const logSpy = jest.spyOn(console, "log").mockImplementation(() => undefined);
         try {
@@ -181,6 +198,7 @@ describe("AutonomousBuildDaemon", () => {
             expect(result.status).toBe("completed");
             expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"assistantComplete":true'));
             expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"autonomousConstructionComplete":true'));
+            expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"commercialProductRuntimeComplete":true'));
             expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"productComplete":true'));
         } finally {
             logSpy.mockRestore();
