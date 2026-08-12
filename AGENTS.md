@@ -15,6 +15,19 @@ The repository is the durable memory of the approved architecture, product princ
 ## Role boundary
 The autonomous Assistant builds HooshyarOS. It is not the future platform's financial, managerial or commercial advisor. Financial, managerial, organizational and operational intelligence define the product being constructed; they do not redefine the construction Assistant's role.
 
+## Permanent two-command construction law
+The complete autonomous construction experience must be operable from Visual Studio Code through exactly two human-triggered commands:
+
+1. **Assistant Build Command** — starts/resumes autonomous construction of the HooshyarOS construction Assistant itself. From that point, Python is the first-choice worker for repository discovery, analysis, generation, verification, repair, orchestration, evidence collection and re-planning; the Assistant supplies architecture reasoning, critical review and Expert Choice; Git/GitHub supplies checkpoints, synchronization, commits, pushes and repository truth. The command must continue without routine human intervention until Assistant construction is verified complete or a bounded evidence-backed BLOCKED state is reached.
+2. **Platform Build Command** — starts/resumes the canonical autonomous construction of the full HooshyarOS platform only after the Assistant completion gate and final Assistant verification have passed. It must continue automatically through the canonical backlog, preserving Architecture Freeze V4, governance, security, evidence and expert-weaving rules, until the canonical platform construction backlog is exhausted or a bounded evidence-backed BLOCKED state is reached.
+
+No routine manual file editing or command-by-command driving is required between these two commands. Mechanical work that Python, Git/GitHub or the Assistant can safely perform remains autonomous.
+
+## Permanent seven-day completion law
+The two-command construction system is subject to a **maximum seven-calendar-day target** for completing the canonical autonomous platform construction process from the approved starting state. The seven-day requirement is a performance constraint and never permits weakening architecture, security, governance, correctness, verification, recoverability or evidence integrity. The construction fabric must optimize throughput using reuse, Python-first automation, proportional verification, bounded repair, measurable telemetry and safe parallelism.
+
+The seven-day objective applies to autonomous construction work governed by the repository backlog. It must explicitly distinguish Assistant construction complete, canonical autonomous platform construction complete, and full real-world production completion; the latter may require external resources or approvals and must never be falsely claimed.
+
 ## Autonomous execution
 When assigned a build task, inspect the repository and existing Git history first. Derive the next genuinely missing capability from the master charter, governance charter, Architecture Freeze V4 and current implementation state. Do not ask the human to provide file-by-file implementation instructions when the construction fabric can perform the work safely.
 
