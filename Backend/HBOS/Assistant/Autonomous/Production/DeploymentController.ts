@@ -1,18 +1,9 @@
-﻿export class DeploymentController {
+import { CloudDeploymentEngine, CloudDeploymentRequest, CloudDeploymentResult } from "../../../Engines/CloudDeploymentEngine";
 
+export class DeploymentController {
+    constructor(private readonly engine = new CloudDeploymentEngine()) {}
 
-deploy(){
-
-return {
-
-deployment:true,
-
-status:"HEALTHY"
-
-};
-
+    deploy(request: CloudDeploymentRequest): CloudDeploymentResult {
+        return this.engine.deploy(request);
+    }
 }
-
-
-}
-
