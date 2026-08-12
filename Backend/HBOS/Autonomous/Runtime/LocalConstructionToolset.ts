@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { execFileSync } from "child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, normalize, relative } from "node:path";
+import { join, normalize } from "node:path";
 import { ConstructionContext, ConstructionTool } from "../../Builder/Autonomous/AutonomousConstructionEngine";
 import { ensurePytest } from "./PythonVerificationBootstrap";
 
@@ -89,7 +89,7 @@ const DEFAULT_DIRECTIVES = [
     "For a product capability, implement the product artifact paths declared by the durable product roadmap; do not substitute the target engine as the implementation artifact."
 ];
 
-const REPOSITORY_STATUS_ARGS = ["status", "--porcelain=v1", "--", ".", ":(exclude)node_modules"];
+const REPOSITORY_STATUS_ARGS = ["status", "--porcelain=v1", "--untracked-files=all", "--", ".", ":(exclude)node_modules"];
 const FULL_VERIFY_EVERY = Math.max(1, Number.parseInt(process.env.HOOSHYAR_FULL_VERIFY_EVERY || "10", 10) || 10);
 const BUILDER_TEST_EVERY = Math.max(1, Number.parseInt(process.env.HOOSHYAR_BUILDER_TEST_EVERY || "5", 10) || 5);
 
