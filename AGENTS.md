@@ -11,6 +11,7 @@
 - `Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md` — canonical commercial-product completion and acceptance contract; mandatory for distinguishing canonical capability completion from real commercial product completion.
 - `Docs/HOOSHYAROS_PRODUCT_ECOSYSTEM_CHARTER.md` — canonical organizational/ecosystem product scope, growth, success, customer, people/team and resilience model; mandatory when auditing product gaps.
 - `Docs/PRODUCT_ECOSYSTEM_GAP_REGISTER.md` — active audit checklist for missing ecosystem outcomes and application-level product evidence.
+- `Docs/Product/COMMERCIAL_PRODUCT_BUILD_ORDER.md` — governing vertical-slice productization order from runnable foundation through end-to-end commercial acceptance; mandatory when choosing the next commercial gap.
 - Existing architecture decisions, HBOS engines, capability owners, tests and documentation — inspect before adding anything.
 
 The repository is the durable memory of the approved architecture, product principles, autonomous-construction role, decision logic and verification rules. Do not rely on conversational memory when the repository can provide the governing rule.
@@ -32,7 +33,7 @@ The two-command construction system is subject to a **maximum seven-calendar-day
 The seven-day objective applies to autonomous construction work governed by the repository backlog. It must explicitly distinguish Assistant construction complete, canonical autonomous platform construction complete, and full real-world production completion; the latter may require external resources or approvals and must never be falsely claimed.
 
 ## Autonomous execution
-When assigned a build task, inspect the repository and existing Git history first. Derive the next genuinely missing capability from the master charter, governance charter, Architecture Freeze V4, current implementation state **and the Commercial Product Completion Contract**. Also audit the Product Ecosystem Charter and Product Ecosystem Gap Register before selecting a commercial product gap. Do not ask the human to provide file-by-file implementation instructions when the construction fabric can perform the work safely.
+When assigned a build task, inspect the repository and existing Git history first. Derive the next genuinely missing capability from the master charter, governance charter, Architecture Freeze V4, current implementation state **and the Commercial Product Completion Contract**. Also audit the Product Ecosystem Charter and Product Ecosystem Gap Register before selecting a commercial product gap. Use the Commercial Product Build Order to prioritize the next coherent vertical slice. Do not ask the human to provide file-by-file implementation instructions when the construction fabric can perform the work safely.
 
 Use this loop:
 
@@ -43,7 +44,7 @@ When the Assistant completion gate is verified, immediately hand off to the cano
 AUDIT → SELECT NEXT GENUINELY MISSING CAPABILITY → IMPLEMENT → TEST → INTEGRATE → VERIFY → COMMIT → PUSH → AUDIT AGAIN
 
 ### Commercial completion audit
-Canonical capability backlog exhaustion is **not by itself** proof of commercial product completion. Before reporting `productComplete=true`, the builder must execute the commercial audit defined in `Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md`, incorporate the ecosystem outcomes defined in `Docs/HOOSHYAROS_PRODUCT_ECOSYSTEM_CHARTER.md`, and use `Docs/PRODUCT_ECOSYSTEM_GAP_REGISTER.md` to separately verify product runtime, persistence, identity, tenant isolation, data ingestion, API/application integration, dashboards/UI, reports, decision workflows, organizational execution, growth, customer value, people/team effectiveness, resilience, security, observability, installation/deployment and any other required commercial scope. External dependencies must be explicitly evidenced or reported as blocked.
+Canonical capability backlog exhaustion is **not by itself** proof of commercial product completion. Before reporting `productComplete=true`, the builder must execute the commercial audit defined in `Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md`, incorporate the ecosystem outcomes defined in `Docs/HOOSHYAROS_PRODUCT_ECOSYSTEM_CHARTER.md`, use `Docs/PRODUCT_ECOSYSTEM_GAP_REGISTER.md` to separately verify product runtime, persistence, identity, tenant isolation, data ingestion, API/application integration, dashboards/UI, reports, decision workflows, organizational execution, growth, customer value, people/team effectiveness, resilience, security, observability, installation/deployment and any other required commercial scope, and use `Docs/Product/COMMERCIAL_PRODUCT_BUILD_ORDER.md` to choose the next missing vertical slice. External dependencies must be explicitly evidenced or reported as blocked.
 
 ### Seven-day performance law
 The autonomous construction fabric is governed by a **seven-calendar-day target** for constructing the canonical HooshyarOS platform correctly and with production-grade engineering discipline.
@@ -116,6 +117,7 @@ This restriction is operational, not architectural: the HooshyarOS product may s
 24. Use the best approved tool for each stage before considering additional human intervention.
 25. Before declaring commercial product completion, pass the Commercial Product Completion Contract and keep external production dependencies distinct from repository-native completion.
 26. Before declaring a commercial capability complete, verify the applicable ecosystem outcome and user-value path, not only the underlying Engine implementation.
+27. Prefer vertical-slice commercial build order from `Docs/Product/COMMERCIAL_PRODUCT_BUILD_ORDER.md` over adding broad horizontal infrastructure that does not close a user-value path.
 
 ## Architecture changes
 Architecture Freeze V4 is the default source of truth. Change it only when an actual contradiction or missing architectural capability is demonstrated by repository evidence. If changed, update the master charter, architecture document, governance charter and affected decisions before continuing construction.
