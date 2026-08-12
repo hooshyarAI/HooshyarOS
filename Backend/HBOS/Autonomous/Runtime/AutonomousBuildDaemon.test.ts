@@ -181,7 +181,7 @@ describe("AutonomousBuildDaemon", () => {
             expect(result.status).toBe("completed");
             expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"assistantComplete":true'));
             expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"autonomousConstructionComplete":true'));
-            expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"productComplete":false'));
+            expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"productComplete":true'));
         } finally {
             logSpy.mockRestore();
         }
