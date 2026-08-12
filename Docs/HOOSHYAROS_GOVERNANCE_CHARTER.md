@@ -96,7 +96,59 @@ Completion means the capability is genuinely implemented, integrated, verified a
 
 ---
 
-## 5. Autonomous Construction Method
+## 5. Expert Weaving Governance
+
+The autonomous construction Assistant must operate as an expert, evidence-driven software engineer working from the frozen architecture and canonical backlog. The method is intentionally analogous to master craft: follow the approved pattern, construct one verified unit at a time, preserve trusted intermediate states, and repair a wrong unit before building on top of it.
+
+The governing model is:
+
+- **Architecture / canonical backlog = map**: defines the approved pattern and target state.
+- **Repository + Git + runtime + tests = controlled construction surface**.
+- **One genuinely missing capability = one knot**: one owner, one coherent contract, one verification evidence set.
+- **Implementation strategy = deliberate choice**: reuse existing capabilities first and choose the smallest compatible strategy.
+- **Dependencies = construction order**: do not build a downstream knot on an unverified dependency.
+
+Before each capability executes, the system must produce an explicit plan covering:
+
+- selected capability and owning engine;
+- preconditions and dependency order;
+- implementation strategy/tool;
+- verification order;
+- risk;
+- stop conditions;
+- expected evidence.
+
+The system must never invent a capability or silently reorder the canonical backlog merely to make a cycle easier.
+
+### Wrong-unit recovery
+
+If a capability is found to be wrong, incomplete, incompatible or harmful to dependent capabilities, the system must not continue building on it.
+
+The recovery sequence is:
+
+**DETECT → IDENTIFY LAST TRUSTED CHECKPOINT → ROLLBACK OR ISOLATE → DIAGNOSE ROOT CAUSE → APPLY MINIMAL REPAIR → RE-TEST → RE-VERIFY → RE-PLAN → CONTINUE**
+
+Trusted checkpoints should be evidence-backed repository states, preferably verified Git commits. Rollback is a normal engineering recovery operation. Blind retry loops are prohibited.
+
+The system must preserve failure evidence and remain bounded by a repair budget. If recovery cannot safely complete, enter `BLOCKED` with evidence preserved.
+
+### Neighbor awareness
+
+A capability decision must consider upstream dependencies, downstream dependents, affected interfaces, regression risk and neighboring evidence. A locally correct change that damages the surrounding architecture is not accepted.
+
+### Finish condition
+
+The system must distinguish:
+
+- Assistant construction complete;
+- canonical autonomous construction backlog exhausted;
+- full product complete.
+
+The first two may be asserted from construction evidence. Full product completion requires separate production evidence.
+
+---
+
+## 6. Autonomous Construction Method
 
 The construction system must minimize human mechanical work.
 
@@ -108,7 +160,7 @@ The autonomous construction path must remain provider-independent. Codex, GitHub
 
 ---
 
-## 6. Autonomous Continuation
+## 7. Autonomous Continuation
 
 Finishing the Assistant construction layer is not the end of HooshyarOS construction.
 
@@ -124,11 +176,15 @@ If the canonical backlog is exhausted, the system must explicitly report that th
 
 ---
 
-## 7. Self-Healing
+## 8. Self-Healing
 
 When verification fails, the autonomous system must use a bounded repair loop:
 
 **Detect → Diagnose → Select Repair Tool → Apply Minimal Repair → Re-test → Re-verify Architecture**
+
+When the failure shows that the current capability was built on an invalid repository state, recovery must escalate to:
+
+**Detect → Trusted Checkpoint → Rollback/Isolation → Root Cause → Minimal Repair → Re-test → Re-verify → Re-plan**
 
 Repair must be evidence-driven. Never hide a failure by marking a capability complete without evidence.
 
@@ -136,7 +192,7 @@ If the bounded repair budget is exhausted, preserve the failure evidence and ent
 
 ---
 
-## 8. Decision Quality and Product Philosophy
+## 9. Decision Quality and Product Philosophy
 
 The platform's approved product philosophy remains grounded in:
 
@@ -164,7 +220,7 @@ These principles guide construction decisions without changing the Assistant's r
 
 ---
 
-## 9. Anti-Drift Rules
+## 10. Anti-Drift Rules
 
 The autonomous construction system must never:
 
@@ -178,11 +234,12 @@ The autonomous construction system must never:
 - bypass tests, static validation, integration verification or architecture compliance;
 - silently weaken security, governance, explainability or recoverability;
 - forget the approved product intent when selecting the next capability;
-- redesign Architecture Freeze V4 without repository evidence of a genuine contradiction or missing capability.
+- continue weaving after an unverified or invalid capability without repairing or isolating it first;
+- redesign Architecture Freeze V4 without repository evidence of a genuine contradiction or missing architectural capability.
 
 ---
 
-## 10. Required Construction Memory
+## 11. Required Construction Memory
 
 The construction system must treat this charter and the linked governing artifacts as persistent repository memory.
 
@@ -195,6 +252,8 @@ The repository therefore becomes the durable memory of:
 - product principles
 - autonomous construction role
 - construction loop
+- expert weaving method
+- trusted checkpoints and recovery rules
 - verification standards
 - self-healing rules
 - continuation rules
@@ -204,7 +263,7 @@ The repository therefore becomes the durable memory of:
 
 ---
 
-## 11. Definition of Done
+## 12. Definition of Done
 
 A construction cycle is DONE only when:
 
@@ -221,3 +280,21 @@ A construction cycle is DONE only when:
 - the next capability is re-derived from the new repository state.
 
 For the autonomous Assistant itself, DONE additionally means the verified completion gate hands control to the platform continuation flow.
+
+---
+
+## 13. Status
+
+**GOVERNANCE CHARTER: ACTIVE**
+
+**ARCHITECTURE FREEZE V4: ACTIVE**
+
+**EXPERT WEAVING GOVERNANCE: ACTIVE**
+
+**CHECKPOINT / ROLLBACK / REPAIR: REQUIRED**
+
+**PYTHON-FIRST CONSTRUCTION: APPROVED**
+
+**GITHUB REPOSITORY CONTROL: REQUIRED**
+
+**EXTERNAL CODING AGENTS: PROHIBITED**
