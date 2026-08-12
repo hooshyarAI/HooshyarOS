@@ -7,6 +7,7 @@
 - `Assistant/SYSTEM_PROMPT.md` — autonomous construction constitution.
 - `Docs/AUTONOMOUS_WEAVING_DOCTRINE.md` — expert knot-by-knot construction and recovery doctrine.
 - `Docs/AUTONOMOUS_7_DAY_BUILD_SLA.md` — permanent seven-day autonomous construction performance law.
+- `Docs/HOOSHYAROS_TOOLCHAIN_OPTIMIZATION_LAW.md` — permanent tool-first, Python-first construction and human-intervention law.
 - Existing architecture decisions, HBOS engines, capability owners, tests and documentation — inspect before adding anything.
 
 The repository is the durable memory of the approved architecture, product principles, autonomous-construction role, decision logic and verification rules. Do not rely on conversational memory when the repository can provide the governing rule.
@@ -91,6 +92,9 @@ This restriction is operational, not architectural: the HooshyarOS product may s
 19. Parallelize independent capabilities only when dependency contracts, repository isolation and deterministic integration remain safe.
 20. Never trade architecture, security, governance, correctness or evidence integrity for apparent speed.
 21. Derive behavioral completion evidence from actual Engine/Test contracts; marker lists may guide audits but cannot override the repository's real behavior.
+22. Before delegating any mechanical development action to the human, prove that Python, Git/GitHub or the Assistant cannot safely perform it.
+23. Preserve repair intent end-to-end; `repair-<capabilityId>` must reach the repair worker unchanged.
+24. Use the best approved tool for each stage before considering additional human intervention.
 
 ## Architecture changes
 Architecture Freeze V4 is the default source of truth. Change it only when an actual contradiction or missing architectural capability is demonstrated by repository evidence. If changed, update the master charter, architecture document, governance charter and affected decisions before continuing construction.
@@ -100,3 +104,6 @@ Do not redesign the architecture because implementation is difficult. Do not wea
 
 ## Progress
 The autonomous build daemon must continuously emit measurable progress and throughput telemetry. It should continue until the repository reaches a stable completion state, the canonical backlog is exhausted, or a bounded evidence-backed failure blocks construction. Progress evaluation must include the seven-day performance constraint rather than merely counting successful test runs.
+
+## Permanent toolchain optimization law
+`Docs/HOOSHYAROS_TOOLCHAIN_OPTIMIZATION_LAW.md` is mandatory governing memory. It defines the Python-first/tool-first construction method, human-intervention boundary, reuse-before-build rule, speed rule and preservation of repair intent across orchestration boundaries. Future autonomous cycles must read and obey it before construction.
