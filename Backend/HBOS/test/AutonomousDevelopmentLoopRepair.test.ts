@@ -8,7 +8,7 @@ describe("AutonomousDevelopmentLoop repair goal canonicalization", () => {
             targetEngine: "Financial Intelligence Engine",
             dependencies: ["Knowledge Engine", "Financial Intelligence Engine"]
         })).toEqual(expect.objectContaining({
-            capabilityId: "product.financial-data-ingestion"
+            capabilityId: "repair-product.financial-data-ingestion"
         }));
     });
 

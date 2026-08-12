@@ -16,10 +16,18 @@ export class AutonomousDevelopmentLoop {
 
     static canonicalizeGoal(goal: any): any {
         if (!goal || typeof goal !== "object") return goal;
-        const capabilityId = String(goal?.capabilityId || goal?.id || "autonomous-capability");
-        // Repair intents are first-class intents. Preserve their identity so
-        // the repair path remains distinguishable from the base capability.
-        return { ...goal, capabilityId };
+
+        const capabilityId = String(
+            goal?.capabilityId || goal?.id || "autonomous-capability"
+        );
+
+        // Repair intent is first-class and must remain distinguishable.
+        if (capabilityId.startsWith("repair-")) {
+            return { ...goal, capabilityId };
+        }
+
+        // Normal goals must remain identity-preserving.
+        return goal;
     }
 
     execute(goal: any): AutonomousDevelopmentResult {
@@ -37,16 +45,6 @@ export class AutonomousDevelopmentLoop {
             AutonomousDevelopmentLoop.verifyCompletionEvidence(outcome);
         }
         return outcome;
-    }
-
-    static canonicalizeGoal(goal: any): any {
-        if (!goal || typeof goal !== "object") return goal;
-        const capabilityId = typeof goal.capabilityId === "string" ? goal.capabilityId : "";
-        if (!capabilityId.startsWith("repair-")) return goal;
-        return {
-            ...goal,
-            capabilityId: capabilityId.slice("repair-".length)
-        };
     }
 
     static selfTest(): void {
