@@ -1,4 +1,6 @@
 import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 
 export interface KnotCheckpoint {
     capabilityId: string;
@@ -62,34 +64,85 @@ export class AutonomousKnotRecovery {
     rollback(root: string, checkpoint: KnotCheckpoint): void {
         if (!checkpoint.commit) throw new Error("Cannot rollback without a verified checkpoint commit");
 
-        const reset = execFileSync("git", ["reset", "--hard", checkpoint.commit], {
-            cwd: root,
-            encoding: "utf8",
-            stdio: ["ignore", "pipe", "pipe"]
-        });
-
-        // The autonomous generator creates untracked product artifacts. A hard
-        // reset restores tracked files but deliberately leaves those artifacts,
-        // which makes the next GENERATE stage see a dirty worktree forever.
-        // The daemon only enters recovery after it established a clean checkpoint,
-        // so untracked files created after that checkpoint are autonomous-owned
-        // mutation and may be removed safely here. Ignored files remain untouched.
-        execFileSync("git", ["clean", "-fd"], {
-            cwd: root,
-            encoding: "utf8",
-            stdio: ["ignore", "pipe", "pipe"]
-        });
-
-        const status = execFileSync("git", ["status", "--porcelain=v1", "--untracked-files=all", "--", ".", ":(exclude)node_modules"], {
+        const head = execFileSync("git", ["rev-parse", "HEAD"], {
             cwd: root,
             encoding: "utf8",
             stdio: ["ignore", "pipe", "pipe"]
         }).trim();
 
-        if (status) {
-            throw new Error(`Checkpoint rollback did not restore a clean worktree for ${checkpoint.commit}: ${status}`);
+        const beforeStatus = execFileSync(
+            "git",
+            ["status", "--porcelain=v1", "--untracked-files=all", "--", ".", ":(exclude)node_modules"],
+            {
+                cwd: root,
+                encoding: "utf8",
+                stdio: ["ignore", "pipe", "pipe"]
+            }
+        ).trim();
+
+        if (head === checkpoint.commit && !beforeStatus) {
+            return;
         }
 
-        void reset;
+        execFileSync("git", ["reset", "--hard", checkpoint.commit], {
+            cwd: root,
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "pipe"]
+        });
+
+        const canonicalId = checkpoint.capabilityId.startsWith("repair-")
+            ? checkpoint.capabilityId.slice("repair-".length)
+            : checkpoint.capabilityId;
+
+        const roadmapPath = join(root, "Docs", "Product", "PRODUCT_CONSTRUCTION_ROADMAP.json");
+
+        if (existsSync(roadmapPath)) {
+            try {
+                const roadmap = JSON.parse(readFileSync(roadmapPath, "utf8")) as {
+                    capabilities?: Array<{
+                        capabilityId?: string;
+                        implementationPath?: string;
+                        testPath?: string;
+                        documentationPath?: string;
+                    }>;
+                };
+
+                const capability = roadmap.capabilities?.find(
+                    item => item.capabilityId === canonicalId
+                );
+
+                const ownedPaths = [
+                    capability?.implementationPath,
+                    capability?.testPath,
+                    capability?.documentationPath
+                ].filter(Boolean) as string[];
+
+                for (const relativePath of ownedPaths) {
+                    execFileSync("git", ["clean", "-fd", "--", relativePath], {
+                        cwd: root,
+                        encoding: "utf8",
+                        stdio: ["ignore", "pipe", "pipe"]
+                    });
+                }
+            } catch {
+                // Rollback remains safe even when the product roadmap is unavailable.
+            }
+        }
+
+        const status = execFileSync(
+            "git",
+            ["status", "--porcelain=v1", "--untracked-files=all", "--", ".", ":(exclude)node_modules"],
+            {
+                cwd: root,
+                encoding: "utf8",
+                stdio: ["ignore", "pipe", "pipe"]
+            }
+        ).trim();
+
+        if (status) {
+            throw new Error(
+                `Checkpoint rollback did not restore a clean worktree for ${checkpoint.commit}: ${status}`
+            );
+        }
     }
 }
