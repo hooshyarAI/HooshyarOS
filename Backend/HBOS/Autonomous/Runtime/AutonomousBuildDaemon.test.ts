@@ -132,7 +132,7 @@ describe("AutonomousBuildDaemon", () => {
         expect(executedGoal.capability).toContain("verification");
     });
 
-    it("reports assistant and autonomous construction completion separately from product completion", () => {
+    it("reports assistant and autonomous construction completion separately from commercial product completion", () => {
         const mission = {
             snapshot: jest.fn(() => ({ commit: "abc123", clean: true })),
             nextMission: jest.fn(() => ({
@@ -166,22 +166,29 @@ describe("AutonomousBuildDaemon", () => {
         } as unknown as AutonomousPlatformContinuation;
 
         const daemon = new AutonomousBuildDaemon({ maxCycles: 1, mission, continuation });
-        const audit = {
-            complete: true,
-            roadmapPresent: true,
-            backlogExhausted: true,
-            missingArtifacts: [],
-            nonAutonomousProductionItems: []
+        (daemon as any).canonicalAudit = {
+            audit: jest.fn(() => ({
+                complete: true,
+                roadmapPresent: true,
+                backlogExhausted: true,
+                missingArtifacts: [],
+                nonAutonomousProductionItems: []
+            }))
         };
-        (daemon as any).canonicalAudit = { audit: jest.fn(() => audit) };
+        (daemon as any).commercialAudit = {
+            audit: jest.fn(() => ({
+                complete: false,
+                contractPresent: true,
+                missingLayers: ["web-entrypoint", "persistence-boundary"],
+                blockedExternalDependencies: ["production-cloud-resources"]
+            }))
+        };
 
         const logSpy = jest.spyOn(console, "log").mockImplementation(() => undefined);
         try {
             const result = daemon.run();
-            expect(result.status).toBe("completed");
-            expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"assistantComplete":true'));
-            expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"autonomousConstructionComplete":true'));
-            expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"productComplete":false'));
+            expect(result.status).toBe("blocked");
+            expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("COMMERCIAL_PRODUCT_AUDIT_MISSING_LAYERS"));
         } finally {
             logSpy.mockRestore();
         }
