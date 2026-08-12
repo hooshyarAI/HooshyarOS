@@ -6,6 +6,7 @@ import { AutonomousPlatformContinuation, PlatformCapabilityMission, PlatformCont
 import { CapabilityEvidenceAudit } from "./CapabilityEvidenceAudit";
 import { CanonicalCapabilityAudit } from "./CanonicalCapabilityAudit";
 import { AutonomousWeavingPlanner } from "./AutonomousWeavingPlanner";
+import { AutonomousKnotRecovery } from "./AutonomousKnotRecovery";
 import { createLocalConstructionTools } from "./LocalConstructionToolset";
 
 export interface DaemonOptions {
@@ -31,6 +32,7 @@ export class AutonomousBuildDaemon {
     private readonly evidenceAudit = new CapabilityEvidenceAudit();
     private readonly canonicalAudit = new CanonicalCapabilityAudit();
     private readonly weavingPlanner = new AutonomousWeavingPlanner();
+    private readonly knotRecovery = new AutonomousKnotRecovery();
     private readonly maxCycles: number;
     private readonly reportEvery: number;
 
@@ -207,15 +209,75 @@ export class AutonomousBuildDaemon {
             console.log(JSON.stringify({ type: "AUTONOMOUS_MISSION", cycle, commit: before.commit, capability: mission.capability, targetEngine: mission.targetEngine }));
 
             const goal = { capabilityId: mission.capabilityId, capability: mission.capability, targetEngine: mission.targetEngine, dependencies: mission.dependencies };
-            const result: AutonomousDevelopmentResult = this.development.execute(goal);
+            let result: AutonomousDevelopmentResult = this.development.execute(goal);
             history.push({ cycle, commit: before.commit, mission: mission.capability, capabilityId: mission.capabilityId, targetEngine: mission.targetEngine, assistantGatePassed: decision.assistantGatePassed, handoff: decision.kind === "platform-continuation" ? decision.continuation : undefined, weavingPlan, result });
 
             if (!result.result.ok) {
-                console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, result }));
-                return { status: "blocked", cycles: cycle, history };
+                const recovery = this.knotRecovery.observe(
+                    { capabilityId: mission.capabilityId, commit: before.commit },
+                    { capabilityId: mission.capabilityId, executionOk: false, verificationComplete: false, repositoryChanged: false }
+                );
+                console.log(JSON.stringify({ type: "AUTONOMOUS_REWEAVE", cycle, recovery }));
+
+                const repairGoal = {
+                    capabilityId: recovery.repairCapabilityId!,
+                    capability: `repair and re-verify knot ${mission.capabilityId} from checkpoint ${before.commit}`,
+                    targetEngine: mission.targetEngine,
+                    dependencies: mission.dependencies
+                };
+                const repairResult = this.development.execute(repairGoal);
+                history.push({ cycle, recovery, repairGoal, repairResult });
+
+                if (!repairResult.result.ok) {
+                    console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, result: repairResult }));
+                    return { status: "blocked", cycles: cycle, history };
+                }
+
+                result = repairResult;
+                const repaired = this.mission.snapshot();
+                if (repaired.commit === before.commit || !repaired.clean) {
+                    console.log(JSON.stringify({
+                        type: "AUTONOMOUS_BLOCKED",
+                        cycle,
+                        result: {
+                            status: "BLOCKED",
+                            stage: "VERIFY",
+                            issues: ["REWEAVE_DID_NOT_PRODUCE_VERIFIED_REPOSITORY_CHANGE"],
+                            checkpoint: before.commit,
+                            current: repaired.commit
+                        }
+                    }));
+                    return { status: "blocked", cycles: cycle, history };
+                }
             }
 
             const after = this.mission.snapshot();
+            const knotObservation = this.knotRecovery.observe(
+                { capabilityId: mission.capabilityId, commit: before.commit },
+                {
+                    capabilityId: mission.capabilityId,
+                    executionOk: result.result.ok,
+                    verificationComplete: result.result.ok && result.result.stage === "FINALIZE",
+                    repositoryChanged: after.commit !== before.commit && after.clean
+                }
+            );
+            console.log(JSON.stringify({ type: "AUTONOMOUS_KNOT_CHECK", cycle, recovery: knotObservation }));
+
+            if (knotObservation.recover) {
+                console.log(JSON.stringify({
+                    type: "AUTONOMOUS_BLOCKED",
+                    cycle,
+                    result: {
+                        status: "BLOCKED",
+                        stage: "VERIFY",
+                        issues: ["KNOT_NOT_VERIFIED"],
+                        checkpoint: before.commit,
+                        recovery: knotObservation
+                    }
+                }));
+                return { status: "blocked", cycles: cycle, history };
+            }
+
             if (after.commit === before.commit && after.clean && cycle < this.maxCycles) {
                 console.log(JSON.stringify({ type: "AUTONOMOUS_IDLE", cycle, commit: after.commit, capability: mission.capability, message: "No repository change was produced; refusing to advance as completed." }));
                 return { status: "idle", cycles: cycle, history };
