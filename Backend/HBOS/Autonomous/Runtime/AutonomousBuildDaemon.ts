@@ -8,11 +8,13 @@ import { CanonicalCapabilityAudit } from "./CanonicalCapabilityAudit";
 import { AutonomousWeavingPlanner } from "./AutonomousWeavingPlanner";
 import { AutonomousKnotRecovery } from "./AutonomousKnotRecovery";
 import { createLocalConstructionTools } from "./LocalConstructionToolset";
+import { AutonomousPerformanceBudget } from "./AutonomousPerformanceBudget";
 
 export interface DaemonOptions {
     root?: string;
     maxCycles?: number;
     reportEvery?: number;
+    performanceBudget?: AutonomousPerformanceBudget;
     mission?: AutonomousProjectMission;
     continuation?: AutonomousPlatformContinuation;
     development?: AutonomousDevelopmentLoop;
@@ -35,6 +37,7 @@ export class AutonomousBuildDaemon {
     private readonly knotRecovery = new AutonomousKnotRecovery();
     private readonly maxCycles: number;
     private readonly reportEvery: number;
+    private readonly performanceBudget: AutonomousPerformanceBudget;
 
     constructor(options: DaemonOptions = {}) {
         this.root = options.root || process.cwd();
@@ -43,6 +46,7 @@ export class AutonomousBuildDaemon {
         this.development = options.development ?? new AutonomousDevelopmentLoop(createLocalConstructionTools(this.root));
         this.maxCycles = options.maxCycles ?? 1000;
         this.reportEvery = options.reportEvery ?? 1;
+        this.performanceBudget = options.performanceBudget ?? new AutonomousPerformanceBudget();
     }
 
     private finalCompletionEvidence(selected: Mission): ReturnType<CapabilityEvidenceAudit["evaluate"]> {
@@ -137,10 +141,21 @@ export class AutonomousBuildDaemon {
     run() {
         const history: unknown[] = [];
         for (let cycle = 1; cycle <= this.maxCycles; cycle += 1) {
+            const cycleStartedAt = this.performanceBudget.beginCycle();
+            let budgetSnapshot;
+            try {
+                budgetSnapshot = this.performanceBudget.assertWithinDeadline();
+            } catch (error) {
+                const result = { status: "blocked", cycles: cycle - 1, history, reason: String(error) };
+                console.log(JSON.stringify({ type: "AUTONOMOUS_PERFORMANCE_BUDGET_EXCEEDED", cycle, ...this.performanceBudget.snapshot(), error: String(error) }));
+                return result;
+            }
+
             const before = this.mission.snapshot();
             const decision = this.selectMission();
 
             if (decision.kind === "platform-complete") {
+                budgetSnapshot = this.performanceBudget.completeCycle(cycleStartedAt);
                 console.log(JSON.stringify({
                     type: "AUTONOMOUS_PLATFORM_CONSTRUCTION_COMPLETE",
                     cycle,
@@ -151,56 +166,36 @@ export class AutonomousBuildDaemon {
                     backlogExhausted: decision.audit.backlogExhausted,
                     nonAutonomousProductionItems: decision.audit.nonAutonomousProductionItems,
                     continuation: decision.continuation,
+                    performance: budgetSnapshot,
                     message: "Assistant construction and the canonical autonomous platform construction backlog are complete; this does not assert full product completion."
                 }));
                 return { status: "completed", cycles: cycle, history };
             }
 
             if (decision.kind === "platform-audit-blocked") {
+                budgetSnapshot = this.performanceBudget.completeCycle(cycleStartedAt);
                 const result = {
-                    goal: {
-                        capabilityId: "platform.continuation.audit",
-                        capability: decision.reason,
-                        targetEngine: "Autonomous Operations Engine",
-                        dependencies: []
-                    },
-                    result: {
-                        ok: false,
-                        status: "BLOCKED",
-                        attempts: 0,
-                        selectedTool: "audit",
-                        issues: [decision.reason],
-                        trace: ["ARCHITECTURE", "AUDIT", "FINALIZE"],
-                        details: JSON.stringify(decision.details),
-                        stage: "FINALIZE"
-                    },
+                    goal: { capabilityId: "platform.continuation.audit", capability: decision.reason, targetEngine: "Autonomous Operations Engine", dependencies: [] },
+                    result: { ok: false, status: "BLOCKED", attempts: 0, selectedTool: "audit", issues: [decision.reason], trace: ["ARCHITECTURE", "AUDIT", "FINALIZE"], details: JSON.stringify(decision.details), stage: "FINALIZE" },
                     status: "blocked"
                 };
-                console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, result }));
-                return { status: "blocked", cycles: cycle, history: [...history, { cycle, audit: decision.details, status: "blocked" }] };
+                console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, performance: budgetSnapshot, result }));
+                return { status: "blocked", cycles: cycle, history: [...history, { cycle, audit: decision.details, status: "blocked", performance: budgetSnapshot }] };
             }
 
             const mission = decision.mission;
             const weavingPlan = this.weavingPlanner.plan(mission, before.clean);
-            console.log(JSON.stringify({ type: "AUTONOMOUS_WEAVING_PLAN", cycle, plan: weavingPlan }));
+            console.log(JSON.stringify({ type: "AUTONOMOUS_WEAVING_PLAN", cycle, plan: weavingPlan, performance: budgetSnapshot }));
 
             if (!weavingPlan.safe) {
+                budgetSnapshot = this.performanceBudget.completeCycle(cycleStartedAt);
                 const blocked = {
                     goal: { capabilityId: weavingPlan.capabilityId, capability: mission.capability, targetEngine: mission.targetEngine, dependencies: mission.dependencies },
-                    result: {
-                        ok: false,
-                        status: "BLOCKED",
-                        attempts: 0,
-                        selectedTool: "weaving-planner",
-                        issues: ["WEAVING_PRECONDITION_FAILED"],
-                        trace: ["ARCHITECTURE", "PLAN"],
-                        details: weavingPlan.rationale,
-                        stage: "PLAN"
-                    },
+                    result: { ok: false, status: "BLOCKED", attempts: 0, selectedTool: "weaving-planner", issues: ["WEAVING_PRECONDITION_FAILED"], trace: ["ARCHITECTURE", "PLAN"], details: weavingPlan.rationale, stage: "PLAN" },
                     status: "blocked"
                 };
-                console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, result: blocked }));
-                return { status: "blocked", cycles: cycle, history: [...history, { cycle, weavingPlan, status: "blocked" }] };
+                console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, performance: budgetSnapshot, result: blocked }));
+                return { status: "blocked", cycles: cycle, history: [...history, { cycle, weavingPlan, status: "blocked", performance: budgetSnapshot }] };
             }
 
             if (decision.kind === "platform-continuation") {
@@ -218,20 +213,14 @@ export class AutonomousBuildDaemon {
                     { capabilityId: mission.capabilityId, executionOk: false, verificationComplete: false, repositoryChanged: false }
                 );
                 console.log(JSON.stringify({ type: "AUTONOMOUS_REWEAVE", cycle, recovery }));
-
                 try {
                     this.knotRecovery.rollback(this.root, recovery.checkpoint);
                     console.log(JSON.stringify({ type: "AUTONOMOUS_ROLLBACK", cycle, checkpoint: recovery.checkpoint.commit, capabilityId: mission.capabilityId }));
                 } catch (error) {
-                    const blocked = {
-                        status: "BLOCKED",
-                        stage: "RECOVERY",
-                        issues: ["CHECKPOINT_ROLLBACK_FAILED"],
-                        checkpoint: recovery.checkpoint.commit,
-                        error: String(error)
-                    };
-                    console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, result: blocked }));
-                    return { status: "blocked", cycles: cycle, history: [...history, { cycle, recovery, status: "blocked", result: blocked }] };
+                    const blocked = { status: "BLOCKED", stage: "RECOVERY", issues: ["CHECKPOINT_ROLLBACK_FAILED"], checkpoint: recovery.checkpoint.commit, error: String(error) };
+                    budgetSnapshot = this.performanceBudget.completeCycle(cycleStartedAt);
+                    console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, performance: budgetSnapshot, result: blocked }));
+                    return { status: "blocked", cycles: cycle, history: [...history, { cycle, recovery, status: "blocked", result: blocked, performance: budgetSnapshot }] };
                 }
 
                 const repairGoal = {
@@ -244,24 +233,17 @@ export class AutonomousBuildDaemon {
                 history.push({ cycle, recovery, repairGoal, repairResult });
 
                 if (!repairResult.result.ok) {
-                    console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, result: repairResult }));
+                    budgetSnapshot = this.performanceBudget.completeCycle(cycleStartedAt);
+                    console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, performance: budgetSnapshot, result: repairResult }));
                     return { status: "blocked", cycles: cycle, history };
                 }
 
                 result = repairResult;
                 const repaired = this.mission.snapshot();
                 if (repaired.commit === before.commit || !repaired.clean) {
-                    console.log(JSON.stringify({
-                        type: "AUTONOMOUS_BLOCKED",
-                        cycle,
-                        result: {
-                            status: "BLOCKED",
-                            stage: "VERIFY",
-                            issues: ["REWEAVE_DID_NOT_PRODUCE_VERIFIED_REPOSITORY_CHANGE"],
-                            checkpoint: before.commit,
-                            current: repaired.commit
-                        }
-                    }));
+                    budgetSnapshot = this.performanceBudget.completeCycle(cycleStartedAt);
+                    const blocked = { status: "BLOCKED", stage: "VERIFY", issues: ["REWEAVE_DID_NOT_PRODUCE_VERIFIED_REPOSITORY_CHANGE"], checkpoint: before.commit, current: repaired.commit };
+                    console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, performance: budgetSnapshot, result: blocked }));
                     return { status: "blocked", cycles: cycle, history };
                 }
             }
@@ -269,39 +251,28 @@ export class AutonomousBuildDaemon {
             const after = this.mission.snapshot();
             const knotObservation = this.knotRecovery.observe(
                 { capabilityId: mission.capabilityId, commit: before.commit },
-                {
-                    capabilityId: mission.capabilityId,
-                    executionOk: result.result.ok,
-                    verificationComplete: result.result.ok && result.result.stage === "FINALIZE",
-                    repositoryChanged: after.commit !== before.commit && after.clean
-                }
+                { capabilityId: mission.capabilityId, executionOk: result.result.ok, verificationComplete: result.result.ok && result.result.stage === "FINALIZE", repositoryChanged: after.commit !== before.commit && after.clean }
             );
             console.log(JSON.stringify({ type: "AUTONOMOUS_KNOT_CHECK", cycle, recovery: knotObservation }));
 
             if (knotObservation.recover) {
-                console.log(JSON.stringify({
-                    type: "AUTONOMOUS_BLOCKED",
-                    cycle,
-                    result: {
-                        status: "BLOCKED",
-                        stage: "VERIFY",
-                        issues: ["KNOT_NOT_VERIFIED"],
-                        checkpoint: before.commit,
-                        recovery: knotObservation
-                    }
-                }));
+                budgetSnapshot = this.performanceBudget.completeCycle(cycleStartedAt);
+                const blocked = { status: "BLOCKED", stage: "VERIFY", issues: ["KNOT_NOT_VERIFIED"], checkpoint: before.commit, recovery: knotObservation };
+                console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, performance: budgetSnapshot, result: blocked }));
                 return { status: "blocked", cycles: cycle, history };
             }
 
+            budgetSnapshot = this.performanceBudget.completeCycle(cycleStartedAt);
+            history.push({ cyclePerformance: budgetSnapshot });
             if (after.commit === before.commit && after.clean && cycle < this.maxCycles) {
-                console.log(JSON.stringify({ type: "AUTONOMOUS_IDLE", cycle, commit: after.commit, capability: mission.capability, message: "No repository change was produced; refusing to advance as completed." }));
+                console.log(JSON.stringify({ type: "AUTONOMOUS_IDLE", cycle, commit: after.commit, capability: mission.capability, performance: budgetSnapshot, message: "No repository change was produced; refusing to advance as completed." }));
                 return { status: "idle", cycles: cycle, history };
             }
             if (cycle % this.reportEvery === 0) {
-                console.log(JSON.stringify({ type: "AUTONOMOUS_PROGRESS", cycle, latestCommit: after.commit, status: result.status, assistantGatePassed: decision.assistantGatePassed }));
+                console.log(JSON.stringify({ type: "AUTONOMOUS_PROGRESS", cycle, latestCommit: after.commit, status: result.status, assistantGatePassed: decision.assistantGatePassed, performance: budgetSnapshot }));
             }
         }
-        console.log(JSON.stringify({ type: "AUTONOMOUS_CYCLE_LIMIT", cycles: this.maxCycles }));
+        console.log(JSON.stringify({ type: "AUTONOMOUS_CYCLE_LIMIT", cycles: this.maxCycles, performance: this.performanceBudget.snapshot() }));
         return { status: "cycle_limit", cycles: this.maxCycles, history };
     }
 }
