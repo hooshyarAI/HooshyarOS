@@ -24,6 +24,14 @@ export class APIGatewayEngine implements Engine {
         return { path: normalizedPath, method: normalizedMethod, status: "READY" };
     }
 
+    handleRequest(path: string, method = "GET"): ApiRouteResult {
+        return this.route(path, method);
+    }
+
+    request(path: string, method = "GET"): ApiRouteResult {
+        return this.route(path, method);
+    }
+
     describeCapability(): { id: string; capability: string; targetEngine: string } {
         return {
             id: "platform.api-gateway",
