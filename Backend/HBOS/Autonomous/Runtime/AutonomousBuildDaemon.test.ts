@@ -105,20 +105,20 @@ describe("AutonomousBuildDaemon", () => {
         } as unknown as AutonomousPlatformContinuation;
 
         const execute = jest.fn((goal: any): AutonomousDevelopmentResult => ({
-        status: "completed",
-        goal,
-        plan: { requirement: {} } as any,
-        result: {
-            ok: true,
-            status: "BUILT",
-            attempts: 0,
-            selectedTool: "git",
-            issues: [],
-            trace: ["ARCHITECTURE", "PLAN", "GENERATE", "VERIFY", "FINALIZE"],
-            details: "verified completion evidence construction",
-            stage: "FINALIZE"
-        }
-    }));
+            status: "completed",
+            goal,
+            plan: { requirement: {} } as any,
+            result: {
+                ok: true,
+                status: "BUILT",
+                attempts: 0,
+                selectedTool: "git",
+                issues: [],
+                trace: ["ARCHITECTURE", "PLAN", "GENERATE", "VERIFY", "FINALIZE"],
+                details: "verified completion evidence construction",
+                stage: "FINALIZE"
+            }
+        }));
         const development = { execute } as unknown as AutonomousDevelopmentLoop;
         const daemon = new AutonomousBuildDaemon({ maxCycles: 1, mission, continuation, development });
 
@@ -131,6 +131,59 @@ describe("AutonomousBuildDaemon", () => {
         expect(executedGoal.capabilityId).toBe("assistant.completion.evidence");
         expect(executedGoal.capability).toContain("verification");
     });
+
+    it("reports assistant and autonomous construction completion separately from product completion", () => {
+        const mission = {
+            snapshot: jest.fn(() => ({ commit: "abc123", clean: true })),
+            nextMission: jest.fn(() => ({
+                capabilityId: "assistant.completion.gate",
+                capability: "HooshyarOS Autonomous Assistant completion gate",
+                targetEngine: "Autonomous Operations Engine",
+                dependencies: [],
+                evidence: {
+                    root: process.cwd(),
+                    commit: "abc123",
+                    clean: true,
+                    architectureFiles: [],
+                    engineCount: 0,
+                    runtimeFileCount: 0,
+                    latestCommits: []
+                },
+                directives: [],
+                architectureRules: []
+            })),
+            nextPlatformMission: jest.fn(() => null)
+        } as unknown as AutonomousProjectMission;
+
+        const continuation = {
+            createMission: jest.fn(() => ({
+                capabilityId: "platform.continuation" as const,
+                capability: "continue autonomous construction of HooshyarOS platform capabilities",
+                instruction: "AUDIT → SELECT NEXT GENUINELY MISSING CAPABILITY → IMPLEMENT → TEST → INTEGRATE → VERIFY → COMMIT → PUSH → AUDIT AGAIN",
+                source: "assistant.completion.gate" as const
+            })),
+            selectNextCapability: jest.fn(() => null)
+        } as unknown as AutonomousPlatformContinuation;
+
+        const daemon = new AutonomousBuildDaemon({ maxCycles: 1, mission, continuation });
+        const audit = {
+            complete: true,
+            roadmapPresent: true,
+            backlogExhausted: true,
+            missingArtifacts: [],
+            nonAutonomousProductionItems: []
+        };
+        (daemon as any).canonicalAudit = { audit: jest.fn(() => audit) };
+
+        const logSpy = jest.spyOn(console, "log").mockImplementation(() => undefined);
+        try {
+            const result = daemon.run();
+            expect(result.status).toBe("completed");
+            expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"assistantComplete":true'));
+            expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"autonomousConstructionComplete":true'));
+            expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('"productComplete":false'));
+        } finally {
+            logSpy.mockRestore();
+        }
+    });
 });
-
-
