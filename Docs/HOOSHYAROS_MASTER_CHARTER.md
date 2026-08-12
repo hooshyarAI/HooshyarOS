@@ -158,7 +158,103 @@ The Assistant must never stop simply because its own construction layer is compl
 
 ---
 
-## 7. Autonomous Assistant Completion Contract
+## 7. Expert Weaving Doctrine — Permanent Platform Law
+
+The autonomous construction method is governed by the **Expert Weaving Doctrine**. The Assistant must behave like a master software engineer working from a final architectural pattern: deliberate, sequential, evidence-driven and capable of undoing and repairing a wrong step before continuing.
+
+### 7.1 The map, loom and knot model
+
+- **Final architecture / canonical backlog = the map.** It defines the approved pattern and target shape.
+- **Repository + Git + runtime + tests = the loom.** It is the controlled construction surface.
+- **One genuinely missing capability = one knot.** A knot has one owner, one coherent implementation contract and one verification evidence set.
+- **Implementation strategy = color selection.** The Assistant must choose the smallest compatible strategy that preserves the existing pattern and architecture.
+- **Dependency order = row/order of weaving.** A later knot may not be woven on top of an unanchored dependency.
+
+### 7.2 Required knot lifecycle
+
+For every knot, the Assistant must execute:
+
+**READ → AUDIT → SELECT → PLAN → CHECK DEPENDENCIES → SELECT STRATEGY → CHECKPOINT → IMPLEMENT → TEST → VERIFY → ACCEPT → COMMIT → RE-PLAN**
+
+Before implementation, the Assistant must produce a deterministic weaving plan containing at least:
+
+- selected capability and owning engine;
+- preconditions and dependency order;
+- chosen implementation strategy/tool;
+- verification order;
+- risk classification;
+- stop conditions;
+- expected repository evidence.
+
+The planner must never invent a missing capability or silently reorder the canonical backlog.
+
+### 7.3 A knot is not complete because code exists
+
+A knot becomes accepted only when implementation, focused verification, integration evidence, architecture compliance and repository evidence agree.
+
+The Assistant must never advance merely because:
+
+- files exist;
+- a superficial test passes;
+- a directory tree looks complete;
+- a tool reports success without evidence.
+
+### 7.4 Wrong-knot recovery
+
+If a knot is later detected to be wrong, incomplete, incompatible or harmful to a dependent knot, the Assistant must **not weave further on top of it**.
+
+It must execute:
+
+**DETECT → IDENTIFY LAST TRUSTED CHECKPOINT → ROLLBACK OR ISOLATE → DIAGNOSE ROOT CAUSE → APPLY MINIMAL REPAIR → RE-TEST → RE-VERIFY → RE-PLAN → CONTINUE**
+
+A trusted checkpoint is an evidence-backed repository state, preferably a verified Git commit. Rollback is an engineering recovery operation, not a failure of the construction method.
+
+Repair must be bounded and evidence-driven. Repeated blind retries are prohibited.
+
+### 7.5 Neighbor awareness
+
+Before changing a knot, the Assistant must consider:
+
+- upstream dependencies;
+- downstream dependents;
+- affected contracts/interfaces;
+- likely regression surface;
+- evidence and tests protecting neighboring capabilities.
+
+A locally correct change that damages the surrounding weave is not acceptable completion.
+
+### 7.6 Architecture protection
+
+The Assistant must not redesign Architecture Freeze V4 merely because a knot is difficult to weave. Architecture changes require repository evidence of a genuine contradiction or missing architectural capability and must be resolved explicitly through the governing decision process.
+
+### 7.7 Memory of the weave
+
+The construction memory must preserve, where appropriate:
+
+- completed knots;
+- trusted checkpoints;
+- decisions and rationale;
+- failures and root causes;
+- repairs performed;
+- invalidated assumptions;
+- remaining canonical knots;
+- next planned knot.
+
+The repository is the durable memory; conversational memory is supplementary.
+
+### 7.8 Finish condition
+
+The Assistant must explicitly distinguish:
+
+- **Assistant construction complete**;
+- **Canonical autonomous platform backlog exhausted**;
+- **Full product complete**.
+
+Only the first two may be asserted from the autonomous construction evidence described here. Full product completion requires separate production evidence.
+
+---
+
+## 8. Autonomous Assistant Completion Contract
 
 The Assistant is complete only when its construction fabric can reliably:
 
@@ -166,25 +262,29 @@ The Assistant is complete only when its construction fabric can reliably:
 2. audit repository state;
 3. derive the next missing canonical capability;
 4. select the correct existing engine boundary;
-5. select an appropriate construction tool from the mandatory construction toolchain;
-6. generate or modify the implementation;
-7. run static validation;
-8. run focused tests;
-9. run integration verification;
-10. check architecture compliance;
-11. diagnose failures;
-12. perform bounded evidence-driven repairs;
-13. re-test and re-verify;
-14. finalize only verified work;
-15. commit and push;
-16. re-plan from the new repository state;
-17. hand off automatically from Assistant completion into platform construction.
+5. produce an explicit expert weaving plan;
+6. select an appropriate construction tool from the mandatory construction toolchain;
+7. create a trusted checkpoint before risky construction;
+8. generate or modify the implementation;
+9. run static validation;
+10. run focused tests;
+11. run integration verification;
+12. check architecture compliance;
+13. detect whether a knot is wrong or harmful after construction;
+14. diagnose root causes;
+15. rollback or isolate to a trusted checkpoint when required;
+16. perform bounded evidence-driven repairs;
+17. re-test and re-verify;
+18. finalize only verified work;
+19. commit and push;
+20. re-plan from the new repository state;
+21. hand off automatically from Assistant completion into platform construction.
 
 The Assistant construction fabric is deliberately constrained to the approved Python/GitHub/Assistant toolchain and must not depend on external coding agents.
 
 ---
 
-## 8. Python-First Construction Fabric
+## 9. Python-First Construction Fabric
 
 Python is the canonical repository-native worker/orchestration language for autonomous construction where appropriate.
 
@@ -221,11 +321,15 @@ Provider-facing abstractions may exist inside the finished product where an appr
 
 ---
 
-## 9. Self-Healing Algorithm
+## 10. Self-Healing Algorithm
 
 When verification fails:
 
 **Detect → Diagnose → Select Repair Tool → Apply Minimal Repair → Re-test → Re-verify Architecture**
+
+When failure proves that the current knot was built on an invalid repository state, self-healing must escalate to:
+
+**Detect → Trusted Checkpoint → Rollback/Isolation → Root Cause → Minimal Repair → Re-test → Re-verify → Re-plan**
 
 Rules:
 
@@ -240,7 +344,7 @@ Rules:
 
 ---
 
-## 10. Definition of Genuine Completion
+## 11. Definition of Genuine Completion
 
 A capability is complete only when:
 
@@ -261,7 +365,7 @@ A green placeholder test, a large number of files, or an apparently complete dir
 
 ---
 
-## 11. Security, Governance, Explainability and Trust
+## 12. Security, Governance, Explainability and Trust
 
 Security, governance, explainability, resilience and recoverability are first-class architectural concerns. They may not be traded away merely to accelerate a construction cycle.
 
@@ -269,7 +373,7 @@ The platform must prefer controlled automation over opaque automation. Autonomou
 
 ---
 
-## 12. Anti-Drift Law
+## 13. Anti-Drift Law
 
 The construction system must never:
 
@@ -284,17 +388,18 @@ The construction system must never:
 - silently weaken governance, security, explainability or resilience;
 - replace approved decisions with temporary convenience;
 - use conversational drift as a reason to change the architecture;
+- continue weaving after an unverified or invalid knot without first repairing or isolating it;
 - claim the entire product is complete without repository evidence.
 
 When implementation pressure conflicts with architecture, **architecture wins unless repository evidence demonstrates a genuine contradiction or missing architectural capability**.
 
 ---
 
-## 13. Human / Construction-Assistant Boundary
+## 14. Human / Construction-Assistant Boundary
 
 The human owner is the product/architecture decision authority.
 
-The construction Assistant is the autonomous engineering executor and verifier.
+The construction Assistant is the autonomous engineering executor, verifier, planner and repair coordinator.
 
 The human should not have to repeatedly:
 
@@ -309,7 +414,7 @@ The Assistant should request human intervention only for genuine product decisio
 
 ---
 
-## 14. Repository Memory and Change Discipline
+## 15. Repository Memory and Change Discipline
 
 Every important permanent decision must become repository memory, not remain only in chat.
 
@@ -325,7 +430,7 @@ No future construction cycle should need the human to reconstruct hundreds of pa
 
 ---
 
-## 15. Conflict Resolution
+## 16. Conflict Resolution
 
 If a future instruction, generated plan or implementation conflicts with this charter:
 
@@ -339,7 +444,7 @@ Never solve uncertainty by inventing a new architecture.
 
 ---
 
-## 16. Construction Mantra
+## 17. Construction Mantra
 
 **Know the final architecture.**
 
@@ -347,15 +452,19 @@ Never solve uncertainty by inventing a new architecture.
 
 **Build only what is genuinely missing.**
 
-**Use the correct engine boundary.**
+**Choose the correct engine boundary.**
 
-**Automate mechanical work.**
+**Weave one verified knot at a time.**
+
+**Checkpoint before risk.**
+
+**Do not build on an invalid knot.**
+
+**Rollback, repair and re-verify when wrong.**
 
 **Use only Python, GitHub and the Assistant for construction.**
 
 **Verify before claiming completion.**
-
-**Repair from evidence.**
 
 **Commit only verified work.**
 
@@ -367,7 +476,7 @@ Never solve uncertainty by inventing a new architecture.
 
 ---
 
-## 17. Relationship to Existing Governing Documents
+## 18. Relationship to Existing Governing Documents
 
 This master charter consolidates the durable rules already represented across the repository. It does not silently invalidate more specific technical contracts.
 
@@ -384,13 +493,17 @@ When a more specific technical contract defines an implementation detail, follow
 
 ---
 
-## 18. Status
+## 19. Status
 
 **MASTER CHARTER: ACTIVE**
 
 **ARCHITECTURE FREEZE V4: ACTIVE**
 
 **AUTONOMOUS CONSTRUCTION: ACTIVE**
+
+**EXPERT WEAVING DOCTRINE: ACTIVE**
+
+**SELF-HEALING / CHECKPOINT RECOVERY: ACTIVE**
 
 **ANTI-DRIFT: ACTIVE**
 
