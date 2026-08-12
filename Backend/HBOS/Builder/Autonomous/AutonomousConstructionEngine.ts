@@ -63,6 +63,13 @@ export class AutonomousConstructionEngine {
             trace.push(stage);
             const result = this.execute(stage, plan, attempt, artifacts, issues);
             if (!result.ok) {
+                if (stage === "GENERATE" && this.isIdempotentGenerationNoOp(result)) {
+                    artifacts[stage] = {
+                        ...(this.recordArtifact(result.artifact) ?? {}),
+                        idempotentNoOp: true
+                    };
+                    continue;
+                }
                 issues.push(result.issue || `${stage}_FAILED`);
                 return this.blocked(stage, attempt, issues, trace);
             }
@@ -91,12 +98,7 @@ export class AutonomousConstructionEngine {
             trace.push("VERIFY");
             issues.length = 0;
             verification = this.execute("VERIFY", plan, attempt, artifacts, issues);
-            if (verification.ok) {
-                // A repaired build is still required to pass FINALIZE. Returning
-                // here used to skip git finalization and made completion evidence
-                // claim a success without a FINALIZE stage.
-                break;
-            }
+            if (verification.ok) break;
         }
 
         if (!verification.ok) {
@@ -107,11 +109,41 @@ export class AutonomousConstructionEngine {
         trace.push("FINALIZE");
         const finalize = this.execute("FINALIZE", plan, attempt, artifacts, issues);
         if (!finalize.ok) {
-            issues.push(finalize.issue || "FINALIZE_FAILED");
-            return this.blocked("FINALIZE", attempt, issues, trace);
+            if (this.isIdempotentFinalizeNoOp(finalize, artifacts)) {
+                artifacts.FINALIZE = {
+                    ...(this.recordArtifact(finalize.artifact) ?? {}),
+                    idempotentNoOp: true
+                };
+            } else {
+                issues.push(finalize.issue || "FINALIZE_FAILED");
+                return this.blocked("FINALIZE", attempt, issues, trace);
+            }
+        } else if (finalize.artifact !== undefined) {
+            artifacts.FINALIZE = finalize.artifact;
         }
 
         return this.success(attempt > 0 ? "REPAIRED" : "BUILT", attempt, trace);
+    }
+
+    private isIdempotentGenerationNoOp(result: { ok: boolean; artifact?: unknown; issue?: string }): boolean {
+        if (result.ok || result.issue !== "AUTONOMOUS_AGENT_NO_REPOSITORY_CHANGE") return false;
+        const artifact = this.recordArtifact(result.artifact);
+        if (!artifact) return false;
+        const output = typeof artifact.output === "string" ? artifact.output : "";
+        return artifact.changed === false && artifact.exitCode === 0 && /Already implemented:/i.test(output);
+    }
+
+    private isIdempotentFinalizeNoOp(
+        result: { ok: boolean; artifact?: unknown; issue?: string },
+        artifacts: Record<string, unknown>
+    ): boolean {
+        if (result.ok || result.issue !== "GIT_NO_REPOSITORY_CHANGE") return false;
+        const generated = this.recordArtifact(artifacts.GENERATE);
+        return generated?.idempotentNoOp === true;
+    }
+
+    private recordArtifact(value: unknown): Record<string, any> | null {
+        return value !== null && typeof value === "object" ? value as Record<string, any> : null;
     }
 
     private execute(stage: ConstructionStage, plan: ArchitecturePlan, attempt: number, artifacts: Record<string, unknown>, issues: string[]) {
