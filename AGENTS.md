@@ -23,13 +23,24 @@ When the Assistant completion gate is verified, immediately hand off to the cano
 
 AUDIT → SELECT NEXT GENUINELY MISSING CAPABILITY → IMPLEMENT → TEST → INTEGRATE → VERIFY → COMMIT → PUSH → AUDIT AGAIN
 
+## Construction tool policy
+The construction process is permanently limited to these active tools:
+
+1. **Python** — autonomous analysis, generation, verification, repair, orchestration and repository-native workers.
+2. **GitHub** — source control, repository inspection, commits, synchronization, review and publication.
+3. **This Assistant** — architecture reasoning, critical review, expert choice, implementation decisions and orchestration.
+
+No other external coding assistant, cloud coding agent or alternative coding provider may participate in the HooshyarOS construction process. In particular, Codex, GitHub Copilot, Claude and equivalent external coding agents are prohibited from the construction path.
+
+This restriction is operational, not architectural: the HooshyarOS product may still contain provider-facing runtime abstractions when the frozen architecture explicitly requires them, but the autonomous construction fabric itself must not depend on those providers.
+
 ## Engineering rules
 1. One capability = one coherent implementation contract + verification evidence.
 2. One Capability = One Engine = One Test = One Commit.
 3. Never create a duplicate engine when an existing engine owns the capability.
 4. Prefer the smallest complete change that advances the frozen architecture.
-5. Prefer repository-native tooling and Python workers for autonomous analysis, generation, verification and repair where useful.
-6. External coding providers such as Codex, Copilot or Claude must never become hidden architectural dependencies.
+5. Use Python workers and GitHub as the canonical autonomous construction toolchain.
+6. Do not invoke, install, configure or rely on external coding agents/providers during construction.
 7. Run static validation, focused tests and integration verification before finalizing.
 8. If verification fails, diagnose and repair automatically within a bounded budget.
 9. Preserve failure evidence; never fake a healthy result.
@@ -37,6 +48,7 @@ AUDIT → SELECT NEXT GENUINELY MISSING CAPABILITY → IMPLEMENT → TEST → IN
 11. Commit only verified work.
 12. Re-plan from the repository state after each completed capability.
 13. Do not stop at Assistant completion; continue into the canonical platform backlog.
+14. Cloud deployment and other external infrastructure operations must be represented by evidence-backed repository contracts; never claim external execution from a local stub.
 
 ## Architecture changes
 Architecture Freeze V4 is the default source of truth. Change it only when an actual contradiction or missing architectural capability is demonstrated by repository evidence. If changed, update the master charter, architecture document, governance charter and affected decisions before continuing construction.
