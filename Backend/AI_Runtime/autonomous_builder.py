@@ -36,6 +36,7 @@ PLATFORM_CAPABILITIES = {
     "platform.user-management": "UserManagementEngine",
     "platform.organization-model": "OrganizationModelEngine",
     "platform.security-layer": "SecurityLayerEngine",
+    "platform.api-gateway": "APIGatewayEngine",
 }
 
 PLATFORM_DEPENDENCIES = {
@@ -53,6 +54,11 @@ PLATFORM_DEPENDENCIES = {
         "Docs/Engines/UserManagementEngine.md",
         "Docs/Engines/OrganizationModelEngine.md",
     ],
+    "platform.api-gateway": [
+        "Backend/HBOS/Engines/SecurityLayerEngine.ts",
+        "Backend/HBOS/test/SecurityLayerEngine.test.ts",
+        "Docs/Engines/SecurityLayerEngine.md",
+    ],
 }
 
 
@@ -62,19 +68,93 @@ def platform_artifacts(capability_id: str):
         "UserManagementEngine": "registerUser",
         "OrganizationModelEngine": "createOrganization",
         "SecurityLayerEngine": "authorize",
+        "APIGatewayEngine": "route",
     }[engine]
     test_input = {
         "UserManagementEngine": "ali",
         "OrganizationModelEngine": "hooshyar",
         "SecurityLayerEngine": "admin",
+        "APIGatewayEngine": "/health",
     }[engine]
     docs = {
         "UserManagementEngine": "# User Management Engine\n\nCanonical Phase 2 capability. Owns the minimal user-management contract and remains governed by HBOS Core and Governance Engine.\n",
         "OrganizationModelEngine": "# Organization Model Engine\n\nCanonical Phase 2 capability. Owns the minimal organization model contract and depends on User Management.\n",
         "SecurityLayerEngine": "# Security Layer Engine\n\nCanonical Phase 2 capability. Owns the minimal authorization contract and depends on User Management and Organization Model.\n",
+        "APIGatewayEngine": "# API Gateway Engine\n\nCanonical Phase 2 capability. Owns deterministic request routing and depends on the Security Layer.\n",
     }
-    engine_code = f'''import {{ Engine }} from "../Core/Engine";\n\nexport class {engine} implements Engine {{\n    name = "{engine}";\n    initialize(): void {{}}\n    health(): boolean {{ return true; }}\n    {method}(value: string): {{ value: string; status: "READY" | "BLOCKED" }} {{\n        const status = value && value.trim() ? "READY" : "BLOCKED";\n        return {{ value, status }};\n    }}\n}}\n'''
-    test_code = f'''import {{ {engine} }} from "../Engines/{engine}";\n\ndescribe("{engine}", () => {{\n    it("accepts its canonical minimal operation", () => {{\n        expect(new {engine}().{method}("{test_input}").status).toBe("READY");\n    }});\n    it("blocks an empty operation", () => {{\n        expect(new {engine}().{method}(" ").status).toBe("BLOCKED");\n    }});\n}});\n'''
+    if engine == "APIGatewayEngine":
+        engine_code = '''import { Engine } from "../Core/Engine";
+
+export interface ApiRouteResult {
+    path: string;
+    method: string;
+    status: "READY" | "BLOCKED";
+}
+
+export class APIGatewayEngine implements Engine {
+    name = "APIGatewayEngine";
+
+    initialize(): void {}
+
+    health(): boolean {
+        return true;
+    }
+
+    route(path: string, method = "GET"): ApiRouteResult {
+        const normalizedPath = path?.trim() ?? "";
+        const normalizedMethod = method?.trim().toUpperCase() ?? "";
+        if (!normalizedPath || !normalizedMethod) {
+            return { path: normalizedPath, method: normalizedMethod, status: "BLOCKED" };
+        }
+        return { path: normalizedPath, method: normalizedMethod, status: "READY" };
+    }
+
+    describeCapability(): { id: string; capability: string; targetEngine: string } {
+        return {
+            id: "platform.api-gateway",
+            capability: "implement the Phase 2 API Gateway capability",
+            targetEngine: "API Gateway Engine"
+        };
+    }
+}
+'''
+        test_code = '''import { APIGatewayEngine } from "../Engines/APIGatewayEngine";
+
+describe("APIGatewayEngine", () => {
+    it("routes a valid request", () => {
+        const result = new APIGatewayEngine().route("/health", "get");
+        expect(result).toEqual({ path: "/health", method: "GET", status: "READY" });
+    });
+
+    it("blocks an invalid request", () => {
+        expect(new APIGatewayEngine().route(" ", "").status).toBe("BLOCKED");
+    });
+});
+'''
+    else:
+        engine_code = f'''import {{ Engine }} from "../Core/Engine";
+
+export class {engine} implements Engine {{
+    name = "{engine}";
+    initialize(): void {{}}
+    health(): boolean {{ return true; }}
+    {method}(value: string): {{ value: string; status: "READY" | "BLOCKED" }} {{
+        const status = value && value.trim() ? "READY" : "BLOCKED";
+        return {{ value, status }};
+    }}
+}}
+'''
+        test_code = f'''import {{ {engine} }} from "../Engines/{engine}";
+
+describe("{engine}", () => {{
+    it("accepts its canonical minimal operation", () => {{
+        expect(new {engine}().{method}("{test_input}").status).toBe("READY");
+    }});
+    it("blocks an empty operation", () => {{
+        expect(new {engine}().{method}(" ").status).toBe("BLOCKED");
+    }});
+}});
+'''
     return [
         (f"Backend/HBOS/Engines/{engine}.ts", engine_code),
         (f"Backend/HBOS/test/{engine}.test.ts", test_code),
@@ -272,6 +352,7 @@ CAPABILITY_DEPENDENCIES = {
     "platform.user-management": [],
     "platform.organization-model": PLATFORM_DEPENDENCIES["platform.organization-model"],
     "platform.security-layer": PLATFORM_DEPENDENCIES["platform.security-layer"],
+    "platform.api-gateway": PLATFORM_DEPENDENCIES["platform.api-gateway"],
     "engine.reasoning.canonical": [],
     "engine.organizational.canonical": [],
     "engine.autonomous-operations.canonical": [],
@@ -284,6 +365,22 @@ CAPABILITY_DEPENDENCIES = {
 }
 
 
+def _base_capability_id(capability_id: str) -> str:
+    return capability_id[len("repair-"):] if capability_id.startswith("repair-") else capability_id
+
+
+def _needs_reweave(capability_id: str, artifacts) -> bool:
+    if capability_id == "platform.api-gateway":
+        engine_path = ROOT / "Backend/HBOS/Engines/APIGatewayEngine.ts"
+        test_path = ROOT / "Backend/HBOS/test/APIGatewayEngine.test.ts"
+        if not engine_path.exists() or not test_path.exists():
+            return True
+        engine = engine_path.read_text(encoding="utf-8")
+        test = test_path.read_text(encoding="utf-8")
+        return "route(" not in engine or "route(" not in test or "expect(" not in test
+    return False
+
+
 def main() -> int:
     enforce_construction_policy()
     parser = argparse.ArgumentParser()
@@ -292,12 +389,10 @@ def main() -> int:
     parser.add_argument("--issue", default="")
     args = parser.parse_args()
     match = re.search(r"Capability ID:\s*([^\n]+)", args.prompt)
-    capability_id = match.group(1).strip() if match else ""
+    requested_id = match.group(1).strip() if match else ""
+    capability_id = _base_capability_id(requested_id)
     artifacts = CAPABILITIES.get(capability_id)
 
-    # The explicit generators remain authoritative for frozen canonical work.
-    # The generic path is the escape hatch that makes the worker capable of
-    # constructing a new engine boundary without a new hard-coded branch.
     if artifacts is None:
         spec = spec_from_prompt(args.prompt)
         if spec is None:
@@ -312,11 +407,16 @@ def main() -> int:
         print(f"Blocked by unmet dependencies for {capability_id}: {', '.join(missing)}")
         return 3
 
-    if args.repair:
+    if args.repair or requested_id.startswith("repair-"):
         repaired = write_overwrite(ROOT, artifacts)
         print("Repaired: " + ", ".join(repaired))
         if args.issue:
             print(f"Repair reason: {args.issue}")
+        return 0
+
+    if _needs_reweave(capability_id, artifacts):
+        repaired = write_overwrite(ROOT, artifacts)
+        print("Rewoven: " + ", ".join(repaired))
         return 0
 
     generated = write_missing(ROOT, artifacts)
