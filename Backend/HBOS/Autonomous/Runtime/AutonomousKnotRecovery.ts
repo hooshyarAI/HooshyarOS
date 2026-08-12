@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+
 export interface KnotCheckpoint {
     capabilityId: string;
     commit: string;
@@ -55,5 +57,14 @@ export class AutonomousKnotRecovery {
                 "repair would cross an architecture ownership boundary"
             ]
         };
+    }
+
+    rollback(root: string, checkpoint: KnotCheckpoint): void {
+        if (!checkpoint.commit) throw new Error("Cannot rollback without a verified checkpoint commit");
+        execFileSync("git", ["reset", "--hard", checkpoint.commit], {
+            cwd: root,
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "pipe"]
+        });
     }
 }
