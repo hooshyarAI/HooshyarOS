@@ -3,29 +3,31 @@ import { join } from "node:path";
 import { AutonomousPlatformContinuation } from "../Autonomous/Runtime/AutonomousPlatformContinuation";
 import { AutonomousProjectMission } from "../Autonomous/Runtime/AutonomousProjectMission";
 
-function seedPerformance(root: string): void {
-    [
-        "Backend/HBOS/Engines/PerformanceTestingEngine.ts",
-        "Backend/HBOS/test/PerformanceTestingEngine.test.ts",
-        "Docs/Engines/PerformanceTestingEngine.md"
-    ].forEach(file => {
+function seedFiles(root: string, files: string[]): void {
+    files.forEach(file => {
         const path = join(root, file);
         mkdirSync(join(path, ".."), { recursive: true });
         require("node:fs").writeFileSync(path, "ok", "utf8");
     });
 }
 
-function seedCustomer(root: string): void {
-    [
-        "Backend/HBOS/Engines/CustomerTestingEngine.ts",
-        "Backend/HBOS/test/CustomerTestingEngine.test.ts",
-        "Docs/Engines/CustomerTestingEngine.md"
-    ].forEach(file => {
-        const path = join(root, file);
-        mkdirSync(join(path, ".."), { recursive: true });
-        require("node:fs").writeFileSync(path, "ok", "utf8");
-    });
-}
+const performanceFiles = [
+    "Backend/HBOS/Engines/PerformanceTestingEngine.ts",
+    "Backend/HBOS/test/PerformanceTestingEngine.test.ts",
+    "Docs/Engines/PerformanceTestingEngine.md"
+];
+
+const customerFiles = [
+    "Backend/HBOS/Engines/CustomerTestingEngine.ts",
+    "Backend/HBOS/test/CustomerTestingEngine.test.ts",
+    "Docs/Engines/CustomerTestingEngine.md"
+];
+
+const deploymentReadinessFiles = [
+    "Backend/HBOS/Engines/DeploymentReadinessEngine.ts",
+    "Backend/HBOS/test/DeploymentReadinessEngine.test.ts",
+    "Docs/Engines/DeploymentReadinessEngine.md"
+];
 
 describe("AutonomousPlatformContinuation", () => {
     it("creates the canonical post-Assistant platform continuation mission", () => {
@@ -51,7 +53,7 @@ describe("AutonomousPlatformContinuation", () => {
     it("selects customer testing after performance testing is complete", () => {
         const root = mkdtempSync(join(process.cwd(), "tmp-customer-continuation-"));
         try {
-            seedPerformance(root);
+            seedFiles(root, performanceFiles);
             const projectMission = {
                 nextPlatformMission: () => null,
                 snapshot: () => ({ root })
@@ -81,11 +83,27 @@ describe("AutonomousPlatformContinuation", () => {
         }
     });
 
+    it("selects deployment readiness after customer testing is complete", () => {
+        const root = mkdtempSync(join(process.cwd(), "tmp-deployment-readiness-continuation-"));
+        try {
+            seedFiles(root, [...performanceFiles, ...customerFiles]);
+            const projectMission = {
+                nextPlatformMission: () => null,
+                snapshot: () => ({ root })
+            } as unknown as AutonomousProjectMission;
+            const selected = new AutonomousPlatformContinuation().selectNextCapability(projectMission);
+
+            expect(selected?.capabilityId).toBe("platform.deployment-readiness");
+            expect(selected?.targetEngine).toBe("Deployment Readiness Engine");
+        } finally {
+            rmSync(root, { recursive: true, force: true });
+        }
+    });
+
     it("returns null when the production extension chain is exhausted", () => {
         const root = mkdtempSync(join(process.cwd(), "tmp-production-complete-"));
         try {
-            seedPerformance(root);
-            seedCustomer(root);
+            seedFiles(root, [...performanceFiles, ...customerFiles, ...deploymentReadinessFiles]);
             const projectMission = {
                 nextPlatformMission: () => null,
                 snapshot: () => ({ root })
