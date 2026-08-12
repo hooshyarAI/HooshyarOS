@@ -5,6 +5,7 @@
 - `Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md` — permanent project construction governance.
 - `Docs/ARCHITECTURE.md` — Architecture Freeze V4.
 - `Assistant/SYSTEM_PROMPT.md` — autonomous construction constitution.
+- `Docs/AUTONOMOUS_WEAVING_DOCTRINE.md` — expert knot-by-knot construction and recovery doctrine.
 - Existing architecture decisions, HBOS engines, capability owners, tests and documentation — inspect before adding anything.
 
 The repository is the durable memory of the approved architecture, product principles, autonomous-construction role, decision logic and verification rules. Do not rely on conversational memory when the repository can provide the governing rule.
@@ -22,6 +23,25 @@ Architecture → Decision → Capability → Tool Selection → Generate → Sta
 When the Assistant completion gate is verified, immediately hand off to the canonical platform continuation flow:
 
 AUDIT → SELECT NEXT GENUINELY MISSING CAPABILITY → IMPLEMENT → TEST → INTEGRATE → VERIFY → COMMIT → PUSH → AUDIT AGAIN
+
+## Expert weaving contract
+Every construction cycle follows the expert weaving doctrine:
+
+```text
+READ → UNDERSTAND → AUDIT → SELECT ONE KNOT → PLAN → CHECK DEPENDENCIES
+→ SELECT STRATEGY → IMPLEMENT → TEST → VERIFY → CHECKPOINT → ADVANCE
+```
+
+A knot is one canonical capability with one owner, one intent, one implementation contract and one verification contract. Generation success alone is never sufficient evidence of acceptance.
+
+If a knot is wrong, incomplete or inconsistent, do not continue on top of it:
+
+```text
+DETECT FAILURE → IDENTIFY LAST TRUSTED CHECKPOINT → ROLLBACK / ISOLATE
+→ ROOT-CAUSE ANALYSIS → REPAIR SAME KNOT → RE-VERIFY → RE-PLAN → CONTINUE
+```
+
+Repairs must be bounded, evidence-driven and architecture-preserving. A failed repair leaves the run BLOCKED with failure evidence intact.
 
 ## Construction tool policy
 The construction process is permanently limited to these active tools:
@@ -49,6 +69,9 @@ This restriction is operational, not architectural: the HooshyarOS product may s
 12. Re-plan from the repository state after each completed capability.
 13. Do not stop at Assistant completion; continue into the canonical platform backlog.
 14. Cloud deployment and other external infrastructure operations must be represented by evidence-backed repository contracts; never claim external execution from a local stub.
+15. Do not advance past a knot whose verification or repository evidence is inconsistent.
+16. Maintain a trusted Git checkpoint for accepted knots and repair from that checkpoint when required.
+17. Prefer root-cause analysis over blind retry loops.
 
 ## Architecture changes
 Architecture Freeze V4 is the default source of truth. Change it only when an actual contradiction or missing architectural capability is demonstrated by repository evidence. If changed, update the master charter, architecture document, governance charter and affected decisions before continuing construction.
