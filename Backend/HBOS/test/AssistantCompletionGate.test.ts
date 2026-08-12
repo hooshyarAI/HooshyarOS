@@ -76,7 +76,7 @@ describe("Assistant completion gate", () => {
         }
     });
 
-    it("rejects the legacy advisor-only identity even when structural evidence exists", () => {
+    it("does not require legacy advisor text when structural Python-only evidence is present", () => {
         const root = mkdtempSync(join(tmpdir(), "hooshyar-assistant-gate-legacy-"));
         try {
             seedCanonicalAssistantEvidence(root);
@@ -84,7 +84,7 @@ describe("Assistant completion gate", () => {
             const mission = new AutonomousProjectMission(root);
             const next = mission.nextMission();
 
-            expect(next.capabilityId).toBe("assistant.completion.evidence");
+            expect(next.capabilityId).toBe("assistant.completion.gate");
         } finally {
             rmSync(root, { recursive: true, force: true });
         }
