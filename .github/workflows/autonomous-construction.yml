@@ -1,80 +1,29 @@
-name: HooshyarOS Autonomous Construction
+name: HooshyarOS Autonomous Construction Launcher
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
-concurrency:
-  group: hooshyaros-autonomous-construction
-  cancel-in-progress: false
-
 permissions:
-  contents: write
   actions: write
+  contents: read
+
+concurrency:
+  group: hooshyaros-autonomous-construction-launcher
+  cancel-in-progress: true
 
 jobs:
-  construct:
+  launch:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 10
     steps:
-      - name: Checkout main with write credentials
+      - name: Checkout main
         uses: actions/checkout@v4
         with:
           ref: main
-          fetch-depth: 0
-          persist-credentials: true
+          fetch-depth: 1
+          persist-credentials: false
 
-      - name: Configure Git identity
-        run: |
-          git config user.name "hooshyarAI autonomous builder"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-      - name: Assert clean worktree before dependency installation
-        run: |
-          git status --short
-          test -z "$(git status --porcelain)"
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install dependencies
-        run: |
-          npm ci
-          python -m pip install --upgrade pip pytest
-
-      - name: Diagnose autonomous mission boundary
-        run: |
-          npx tsx -e 'import { AutonomousProjectMission } from "./Backend/HBOS/Autonomous/Runtime/AutonomousProjectMission"; const m=new AutonomousProjectMission(process.cwd()); console.log(JSON.stringify({next:m.nextMission(),platform:m.nextPlatformMission()},null,2));' > /tmp/autonomous-mission-diagnostic.json
-
-      - name: Upload autonomous mission diagnostic
-        uses: actions/upload-artifact@v4
-        with:
-          name: autonomous-mission-diagnostic
-          path: /tmp/autonomous-mission-diagnostic.json
-          if-no-files-found: error
-
-      - name: Run autonomous construction loop
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run autonomous:build
-
-      - name: Continue autonomous cycle after a repository change
-        if: success()
+      - name: Dispatch the canonical construction authority
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if [ "$(git rev-parse HEAD)" != "${GITHUB_SHA}" ]; then
-            echo "Repository changed by autonomous builder; dispatching the next construction cycle."
-            gh workflow run autonomous-construction.yml --ref main
-          else
-            echo "No repository change produced by this cycle; construction remains stopped."
-          fi
+        run: gh workflow run autonomous-platform-construction.yml --ref main
