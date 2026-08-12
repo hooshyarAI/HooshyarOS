@@ -1,8 +1,10 @@
 {
-  "version": "2.0",
+  "version": "2.1",
   "status": "governing-product-build-input",
   "rule": "Product capabilities extend existing Architecture Freeze V4 engine owners; do not create duplicate engine hierarchies.",
   "commercialScopeSource": "Docs/HOOSHYAROS_COMMERCIAL_SCOPE_RECONCILIATION.md",
+  "ecosystemScopeSource": "Docs/HOOSHYAROS_PRODUCT_ECOSYSTEM_CHARTER.md",
+  "chatReconciliationSource": "Docs/HOOSHYAROS_CHAT_DECISION_RECONCILIATION.md",
   "capabilities": [
     {
       "capabilityId": "product.financial-data-ingestion",
@@ -165,6 +167,51 @@
       "implementationPath": "Backend/HBOS/Product/CommercialE2EAcceptanceScenario.ts",
       "testPath": "Backend/HBOS/test/CommercialE2EAcceptanceScenario.test.ts",
       "documentationPath": "Docs/Product/CommercialE2EAcceptanceScenario.md"
+    },
+    {
+      "capabilityId": "product.regulatory-standards-and-market-knowledge-updates",
+      "capability": "maintain governed, versioned updates for Iranian accounting/tax/regulatory standards and authorized economic/market knowledge used by intelligence features",
+      "targetEngine": "Knowledge Engine",
+      "dependencies": ["Knowledge Engine", "Governance Engine", "Reasoning Engine"],
+      "implementationPath": "Backend/HBOS/Product/RegulatoryMarketKnowledgeUpdateService.ts",
+      "testPath": "Backend/HBOS/test/RegulatoryMarketKnowledgeUpdateService.test.ts",
+      "documentationPath": "Docs/Product/RegulatoryMarketKnowledgeUpdateService.md"
+    },
+    {
+      "capabilityId": "product.report-builder-and-export",
+      "capability": "provide governed configurable report composition, reusable templates, evidence-linked sections and export/download workflows across executive, financial and operational reporting",
+      "targetEngine": "Executive Intelligence Engine",
+      "dependencies": ["Reports Engine", "Knowledge Engine", "product.web-application-shell"],
+      "implementationPath": "Backend/HBOS/Product/CommercialReportBuilder.ts",
+      "testPath": "Backend/HBOS/test/CommercialReportBuilder.test.ts",
+      "documentationPath": "Docs/Product/CommercialReportBuilder.md"
+    },
+    {
+      "capabilityId": "product.goal-kpi-project-task-scheduling",
+      "capability": "connect organizational goals and KPIs to projects, tasks, owners, deadlines, schedules and measurable outcomes for execution continuity",
+      "targetEngine": "Organizational Intelligence Engine",
+      "dependencies": ["product.goal-okr-transformation", "Project Pilot Engine", "Autonomous Operations Engine"],
+      "implementationPath": "Backend/HBOS/Product/GoalExecutionSchedulingService.ts",
+      "testPath": "Backend/HBOS/test/GoalExecutionSchedulingService.test.ts",
+      "documentationPath": "Docs/Product/GoalExecutionSchedulingService.md"
+    },
+    {
+      "capabilityId": "product.growth-intelligence",
+      "capability": "compose explainable growth opportunities, constraints and trade-offs across finance, customers, operations, capacity and strategy",
+      "targetEngine": "Executive Intelligence Engine",
+      "dependencies": ["Financial Intelligence Engine", "Organizational Intelligence Engine", "Knowledge Engine", "Customer Success"],
+      "implementationPath": "Backend/HBOS/Product/GrowthIntelligenceService.ts",
+      "testPath": "Backend/HBOS/test/GrowthIntelligenceService.test.ts",
+      "documentationPath": "Docs/Product/GrowthIntelligenceService.md"
+    },
+    {
+      "capabilityId": "product.resilience-continuity-lifecycle",
+      "capability": "connect early warning, impact assessment, scenario analysis, mitigation, continuity, recovery measurement and lessons learned into one governed resilience lifecycle",
+      "targetEngine": "Autonomous Operations Engine",
+      "dependencies": ["Risk Intelligence Engine", "Organizational Intelligence Engine", "Knowledge Engine", "Governance Engine"],
+      "implementationPath": "Backend/HBOS/Product/ResilienceContinuityLifecycle.ts",
+      "testPath": "Backend/HBOS/test/ResilienceContinuityLifecycle.test.ts",
+      "documentationPath": "Docs/Product/ResilienceContinuityLifecycle.md"
     }
   ]
 }
