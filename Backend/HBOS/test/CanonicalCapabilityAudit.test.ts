@@ -42,52 +42,25 @@ describe("CanonicalCapabilityAudit", () => {
         try {
             seedRoadmap(root);
             const artifacts = [
-                "Backend/HBOS/Engines/UserManagementEngine.ts",
-                "Backend/HBOS/test/UserManagementEngine.test.ts",
-                "Docs/Engines/UserManagementEngine.md",
-                "Backend/HBOS/Engines/OrganizationModelEngine.ts",
-                "Backend/HBOS/test/OrganizationModelEngine.test.ts",
-                "Docs/Engines/OrganizationModelEngine.md",
-                "Backend/HBOS/Engines/SecurityLayerEngine.ts",
-                "Backend/HBOS/test/SecurityLayerEngine.test.ts",
-                "Docs/Engines/SecurityLayerEngine.md",
-                "Backend/HBOS/Engines/APIGatewayEngine.ts",
-                "Backend/HBOS/test/APIGatewayEngine.test.ts",
-                "Docs/Engines/APIGatewayEngine.md",
-                "Backend/HBOS/Engines/FinancialIntelligenceEngine.ts",
-                "Backend/HBOS/test/FinancialIntelligenceEngine.test.ts",
-                "Docs/Engines/FinancialIntelligenceEngine.md",
-                "Backend/HBOS/Engines/BudgetIntelligenceEngine.ts",
-                "Backend/HBOS/test/BudgetIntelligenceEngine.test.ts",
-                "Docs/Engines/BudgetIntelligenceEngine.md",
-                "Backend/HBOS/Engines/TaxIntelligenceEngine.ts",
-                "Backend/HBOS/test/TaxIntelligenceEngine.test.ts",
-                "Docs/Engines/TaxIntelligenceEngine.md",
-                "Backend/HBOS/Engines/RiskIntelligenceEngine.ts",
-                "Backend/HBOS/test/RiskIntelligenceEngine.test.ts",
-                "Backend/HBOS/Engines/DashboardEngine.ts",
-                "Backend/HBOS/test/DashboardEngine.test.ts",
-                "Docs/Engines/DashboardEngine.md",
-                "Backend/HBOS/Engines/ReportsEngine.ts",
-                "Backend/HBOS/test/ReportsEngine.test.ts",
-                "Docs/Engines/ReportsEngine.md",
-                "Backend/HBOS/Engines/AlertsEngine.ts",
-                "Backend/HBOS/test/AlertsEngine.test.ts",
-                "Docs/Engines/AlertsEngine.md",
-                "Backend/HBOS/Assistant/Autonomous/HooshyarAutonomousAssistant.ts",
-                "Backend/HBOS/test/HooshyarAutonomousAssistant.test.ts",
-                "Backend/HBOS/Engines/ProductionReadinessEngine.ts",
-                "Backend/HBOS/test/ProductionReadinessEngine.test.ts",
-                "Docs/Engines/ProductionReadinessEngine.md",
-                "Backend/HBOS/Engines/SecurityAuditEngine.ts",
-                "Backend/HBOS/test/SecurityAuditEngine.test.ts",
-                "Docs/Engines/SecurityAuditEngine.md",
-                "Backend/HBOS/Engines/PerformanceTestingEngine.ts",
-                "Backend/HBOS/test/PerformanceTestingEngine.test.ts",
-                "Docs/Engines/PerformanceTestingEngine.md",
-                "Backend/HBOS/Engines/CustomerTestingEngine.ts",
-                "Backend/HBOS/test/CustomerTestingEngine.test.ts",
-                "Docs/Engines/CustomerTestingEngine.md"
+                "Backend/HBOS/Engines/UserManagementEngine.ts","Backend/HBOS/test/UserManagementEngine.test.ts","Docs/Engines/UserManagementEngine.md",
+                "Backend/HBOS/Engines/OrganizationModelEngine.ts","Backend/HBOS/test/OrganizationModelEngine.test.ts","Docs/Engines/OrganizationModelEngine.md",
+                "Backend/HBOS/Engines/SecurityLayerEngine.ts","Backend/HBOS/test/SecurityLayerEngine.test.ts","Docs/Engines/SecurityLayerEngine.md",
+                "Backend/HBOS/Engines/APIGatewayEngine.ts","Backend/HBOS/test/APIGatewayEngine.test.ts","Docs/Engines/APIGatewayEngine.md",
+                "Backend/HBOS/Engines/FinancialIntelligenceEngine.ts","Backend/HBOS/test/FinancialIntelligenceEngine.test.ts","Docs/Engines/FinancialIntelligenceEngine.md",
+                "Backend/HBOS/Engines/BudgetIntelligenceEngine.ts","Backend/HBOS/test/BudgetIntelligenceEngine.test.ts","Docs/Engines/BudgetIntelligenceEngine.md",
+                "Backend/HBOS/Engines/TaxIntelligenceEngine.ts","Backend/HBOS/test/TaxIntelligenceEngine.test.ts","Docs/Engines/TaxIntelligenceEngine.md",
+                "Backend/HBOS/Engines/RiskIntelligenceEngine.ts","Backend/HBOS/test/RiskIntelligenceEngine.test.ts",
+                "Backend/HBOS/Engines/DashboardEngine.ts","Backend/HBOS/test/DashboardEngine.test.ts","Docs/Engines/DashboardEngine.md",
+                "Backend/HBOS/Engines/ReportsEngine.ts","Backend/HBOS/test/ReportsEngine.test.ts","Docs/Engines/ReportsEngine.md",
+                "Backend/HBOS/Engines/AlertsEngine.ts","Backend/HBOS/test/AlertsEngine.test.ts","Docs/Engines/AlertsEngine.md",
+                "Backend/HBOS/Assistant/Autonomous/HooshyarAutonomousAssistant.ts","Backend/HBOS/test/HooshyarAutonomousAssistant.test.ts",
+                "Backend/HBOS/Engines/ProductionReadinessEngine.ts","Backend/HBOS/test/ProductionReadinessEngine.test.ts","Docs/Engines/ProductionReadinessEngine.md",
+                "Backend/HBOS/Engines/SecurityAuditEngine.ts","Backend/HBOS/test/SecurityAuditEngine.test.ts","Docs/Engines/SecurityAuditEngine.md",
+                "Backend/HBOS/Engines/PerformanceTestingEngine.ts","Backend/HBOS/test/PerformanceTestingEngine.test.ts","Docs/Engines/PerformanceTestingEngine.md",
+                "Backend/HBOS/Engines/CustomerTestingEngine.ts","Backend/HBOS/test/CustomerTestingEngine.test.ts","Docs/Engines/CustomerTestingEngine.md",
+                "Backend/HBOS/Engines/DeploymentReadinessEngine.ts","Backend/HBOS/test/DeploymentReadinessEngine.test.ts","Docs/Engines/DeploymentReadinessEngine.md",
+                "Backend/HBOS/Engines/DeploymentContractEngine.ts","Backend/HBOS/test/DeploymentContractEngine.test.ts","Docs/Engines/DeploymentContractEngine.md",
+                "Backend/HBOS/Engines/CloudDeploymentEngine.ts","Backend/HBOS/test/CloudDeploymentEngine.test.ts","Docs/Engines/CloudDeploymentEngine.md","Backend/HBOS/Assistant/Autonomous/Production/DeploymentController.ts","Backend/AI_Runtime/cloud_deployment.py"
             ];
             artifacts.forEach(file => write(root, file));
             const mission = { nextPlatformMission: () => null } as unknown as AutonomousProjectMission;
@@ -95,9 +68,7 @@ describe("CanonicalCapabilityAudit", () => {
             expect(result.complete).toBe(true);
             expect(result.backlogExhausted).toBe(true);
             expect(result.missingArtifacts).toEqual([]);
-            expect(result.nonAutonomousProductionItems).toEqual([
-                "Cloud Deployment"
-            ]);
+            expect(result.nonAutonomousProductionItems).toEqual([]);
         } finally {
             rmSync(root, { recursive: true, force: true });
         }
