@@ -81,7 +81,10 @@ describe("CanonicalCapabilityAudit", () => {
                 "Docs/Engines/ProductionReadinessEngine.md",
                 "Backend/HBOS/Engines/SecurityAuditEngine.ts",
                 "Backend/HBOS/test/SecurityAuditEngine.test.ts",
-                "Docs/Engines/SecurityAuditEngine.md"
+                "Docs/Engines/SecurityAuditEngine.md",
+                "Backend/HBOS/Engines/PerformanceTestingEngine.ts",
+                "Backend/HBOS/test/PerformanceTestingEngine.test.ts",
+                "Docs/Engines/PerformanceTestingEngine.md"
             ];
             artifacts.forEach(file => write(root, file));
             const mission = { nextPlatformMission: () => null } as unknown as AutonomousProjectMission;
@@ -91,7 +94,6 @@ describe("CanonicalCapabilityAudit", () => {
             expect(result.missingArtifacts).toEqual([]);
             expect(result.nonAutonomousProductionItems).toEqual([
                 "Cloud Deployment",
-                "Performance Testing",
                 "Customer Testing"
             ]);
         } finally {
