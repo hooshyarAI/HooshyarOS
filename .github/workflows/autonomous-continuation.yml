@@ -1,30 +1,28 @@
-name: HooshyarOS Autonomous Continuation
+name: HooshyarOS Autonomous Continuation Validation
 
 on:
   workflow_dispatch:
   push:
     branches: [main]
-  schedule:
-    - cron: "*/30 * * * *"
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: hooshyaros-autonomous-continuation
-  cancel-in-progress: false
+  group: hooshyaros-autonomous-validation
+  cancel-in-progress: true
 
 jobs:
-  continue:
+  validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - name: Checkout main
         uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
-          persist-credentials: true
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -37,20 +35,17 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install Node dependencies
-        run: npm install
+      - name: Install Node dependencies reproducibly
+        run: npm ci
 
-      - name: Verify autonomous runtime
+      - name: Assert clean repository after dependency installation
+        run: test -z "$(git status --porcelain)"
+
+      - name: Verify autonomous runtime contracts
         run: |
           npx tsc Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.ts Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts Backend/HBOS/Autonomous/Runtime/AutonomousProjectMission.ts --noEmit --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --pretty false
           python -m compileall -q Backend/AI_Runtime
 
-      - name: Verify Assistant completion gate
+      - name: Verify autonomous assistant contracts
         run: |
-          npx jest --runInBand Backend/HBOS/test/AssistantCompletionGate.test.ts Backend/HBOS/test/AutonomousCompletionGate.test.ts Backend/HBOS/test/HooshyarAutonomousAssistant.test.ts
-
-      - name: Run autonomous construction loop
-        env:
-          GITHUB_ACTIONS: "true"
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx tsx Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts
+          npx jest --runInBand Backend/HBOS/test/AssistantCompletionGate.test.ts Backend/HBOS/test/AutonomousCompletionGate.test.ts Backend/HBOS/test/HooshyarAutonomousAssistant.test.ts Backend/HBOS/test/AutonomousPlatformWeaving.test.ts
