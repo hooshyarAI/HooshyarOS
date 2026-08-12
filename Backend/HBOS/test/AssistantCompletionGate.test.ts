@@ -57,7 +57,7 @@ function seedCanonicalAssistantEvidence(root: string): void {
 
     const prompt = join(root, "Assistant/SYSTEM_PROMPT.md");
     mkdirSync(join(prompt, ".."), { recursive: true });
-    writeFileSync(prompt, "autonomous construction intelligence; not a human executive's financial, managerial or commercial advisor", "utf8");
+    writeFileSync(prompt, "Python-only autonomous construction intelligence; not a human executive's financial, managerial or commercial advisor", "utf8");
 }
 
 describe("Assistant completion gate", () => {
