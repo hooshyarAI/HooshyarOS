@@ -14,9 +14,9 @@ describe("CommercialProductCompletionAudit", () => {
         const result = audit.audit(process.cwd());
 
         expect(result.complete).toBe(false);
-        expect(result.missingLayers).toContain("web-entrypoint");
         expect(result.missingLayers).not.toContain("persistence-boundary");
         expect(result.missingLayers).not.toContain("authentication-authorization-boundary");
+        expect(result.missingLayers.some(layer => layer.startsWith("roadmap:"))).toBe(true);
     });
 
     it("reports a missing commercial roadmap artifact instead of claiming completion", () => {
