@@ -17,12 +17,12 @@ export class CanonicalCapabilityAudit {
         "Security Layer": ["authorize"],
         "API Gateway": ["route"],
         "Financial Analysis": ["analyze"],
-        "Budget Intelligence": ["analyze", "describeCapability"],
-        "Tax Intelligence": ["estimate", "describeCapability"],
-        "Risk Intelligence": ["assess", "describeCapability"],
-        "Dashboard": ["snapshot", "describeCapability"],
-        "Reports": ["build", "describeCapability"],
-        "Alerts": ["evaluate", "describeCapability"]
+        "Budget Intelligence": ["analyze"],
+        "Tax Intelligence": ["estimate"],
+        "Risk Intelligence": ["assess"],
+        "Dashboard": ["snapshot"],
+        "Reports": ["build"],
+        "Alerts": ["evaluate"]
     };
 
     audit(root: string, mission: AutonomousProjectMission): CanonicalCapabilityAuditResult {
