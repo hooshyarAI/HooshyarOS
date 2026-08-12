@@ -17,13 +17,16 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 DAEMON = ROOT / "Backend" / "HBOS" / "Autonomous" / "Runtime" / "AutonomousBuildDaemon.ts"
 TSX = ROOT / "node_modules" / ".bin" / ("tsx.cmd" if os.name == "nt" else "tsx")
-HANDOFF_MARKER = '"type":"AUTONOMOUS_PLATFORM_CONTINUATION"'
+HANDOFF_MARKER = '\"type\":\"AUTONOMOUS_PLATFORM_CONTINUATION\"'
 ROADMAP = ROOT / "Docs" / "Product" / "PRODUCT_CONSTRUCTION_ROADMAP.json"
 
 
 def run(command: str, args: list[str], timeout: int = 30 * 60) -> subprocess.CompletedProcess[str]:
+    executable = command
+    if os.name == "nt" and command == "npm":
+        executable = "npm.cmd"
     return subprocess.run(
-        [command, *args],
+        [executable, *args],
         cwd=ROOT,
         text=True,
         encoding="utf-8",
