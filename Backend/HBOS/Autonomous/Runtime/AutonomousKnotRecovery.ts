@@ -61,10 +61,35 @@ export class AutonomousKnotRecovery {
 
     rollback(root: string, checkpoint: KnotCheckpoint): void {
         if (!checkpoint.commit) throw new Error("Cannot rollback without a verified checkpoint commit");
-        execFileSync("git", ["reset", "--hard", checkpoint.commit], {
+
+        const reset = execFileSync("git", ["reset", "--hard", checkpoint.commit], {
             cwd: root,
             encoding: "utf8",
             stdio: ["ignore", "pipe", "pipe"]
         });
+
+        // The autonomous generator creates untracked product artifacts. A hard
+        // reset restores tracked files but deliberately leaves those artifacts,
+        // which makes the next GENERATE stage see a dirty worktree forever.
+        // The daemon only enters recovery after it established a clean checkpoint,
+        // so untracked files created after that checkpoint are autonomous-owned
+        // mutation and may be removed safely here. Ignored files remain untouched.
+        execFileSync("git", ["clean", "-fd"], {
+            cwd: root,
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "pipe"]
+        });
+
+        const status = execFileSync("git", ["status", "--porcelain=v1", "--untracked-files=all", "--", ".", ":(exclude)node_modules"], {
+            cwd: root,
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "pipe"]
+        }).trim();
+
+        if (status) {
+            throw new Error(`Checkpoint rollback did not restore a clean worktree for ${checkpoint.commit}: ${status}`);
+        }
+
+        void reset;
     }
 }
