@@ -1,5 +1,5 @@
 import { AutonomousProjectMission, Mission } from "./AutonomousProjectMission";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { AutonomousCapabilityDiscovery } from "./AutonomousCapabilityDiscovery";
 
@@ -11,6 +11,16 @@ export interface PlatformContinuationMission {
 }
 
 export type PlatformCapabilityMission = Omit<Mission, "evidence" | "architectureRules" | "directives">;
+
+type CommercialRoadmapCapability = {
+    capabilityId: string;
+    capability: string;
+    targetEngine: string;
+    dependencies: string[];
+    implementationPath: string;
+    testPath: string;
+    documentationPath: string;
+};
 
 /**
  * Canonical handoff from the completed autonomous Assistant to continued
@@ -28,6 +38,34 @@ export class AutonomousPlatformContinuation {
             instruction: "AUDIT → DISCOVER → SELECT NEXT GENUINELY MISSING CAPABILITY → IMPLEMENT → TEST → INTEGRATE → VERIFY → COMMIT → PUSH → AUDIT AGAIN",
             source: "assistant.completion.gate"
         };
+    }
+
+    private selectCommercialRoadmapCapability(root: string): PlatformCapabilityMission | null {
+        const roadmapPath = join(root, "Docs", "Product", "PRODUCT_CONSTRUCTION_ROADMAP.json");
+        if (!existsSync(roadmapPath)) return null;
+
+        try {
+            const parsed = JSON.parse(readFileSync(roadmapPath, "utf8")) as { capabilities?: CommercialRoadmapCapability[] };
+            const capabilities = Array.isArray(parsed.capabilities) ? parsed.capabilities : [];
+            for (const candidate of capabilities) {
+                const requiredPaths = [candidate.implementationPath, candidate.testPath, candidate.documentationPath]
+                    .filter((value): value is string => typeof value === "string" && value.length > 0)
+                    .map((value) => join(root, value));
+
+                if (requiredPaths.length > 0 && !requiredPaths.every(existsSync)) {
+                    return {
+                        capabilityId: candidate.capabilityId,
+                        capability: candidate.capability,
+                        targetEngine: candidate.targetEngine,
+                        dependencies: candidate.dependencies
+                    };
+                }
+            }
+        } catch {
+            return null;
+        }
+
+        return null;
     }
 
     /** Converts the completion handoff into a real backlog mission. */
@@ -96,6 +134,11 @@ export class AutonomousPlatformContinuation {
                 dependencies: missingDiscovered.dependencies
             };
         }
-        return null;
+
+        // Once the legacy/canonical platform-engine backlog is exhausted,
+        // continue directly into the governed commercial product roadmap.
+        // The roadmap itself owns ordering, engine ownership, dependencies and
+        // the exact implementation/test/documentation artifact boundary.
+        return this.selectCommercialRoadmapCapability(root);
     }
 }
