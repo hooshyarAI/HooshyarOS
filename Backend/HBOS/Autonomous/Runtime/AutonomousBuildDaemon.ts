@@ -46,9 +46,7 @@ export class AutonomousBuildDaemon {
         this.development = options.development ?? new AutonomousDevelopmentLoop(createLocalConstructionTools(this.root));
         this.maxCycles = options.maxCycles ?? 1000;
         this.reportEvery = options.reportEvery ?? 1;
-        this.performanceBudget = options.performanceBudget ?? new AutonomousPerformanceBudget({
-            statePath: join(this.root, ".git", "hooshyar-autonomous-performance.json")
-        });
+        this.performanceBudget = options.performanceBudget ?? new AutonomousPerformanceBudget({ statePath: join(this.root, ".git", "hooshyar-autonomous-performance.json") });
     }
 
     private finalCompletionEvidence(selected: Mission): ReturnType<CapabilityEvidenceAudit["evaluate"]> {
@@ -79,43 +77,25 @@ export class AutonomousBuildDaemon {
             "Backend/HBOS/Engines/DecisionEngine.ts",
             "Backend/HBOS/Engines/GovernanceEngine.ts"
         ];
-        const implementation = implementationPaths.every(exists);
-        const test = testPaths.every(exists);
-        const documentation = documentationPaths.every(exists);
-        const dependenciesSatisfied = dependencyPaths.every(exists);
-        const verified = test && selected.evidence.clean && selected.evidence.commit.length > 0;
-
-        return this.evidenceAudit.evaluate({ implementation, test, documentation, dependenciesSatisfied, verified });
+        return this.evidenceAudit.evaluate({
+            implementation: implementationPaths.every(exists),
+            test: testPaths.every(exists),
+            documentation: documentationPaths.every(exists),
+            dependenciesSatisfied: dependencyPaths.every(exists),
+            verified: testPaths.every(exists) && selected.evidence.clean && selected.evidence.commit.length > 0
+        });
     }
 
     private selectMission(): MissionDecision {
         const selected = this.mission.nextMission();
         if (selected.capabilityId !== "assistant.completion.gate") return { kind: "mission", mission: selected, assistantGatePassed: false };
-
         const continuation = this.continuation.createMission();
         const nextPlatformMission = this.continuation.selectNextCapability(this.mission);
         if (nextPlatformMission) return { kind: "platform-continuation", mission: nextPlatformMission, assistantGatePassed: true, continuation };
-
         const finalEvidence = this.finalCompletionEvidence(selected);
-        if (!finalEvidence.complete) {
-            return {
-                kind: "mission",
-                mission: { ...selected, capabilityId: "assistant.completion.evidence", capability: `complete missing final completion evidence: ${finalEvidence.missing.join(", ")}` },
-                assistantGatePassed: false
-            };
-        }
-
+        if (!finalEvidence.complete) return { kind: "mission", mission: { ...selected, capabilityId: "assistant.completion.evidence", capability: `complete missing final completion evidence: ${finalEvidence.missing.join(", ")}` }, assistantGatePassed: false };
         const audit = this.canonicalAudit.audit(this.root, this.mission);
-        if (!audit.complete) {
-            return {
-                kind: "platform-audit-blocked",
-                mission: selected,
-                assistantGatePassed: true,
-                continuation,
-                reason: audit.missingArtifacts.length > 0 ? "CANONICAL_CAPABILITY_AUDIT_MISSING_ARTIFACTS" : audit.roadmapPresent ? "CANONICAL_CAPABILITY_AUDIT_BACKLOG_NOT_EXHAUSTED" : "CANONICAL_CAPABILITY_AUDIT_ROADMAP_MISSING",
-                details: audit
-            };
-        }
+        if (!audit.complete) return { kind: "platform-audit-blocked", mission: selected, assistantGatePassed: true, continuation, reason: audit.missingArtifacts.length > 0 ? "CANONICAL_CAPABILITY_AUDIT_MISSING_ARTIFACTS" : audit.roadmapPresent ? "CANONICAL_CAPABILITY_AUDIT_BACKLOG_NOT_EXHAUSTED" : "CANONICAL_CAPABILITY_AUDIT_ROADMAP_MISSING", details: audit };
         return { kind: "platform-complete", mission: selected, assistantGatePassed: true, continuation, audit };
     }
 
@@ -131,7 +111,6 @@ export class AutonomousBuildDaemon {
                 console.log(JSON.stringify({ type: "AUTONOMOUS_PERFORMANCE_BUDGET_EXCEEDED", cycle, ...this.performanceBudget.snapshot(), error: String(error) }));
                 return result;
             }
-
             const before = this.mission.snapshot();
             const decision = this.selectMission();
             if (decision.kind === "platform-complete") {
@@ -145,7 +124,6 @@ export class AutonomousBuildDaemon {
                 console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, performance: budgetSnapshot, result }));
                 return { status: "blocked", cycles: cycle, history: [...history, { cycle, audit: decision.details, status: "blocked", performance: budgetSnapshot }] };
             }
-
             const mission = decision.mission;
             const weavingPlan = this.weavingPlanner.plan(mission, before.clean);
             console.log(JSON.stringify({ type: "AUTONOMOUS_WEAVING_PLAN", cycle, plan: weavingPlan, performance: budgetSnapshot }));
@@ -155,7 +133,6 @@ export class AutonomousBuildDaemon {
                 console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, performance: budgetSnapshot, result: blocked }));
                 return { status: "blocked", cycles: cycle, history: [...history, { cycle, weavingPlan, status: "blocked", performance: budgetSnapshot }] };
             }
-
             if (decision.kind === "platform-continuation") console.log(JSON.stringify({ type: "AUTONOMOUS_PLATFORM_CONTINUATION", cycle, continuation: decision.continuation, mission }));
             console.log(JSON.stringify({ type: "AUTONOMOUS_MISSION", cycle, commit: before.commit, capability: mission.capability, targetEngine: mission.targetEngine }));
 
@@ -172,14 +149,18 @@ export class AutonomousBuildDaemon {
                 } catch (error) {
                     const blocked = { status: "BLOCKED", stage: "RECOVERY", issues: ["CHECKPOINT_ROLLBACK_FAILED"], checkpoint: recovery.checkpoint.commit, error: String(error) };
                     budgetSnapshot = this.performanceBudget.completeCycle(cycleStartedAt);
+                    const current = history[history.length - 1] as Record<string, unknown>;
+                    current.performance = budgetSnapshot;
                     console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, performance: budgetSnapshot, result: blocked }));
-                    return { status: "blocked", cycles: cycle, history: [...history, { cycle, recovery, status: "blocked", result: blocked, performance: budgetSnapshot }] };
+                    return { status: "blocked", cycles: cycle, history };
                 }
                 const repairGoal = { capabilityId: recovery.repairCapabilityId!, capability: `repair and re-verify knot ${mission.capabilityId} from checkpoint ${before.commit}`, targetEngine: mission.targetEngine, dependencies: mission.dependencies };
                 const repairResult = this.development.execute(repairGoal);
                 history.push({ cycle, recovery, repairGoal, repairResult });
                 if (!repairResult.result.ok) {
                     budgetSnapshot = this.performanceBudget.completeCycle(cycleStartedAt);
+                    const current = history[history.length - 2] as Record<string, unknown>;
+                    current.performance = budgetSnapshot;
                     console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, performance: budgetSnapshot, result: repairResult }));
                     return { status: "blocked", cycles: cycle, history };
                 }
@@ -188,6 +169,8 @@ export class AutonomousBuildDaemon {
                 if (repaired.commit === before.commit || !repaired.clean) {
                     budgetSnapshot = this.performanceBudget.completeCycle(cycleStartedAt);
                     const blocked = { status: "BLOCKED", stage: "VERIFY", issues: ["REWEAVE_DID_NOT_PRODUCE_VERIFIED_REPOSITORY_CHANGE"], checkpoint: before.commit, current: repaired.commit };
+                    const current = history[history.length - 1] as Record<string, unknown>;
+                    current.performance = budgetSnapshot;
                     console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, performance: budgetSnapshot, result: blocked }));
                     return { status: "blocked", cycles: cycle, history };
                 }
@@ -199,12 +182,14 @@ export class AutonomousBuildDaemon {
             if (knotObservation.recover) {
                 budgetSnapshot = this.performanceBudget.completeCycle(cycleStartedAt);
                 const blocked = { status: "BLOCKED", stage: "VERIFY", issues: ["KNOT_NOT_VERIFIED"], checkpoint: before.commit, recovery: knotObservation };
+                const current = history[history.length - 1] as Record<string, unknown>;
+                current.performance = budgetSnapshot;
                 console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, performance: budgetSnapshot, result: blocked }));
                 return { status: "blocked", cycles: cycle, history };
             }
-
             budgetSnapshot = this.performanceBudget.completeCycle(cycleStartedAt);
-            history.push({ cyclePerformance: budgetSnapshot });
+            const current = history.findLast?.((entry: any) => entry && entry.cycle === cycle) as Record<string, unknown> | undefined;
+            if (current) current.performance = budgetSnapshot;
             if (after.commit === before.commit && after.clean && cycle < this.maxCycles) {
                 console.log(JSON.stringify({ type: "AUTONOMOUS_IDLE", cycle, commit: after.commit, capability: mission.capability, performance: budgetSnapshot, message: "No repository change was produced; refusing to advance as completed." }));
                 return { status: "idle", cycles: cycle, history };
