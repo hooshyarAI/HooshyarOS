@@ -64,7 +64,7 @@ describe("AutonomousBuildDaemon", () => {
         const daemon = new AutonomousBuildDaemon({ maxCycles: 1, mission, continuation, development });
         const result = daemon.run();
 
-        expect(result.status).toBe("blocked");
+        expect(result.status).toBe("cycle_limit");
         expect(result.cycles).toBe(1);
         expect(result.history).toHaveLength(1);
         expect(result.history[0]).toEqual(expect.objectContaining({
