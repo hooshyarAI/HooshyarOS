@@ -24,7 +24,7 @@ export class CommercialProductCompletionAudit {
             "2. Identity, users and organizations",
             "4. Data ingestion and canonical data",
             "9. Dashboards and reports",
-            "14. Deployment/installation",
+            "14. Deployment and installation",
             "## Evidence model",
             "## Completion states"
         ];
