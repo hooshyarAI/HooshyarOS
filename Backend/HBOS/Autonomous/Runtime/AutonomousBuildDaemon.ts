@@ -5,6 +5,7 @@ import { AutonomousProjectMission, Mission } from "./AutonomousProjectMission";
 import { AutonomousPlatformContinuation, PlatformCapabilityMission, PlatformContinuationMission } from "./AutonomousPlatformContinuation";
 import { CapabilityEvidenceAudit } from "./CapabilityEvidenceAudit";
 import { CanonicalCapabilityAudit } from "./CanonicalCapabilityAudit";
+import { CommercialProductCompletionAudit } from "./CommercialProductCompletionAudit";
 import { AutonomousWeavingPlanner } from "./AutonomousWeavingPlanner";
 import { AutonomousKnotRecovery } from "./AutonomousKnotRecovery";
 import { createLocalConstructionTools } from "./LocalConstructionToolset";
@@ -23,7 +24,7 @@ export interface DaemonOptions {
 type MissionDecision =
     | { kind: "mission"; mission: Mission; assistantGatePassed: false; continuation?: undefined }
     | { kind: "platform-continuation"; mission: PlatformCapabilityMission; assistantGatePassed: true; continuation: PlatformContinuationMission }
-    | { kind: "platform-complete"; mission: Mission; assistantGatePassed: true; continuation: PlatformContinuationMission; audit: ReturnType<CanonicalCapabilityAudit["audit"]> }
+    | { kind: "platform-complete"; mission: Mission; assistantGatePassed: true; continuation: PlatformContinuationMission; canonicalAudit: ReturnType<CanonicalCapabilityAudit["audit"]>; commercialAudit: ReturnType<CommercialProductCompletionAudit["audit"]> }
     | { kind: "platform-audit-blocked"; mission: Mission; assistantGatePassed: true; continuation: PlatformContinuationMission; reason: string; details: unknown };
 
 export class AutonomousBuildDaemon {
@@ -33,6 +34,7 @@ export class AutonomousBuildDaemon {
     private readonly development: AutonomousDevelopmentLoop;
     private readonly evidenceAudit = new CapabilityEvidenceAudit();
     private readonly canonicalAudit = new CanonicalCapabilityAudit();
+    private readonly commercialAudit = new CommercialProductCompletionAudit();
     private readonly weavingPlanner = new AutonomousWeavingPlanner();
     private readonly knotRecovery = new AutonomousKnotRecovery();
     private readonly maxCycles: number;
@@ -105,18 +107,31 @@ export class AutonomousBuildDaemon {
             };
         }
 
-        const audit = this.canonicalAudit.audit(this.root, this.mission);
-        if (!audit.complete) {
+        const canonicalAudit = this.canonicalAudit.audit(this.root, this.mission);
+        if (!canonicalAudit.complete) {
             return {
                 kind: "platform-audit-blocked",
                 mission: selected,
                 assistantGatePassed: true,
                 continuation,
-                reason: audit.missingArtifacts.length > 0 ? "CANONICAL_CAPABILITY_AUDIT_MISSING_ARTIFACTS" : audit.roadmapPresent ? "CANONICAL_CAPABILITY_AUDIT_BACKLOG_NOT_EXHAUSTED" : "CANONICAL_CAPABILITY_AUDIT_ROADMAP_MISSING",
-                details: audit
+                reason: canonicalAudit.missingArtifacts.length > 0 ? "CANONICAL_CAPABILITY_AUDIT_MISSING_ARTIFACTS" : canonicalAudit.roadmapPresent ? "CANONICAL_CAPABILITY_AUDIT_BACKLOG_NOT_EXHAUSTED" : "CANONICAL_CAPABILITY_AUDIT_ROADMAP_MISSING",
+                details: canonicalAudit
             };
         }
-        return { kind: "platform-complete", mission: selected, assistantGatePassed: true, continuation, audit };
+
+        const commercialAudit = this.commercialAudit.audit(this.root);
+        if (!commercialAudit.complete) {
+            return {
+                kind: "platform-audit-blocked",
+                mission: selected,
+                assistantGatePassed: true,
+                continuation,
+                reason: "COMMERCIAL_PRODUCT_AUDIT_MISSING_LAYERS",
+                details: commercialAudit
+            };
+        }
+
+        return { kind: "platform-complete", mission: selected, assistantGatePassed: true, continuation, canonicalAudit, commercialAudit };
     }
 
     run() {
@@ -136,7 +151,8 @@ export class AutonomousBuildDaemon {
             const decision = this.selectMission();
             if (decision.kind === "platform-complete") {
                 budgetSnapshot = this.performanceBudget.completeCycle(cycleStartedAt);
-                console.log(JSON.stringify({ type: "AUTONOMOUS_PLATFORM_CONSTRUCTION_COMPLETE", cycle, status: "completed", assistantComplete: true, autonomousConstructionComplete: true, productComplete: decision.audit.complete, backlogExhausted: decision.audit.backlogExhausted, nonAutonomousProductionItems: decision.audit.nonAutonomousProductionItems, continuation: decision.continuation, performance: budgetSnapshot, message: "Assistant construction and the canonical autonomous platform construction backlog are complete; productComplete is derived from the canonical capability audit verdict." }));
+                const productComplete = decision.canonicalAudit.complete && decision.commercialAudit.complete;
+                console.log(JSON.stringify({ type: "AUTONOMOUS_PLATFORM_CONSTRUCTION_COMPLETE", cycle, status: "completed", assistantComplete: true, autonomousConstructionComplete: true, canonicalPlatformConstructionComplete: decision.canonicalAudit.complete, commercialProductRuntimeComplete: decision.commercialAudit.complete, externalProductionDependenciesComplete: decision.commercialAudit.blockedExternalDependencies.length === 0, productComplete, backlogExhausted: decision.canonicalAudit.backlogExhausted, nonAutonomousProductionItems: decision.canonicalAudit.nonAutonomousProductionItems, commercialMissingLayers: decision.commercialAudit.missingLayers, blockedExternalDependencies: decision.commercialAudit.blockedExternalDependencies, continuation: decision.continuation, performance: budgetSnapshot, message: "Assistant and canonical construction are complete; commercial product completion is derived from independent application-level evidence." }));
                 return { status: "completed", cycles: cycle, history };
             }
             if (decision.kind === "platform-audit-blocked") {
