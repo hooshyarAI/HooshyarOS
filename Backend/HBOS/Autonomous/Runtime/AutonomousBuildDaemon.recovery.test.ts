@@ -1,8 +1,16 @@
 import { AutonomousBuildDaemon } from "./AutonomousBuildDaemon";
+import { AutonomousKnotRecovery } from "./AutonomousKnotRecovery";
 import { AutonomousDevelopmentLoop, AutonomousDevelopmentResult } from "../../Architecture/Autonomous/AutonomousDevelopmentLoop";
 import { AutonomousProjectMission } from "./AutonomousProjectMission";
 
 describe("AutonomousBuildDaemon knot recovery", () => {
+    beforeEach(() => {
+        jest.spyOn(AutonomousKnotRecovery.prototype, "rollback").mockImplementation(() => undefined);
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
+    });
     it("repairs a failed knot from its checkpoint before allowing the run to continue", () => {
         const execute = jest.fn()
             .mockImplementationOnce((_goal: any): AutonomousDevelopmentResult => ({

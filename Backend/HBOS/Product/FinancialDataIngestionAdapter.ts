@@ -1,14 +1,19 @@
-export interface NormalizedFinancialRecord { [key: string]: unknown; }
+import { Engine } from "../Core/Engine";
 
-export class FinancialDataIngestionAdapter {
-    readonly capabilityId = "product.financial-data-ingestion";
-    readonly targetEngine = "Financial Intelligence Engine";
+export class FinancialDataIngestionAdapter implements Engine {
+    name = "FinancialDataIngestionAdapter";
 
-    initialize(): { status: "READY" } {
-        return { status: "READY" };
+    initialize(): void {}
+
+    health(): boolean {
+        return true;
     }
 
-    ingest(records: Record<string, unknown>[]): NormalizedFinancialRecord[] {
-        return records.map((record) => Object.fromEntries(Object.entries(record).map(([key, value]) => [key.trim(), value])));
+    describeCapability(): { id: string; capability: string; targetEngine: string } {
+        return {
+            id: "repair-product.financial-data-ingestion",
+            capability: "repair and re-verify knot product.financial-data-ingestion from checkpoint cefa479",
+            targetEngine: "Financial Intelligence Engine"
+        };
     }
 }
