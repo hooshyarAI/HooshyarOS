@@ -138,14 +138,16 @@ export class AutonomousBuildDaemon {
 
             if (decision.kind === "platform-complete") {
                 console.log(JSON.stringify({
-                    type: "AUTONOMOUS_PLATFORM_BACKLOG_EXHAUSTED",
+                    type: "AUTONOMOUS_PLATFORM_CONSTRUCTION_COMPLETE",
                     cycle,
                     status: "completed",
+                    assistantComplete: true,
+                    autonomousConstructionComplete: true,
                     productComplete: false,
                     backlogExhausted: decision.audit.backlogExhausted,
                     nonAutonomousProductionItems: decision.audit.nonAutonomousProductionItems,
                     continuation: decision.continuation,
-                    message: "Canonical autonomous construction backlog is exhausted; this does not assert full product completion."
+                    message: "Assistant construction and the canonical autonomous platform construction backlog are complete; this does not assert full product completion."
                 }));
                 return { status: "completed", cycles: cycle, history };
             }
