@@ -93,6 +93,17 @@ export class AutonomousPlatformContinuation {
                     p("Backend/HBOS/Assistant/Autonomous/Production/DeploymentController.ts"),
                     p("Backend/AI_Runtime/cloud_deployment.py")
                 ]
+            },
+            {
+                capabilityId: "platform.production-acceptance",
+                capability: "implement repository-native Production Acceptance capability and complete the internal acceptance gate before external deployment validation",
+                targetEngine: "Production Acceptance Engine",
+                dependencies: ["Cloud Deployment Engine", "Production Readiness Engine", "Deployment Readiness Engine"],
+                requiredPaths: [
+                    p("Backend/HBOS/Engines/ProductionAcceptanceEngine.ts"),
+                    p("Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"),
+                    p("Docs/Engines/ProductionAcceptanceEngine.md")
+                ]
             }
         ];
 
