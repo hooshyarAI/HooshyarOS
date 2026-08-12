@@ -1,32 +1,22 @@
 import { HBOS } from "../Core/HBOS";
 
+describe("HBOS Boot Integration", () => {
+    test("boots through dependency validation and reports healthy registered engines", () => {
+        const hbos = new HBOS();
 
-describe(
-"HBOS Boot Integration",
-()=>{
+        expect(hbos.boot()).toBe(true);
 
+        const health = hbos.health();
 
-test(
-"should boot when dependencies are available",
-()=>{
-
-
-const hbos =
-new HBOS();
-
-
-
-const result =
-hbos.boot();
-
-
-
-expect(result)
-.toBe(true);
-
-
-
-});
-
-
+        expect(health.length).toBeGreaterThanOrEqual(6);
+        expect(health.every(engine => engine.healthy)).toBe(true);
+        expect(health.map(engine => engine.name)).toEqual(expect.arrayContaining([
+            "MemoryEngine",
+            "ReactionEngine",
+            "DecisionEngine",
+            "ProjectPilotEngine",
+            "KnowledgeEngine",
+            "AssistantEngine"
+        ]));
+    });
 });
