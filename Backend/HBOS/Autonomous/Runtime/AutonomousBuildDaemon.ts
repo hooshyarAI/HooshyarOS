@@ -136,7 +136,7 @@ export class AutonomousBuildDaemon {
             const decision = this.selectMission();
             if (decision.kind === "platform-complete") {
                 budgetSnapshot = this.performanceBudget.completeCycle(cycleStartedAt);
-                console.log(JSON.stringify({ type: "AUTONOMOUS_PLATFORM_CONSTRUCTION_COMPLETE", cycle, status: "completed", assistantComplete: true, autonomousConstructionComplete: true, productComplete: false, backlogExhausted: decision.audit.backlogExhausted, nonAutonomousProductionItems: decision.audit.nonAutonomousProductionItems, continuation: decision.continuation, performance: budgetSnapshot, message: "Assistant construction and the canonical autonomous platform construction backlog are complete; this does not assert full product completion." }));
+                console.log(JSON.stringify({ type: "AUTONOMOUS_PLATFORM_CONSTRUCTION_COMPLETE", cycle, status: "completed", assistantComplete: true, autonomousConstructionComplete: true, productComplete: decision.audit.complete, backlogExhausted: decision.audit.backlogExhausted, nonAutonomousProductionItems: decision.audit.nonAutonomousProductionItems, continuation: decision.continuation, performance: budgetSnapshot, message: "Assistant construction and the canonical autonomous platform construction backlog are complete; productComplete is derived from the canonical capability audit verdict." }));
                 return { status: "completed", cycles: cycle, history };
             }
             if (decision.kind === "platform-audit-blocked") {
