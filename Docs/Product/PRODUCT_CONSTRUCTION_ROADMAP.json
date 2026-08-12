@@ -1,7 +1,8 @@
 {
-  "version": "1.0",
+  "version": "2.0",
   "status": "governing-product-build-input",
   "rule": "Product capabilities extend existing Architecture Freeze V4 engine owners; do not create duplicate engine hierarchies.",
+  "commercialScopeSource": "Docs/HOOSHYAROS_COMMERCIAL_SCOPE_RECONCILIATION.md",
   "capabilities": [
     {
       "capabilityId": "product.financial-data-ingestion",
@@ -32,7 +33,7 @@
     },
     {
       "capabilityId": "product.decision-workbench",
-      "capability": "provide explainable decision scenarios, expert-choice evaluation and recommendation evidence",
+      "capability": "provide explainable decision scenarios, Expert Choice/AHP-style evaluation and recommendation evidence",
       "targetEngine": "Decision Intelligence Engine",
       "dependencies": ["Decision Engine", "Reasoning Engine", "Governance Engine"],
       "implementationPath": "Backend/HBOS/Product/DecisionWorkbench.ts",
@@ -47,6 +48,123 @@
       "implementationPath": "Backend/HBOS/Product/OrganizationalExecutionCoordinator.ts",
       "testPath": "Backend/HBOS/test/OrganizationalExecutionCoordinator.test.ts",
       "documentationPath": "Docs/Product/OrganizationalExecutionCoordinator.md"
+    },
+    {
+      "capabilityId": "product.organization-identity-and-rbac",
+      "capability": "provide commercial authentication, organization/tenant context, membership, roles, permissions and secure session lifecycle",
+      "targetEngine": "Governance Engine",
+      "dependencies": ["HBOS Core", "Security Layer", "Organization Model"],
+      "implementationPath": "Backend/HBOS/Product/OrganizationIdentityService.ts",
+      "testPath": "Backend/HBOS/test/OrganizationIdentityService.test.ts",
+      "documentationPath": "Docs/Product/OrganizationIdentityService.md"
+    },
+    {
+      "capabilityId": "product.persistence-and-tenant-data",
+      "capability": "provide durable persistence, tenant ownership boundaries, evidence storage and auditable organizational data access",
+      "targetEngine": "Governance Engine",
+      "dependencies": ["Organization Model", "Security Layer", "Knowledge Engine"],
+      "implementationPath": "Backend/HBOS/Product/TenantPersistenceService.ts",
+      "testPath": "Backend/HBOS/test/TenantPersistenceService.test.ts",
+      "documentationPath": "Docs/Product/TenantPersistenceService.md"
+    },
+    {
+      "capabilityId": "product.web-application-shell",
+      "capability": "provide the runnable responsive web/PWA application shell connecting browser/mobile form factors to the API Gateway and HBOS",
+      "targetEngine": "Assistant Engine",
+      "dependencies": ["API Gateway", "User Management", "Security Layer"],
+      "implementationPath": "Frontend/HooshyarWebApp",
+      "testPath": "Backend/HBOS/test/HooshyarWebApplication.test.ts",
+      "documentationPath": "Docs/Product/HooshyarWebApplication.md"
+    },
+    {
+      "capabilityId": "product.dashboard-and-report-application",
+      "capability": "provide usable executive, financial, KPI, budget, risk, tax, alerts, decision and operational dashboards plus report/export flows",
+      "targetEngine": "Executive Intelligence Engine",
+      "dependencies": ["Dashboard Engine", "Reports Engine", "Alerts Engine", "product.web-application-shell"],
+      "implementationPath": "Backend/HBOS/Product/CommercialDashboardApplication.ts",
+      "testPath": "Backend/HBOS/test/CommercialDashboardApplication.test.ts",
+      "documentationPath": "Docs/Product/CommercialDashboardApplication.md"
+    },
+    {
+      "capabilityId": "product.goal-okr-transformation",
+      "capability": "connect Vision to Mission, organizational DNA, AI Council, Strategic Transformation Engine, OKR, projects, tasks, execution, learning and evolution",
+      "targetEngine": "Organizational Intelligence Engine",
+      "dependencies": ["Organization Model", "Decision Engine", "Project Pilot Engine"],
+      "implementationPath": "Backend/HBOS/Product/StrategicTransformationOKRService.ts",
+      "testPath": "Backend/HBOS/test/StrategicTransformationOKRService.test.ts",
+      "documentationPath": "Docs/Product/StrategicTransformationOKRService.md"
+    },
+    {
+      "capabilityId": "product.kaizen-continuous-improvement",
+      "capability": "provide continuous organizational improvement through daily improvement, Kaizen suggestions, dashboard, score and invisible Kaizen loops",
+      "targetEngine": "Organizational Intelligence Engine",
+      "dependencies": ["Knowledge Engine", "Decision Engine", "product.goal-okr-transformation"],
+      "implementationPath": "Backend/HBOS/Product/KaizenImprovementService.ts",
+      "testPath": "Backend/HBOS/test/KaizenImprovementService.test.ts",
+      "documentationPath": "Docs/Product/KaizenImprovementService.md"
+    },
+    {
+      "capabilityId": "product.customer-success",
+      "capability": "manage organizational customer onboarding, adoption, value realization, success signals, feedback and renewal-risk evidence",
+      "targetEngine": "Organizational Intelligence Engine",
+      "dependencies": ["Organization Model", "Knowledge Engine", "Dashboard Engine"],
+      "implementationPath": "Backend/HBOS/Product/CustomerSuccessService.ts",
+      "testPath": "Backend/HBOS/test/CustomerSuccessService.test.ts",
+      "documentationPath": "Docs/Product/CustomerSuccessService.md"
+    },
+    {
+      "capabilityId": "product.talent-and-succession",
+      "capability": "support organizational talent development, role continuity, succession planning, knowledge transfer and dependency-on-individual detection",
+      "targetEngine": "Organizational Intelligence Engine",
+      "dependencies": ["Organization Model", "Knowledge Engine", "product.goal-okr-transformation"],
+      "implementationPath": "Backend/HBOS/Product/TalentSuccessionService.ts",
+      "testPath": "Backend/HBOS/test/TalentSuccessionService.test.ts",
+      "documentationPath": "Docs/Product/TalentSuccessionService.md"
+    },
+    {
+      "capabilityId": "product.universal-ai-gateway",
+      "capability": "provide AI-agnostic replaceable-provider orchestration, multi-AI verification, best-tool selection, AI health monitoring, marketplace boundary and cloud/local/offline readiness",
+      "targetEngine": "Reasoning Engine",
+      "dependencies": ["Reasoning Engine", "Knowledge Engine", "Governance Engine"],
+      "implementationPath": "Backend/HBOS/Product/UniversalAIGateway.ts",
+      "testPath": "Backend/HBOS/test/UniversalAIGateway.test.ts",
+      "documentationPath": "Docs/Product/UniversalAIGateway.md"
+    },
+    {
+      "capabilityId": "product.offline-sync-and-conflict-resolution",
+      "capability": "support approved offline/local work with durable local evidence, synchronization and explicit conflict resolution without silent data loss",
+      "targetEngine": "Autonomous Operations Engine",
+      "dependencies": ["Universal AI Gateway", "Organization Model", "Tenant Persistence"],
+      "implementationPath": "Backend/HBOS/Product/OfflineSyncCoordinator.ts",
+      "testPath": "Backend/HBOS/test/OfflineSyncCoordinator.test.ts",
+      "documentationPath": "Docs/Product/OfflineSyncCoordinator.md"
+    },
+    {
+      "capabilityId": "product.mobile-and-admin-surfaces",
+      "capability": "provide responsive phone experience plus organizational administration surfaces for users, roles, tenants, integrations and governance",
+      "targetEngine": "Assistant Engine",
+      "dependencies": ["Web Application Shell", "Organization Identity and RBAC", "API Gateway"],
+      "implementationPath": "Frontend/HooshyarWebApp/AdminAndMobileSurfaces",
+      "testPath": "Backend/HBOS/test/MobileAndAdminSurfaces.test.ts",
+      "documentationPath": "Docs/Product/MobileAndAdminSurfaces.md"
+    },
+    {
+      "capabilityId": "product.commercial-subscription-entitlements",
+      "capability": "provide subscription plans, tenant entitlements, usage limits, trial/expiry behavior and billing-provider integration boundary when enabled",
+      "targetEngine": "Governance Engine",
+      "dependencies": ["Organization Identity and RBAC", "Tenant Persistence"],
+      "implementationPath": "Backend/HBOS/Product/SubscriptionEntitlementService.ts",
+      "testPath": "Backend/HBOS/test/SubscriptionEntitlementService.test.ts",
+      "documentationPath": "Docs/Product/SubscriptionEntitlementService.md"
+    },
+    {
+      "capabilityId": "product.commercial-e2e-acceptance",
+      "capability": "prove the complete organizational customer value path using representative data from onboarding through insight, decision, execution and measured outcome",
+      "targetEngine": "Autonomous Operations Engine",
+      "dependencies": ["Web Application Shell", "Tenant Persistence", "Financial Data Ingestion", "Dashboard Application", "Decision Workbench", "Organizational Execution", "Customer Success"],
+      "implementationPath": "Backend/HBOS/Product/CommercialE2EAcceptanceScenario.ts",
+      "testPath": "Backend/HBOS/test/CommercialE2EAcceptanceScenario.test.ts",
+      "documentationPath": "Docs/Product/CommercialE2EAcceptanceScenario.md"
     }
   ]
 }
