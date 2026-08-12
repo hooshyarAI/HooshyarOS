@@ -22,24 +22,24 @@ describe("AutonomousPlatformContinuation", () => {
         expect(selected?.capabilityId).not.toBe("platform.continuation");
     });
 
-    it("selects the approved performance extension when the canonical backlog is exhausted", () => {
-        const projectMission = {
-            nextPlatformMission: () => null,
-            snapshot: () => ({ root: ".tmp-performance-extension-root" })
-        } as unknown as AutonomousProjectMission;
-
-        const selected = new AutonomousPlatformContinuation().selectNextCapability(projectMission);
-
-        expect(selected?.capabilityId).toBe("platform.performance-testing");
-        expect(selected?.targetEngine).toBe("Performance Testing Engine");
-    });
-
-    it("does not turn an exhausted backlog into a fake continuation capability", () => {
+    it("selects customer testing after the performance extension is complete", () => {
         const projectMission = {
             nextPlatformMission: () => null,
             snapshot: () => ({ root: process.cwd() })
         } as unknown as AutonomousProjectMission;
 
-        expect(new AutonomousPlatformContinuation().selectNextCapability(projectMission)).toBeNull();
+        const selected = new AutonomousPlatformContinuation().selectNextCapability(projectMission);
+
+        expect(selected?.capabilityId).toBe("platform.customer-testing");
+        expect(selected?.targetEngine).toBe("Customer Testing Engine");
+    });
+
+    it("does not turn an exhausted production chain into a fake continuation capability", () => {
+        const projectMission = {
+            nextPlatformMission: () => null,
+            snapshot: () => ({ root: ".tmp-production-extension-root" })
+        } as unknown as AutonomousProjectMission;
+
+        expect(new AutonomousPlatformContinuation().selectNextCapability(projectMission)).toBe("platform.performance-testing");
     });
 });
