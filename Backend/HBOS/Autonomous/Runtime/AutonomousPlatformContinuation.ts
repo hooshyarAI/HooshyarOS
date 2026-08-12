@@ -1,6 +1,7 @@
 import { AutonomousProjectMission, Mission } from "./AutonomousProjectMission";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { AutonomousCapabilityDiscovery } from "./AutonomousCapabilityDiscovery";
 
 export interface PlatformContinuationMission {
     capabilityId: "platform.continuation";
@@ -14,23 +15,22 @@ export type PlatformCapabilityMission = Omit<Mission, "evidence" | "architecture
 /**
  * Canonical handoff from the completed autonomous Assistant to continued
  * HooshyarOS platform construction. The Assistant owns orchestration; the
- * platform backlog and approved production extension registry own the next
+ * platform backlog and repository-owned capability contracts own the next
  * concrete capability.
  */
 export class AutonomousPlatformContinuation {
+    private readonly discovery = new AutonomousCapabilityDiscovery();
+
     createMission(): PlatformContinuationMission {
         return {
             capabilityId: "platform.continuation",
             capability: "continue autonomous construction of HooshyarOS platform capabilities",
-            instruction: "AUDIT → SELECT NEXT GENUINELY MISSING CAPABILITY → IMPLEMENT → TEST → INTEGRATE → VERIFY → COMMIT → PUSH → AUDIT AGAIN",
+            instruction: "AUDIT → DISCOVER → SELECT NEXT GENUINELY MISSING CAPABILITY → IMPLEMENT → TEST → INTEGRATE → VERIFY → COMMIT → PUSH → AUDIT AGAIN",
             source: "assistant.completion.gate"
         };
     }
 
-    /**
-     * Converts the completion handoff into a real backlog mission. A
-     * continuation must never be treated as a build capability itself.
-     */
+    /** Converts the completion handoff into a real backlog mission. */
     selectNextCapability(projectMission: AutonomousProjectMission): PlatformCapabilityMission | null {
         const canonical = projectMission.nextPlatformMission();
         if (canonical) return canonical;
@@ -43,72 +43,58 @@ export class AutonomousPlatformContinuation {
                 capability: "implement repository-native Performance Testing capability",
                 targetEngine: "Performance Testing Engine",
                 dependencies: ["Production Readiness Engine", "Security Audit Engine"],
-                requiredPaths: [
-                    p("Backend/HBOS/Engines/PerformanceTestingEngine.ts"),
-                    p("Backend/HBOS/test/PerformanceTestingEngine.test.ts"),
-                    p("Docs/Engines/PerformanceTestingEngine.md")
-                ]
+                requiredPaths: [p("Backend/HBOS/Engines/PerformanceTestingEngine.ts"), p("Backend/HBOS/test/PerformanceTestingEngine.test.ts"), p("Docs/Engines/PerformanceTestingEngine.md")]
             },
             {
                 capabilityId: "platform.customer-testing",
                 capability: "implement repository-native Customer Testing capability",
                 targetEngine: "Customer Testing Engine",
                 dependencies: ["Performance Testing Engine", "Production Readiness Engine"],
-                requiredPaths: [
-                    p("Backend/HBOS/Engines/CustomerTestingEngine.ts"),
-                    p("Backend/HBOS/test/CustomerTestingEngine.test.ts"),
-                    p("Docs/Engines/CustomerTestingEngine.md")
-                ]
+                requiredPaths: [p("Backend/HBOS/Engines/CustomerTestingEngine.ts"), p("Backend/HBOS/test/CustomerTestingEngine.test.ts"), p("Docs/Engines/CustomerTestingEngine.md")]
             },
             {
                 capabilityId: "platform.deployment-readiness",
                 capability: "implement repository-native Deployment Readiness capability",
                 targetEngine: "Deployment Readiness Engine",
                 dependencies: ["Production Readiness Engine", "Customer Testing Engine"],
-                requiredPaths: [
-                    p("Backend/HBOS/Engines/DeploymentReadinessEngine.ts"),
-                    p("Backend/HBOS/test/DeploymentReadinessEngine.test.ts"),
-                    p("Docs/Engines/DeploymentReadinessEngine.md")
-                ]
+                requiredPaths: [p("Backend/HBOS/Engines/DeploymentReadinessEngine.ts"), p("Backend/HBOS/test/DeploymentReadinessEngine.test.ts"), p("Docs/Engines/DeploymentReadinessEngine.md")]
             },
             {
                 capabilityId: "platform.deployment-contract",
                 capability: "implement repository-native Deployment Contract capability",
                 targetEngine: "Deployment Contract Engine",
                 dependencies: ["Deployment Readiness Engine", "Customer Testing Engine"],
-                requiredPaths: [
-                    p("Backend/HBOS/Engines/DeploymentContractEngine.ts"),
-                    p("Backend/HBOS/test/DeploymentContractEngine.test.ts"),
-                    p("Docs/Engines/DeploymentContractEngine.md")
-                ]
+                requiredPaths: [p("Backend/HBOS/Engines/DeploymentContractEngine.ts"), p("Backend/HBOS/test/DeploymentContractEngine.test.ts"), p("Docs/Engines/DeploymentContractEngine.md")]
             },
             {
                 capabilityId: "platform.cloud-deployment",
                 capability: "implement repository-native Cloud Deployment execution capability",
                 targetEngine: "Cloud Deployment Engine",
                 dependencies: ["Deployment Contract Engine", "Deployment Readiness Engine"],
-                requiredPaths: [
-                    p("Backend/HBOS/Engines/CloudDeploymentEngine.ts"),
-                    p("Backend/HBOS/test/CloudDeploymentEngine.test.ts"),
-                    p("Backend/HBOS/Assistant/Autonomous/Production/DeploymentController.ts"),
-                    p("Backend/AI_Runtime/cloud_deployment.py")
-                ]
+                requiredPaths: [p("Backend/HBOS/Engines/CloudDeploymentEngine.ts"), p("Backend/HBOS/test/CloudDeploymentEngine.test.ts"), p("Backend/HBOS/Assistant/Autonomous/Production/DeploymentController.ts"), p("Backend/AI_Runtime/cloud_deployment.py")]
             },
             {
                 capabilityId: "platform.production-acceptance",
                 capability: "implement repository-native Production Acceptance capability and complete the internal acceptance gate before external deployment validation",
                 targetEngine: "Production Acceptance Engine",
                 dependencies: ["Cloud Deployment Engine", "Production Readiness Engine", "Deployment Readiness Engine"],
-                requiredPaths: [
-                    p("Backend/HBOS/Engines/ProductionAcceptanceEngine.ts"),
-                    p("Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"),
-                    p("Docs/Engines/ProductionAcceptanceEngine.md")
-                ]
+                requiredPaths: [p("Backend/HBOS/Engines/ProductionAcceptanceEngine.ts"), p("Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"), p("Docs/Engines/ProductionAcceptanceEngine.md")]
             }
         ];
 
         for (const extension of extensions) {
             if (!extension.requiredPaths.every(existsSync)) return extension;
+        }
+
+        const discovered = this.discovery.discover(root);
+        const missingDiscovered = discovered.find(candidate => !candidate.requiredPaths.every(existsSync));
+        if (missingDiscovered) {
+            return {
+                capabilityId: missingDiscovered.capabilityId,
+                capability: missingDiscovered.capability,
+                targetEngine: missingDiscovered.targetEngine,
+                dependencies: missingDiscovered.dependencies
+            };
         }
         return null;
     }
