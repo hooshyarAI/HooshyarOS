@@ -46,6 +46,9 @@ READ → UNDERSTAND → AUDIT → SELECT ONE KNOT → PLAN → CHECK DEPENDENCIE
 
 A knot is one canonical capability with one owner, one intent, one implementation contract and one verification contract. Generation success alone is never sufficient evidence of acceptance.
 
+### Capability evidence rule
+Behavioral evidence is authoritative when it reflects the **actual owning Engine contract and the focused test contract**. Hard-coded method markers are hints only and must never be the sole source of truth for capability completion. The mission/audit layer must tolerate legitimate contract names such as `audit`, `analyze`, `validate`, `deploy`, `route`, or other repository-defined behavior without forcing a generic naming convention.
+
 If a knot is wrong, incomplete or inconsistent, do not continue on top of it:
 
 ```text
@@ -62,7 +65,7 @@ The construction process is permanently limited to these active tools:
 2. **GitHub** — source control, repository inspection, commits, synchronization, review and publication.
 3. **This Assistant** — architecture reasoning, critical review, expert choice, implementation decisions and orchestration.
 
-No other external coding assistant, cloud coding agent or alternative coding provider may participate in the HooshyarOS construction process. In particular, Codex, GitHub Copilot, Claude and equivalent external coding agents are prohibited from the construction path.
+No other external coding assistant, cloud coding agent or alternative coding provider may participate in the HooshyarOS construction path. In particular, Codex, GitHub Copilot, Claude and equivalent external coding agents are prohibited from the construction path.
 
 This restriction is operational, not architectural: the HooshyarOS product may still contain provider-facing runtime abstractions when the frozen architecture explicitly requires them, but the autonomous construction fabric itself must not depend on those providers.
 
@@ -87,6 +90,7 @@ This restriction is operational, not architectural: the HooshyarOS product may s
 18. Optimize the construction method continuously against the seven-day objective using measured throughput evidence.
 19. Parallelize independent capabilities only when dependency contracts, repository isolation and deterministic integration remain safe.
 20. Never trade architecture, security, governance, correctness or evidence integrity for apparent speed.
+21. Derive behavioral completion evidence from actual Engine/Test contracts; marker lists may guide audits but cannot override the repository's real behavior.
 
 ## Architecture changes
 Architecture Freeze V4 is the default source of truth. Change it only when an actual contradiction or missing architectural capability is demonstrated by repository evidence. If changed, update the master charter, architecture document, governance charter and affected decisions before continuing construction.
