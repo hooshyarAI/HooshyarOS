@@ -1,6 +1,7 @@
 /// <reference types="node" />
 import { execFileSync } from "child_process";
 import { ConstructionContext, ConstructionTool } from "../../Builder/Autonomous/AutonomousConstructionEngine";
+import { ensurePytest } from "./PythonVerificationBootstrap";
 
 function run(command: string, args: string[], cwd: string, timeout = 15 * 60 * 1000) {
     try {
@@ -131,19 +132,34 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                     const syntax = run("python", ["-m", "compileall", "-q", "Backend/AI_Runtime"], root);
                     if (!syntax.ok) return { ok: false, issue: "AUTONOMOUS_PYTHON_SYNTAX_VERIFY_FAILED", artifact: { syntaxVerified: false, output: syntax.output, error: syntax.error } };
 
+                    const bootstrap = ensurePytest(root);
+                    if (!bootstrap.ok) {
+                        return {
+                            ok: false,
+                            issue: "AUTONOMOUS_PYTEST_BOOTSTRAP_FAILED",
+                            artifact: {
+                                syntaxVerified: true,
+                                pytestBootstrapped: false,
+                                output: bootstrap.output,
+                                error: bootstrap.error
+                            }
+                        };
+                    }
+
                     const builderTests = run("python", ["-m", "pytest", "Backend/AI_Runtime/tests/test_autonomous_builder_platform.py", "Backend/AI_Runtime/tests/test_autonomous_spec.py", "-q"], root);
-                    if (!builderTests.ok) return { ok: false, issue: "AUTONOMOUS_BUILDER_TESTS_FAILED", artifact: { syntaxVerified: true, builderTestsVerified: false, output: builderTests.output, error: builderTests.error } };
+                    if (!builderTests.ok) return { ok: false, issue: "AUTONOMOUS_BUILDER_TESTS_FAILED", artifact: { syntaxVerified: true, pytestBootstrapped: true, builderTestsVerified: false, output: builderTests.output, error: builderTests.error } };
 
                     const jest = run("node", ["./node_modules/jest/bin/jest.js", "--config", "./jest.config.js", "--maxWorkers=50%"], root);
                     const artifact = {
                         type: "AUTONOMOUS_VERIFY_RESULT",
                         command: "compileall + pytest autonomous builder/spec + parallel Jest",
                         syntaxVerified: true,
+                        pytestBootstrapped: bootstrap.installed,
                         builderTestsVerified: builderTests.code === 0,
                         jestVerified: jest.code === 0,
                         verified: jest.code === 0,
                         timestamp: new Date().toISOString(),
-                        output: `${syntax.output}\n${builderTests.output}\n${jest.output}`,
+                        output: `${syntax.output}\n${bootstrap.output}\n${builderTests.output}\n${jest.output}`,
                         error: jest.error
                     };
                     console.log(JSON.stringify(artifact, null, 2));
@@ -184,9 +200,6 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                 if (!status.ok) return { ok: false, issue: "GIT_STATUS_FAILED", artifact: { output: status.output, error: status.error } };
                 if (!status.output.trim()) return { ok: false, issue: "GIT_NO_REPOSITORY_CHANGE", artifact: { clean: true, committed: false, pushed: false, changeDetected: false } };
 
-                // Stage the entire repository using Git's native recursive add.
-                // The previous pathspec/exclusion form could fail in some
-                // environments even though git status worked correctly.
                 const add = run("git", ["add", "-A"], root);
                 if (!add.ok) return { ok: false, issue: "GIT_ADD_FAILED", artifact: { output: add.output, error: add.error } };
                 const staged = run("git", ["diff", "--cached", "--quiet"], root);
