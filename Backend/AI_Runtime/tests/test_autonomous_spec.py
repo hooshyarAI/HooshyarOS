@@ -18,6 +18,17 @@ PROMPT = (
 )
 
 
+PRODUCT_PROMPT = (
+    "Capability ID: product.financial-data-ingestion\n"
+    "Capability: ingest and normalize repository-supported financial/accounting data for the Financial Intelligence Engine\n"
+    "Target Engine: Financial Intelligence Engine\n"
+    "Dependencies: Knowledge Engine, Financial Intelligence Engine\n"
+    "Required artifact paths: Backend/HBOS/Product/FinancialDataIngestionAdapter.ts ; Backend/HBOS/test/FinancialDataIngestionAdapter.test.ts ; Docs/Product/FinancialDataIngestionAdapter.md\n"
+    "Architecture rules: Preserve Architecture Freeze V4 and existing engine boundaries\n"
+    "Directives: Implement exactly ONE concrete capability from the canonical backlog\n"
+)
+
+
 def test_spec_from_prompt_builds_canonical_paths_and_contract():
     spec = spec_from_prompt(PROMPT)
     assert spec is not None
@@ -29,6 +40,21 @@ def test_spec_from_prompt_builds_canonical_paths_and_contract():
     assert "Everything is an Engine" in spec.architecture_rules
     assert "Implement exactly ONE concrete capability from the canonical backlog" in spec.directives
     assert validate_spec(spec) == []
+
+
+def test_product_spec_honors_declared_artifact_paths():
+    spec = spec_from_prompt(PRODUCT_PROMPT)
+    assert spec is not None
+    assert spec.class_name == "FinancialDataIngestionAdapter"
+    assert spec.engine_path == "Backend/HBOS/Product/FinancialDataIngestionAdapter.ts"
+    assert spec.test_path == "Backend/HBOS/test/FinancialDataIngestionAdapter.test.ts"
+    assert spec.docs_path == "Docs/Product/FinancialDataIngestionAdapter.md"
+
+    artifacts = dict(generic_artifacts(spec))
+    assert "class FinancialDataIngestionAdapter" in artifacts[spec.engine_path]
+    assert "ingest(" in artifacts[spec.engine_path]
+    assert "../Product/FinancialDataIngestionAdapter" in artifacts[spec.test_path]
+    assert "product.financial-data-ingestion" in artifacts[spec.docs_path]
 
 
 def test_generic_artifacts_preserve_architecture_contract():
