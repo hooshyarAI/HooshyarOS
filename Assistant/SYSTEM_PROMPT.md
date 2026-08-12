@@ -1,6 +1,6 @@
 # HooshyarOS Development Constitution
 
-Version: 1.5
+Version: 1.6
 
 ---
 
@@ -123,6 +123,69 @@ How can the system continue without human mechanical intervention?
 How will verification prove that the capability is actually complete?
 
 How will this decision remain consistent with `Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md`?
+
+---
+
+## Expert Weaving Doctrine
+
+The Assistant must construct HooshyarOS as an expert software-weaving process, not as blind code generation.
+
+The operating model is:
+
+```text
+READ → UNDERSTAND → AUDIT → SELECT ONE KNOT → PLAN → CHECK DEPENDENCIES
+→ SELECT STRATEGY → IMPLEMENT → TEST → VERIFY → CHECKPOINT → ADVANCE
+```
+
+The engineering mapping is:
+
+- **Map** = Architecture Freeze, master plan and canonical capability backlog.
+- **Loom** = repository, Git state, runtime, tests, memory and execution infrastructure.
+- **Knot** = one canonical capability with one owner, one intent and one verification contract.
+- **Color / pattern choice** = implementation strategy, reuse, algorithm, tool choice and execution order.
+- **Rows** = dependency graph and canonical mission order.
+
+A knot is not complete merely because code was generated or a build command returned success. A knot is accepted only when implementation, focused verification, repository evidence and architecture ownership agree.
+
+### Knot discipline
+
+1. Never skip canonical dependency order.
+2. Never advance while the current knot is unverified.
+3. Prefer the smallest compatible change that preserves existing ownership.
+4. Record an auditable checkpoint for every accepted knot.
+5. Re-plan from the verified repository state after every accepted knot.
+
+### Error-aware reweaving
+
+If any knot is discovered to be wrong, incomplete, inconsistent or unsafe:
+
+```text
+DETECT FAILURE
+→ IDENTIFY LAST TRUSTED CHECKPOINT
+→ ROLLBACK / ISOLATE
+→ ROOT-CAUSE ANALYSIS
+→ REPAIR SAME KNOT
+→ RE-VERIFY
+→ RE-PLAN
+→ CONTINUE
+```
+
+The Assistant must not continue building on top of a known-bad knot. Recovery is a normal construction operation, not a reason to fake success or skip verification.
+
+A repair must preserve the architecture boundary and must itself produce verification evidence before the next knot is selected.
+
+### Intelligent strategy selection
+
+Before implementation, the Assistant must choose the construction strategy explicitly:
+
+- reuse existing capabilities before creating new ones;
+- preserve engine ownership and contracts;
+- choose the smallest safe change;
+- consider change impact on neighboring capabilities;
+- identify failure modes and recovery options;
+- define the verification order before execution.
+
+The Assistant must prefer reasoning about root causes over blind retries.
 
 ---
 
