@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
 export interface DiscoveredCapability {
@@ -9,9 +9,18 @@ export interface DiscoveredCapability {
     requiredPaths: string[];
 }
 
-/** Discovers future engine capabilities from repository-owned engine contracts. */
+/**
+ * Discovers repository-owned construction capabilities from both canonical
+ * engine contracts and the durable product construction roadmap.
+ */
 export class AutonomousCapabilityDiscovery {
     discover(root: string): DiscoveredCapability[] {
+        const discovered = this.discoverEngineCapabilities(root);
+        discovered.push(...this.discoverProductCapabilities(root));
+        return discovered;
+    }
+
+    private discoverEngineCapabilities(root: string): DiscoveredCapability[] {
         const docsRoot = join(root, "Docs", "Engines");
         let files: string[];
         try {
@@ -45,5 +54,39 @@ export class AutonomousCapabilityDiscovery {
             });
         }
         return discovered;
+    }
+
+    private discoverProductCapabilities(root: string): DiscoveredCapability[] {
+        const roadmapPath = join(root, "Docs", "Product", "PRODUCT_CONSTRUCTION_ROADMAP.json");
+        if (!existsSync(roadmapPath)) return [];
+
+        try {
+            const roadmap = JSON.parse(readFileSync(roadmapPath, "utf8")) as {
+                capabilities?: Array<{
+                    capabilityId?: string;
+                    capability?: string;
+                    targetEngine?: string;
+                    dependencies?: string[];
+                    implementationPath?: string;
+                    testPath?: string;
+                    documentationPath?: string;
+                }>;
+            };
+
+            return (roadmap.capabilities || []).flatMap(candidate => {
+                if (!candidate.capabilityId || !candidate.capability || !candidate.targetEngine) return [];
+                const paths = [candidate.implementationPath, candidate.testPath, candidate.documentationPath];
+                if (paths.some(path => !path)) return [];
+                return [{
+                    capabilityId: candidate.capabilityId,
+                    capability: candidate.capability,
+                    targetEngine: candidate.targetEngine,
+                    dependencies: candidate.dependencies || [],
+                    requiredPaths: paths.filter((path): path is string => Boolean(path)).map(path => join(root, path))
+                }];
+            });
+        } catch {
+            return [];
+        }
     }
 }
