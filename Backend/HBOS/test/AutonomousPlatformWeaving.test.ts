@@ -44,6 +44,10 @@ describe("AutonomousPlatformWeaving", () => {
             : "";
         const behavior = behaviorByEngine[className] ?? "verified";
         const isTest = /[\\/]test[\\/]/.test(path);
+        if (path.endsWith(".py")) {
+            writeFileSync(target, "def deploy(manifest):\n    return {\"ok\": True, \"manifest\": manifest}\n", "utf8");
+            return;
+        }
         writeFileSync(target, isTest ? `describe("behavior", () => { test("works", () => { const engine = new ${className}(); ${behavior} expect(true).toBe(true); }); });\n` : `class ${className} { ${behavior} } // verified implementation evidence\n`, "utf8");
     };
 
@@ -122,7 +126,13 @@ describe("AutonomousPlatformWeaving", () => {
         complete(root, ["Backend/HBOS/Engines/DeploymentContractEngine.ts", "Backend/HBOS/test/DeploymentContractEngine.test.ts", "Docs/Engines/DeploymentContractEngine.md"]);
         expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.cloud-deployment");
 
-        complete(root, ["Backend/HBOS/Engines/CloudDeploymentEngine.ts", "Backend/HBOS/test/CloudDeploymentEngine.test.ts", "Docs/Engines/CloudDeploymentEngine.md"]);
+        complete(root, [
+            "Backend/HBOS/Engines/CloudDeploymentEngine.ts",
+            "Backend/HBOS/test/CloudDeploymentEngine.test.ts",
+            "Backend/HBOS/Assistant/Autonomous/Production/DeploymentController.ts",
+            "Backend/AI_Runtime/cloud_deployment.py",
+            "Docs/Engines/CloudDeploymentEngine.md"
+        ]);
         expect(mission.nextPlatformMission()).toBeNull();
     });
 
