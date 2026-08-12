@@ -24,6 +24,7 @@ describe("AutonomousPlatformContinuation", () => {
         expect(mission.capabilityId).toBe("platform.continuation");
         expect(mission.source).toBe("assistant.completion.gate");
         expect(mission.instruction).toContain("AUDIT");
+        expect(mission.instruction).toContain("DISCOVER");
         expect(mission.instruction).toContain("IMPLEMENT");
         expect(mission.instruction).toContain("VERIFY");
         expect(mission.instruction).toContain("PUSH");
