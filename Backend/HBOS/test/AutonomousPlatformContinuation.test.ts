@@ -11,34 +11,15 @@ function seedFiles(root: string, files: string[]): void {
     });
 }
 
-const performanceFiles = [
-    "Backend/HBOS/Engines/PerformanceTestingEngine.ts",
-    "Backend/HBOS/test/PerformanceTestingEngine.test.ts",
-    "Docs/Engines/PerformanceTestingEngine.md"
-];
-
-const customerFiles = [
-    "Backend/HBOS/Engines/CustomerTestingEngine.ts",
-    "Backend/HBOS/test/CustomerTestingEngine.test.ts",
-    "Docs/Engines/CustomerTestingEngine.md"
-];
-
-const deploymentReadinessFiles = [
-    "Backend/HBOS/Engines/DeploymentReadinessEngine.ts",
-    "Backend/HBOS/test/DeploymentReadinessEngine.test.ts",
-    "Docs/Engines/DeploymentReadinessEngine.md"
-];
-
-const deploymentContractFiles = [
-    "Backend/HBOS/Engines/DeploymentContractEngine.ts",
-    "Backend/HBOS/test/DeploymentContractEngine.test.ts",
-    "Docs/Engines/DeploymentContractEngine.md"
-];
+const performanceFiles = ["Backend/HBOS/Engines/PerformanceTestingEngine.ts","Backend/HBOS/test/PerformanceTestingEngine.test.ts","Docs/Engines/PerformanceTestingEngine.md"];
+const customerFiles = ["Backend/HBOS/Engines/CustomerTestingEngine.ts","Backend/HBOS/test/CustomerTestingEngine.test.ts","Docs/Engines/CustomerTestingEngine.md"];
+const deploymentReadinessFiles = ["Backend/HBOS/Engines/DeploymentReadinessEngine.ts","Backend/HBOS/test/DeploymentReadinessEngine.test.ts","Docs/Engines/DeploymentReadinessEngine.md"];
+const deploymentContractFiles = ["Backend/HBOS/Engines/DeploymentContractEngine.ts","Backend/HBOS/test/DeploymentContractEngine.test.ts","Docs/Engines/DeploymentContractEngine.md"];
+const cloudFiles = ["Backend/HBOS/Engines/CloudDeploymentEngine.ts","Backend/HBOS/test/CloudDeploymentEngine.test.ts","Docs/Engines/CloudDeploymentEngine.md","Backend/HBOS/Assistant/Autonomous/Production/DeploymentController.ts","Backend/AI_Runtime/cloud_deployment.py"];
 
 describe("AutonomousPlatformContinuation", () => {
     it("creates the canonical post-Assistant platform continuation mission", () => {
         const mission = new AutonomousPlatformContinuation().createMission();
-
         expect(mission.capabilityId).toBe("platform.continuation");
         expect(mission.source).toBe("assistant.completion.gate");
         expect(mission.instruction).toContain("AUDIT");
@@ -49,75 +30,19 @@ describe("AutonomousPlatformContinuation", () => {
 
     it("delegates continuation selection to the canonical platform backlog", () => {
         const projectMission = new AutonomousProjectMission(process.cwd());
-        const continuation = new AutonomousPlatformContinuation();
-        const selected = continuation.selectNextCapability(projectMission);
-
+        const selected = new AutonomousPlatformContinuation().selectNextCapability(projectMission);
         expect(selected === null || selected.capabilityId).toBeTruthy();
         expect(selected?.capabilityId).not.toBe("platform.continuation");
     });
 
-    it("selects customer testing after performance testing is complete", () => {
-        const root = mkdtempSync(join(process.cwd(), "tmp-customer-continuation-"));
+    it("selects cloud deployment after the deployment contract is complete", () => {
+        const root = mkdtempSync(join(process.cwd(), "tmp-cloud-continuation-"));
         try {
-            seedFiles(root, performanceFiles);
-            const projectMission = {
-                nextPlatformMission: () => null,
-                snapshot: () => ({ root })
-            } as unknown as AutonomousProjectMission;
+            seedFiles(root, [...performanceFiles, ...customerFiles, ...deploymentReadinessFiles, ...deploymentContractFiles]);
+            const projectMission = { nextPlatformMission: () => null, snapshot: () => ({ root }) } as unknown as AutonomousProjectMission;
             const selected = new AutonomousPlatformContinuation().selectNextCapability(projectMission);
-
-            expect(selected?.capabilityId).toBe("platform.customer-testing");
-            expect(selected?.targetEngine).toBe("Customer Testing Engine");
-        } finally {
-            rmSync(root, { recursive: true, force: true });
-        }
-    });
-
-    it("selects performance testing when the production extension chain is missing", () => {
-        const root = mkdtempSync(join(process.cwd(), "tmp-performance-continuation-"));
-        try {
-            const projectMission = {
-                nextPlatformMission: () => null,
-                snapshot: () => ({ root })
-            } as unknown as AutonomousProjectMission;
-            const selected = new AutonomousPlatformContinuation().selectNextCapability(projectMission);
-
-            expect(selected?.capabilityId).toBe("platform.performance-testing");
-            expect(selected?.targetEngine).toBe("Performance Testing Engine");
-        } finally {
-            rmSync(root, { recursive: true, force: true });
-        }
-    });
-
-    it("selects deployment readiness after customer testing is complete", () => {
-        const root = mkdtempSync(join(process.cwd(), "tmp-deployment-readiness-continuation-"));
-        try {
-            seedFiles(root, [...performanceFiles, ...customerFiles]);
-            const projectMission = {
-                nextPlatformMission: () => null,
-                snapshot: () => ({ root })
-            } as unknown as AutonomousProjectMission;
-            const selected = new AutonomousPlatformContinuation().selectNextCapability(projectMission);
-
-            expect(selected?.capabilityId).toBe("platform.deployment-readiness");
-            expect(selected?.targetEngine).toBe("Deployment Readiness Engine");
-        } finally {
-            rmSync(root, { recursive: true, force: true });
-        }
-    });
-
-    it("selects deployment contract after deployment readiness is complete", () => {
-        const root = mkdtempSync(join(process.cwd(), "tmp-deployment-contract-continuation-"));
-        try {
-            seedFiles(root, [...performanceFiles, ...customerFiles, ...deploymentReadinessFiles]);
-            const projectMission = {
-                nextPlatformMission: () => null,
-                snapshot: () => ({ root })
-            } as unknown as AutonomousProjectMission;
-            const selected = new AutonomousPlatformContinuation().selectNextCapability(projectMission);
-
-            expect(selected?.capabilityId).toBe("platform.deployment-contract");
-            expect(selected?.targetEngine).toBe("Deployment Contract Engine");
+            expect(selected?.capabilityId).toBe("platform.cloud-deployment");
+            expect(selected?.targetEngine).toBe("Cloud Deployment Engine");
         } finally {
             rmSync(root, { recursive: true, force: true });
         }
@@ -126,12 +51,8 @@ describe("AutonomousPlatformContinuation", () => {
     it("returns null when the production extension chain is exhausted", () => {
         const root = mkdtempSync(join(process.cwd(), "tmp-production-complete-"));
         try {
-            seedFiles(root, [...performanceFiles, ...customerFiles, ...deploymentReadinessFiles, ...deploymentContractFiles]);
-            const projectMission = {
-                nextPlatformMission: () => null,
-                snapshot: () => ({ root })
-            } as unknown as AutonomousProjectMission;
-
+            seedFiles(root, [...performanceFiles, ...customerFiles, ...deploymentReadinessFiles, ...deploymentContractFiles, ...cloudFiles]);
+            const projectMission = { nextPlatformMission: () => null, snapshot: () => ({ root }) } as unknown as AutonomousProjectMission;
             expect(new AutonomousPlatformContinuation().selectNextCapability(projectMission)).toBeNull();
         } finally {
             rmSync(root, { recursive: true, force: true });
