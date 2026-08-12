@@ -1,4 +1,8 @@
-"""Repository-native performance evidence primitives for HooshyarOS."""
+"""Repository-native performance evidence primitives for HooshyarOS.
+
+The module exposes function-level primitives and a small class facade so
+older runtime chapters can continue to call ``PerformanceEngine().evaluate``.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -6,6 +10,7 @@ from time import perf_counter
 from typing import Callable, TypeVar
 
 T = TypeVar("T")
+
 
 @dataclass(frozen=True)
 class PerformanceSample:
@@ -32,3 +37,21 @@ def benchmark(operation: str, fn: Callable[[], T], iterations: int = 1) -> Perfo
         fn()
     elapsed_ms = (perf_counter() - started) * 1000.0
     return PerformanceSample(operation=operation, elapsed_ms=elapsed_ms)
+
+
+class PerformanceEngine:
+    """Compatibility facade over the repository-native performance primitives."""
+
+    def evaluate(self, metric: str) -> dict[str, str]:
+        return evaluate(metric)
+
+    def measure(self, operation: str, fn: Callable[[], T]) -> tuple[T, PerformanceSample]:
+        return measure(operation, fn)
+
+    def benchmark(
+        self,
+        operation: str,
+        fn: Callable[[], T],
+        iterations: int = 1,
+    ) -> PerformanceSample:
+        return benchmark(operation, fn, iterations)
