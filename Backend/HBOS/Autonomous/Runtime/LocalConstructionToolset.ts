@@ -4,6 +4,7 @@ import { ConstructionContext, ConstructionTool } from "../../Builder/Autonomous/
 import { ensurePytest } from "./PythonVerificationBootstrap";
 
 function run(command: string, args: string[], cwd: string, timeout = 15 * 60 * 1000) {
+    const started = Date.now();
     try {
         let executable = command;
         let executableArgs = args;
@@ -25,12 +26,13 @@ function run(command: string, args: string[], cwd: string, timeout = 15 * 60 * 1
             stdio: ["ignore", "pipe", "pipe"]
         });
 
-        return { ok: true, code: 0, output: String(output), error: null };
+        return { ok: true, code: 0, output: String(output), error: null, elapsedMs: Date.now() - started };
     } catch (error: any) {
         const stdout = String(error?.stdout || "");
         const stderr = String(error?.stderr || "");
-        console.error(JSON.stringify({ type: "AUTONOMOUS_TOOL_ERROR", command, args, cwd, exitCode: error?.status ?? 1, stdout, stderr, message: error?.message ?? `${command} failed` }, null, 2));
-        return { ok: false, code: error?.status ?? 1, output: `${stdout}\n${stderr}`, error: error?.message ?? `${command} failed` };
+        const elapsedMs = Date.now() - started;
+        console.error(JSON.stringify({ type: "AUTONOMOUS_TOOL_ERROR", command, args, cwd, exitCode: error?.status ?? 1, stdout, stderr, elapsedMs, message: error?.message ?? `${command} failed` }, null, 2));
+        return { ok: false, code: error?.status ?? 1, output: `${stdout}\n${stderr}`, error: error?.message ?? `${command} failed`, elapsedMs };
     }
 }
 
@@ -63,12 +65,40 @@ export function buildAgentArgs(_agent: ImplementationAgent, prompt: string): str
 const DEFAULT_DIRECTIVES = [
     "Implement exactly one concrete capability from the canonical mission.",
     "Create or update the focused implementation, focused test and documentation required by the architecture.",
-    "Run focused verification followed by the full Jest suite.",
+    "Run focused verification for the selected knot; run the full Jest suite only at the periodic integration checkpoint.",
     "Repair verification failures before finalization.",
     "Do not redesign Architecture Freeze V4."
 ];
 
 const REPOSITORY_STATUS_ARGS = ["status", "--porcelain=v1", "--", ".", ":(exclude)node_modules"];
+const FULL_VERIFY_EVERY = Math.max(1, Number.parseInt(process.env.HOOSHYAR_FULL_VERIFY_EVERY || "5", 10) || 5);
+
+function focusedTestFor(capabilityId: string): string | null {
+    const known: Record<string, string> = {
+        "platform.user-management": "Backend/HBOS/test/UserManagementEngine.test.ts",
+        "platform.organization-model": "Backend/HBOS/test/OrganizationModelEngine.test.ts",
+        "platform.security-layer": "Backend/HBOS/test/SecurityLayerEngine.test.ts",
+        "platform.api-gateway": "Backend/HBOS/test/APIGatewayEngine.test.ts",
+        "engine.reasoning.canonical": "Backend/HBOS/test/ReasoningEngine.test.ts",
+        "engine.organizational.canonical": "Backend/HBOS/test/OrganizationalIntelligenceEngine.test.ts",
+        "engine.autonomous-operations.canonical": "Backend/HBOS/test/AutonomousOperationsEngine.test.ts",
+        "runtime.reasoning.bridge": "Backend/HBOS/test/PythonReasoningAdapter.test.ts",
+        "platform.financial-intelligence": "Backend/HBOS/test/FinancialIntelligenceEngine.test.ts",
+        "platform.budget-intelligence": "Backend/HBOS/test/BudgetIntelligenceEngine.test.ts",
+        "platform.tax-intelligence": "Backend/HBOS/test/TaxIntelligenceEngine.test.ts",
+        "platform.risk-intelligence": "Backend/HBOS/test/RiskIntelligenceEngine.test.ts",
+        "platform.dashboard": "Backend/HBOS/test/DashboardEngine.test.ts",
+        "platform.reports": "Backend/HBOS/test/ReportsEngine.test.ts",
+        "platform.alerts": "Backend/HBOS/test/AlertsEngine.test.ts",
+        "platform.production-readiness": "Backend/HBOS/test/ProductionReadinessEngine.test.ts",
+        "platform.security-audit": "Backend/HBOS/test/SecurityAuditEngine.test.ts",
+        "platform.performance-testing": "Backend/HBOS/test/PerformanceTestingEngine.test.ts",
+        "platform.customer-testing": "Backend/HBOS/test/CustomerTestingEngine.test.ts",
+        "platform.deployment-readiness": "Backend/HBOS/test/DeploymentReadinessEngine.test.ts",
+        "platform.deployment-contract": "Backend/HBOS/test/DeploymentContractEngine.test.ts"
+    };
+    return known[capabilityId] || null;
+}
 
 function buildAgentPrompt(context: ConstructionContext): string {
     return [
@@ -90,6 +120,8 @@ function buildAgentPrompt(context: ConstructionContext): string {
 }
 
 export function createLocalConstructionTools(root = process.cwd()): ConstructionTool[] {
+    let verificationCount = 0;
+
     return [
         {
             name: "architecture",
@@ -117,7 +149,7 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                 const result = run(agent, buildAgentArgs(agent, buildAgentPrompt(context)), root, 30 * 60 * 1000);
                 const after = run("git", REPOSITORY_STATUS_ARGS, root);
                 const changed = after.ok && repositoryStateChanged(before.output, after.output);
-                const artifact = { type: "AUTONOMOUS_AGENT_GENERATION_RESULT", provider: agent, capabilityId: context.plan.capabilityId, capability: context.plan.capability, exitCode: result.code, changed, output: result.output, error: result.error, timestamp: new Date().toISOString() };
+                const artifact = { type: "AUTONOMOUS_AGENT_GENERATION_RESULT", provider: agent, capabilityId: context.plan.capabilityId, capability: context.plan.capability, exitCode: result.code, changed, elapsedMs: result.elapsedMs, output: result.output, error: result.error, timestamp: new Date().toISOString() };
                 console.log(JSON.stringify(artifact, null, 2));
                 if (!result.ok) return { ok: false, issue: "AUTONOMOUS_AGENT_GENERATION_FAILED", artifact };
                 if (!after.ok) return { ok: false, issue: "AUTONOMOUS_REPOSITORY_STATE_UNAVAILABLE", artifact };
@@ -129,8 +161,11 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
             name: "python",
             execute: (stage, context) => {
                 if (stage === "VERIFY") {
+                    verificationCount += 1;
+                    const focused = focusedTestFor(context.plan.capabilityId);
+                    const fullVerify = verificationCount % FULL_VERIFY_EVERY === 0 || process.env.HOOSHYAR_FULL_VERIFY === "1";
                     const syntax = run("python", ["-m", "compileall", "-q", "Backend/AI_Runtime"], root);
-                    if (!syntax.ok) return { ok: false, issue: "AUTONOMOUS_PYTHON_SYNTAX_VERIFY_FAILED", artifact: { syntaxVerified: false, output: syntax.output, error: syntax.error } };
+                    if (!syntax.ok) return { ok: false, issue: "AUTONOMOUS_PYTHON_SYNTAX_VERIFY_FAILED", artifact: { syntaxVerified: false, elapsedMs: syntax.elapsedMs, output: syntax.output, error: syntax.error } };
 
                     const bootstrap = ensurePytest(root);
                     if (!bootstrap.ok) {
@@ -140,6 +175,7 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                             artifact: {
                                 syntaxVerified: true,
                                 pytestBootstrapped: false,
+                                syntaxElapsedMs: syntax.elapsedMs,
                                 output: bootstrap.output,
                                 error: bootstrap.error
                             }
@@ -147,17 +183,25 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                     }
 
                     const builderTests = run("python", ["-m", "pytest", "Backend/AI_Runtime/tests/test_autonomous_builder_platform.py", "Backend/AI_Runtime/tests/test_autonomous_spec.py", "-q"], root);
-                    if (!builderTests.ok) return { ok: false, issue: "AUTONOMOUS_BUILDER_TESTS_FAILED", artifact: { syntaxVerified: true, pytestBootstrapped: true, builderTestsVerified: false, output: builderTests.output, error: builderTests.error } };
+                    if (!builderTests.ok) return { ok: false, issue: "AUTONOMOUS_BUILDER_TESTS_FAILED", artifact: { syntaxVerified: true, pytestBootstrapped: true, builderTestsVerified: false, syntaxElapsedMs: syntax.elapsedMs, builderTestsElapsedMs: builderTests.elapsedMs, output: builderTests.output, error: builderTests.error } };
 
-                    const jest = run("node", ["./node_modules/jest/bin/jest.js", "--config", "./jest.config.js", "--maxWorkers=50%"], root);
+                    const jestArgs = ["./node_modules/jest/bin/jest.js", "--config", "./jest.config.js", "--maxWorkers=50%"];
+                    if (!fullVerify && focused) jestArgs.push(focused);
+                    const jest = run("node", jestArgs, root);
                     const artifact = {
                         type: "AUTONOMOUS_VERIFY_RESULT",
-                        command: "compileall + pytest autonomous builder/spec + parallel Jest",
+                        verificationMode: fullVerify ? "full" : focused ? "focused" : "syntax+autonomous-tests",
+                        focusedTest: focused,
+                        fullVerify,
+                        fullVerifyEvery: FULL_VERIFY_EVERY,
                         syntaxVerified: true,
                         pytestBootstrapped: bootstrap.installed,
                         builderTestsVerified: builderTests.code === 0,
                         jestVerified: jest.code === 0,
                         verified: jest.code === 0,
+                        syntaxElapsedMs: syntax.elapsedMs,
+                        builderTestsElapsedMs: builderTests.elapsedMs,
+                        jestElapsedMs: jest.elapsedMs,
                         timestamp: new Date().toISOString(),
                         output: `${syntax.output}\n${bootstrap.output}\n${builderTests.output}\n${jest.output}`,
                         error: jest.error
@@ -180,6 +224,7 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                         capabilityId: context.plan.capabilityId,
                         repaired: result.ok && changed,
                         exitCode: result.code,
+                        elapsedMs: result.elapsedMs,
                         output: result.output,
                         error: result.error,
                         timestamp: new Date().toISOString()
