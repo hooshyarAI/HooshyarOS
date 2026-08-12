@@ -3,6 +3,7 @@ export interface ArchitectureRequirement {
     capability: string;
     targetEngine: string;
     dependencies?: string[];
+    requiredPaths?: string[];
 }
 
 export interface ArchitectureDecision {
@@ -15,6 +16,7 @@ export interface ArchitectureDecision {
         targetEngine: string;
         dependencies: string[];
         architectureRules: string[];
+        requiredPaths: string[];
     };
     reasons: string[];
 }
@@ -39,12 +41,14 @@ export class ArchitectureDecisionEngine {
             "Engine must be observable",
             "Engine must be testable",
             "Engine must be recoverable",
-            "No duplicate capability owner"
+            "No duplicate capability owner",
+            "Generated artifacts must stay inside the declared capability boundary"
         ];
 
         reasons.push("requirement is complete");
         reasons.push("architecture rules attached");
         reasons.push("construction plan is deterministic");
+        reasons.push(requirement.requiredPaths?.length ? "capability artifact boundary attached" : "no explicit artifact boundary declared");
 
         return {
             requirement,
@@ -55,7 +59,8 @@ export class ArchitectureDecisionEngine {
                 capability: requirement.capability,
                 targetEngine: requirement.targetEngine,
                 dependencies,
-                architectureRules
+                architectureRules,
+                requiredPaths: requirement.requiredPaths || []
             },
             reasons
         };
