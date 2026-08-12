@@ -32,6 +32,10 @@ def run_daemon(*, assistant_phase: bool) -> int:
     env["HOOSHYAR_AGENT"] = "python"
     env["HOOSHYAR_AUTONOMOUS_DEADLINE_DAYS"] = "7"
     env["HOOSHYAR_BUILD_PHASE"] = "assistant" if assistant_phase else "platform"
+    # Python 3.14 on Windows otherwise inherits cp1252 and can crash while
+    # consuming Unicode emitted by TypeScript (for example Persian text).
+    env["PYTHONIOENCODING"] = "utf-8"
+    env["PYTHONUTF8"] = "1"
 
     process = subprocess.Popen(
         [str(TSX), str(DAEMON)],
@@ -40,6 +44,8 @@ def run_daemon(*, assistant_phase: bool) -> int:
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         bufsize=1,
     )
 
