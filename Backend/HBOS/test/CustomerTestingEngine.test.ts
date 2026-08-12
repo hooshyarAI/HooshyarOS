@@ -1,3 +1,5 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import { CustomerTestingEngine } from "../Engines/CustomerTestingEngine";
 
 describe("CustomerTestingEngine", () => {
@@ -13,9 +15,14 @@ describe("CustomerTestingEngine", () => {
 
     it("reports missing customer-testing evidence deterministically", () => {
         const engine = new CustomerTestingEngine();
-        const missing = engine.audit(require("node:fs").mkdtempSync(require("node:path").join(process.cwd(), "tmp-customer-test-")));
+        const root = mkdtempSync(join(process.cwd(), "tmp-customer-test-"));
 
-        expect(missing.ready).toBe(false);
-        expect(missing.missingArtifacts).toContain("package.json");
+        try {
+            const result = engine.audit(root);
+            expect(result.ready).toBe(false);
+            expect(result.missingArtifacts).toContain("package.json");
+        } finally {
+            rmSync(root, { recursive: true, force: true });
+        }
     });
 });
