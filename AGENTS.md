@@ -8,6 +8,7 @@
 - `Docs/AUTONOMOUS_WEAVING_DOCTRINE.md` — expert knot-by-knot construction and recovery doctrine.
 - `Docs/AUTONOMOUS_7_DAY_BUILD_SLA.md` — permanent seven-day autonomous construction performance law.
 - `Docs/HOOSHYAROS_TOOLCHAIN_OPTIMIZATION_LAW.md` — permanent tool-first, Python-first construction and human-intervention law.
+- `Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md` — canonical commercial-product completion and acceptance contract; mandatory for distinguishing canonical capability completion from real commercial product completion.
 - Existing architecture decisions, HBOS engines, capability owners, tests and documentation — inspect before adding anything.
 
 The repository is the durable memory of the approved architecture, product principles, autonomous-construction role, decision logic and verification rules. Do not rely on conversational memory when the repository can provide the governing rule.
@@ -29,7 +30,7 @@ The two-command construction system is subject to a **maximum seven-calendar-day
 The seven-day objective applies to autonomous construction work governed by the repository backlog. It must explicitly distinguish Assistant construction complete, canonical autonomous platform construction complete, and full real-world production completion; the latter may require external resources or approvals and must never be falsely claimed.
 
 ## Autonomous execution
-When assigned a build task, inspect the repository and existing Git history first. Derive the next genuinely missing capability from the master charter, governance charter, Architecture Freeze V4 and current implementation state. Do not ask the human to provide file-by-file implementation instructions when the construction fabric can perform the work safely.
+When assigned a build task, inspect the repository and existing Git history first. Derive the next genuinely missing capability from the master charter, governance charter, Architecture Freeze V4, current implementation state **and the Commercial Product Completion Contract**. Do not ask the human to provide file-by-file implementation instructions when the construction fabric can perform the work safely.
 
 Use this loop:
 
@@ -38,6 +39,9 @@ Architecture → Decision → Capability → Tool Selection → Generate → Sta
 When the Assistant completion gate is verified, immediately hand off to the canonical platform continuation flow:
 
 AUDIT → SELECT NEXT GENUINELY MISSING CAPABILITY → IMPLEMENT → TEST → INTEGRATE → VERIFY → COMMIT → PUSH → AUDIT AGAIN
+
+### Commercial completion audit
+Canonical capability backlog exhaustion is **not by itself** proof of commercial product completion. Before reporting `productComplete=true`, the builder must execute the commercial audit defined in `Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md` and separately verify product runtime, persistence, identity, tenant isolation, data ingestion, API/application integration, dashboards/UI, reports, decision workflows, organizational execution, security, observability, installation/deployment and any other required commercial scope. External dependencies must be explicitly evidenced or reported as blocked.
 
 ### Seven-day performance law
 The autonomous construction fabric is governed by a **seven-calendar-day target** for constructing the canonical HooshyarOS platform correctly and with production-grade engineering discipline.
@@ -108,6 +112,7 @@ This restriction is operational, not architectural: the HooshyarOS product may s
 22. Before delegating any mechanical development action to the human, prove that Python, Git/GitHub or the Assistant cannot safely perform it.
 23. Preserve repair intent end-to-end; `repair-<capabilityId>` must reach the repair worker unchanged.
 24. Use the best approved tool for each stage before considering additional human intervention.
+25. Before declaring commercial product completion, pass the Commercial Product Completion Contract and keep external production dependencies distinct from repository-native completion.
 
 ## Architecture changes
 Architecture Freeze V4 is the default source of truth. Change it only when an actual contradiction or missing architectural capability is demonstrated by repository evidence. If changed, update the master charter, architecture document, governance charter and affected decisions before continuing construction.
