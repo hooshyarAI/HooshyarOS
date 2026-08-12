@@ -14,6 +14,18 @@ export class AutonomousDevelopmentLoop {
 
     constructor(private readonly tools: ConstructionTool[]) {}
 
+    static canonicalizeGoal(goal: any): any {
+        const capabilityId = String(goal?.capabilityId || goal?.id || "autonomous-capability");
+
+        // Repair intents are first-class construction intents. Never collapse
+        // `repair-<capabilityId>` into the base capability before generation.
+        if (capabilityId.startsWith("repair-")) {
+            return { ...goal, capabilityId };
+        }
+
+        return { ...goal, capabilityId };
+    }
+
     execute(goal: any): AutonomousDevelopmentResult {
         const canonicalGoal = AutonomousDevelopmentLoop.canonicalizeGoal(goal);
         const plan = this.planner.plan(canonicalGoal);
