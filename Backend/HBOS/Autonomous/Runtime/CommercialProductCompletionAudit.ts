@@ -8,8 +8,16 @@ export interface CommercialProductCompletionAuditResult {
     blockedExternalDependencies: string[];
 }
 
+interface RoadmapCapability {
+    capabilityId?: string;
+    implementationPath?: string;
+    testPath?: string;
+    documentationPath?: string;
+}
+
 export class CommercialProductCompletionAudit {
     private readonly contractPath = "Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md";
+    private readonly roadmapPath = "Docs/Product/PRODUCT_CONSTRUCTION_ROADMAP.json";
 
     audit(root: string): CommercialProductCompletionAuditResult {
         const contractFile = join(root, this.contractPath);
@@ -49,15 +57,45 @@ export class CommercialProductCompletionAudit {
             const packageJson = JSON.parse(readFileSync(packagePath, "utf8")) as { scripts?: Record<string, string> };
             const scripts = packageJson.scripts ?? {};
             const hasRunnableWebScript = Boolean(scripts.start || scripts.dev || scripts.serve || scripts.preview);
-            const hasWebSource = ["frontend", "web", "app", "src/app"].some(dir => existsSync(join(root, dir)));
+            const hasWebSource = ["frontend", "web", "app", "src/app", "Frontend/HooshyarWebApp"].some(dir => existsSync(join(root, dir)));
             if (!hasRunnableWebScript && !hasWebSource) missingLayers.push("web-entrypoint");
         }
 
-        const persistenceCandidates = ["Backend/HBOS/Infrastructure", "Backend/HBOS/Persistence", "Backend/AI_Runtime/persistence", "prisma", "database"];
-        if (!persistenceCandidates.some(dir => existsSync(join(root, dir)))) missingLayers.push("persistence-boundary");
+        const persistenceCandidates = [
+            "Backend/HBOS/Infrastructure",
+            "Backend/HBOS/Persistence",
+            "Backend/AI_Runtime/persistence",
+            "prisma",
+            "database",
+            "Backend/HBOS/Product/TenantPersistenceService.ts"
+        ];
+        if (!persistenceCandidates.some(candidate => existsSync(join(root, candidate)))) missingLayers.push("persistence-boundary");
 
-        const authCandidates = ["Backend/HBOS/Auth", "Backend/HBOS/Security", "Backend/HBOS/Identity"];
-        if (!authCandidates.some(dir => existsSync(join(root, dir)))) missingLayers.push("authentication-authorization-boundary");
+        const authCandidates = [
+            "Backend/HBOS/Auth",
+            "Backend/HBOS/Security",
+            "Backend/HBOS/Identity",
+            "Backend/HBOS/Product/OrganizationIdentityService.ts"
+        ];
+        if (!authCandidates.some(candidate => existsSync(join(root, candidate)))) missingLayers.push("authentication-authorization-boundary");
+
+        if (existsSync(join(root, this.roadmapPath))) {
+            try {
+                const roadmap = JSON.parse(readFileSync(join(root, this.roadmapPath), "utf8")) as { capabilities?: RoadmapCapability[] };
+                for (const capability of roadmap.capabilities ?? []) {
+                    const paths = [capability.implementationPath, capability.testPath, capability.documentationPath]
+                        .filter((value): value is string => typeof value === "string" && value.length > 0);
+                    const missing = paths.filter(path => !existsSync(join(root, path)));
+                    if (missing.length > 0) {
+                        missingLayers.push(`roadmap:${capability.capabilityId ?? "unknown"}:${missing.join(",")}`);
+                    }
+                }
+            } catch {
+                missingLayers.push("commercial-roadmap-invalid");
+            }
+        } else {
+            missingLayers.push("commercial-roadmap-missing");
+        }
 
         const blockedExternalDependencies: string[] = [];
         if (contract.includes("Payment-provider activation is an external dependency")) blockedExternalDependencies.push("payment-provider-activation");
