@@ -219,6 +219,21 @@ export class AutonomousBuildDaemon {
                 );
                 console.log(JSON.stringify({ type: "AUTONOMOUS_REWEAVE", cycle, recovery }));
 
+                try {
+                    this.knotRecovery.rollback(this.root, recovery.checkpoint);
+                    console.log(JSON.stringify({ type: "AUTONOMOUS_ROLLBACK", cycle, checkpoint: recovery.checkpoint.commit, capabilityId: mission.capabilityId }));
+                } catch (error) {
+                    const blocked = {
+                        status: "BLOCKED",
+                        stage: "RECOVERY",
+                        issues: ["CHECKPOINT_ROLLBACK_FAILED"],
+                        checkpoint: recovery.checkpoint.commit,
+                        error: String(error)
+                    };
+                    console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, result: blocked }));
+                    return { status: "blocked", cycles: cycle, history: [...history, { cycle, recovery, status: "blocked", result: blocked }] };
+                }
+
                 const repairGoal = {
                     capabilityId: recovery.repairCapabilityId!,
                     capability: `repair and re-verify knot ${mission.capabilityId} from checkpoint ${before.commit}`,
