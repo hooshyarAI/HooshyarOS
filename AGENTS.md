@@ -6,6 +6,7 @@
 - `Docs/ARCHITECTURE.md` — Architecture Freeze V4.
 - `Assistant/SYSTEM_PROMPT.md` — autonomous construction constitution.
 - `Docs/AUTONOMOUS_WEAVING_DOCTRINE.md` — expert knot-by-knot construction and recovery doctrine.
+- `Docs/AUTONOMOUS_7_DAY_BUILD_SLA.md` — permanent seven-day autonomous construction performance law.
 - Existing architecture decisions, HBOS engines, capability owners, tests and documentation — inspect before adding anything.
 
 The repository is the durable memory of the approved architecture, product principles, autonomous-construction role, decision logic and verification rules. Do not rely on conversational memory when the repository can provide the governing rule.
@@ -23,6 +24,17 @@ Architecture → Decision → Capability → Tool Selection → Generate → Sta
 When the Assistant completion gate is verified, immediately hand off to the canonical platform continuation flow:
 
 AUDIT → SELECT NEXT GENUINELY MISSING CAPABILITY → IMPLEMENT → TEST → INTEGRATE → VERIFY → COMMIT → PUSH → AUDIT AGAIN
+
+### Seven-day performance law
+The autonomous construction fabric is governed by a **seven-calendar-day target** for constructing the canonical HooshyarOS platform correctly and with production-grade engineering discipline.
+
+This is a performance constraint, not permission to weaken correctness. All construction decisions must optimize:
+
+**maximum correct throughput subject to architecture, quality, security, governance and verification constraints.**
+
+Therefore the Assistant must actively remove unnecessary serialization, repeated full-suite verification, duplicate generation, false-negative capability detection, blind retry loops and avoidable human intervention. Independent work should be batched or parallelized when dependencies and repository isolation permit it. Verification should be proportional to risk: focused verification for local confidence, periodic integration checkpoints for system confidence, and deep audits when risk or evidence requires them.
+
+The construction fabric must continuously measure generation, verification, repair and cycle time; completed capabilities per hour; retries; queue depth; blocking reasons; and cumulative backlog progress. The seven-day objective must be treated as an engineering constraint and optimized from measured evidence.
 
 ## Expert weaving contract
 Every construction cycle follows the expert weaving doctrine:
@@ -61,7 +73,7 @@ This restriction is operational, not architectural: the HooshyarOS product may s
 4. Prefer the smallest complete change that advances the frozen architecture.
 5. Use Python workers and GitHub as the canonical autonomous construction toolchain.
 6. Do not invoke, install, configure or rely on external coding agents/providers during construction.
-7. Run static validation, focused tests and integration verification before finalizing.
+7. Run static validation, focused tests and integration verification before finalizing, using the risk-proportional cadence defined by the seven-day performance law.
 8. If verification fails, diagnose and repair automatically within a bounded budget.
 9. Preserve failure evidence; never fake a healthy result.
 10. Keep internal contracts observable and recoverable.
@@ -72,6 +84,9 @@ This restriction is operational, not architectural: the HooshyarOS product may s
 15. Do not advance past a knot whose verification or repository evidence is inconsistent.
 16. Maintain a trusted Git checkpoint for accepted knots and repair from that checkpoint when required.
 17. Prefer root-cause analysis over blind retry loops.
+18. Optimize the construction method continuously against the seven-day objective using measured throughput evidence.
+19. Parallelize independent capabilities only when dependency contracts, repository isolation and deterministic integration remain safe.
+20. Never trade architecture, security, governance, correctness or evidence integrity for apparent speed.
 
 ## Architecture changes
 Architecture Freeze V4 is the default source of truth. Change it only when an actual contradiction or missing architectural capability is demonstrated by repository evidence. If changed, update the master charter, architecture document, governance charter and affected decisions before continuing construction.
@@ -80,4 +95,4 @@ Architecture Freeze V4 is the default source of truth. Change it only when an ac
 Do not redesign the architecture because implementation is difficult. Do not weaken governance, security, explainability, resilience or verification to make a cycle appear complete. If a future instruction conflicts with the permanent charter, inspect the evidence and resolve the conflict explicitly rather than inventing a new construction method.
 
 ## Progress
-The autonomous build daemon emits a progress report every 50 cycles. It should continue until the repository reaches a stable completion state, the canonical backlog is exhausted, or a bounded evidence-backed failure blocks construction.
+The autonomous build daemon must continuously emit measurable progress and throughput telemetry. It should continue until the repository reaches a stable completion state, the canonical backlog is exhausted, or a bounded evidence-backed failure blocks construction. Progress evaluation must include the seven-day performance constraint rather than merely counting successful test runs.
