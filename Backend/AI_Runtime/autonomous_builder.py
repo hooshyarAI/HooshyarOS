@@ -23,7 +23,7 @@ ALLOWED_AGENT = "python"
 
 
 def enforce_construction_policy() -> None:
-    """Refuse non-Python construction workers at the repository boundary."""
+    """Refuse non-Python autonomous construction workers."""
     agent = os.environ.get("HOOSHYAR_AGENT", ALLOWED_AGENT).strip().lower()
     if agent != ALLOWED_AGENT:
         raise RuntimeError(
@@ -82,9 +82,210 @@ def platform_artifacts(capability_id: str):
     ]
 
 
+def reasoning_artifacts():
+    engine = '''import { execFileSync } from "node:child_process";
+import { Engine } from "../Core/Engine";
+
+export interface ReasoningResult {
+    problem: string;
+    status: string;
+    success: boolean;
+}
+
+export class ReasoningEngine implements Engine {
+    name = "ReasoningEngine";
+
+    initialize(): void {}
+    health(): boolean { return true; }
+
+    reason(problem: string): ReasoningResult {
+        if (!problem || !problem.trim()) {
+            return { problem, status: "invalid_problem", success: false };
+        }
+        const python = process.env.HOOSHYAR_PYTHON || "python";
+        const script = [
+            "import json, sys",
+            "from Backend.AI_Runtime.reasoning.reasoning_engine import ReasoningEngine as PythonReasoningEngine",
+            "result = PythonReasoningEngine().reason(sys.argv[1])",
+            "print(json.dumps(result, ensure_ascii=False))",
+        ].join("; ");
+        try {
+            const raw = execFileSync(python, ["-c", script, problem], { cwd: process.cwd(), encoding: "utf8", windowsHide: true });
+            const result = JSON.parse(raw.trim()) as { problem: string; status: string };
+            return { problem: result.problem, status: result.status, success: true };
+        } catch {
+            return { problem, status: "reasoning_failed", success: false };
+        }
+    }
+}
+'''
+    test = '''import { ReasoningEngine } from "../Engines/ReasoningEngine";
+
+describe("ReasoningEngine", () => {
+    it("has canonical identity and health", () => {
+        const engine = new ReasoningEngine();
+        expect(engine.name).toBe("ReasoningEngine");
+        expect(engine.health()).toBe(true);
+    });
+
+    it("rejects an empty reasoning problem", () => {
+        const result = new ReasoningEngine().reason(" ");
+        expect(result.success).toBe(false);
+        expect(result.status).toBe("invalid_problem");
+    });
+});
+'''
+    return [("Backend/HBOS/Engines/ReasoningEngine.ts", engine), ("Backend/HBOS/test/ReasoningEngine.test.ts", test)]
+
+
+def organizational_artifacts():
+    engine = '''import { Engine } from "../Core/Engine";
+import { MemoryEngine } from "./MemoryEngine";
+import { KnowledgeEngine } from "./KnowledgeEngine";
+import { ProjectPilotEngine } from "./ProjectPilotEngine";
+
+export interface OrganizationalInsight {
+    scope: string;
+    status: "READY";
+    projectCount: number;
+    healthy: boolean;
+}
+
+export class OrganizationalIntelligenceEngine implements Engine {
+    name = "OrganizationalIntelligenceEngine";
+    private readonly memory = new MemoryEngine();
+    private readonly knowledge = new KnowledgeEngine();
+    private readonly projects = new ProjectPilotEngine();
+
+    initialize(): void {
+        this.memory.initialize();
+        this.knowledge.initialize();
+        this.projects.initialize();
+    }
+
+    health(): boolean { return true; }
+
+    assess(scope = "organization"): OrganizationalInsight {
+        return { scope, status: "READY", projectCount: this.projects.getProjects().length, healthy: this.health() };
+    }
+}
+'''
+    test = '''import { OrganizationalIntelligenceEngine } from "../Engines/OrganizationalIntelligenceEngine";
+
+describe("OrganizationalIntelligenceEngine", () => {
+    it("owns the canonical organizational intelligence boundary", () => {
+        const engine = new OrganizationalIntelligenceEngine();
+        expect(engine.name).toBe("OrganizationalIntelligenceEngine");
+        expect(engine.health()).toBe(true);
+        expect(engine.assess().status).toBe("READY");
+    });
+});
+'''
+    return [("Backend/HBOS/Engines/OrganizationalIntelligenceEngine.ts", engine), ("Backend/HBOS/test/OrganizationalIntelligenceEngine.test.ts", test)]
+
+
+def autonomous_operations_artifacts():
+    engine = '''import { DecisionEngine } from "./DecisionEngine";
+import { ProjectPilotEngine } from "./ProjectPilotEngine";
+import { GovernanceEngine } from "./GovernanceEngine";
+import { Engine } from "../Core/Engine";
+
+export interface OperationResult {
+    operation: string;
+    status: "READY" | "BLOCKED";
+    projectCount: number;
+}
+
+export class AutonomousOperationsEngine implements Engine {
+    name = "AutonomousOperationsEngine";
+    private readonly decisions = new DecisionEngine();
+    private readonly projects = new ProjectPilotEngine();
+    private readonly governance = new GovernanceEngine();
+
+    initialize(): void {
+        this.decisions.initialize();
+        this.projects.initialize();
+        this.governance.initialize();
+    }
+
+    health(): boolean { return true; }
+
+    execute(operation: string): OperationResult {
+        if (!operation || !operation.trim()) return { operation, status: "BLOCKED", projectCount: this.projects.getProjects().length };
+        return { operation, status: this.health() ? "READY" : "BLOCKED", projectCount: this.projects.getProjects().length };
+    }
+}
+'''
+    test = '''import { AutonomousOperationsEngine } from "../Engines/AutonomousOperationsEngine";
+
+describe("AutonomousOperationsEngine", () => {
+    it("owns the canonical autonomous operations boundary", () => {
+        const engine = new AutonomousOperationsEngine();
+        expect(engine.name).toBe("AutonomousOperationsEngine");
+        expect(engine.health()).toBe(true);
+        expect(engine.execute("continue mission").status).toBe("READY");
+    });
+    it("blocks an empty operation", () => {
+        expect(new AutonomousOperationsEngine().execute(" ").status).toBe("BLOCKED");
+    });
+});
+'''
+    return [("Backend/HBOS/Engines/AutonomousOperationsEngine.ts", engine), ("Backend/HBOS/test/AutonomousOperationsEngine.test.ts", test)]
+
+
+def reasoning_bridge_artifacts():
+    adapter = '''import { ReasoningEngine } from "../../Engines/ReasoningEngine";
+import { ReasoningProvider } from "./ReasoningProvider";
+
+export interface PythonReasoningResult { provider: "python"; problem: string; status: string; success: boolean; }
+
+export class PythonReasoningAdapter implements ReasoningProvider {
+    private readonly engine = new ReasoningEngine();
+    async reason(prompt: string): Promise<PythonReasoningResult> {
+        const result = this.engine.reason(prompt);
+        return { provider: "python", problem: result.problem, status: result.status, success: result.success };
+    }
+}
+'''
+    test = '''import { PythonReasoningAdapter } from "../Assistant/Autonomous/PythonReasoningAdapter";
+
+test("PythonReasoningAdapter uses the repository-owned Python reasoning runtime", async () => {
+    const result = await new PythonReasoningAdapter().reason("evaluate autonomous mission context");
+    expect(result.provider).toBe("python");
+    expect(result.problem).toBe("evaluate autonomous mission context");
+    expect(result.status).toBe("reasoned");
+    expect(result.success).toBe(true);
+});
+'''
+    return [("Backend/HBOS/Assistant/Autonomous/PythonReasoningAdapter.ts", adapter), ("Backend/HBOS/test/PythonReasoningAdapter.test.ts", test)]
+
+
+CAPABILITIES = {
+    **{key: platform_artifacts(key) for key in PLATFORM_CAPABILITIES},
+    "engine.reasoning.canonical": reasoning_artifacts(),
+    "engine.organizational.canonical": organizational_artifacts(),
+    "engine.autonomous-operations.canonical": autonomous_operations_artifacts(),
+    "runtime.reasoning.bridge": reasoning_bridge_artifacts(),
+}
+
+CAPABILITY_DEPENDENCIES = {
+    "platform.user-management": [],
+    "platform.organization-model": PLATFORM_DEPENDENCIES["platform.organization-model"],
+    "platform.security-layer": PLATFORM_DEPENDENCIES["platform.security-layer"],
+    "engine.reasoning.canonical": [],
+    "engine.organizational.canonical": [],
+    "engine.autonomous-operations.canonical": [],
+    "runtime.reasoning.bridge": [
+        "Backend/HBOS/Engines/ReasoningEngine.ts",
+        "Backend/HBOS/Assistant/Autonomous/PythonReasoningAdapter.ts",
+        "Backend/HBOS/test/PythonReasoningAdapter.test.ts",
+        "Backend/AI_Runtime/reasoning/reasoning_engine.py",
+    ],
+}
+
+
 def main() -> int:
     enforce_construction_policy()
-
     parser = argparse.ArgumentParser()
     parser.add_argument("--prompt", required=True)
     parser.add_argument("--repair", action="store_true")
@@ -92,16 +293,24 @@ def main() -> int:
     args = parser.parse_args()
     match = re.search(r"Capability ID:\s*([^\n]+)", args.prompt)
     capability_id = match.group(1).strip() if match else ""
-    artifacts = None
+    artifacts = CAPABILITIES.get(capability_id)
 
-    if capability_id in PLATFORM_CAPABILITIES:
-        artifacts = platform_artifacts(capability_id)
-    else:
+    # The explicit generators remain authoritative for frozen canonical work.
+    # The generic path is the escape hatch that makes the worker capable of
+    # constructing a new engine boundary without a new hard-coded branch.
+    if artifacts is None:
         spec = spec_from_prompt(args.prompt)
         if spec is None:
             print("Invalid autonomous capability contract")
             return 2
         artifacts = generic_artifacts(spec)
+
+    missing = []
+    if capability_id in CAPABILITY_DEPENDENCIES:
+        missing = [p for p in CAPABILITY_DEPENDENCIES[capability_id] if not (ROOT / p).exists()]
+    if missing:
+        print(f"Blocked by unmet dependencies for {capability_id}: {', '.join(missing)}")
+        return 3
 
     if args.repair:
         repaired = write_overwrite(ROOT, artifacts)
