@@ -185,16 +185,22 @@ export class AutonomousBuildDaemon {
                 }
                 result = repairResult;
                 const repaired = this.mission.snapshot();
-                if (repaired.commit === before.commit || !repaired.clean) {
+                if (repaired.commit === before.commit && !result.result.idempotent) {
                     budgetSnapshot = this.performanceBudget.completeCycle(cycleStartedAt);
                     const blocked = { status: "BLOCKED", stage: "VERIFY", issues: ["REWEAVE_DID_NOT_PRODUCE_VERIFIED_REPOSITORY_CHANGE"], checkpoint: before.commit, current: repaired.commit };
+                    console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, performance: budgetSnapshot, result: blocked }));
+                    return { status: "blocked", cycles: cycle, history };
+                }
+                if (!repaired.clean) {
+                    budgetSnapshot = this.performanceBudget.completeCycle(cycleStartedAt);
+                    const blocked = { status: "BLOCKED", stage: "VERIFY", issues: ["REWEAVE_LEFT_WORKING_TREE_DIRTY"], checkpoint: before.commit, current: repaired.commit };
                     console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, performance: budgetSnapshot, result: blocked }));
                     return { status: "blocked", cycles: cycle, history };
                 }
             }
 
             const after = this.mission.snapshot();
-            const knotObservation = this.knotRecovery.observe({ capabilityId: mission.capabilityId, commit: before.commit }, { capabilityId: mission.capabilityId, executionOk: result.result.ok, verificationComplete: result.result.ok && result.result.stage === "FINALIZE", repositoryChanged: after.commit !== before.commit && after.clean });
+            const knotObservation = this.knotRecovery.observe({ capabilityId: mission.capabilityId, commit: before.commit }, { capabilityId: mission.capabilityId, executionOk: result.result.ok, verificationComplete: result.result.ok && result.result.stage === "FINALIZE", repositoryChanged: result.result.idempotent ? true : after.commit !== before.commit && after.clean });
             console.log(JSON.stringify({ type: "AUTONOMOUS_KNOT_CHECK", cycle, recovery: knotObservation }));
             if (knotObservation.recover) {
                 budgetSnapshot = this.performanceBudget.completeCycle(cycleStartedAt);
@@ -207,11 +213,14 @@ export class AutonomousBuildDaemon {
             budgetSnapshot = this.performanceBudget.completeCycle(cycleStartedAt);
             const current = history[history.length - 1] as Record<string, unknown>;
             if (current) current.performance = budgetSnapshot;
-            if (after.commit === before.commit && after.clean && cycle < this.maxCycles) {
+            if (after.commit === before.commit && after.clean && !result.result.idempotent && cycle < this.maxCycles) {
                 console.log(JSON.stringify({ type: "AUTONOMOUS_IDLE", cycle, commit: after.commit, capability: mission.capability, performance: budgetSnapshot, message: "No repository change was produced; refusing to advance as completed." }));
                 return { status: "idle", cycles: cycle, history };
             }
-            if (cycle % this.reportEvery === 0) console.log(JSON.stringify({ type: "AUTONOMOUS_PROGRESS", cycle, latestCommit: after.commit, status: result.status, assistantGatePassed: decision.assistantGatePassed, performance: budgetSnapshot }));
+            if (result.result.idempotent) {
+                console.log(JSON.stringify({ type: "AUTONOMOUS_IDEMPOTENT_ADVANCE", cycle, capabilityId: mission.capabilityId, capability: mission.capability, commit: after.commit, status: result.status, message: "Capability already existed, passed verification, and is accepted without synthetic repository mutation." }));
+            }
+            if (cycle % this.reportEvery === 0) console.log(JSON.stringify({ type: "AUTONOMOUS_PROGRESS", cycle, latestCommit: after.commit, status: result.status, assistantGatePassed: decision.assistantGatePassed, idempotent: result.result.idempotent === true, performance: budgetSnapshot }));
         }
         console.log(JSON.stringify({ type: "AUTONOMOUS_CYCLE_LIMIT", cycles: this.maxCycles, performance: this.performanceBudget.snapshot() }));
         return { status: "cycle_limit", cycles: this.maxCycles, history };
