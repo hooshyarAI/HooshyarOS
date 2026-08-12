@@ -40,6 +40,8 @@ describe("AutonomousConstructionEngine idempotent construction", () => {
         expect(result.ok).toBe(true);
         expect(result.status).toBe("BUILT");
         expect(result.stage).toBe("FINALIZE");
+        expect(result.idempotent).toBe(true);
+        expect(result.details).toContain("idempotent");
         expect(result.trace).toEqual(["ARCHITECTURE", "PLAN", "GENERATE", "VERIFY", "FINALIZE"]);
     });
 
