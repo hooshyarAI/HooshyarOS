@@ -16,6 +16,7 @@ describe("AutonomousPlatformWeaving", () => {
         SecurityLayerEngine: "authorize(",
         APIGatewayEngine: "route(",
         ReasoningEngine: "reason(",
+        PythonReasoningAdapter: "reason(",
         OrganizationalIntelligenceEngine: "assess(",
         AutonomousOperationsEngine: "execute(",
         FinancialIntelligenceEngine: "analyze(",
@@ -37,8 +38,10 @@ describe("AutonomousPlatformWeaving", () => {
     const artifact = (root: string, path: string) => {
         const target = join(root, path);
         mkdirSync(join(target, ".."), { recursive: true });
-        const match = path.match(/(?:Engines|test)[\\/]([^\\/]+)Engine(?:\.test)?\.ts$/);
-        const className = match?.[1] ? `${match[1]}Engine` : "";
+        const match = path.match(/(?:Engines|Assistant[\\/]Autonomous|test)[\\/]([^\\/]+?)(?:Engine)?(?:\.test)?\.ts$/);
+        const className = match?.[1]
+            ? `${match[1].endsWith("Engine") ? match[1] : match[1] + (match[1].endsWith("Adapter") ? "" : "Engine")}`
+            : "";
         const behavior = behaviorByEngine[className] ?? "verified";
         const isTest = /[\\/]test[\\/]/.test(path);
         writeFileSync(target, isTest ? `describe("behavior", () => { test("works", () => { const engine = new ${className}(); ${behavior} expect(true).toBe(true); }); });\n` : `class ${className} { ${behavior} } // verified implementation evidence\n`, "utf8");
