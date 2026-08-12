@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { AutonomousDevelopmentLoop } from "../Architecture/Autonomous/AutonomousDevelopmentLoop";
 
 describe("Autonomous development loop integrity", () => {
     it("contains exactly one canonical goal normalizer", () => {
@@ -10,10 +11,15 @@ describe("Autonomous development loop integrity", () => {
         expect(implementations).toHaveLength(1);
     });
 
-    it("maps repair-prefixed goals to their canonical capability identity", () => {
-        const sourcePath = join(process.cwd(), "Backend/HBOS/Architecture/Autonomous/AutonomousDevelopmentLoop.ts");
-        const source = readFileSync(sourcePath, "utf8");
-        expect(source).toContain("capabilityId.startsWith(\"repair-\")");
-        expect(source).toContain("capabilityId.slice(\"repair-\".length)");
+    it("preserves repair-prefixed capability identity during canonicalization", () => {
+        const repairGoal = {
+            capabilityId: "repair-product.financial-data-ingestion",
+            capability: "repair and re-verify knot product.financial-data-ingestion"
+        };
+
+        const canonical = AutonomousDevelopmentLoop.canonicalizeGoal(repairGoal);
+
+        expect(canonical.capabilityId).toBe("repair-product.financial-data-ingestion");
+        expect(canonical.capabilityId.startsWith("repair-")).toBe(true);
     });
 });
