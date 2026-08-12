@@ -16,20 +16,37 @@ function run(command: string, args: string[], cwd: string, timeout = 15 * 60 * 1
             }
         }
         const output = execFileSync(executable, executableArgs, {
-            cwd, encoding: "utf8", timeout, shell: false, windowsHide: true, stdio: ["ignore", "pipe", "pipe"]
+            cwd,
+            encoding: "utf8",
+            timeout,
+            shell: false,
+            windowsHide: true,
+            stdio: ["ignore", "pipe", "pipe"]
         });
         return { ok: true, code: 0, output: String(output), error: null, elapsedMs: Date.now() - started };
     } catch (error: any) {
         const stdout = String(error?.stdout || "");
         const stderr = String(error?.stderr || "");
         const exitCode = error?.status ?? 1;
-        const expectedGitDiffQuiet = process.platform === "win32"
-            ? command === "git" && args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet" && exitCode === 1
-            : false;
+        const expectedGitDiffQuiet = command === "git"
+            && args[0] === "diff"
+            && args[1] === "--cached"
+            && args[2] === "--quiet"
+            && exitCode === 1;
         if (expectedGitDiffQuiet) {
             return { ok: true, code: 1, output: `${stdout}${stderr}`, error: null, elapsedMs: Date.now() - started };
         }
-        console.error(JSON.stringify({ type: "AUTONOMOUS_TOOL_ERROR", command, args, cwd, exitCode, stdout, stderr, elapsedMs: Date.now() - started, message: error?.message ?? `${command} failed` }, null, 2));
+        console.error(JSON.stringify({
+            type: "AUTONOMOUS_TOOL_ERROR",
+            command,
+            args,
+            cwd,
+            exitCode,
+            stdout,
+            stderr,
+            elapsedMs: Date.now() - started,
+            message: error?.message ?? `${command} failed`
+        }, null, 2));
         return { ok: false, code: exitCode, output: `${stdout}\n${stderr}`, error: error?.message ?? `${command} failed`, elapsedMs: Date.now() - started };
     }
 }
@@ -39,17 +56,26 @@ function commandExists(command: string, cwd: string): boolean {
         const locator = process.platform === "win32" ? "where.exe" : "which";
         execFileSync(locator, [command], { cwd, encoding: "utf8", windowsHide: true, stdio: ["ignore", "pipe", "ignore"] });
         return true;
-    } catch { return false; }
+    } catch {
+        return false;
+    }
 }
 
 export type ImplementationAgent = "python";
+
 export function resolveImplementationAgent(root = process.cwd()): ImplementationAgent | null {
     const requested = process.env.HOOSHYAR_AGENT?.trim().toLowerCase();
     if (requested && requested !== "python") return null;
     return commandExists("python", root) ? "python" : null;
 }
-export function repositoryStateChanged(before: string, after: string): boolean { return before.trim() !== after.trim(); }
-export function buildAgentArgs(_agent: ImplementationAgent, prompt: string): string[] { return ["Backend/AI_Runtime/autonomous_builder.py", "--prompt", prompt]; }
+
+export function repositoryStateChanged(before: string, after: string): boolean {
+    return before.trim() !== after.trim();
+}
+
+export function buildAgentArgs(_agent: ImplementationAgent, prompt: string): string[] {
+    return ["Backend/AI_Runtime/autonomous_builder.py", "--prompt", prompt];
+}
 
 const DEFAULT_DIRECTIVES = [
     "Implement exactly one concrete capability from the canonical mission.",
@@ -58,6 +84,7 @@ const DEFAULT_DIRECTIVES = [
     "Repair verification failures before finalization.",
     "Do not redesign Architecture Freeze V4."
 ];
+
 const REPOSITORY_STATUS_ARGS = ["status", "--porcelain=v1", "--", ".", ":(exclude)node_modules"];
 const FULL_VERIFY_EVERY = Math.max(1, Number.parseInt(process.env.HOOSHYAR_FULL_VERIFY_EVERY || "10", 10) || 10);
 const BUILDER_TEST_EVERY = Math.max(1, Number.parseInt(process.env.HOOSHYAR_BUILDER_TEST_EVERY || "5", 10) || 5);
@@ -113,7 +140,16 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
     return [
         {
             name: "architecture",
-            execute: (_stage, context) => ({ ok: Boolean(context.plan.capabilityId && context.plan.capability && context.plan.targetEngine), artifact: { approved: true, capabilityId: context.plan.capabilityId, targetEngine: context.plan.targetEngine, architectureRules: context.plan.architectureRules, directives: DEFAULT_DIRECTIVES } })
+            execute: (_stage, context) => ({
+                ok: Boolean(context.plan.capabilityId && context.plan.capability && context.plan.targetEngine),
+                artifact: {
+                    approved: true,
+                    capabilityId: context.plan.capabilityId,
+                    targetEngine: context.plan.targetEngine,
+                    architectureRules: context.plan.architectureRules,
+                    directives: DEFAULT_DIRECTIVES
+                }
+            })
         },
         {
             name: "generator",
@@ -127,7 +163,18 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                 const result = run(agent, buildAgentArgs(agent, buildAgentPrompt(context)), root, 30 * 60 * 1000);
                 const after = run("git", REPOSITORY_STATUS_ARGS, root);
                 const changed = after.ok && repositoryStateChanged(before.output, after.output);
-                const artifact = { type: "AUTONOMOUS_AGENT_GENERATION_RESULT", provider: agent, capabilityId: context.plan.capabilityId, capability: context.plan.capability, exitCode: result.code, changed, elapsedMs: result.elapsedMs, output: result.output, error: result.error, timestamp: new Date().toISOString() };
+                const artifact = {
+                    type: "AUTONOMOUS_AGENT_GENERATION_RESULT",
+                    provider: agent,
+                    capabilityId: context.plan.capabilityId,
+                    capability: context.plan.capability,
+                    exitCode: result.code,
+                    changed,
+                    elapsedMs: result.elapsedMs,
+                    output: result.output,
+                    error: result.error,
+                    timestamp: new Date().toISOString()
+                };
                 console.log(JSON.stringify(artifact, null, 2));
                 if (!result.ok) return { ok: false, issue: "AUTONOMOUS_AGENT_GENERATION_FAILED", artifact };
                 if (!after.ok) return { ok: false, issue: "AUTONOMOUS_REPOSITORY_STATE_UNAVAILABLE", artifact };
@@ -178,7 +225,9 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                     error: jest.error
                 };
                 console.log(JSON.stringify(artifact, null, 2));
-                return jest.code === 0 ? { ok: true, artifact } : { ok: false, issue: "AUTONOMOUS_VERIFY_FAILED", artifact: { ...artifact, repairRequired: true } };
+                return jest.code === 0
+                    ? { ok: true, artifact }
+                    : { ok: false, issue: "AUTONOMOUS_VERIFY_FAILED", artifact: { ...artifact, repairRequired: true } };
             }
         },
         {
@@ -189,7 +238,7 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                 if (!status.ok) return { ok: false, issue: "GIT_STATUS_FAILED", artifact: { output: status.output, error: status.error } };
                 if (!status.output.trim()) return { ok: false, issue: "GIT_NO_REPOSITORY_CHANGE", artifact: { clean: true, committed: false, pushed: false, changeDetected: false } };
                 const add = run("git", ["add", "-A"], root);
-                if (!add.ok) return { ok: false, issue: "GIT_ADD_FAILED", artifact: { output: add.output, error: add.error };
+                if (!add.ok) return { ok: false, issue: "GIT_ADD_FAILED", artifact: { output: add.output, error: add.error } };
                 const staged = run("git", ["diff", "--cached", "--quiet"], root);
                 if (!staged.ok && staged.code !== 1) return { ok: false, issue: "GIT_STAGED_DIFF_CHECK_FAILED", artifact: { output: staged.output, error: staged.error } };
                 if (staged.code === 0) return { ok: false, issue: "GIT_NO_STAGED_CHANGE", artifact: { clean: true, committed: false, pushed: false, changeDetected: false } };
