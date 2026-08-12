@@ -81,6 +81,18 @@ export class AutonomousPlatformContinuation {
                     p("Backend/HBOS/test/DeploymentContractEngine.test.ts"),
                     p("Docs/Engines/DeploymentContractEngine.md")
                 ]
+            },
+            {
+                capabilityId: "platform.cloud-deployment",
+                capability: "implement repository-native Cloud Deployment execution capability",
+                targetEngine: "Cloud Deployment Engine",
+                dependencies: ["Deployment Contract Engine", "Deployment Readiness Engine"],
+                requiredPaths: [
+                    p("Backend/HBOS/Engines/CloudDeploymentEngine.ts"),
+                    p("Backend/HBOS/test/CloudDeploymentEngine.test.ts"),
+                    p("Backend/HBOS/Assistant/Autonomous/Production/DeploymentController.ts"),
+                    p("Backend/AI_Runtime/cloud_deployment.py")
+                ]
             }
         ];
 
