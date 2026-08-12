@@ -10,11 +10,6 @@ export interface CanonicalCapabilityAuditResult {
     nonAutonomousProductionItems: string[];
 }
 
-/**
- * Independent completion audit for the governed platform continuation loop.
- * Repository-native production controls are treated as autonomous capabilities;
- * external operational activities remain explicitly non-autonomous.
- */
 export class CanonicalCapabilityAudit {
     audit(root: string, mission: AutonomousProjectMission): CanonicalCapabilityAuditResult {
         const roadmapPath = join(root, "Docs", "ROADMAP.md");
@@ -48,7 +43,8 @@ export class CanonicalCapabilityAudit {
             ["Performance Testing", "Backend/HBOS/Engines/PerformanceTestingEngine.ts", "Backend/HBOS/test/PerformanceTestingEngine.test.ts", "Docs/Engines/PerformanceTestingEngine.md"],
             ["Customer Testing", "Backend/HBOS/Engines/CustomerTestingEngine.ts", "Backend/HBOS/test/CustomerTestingEngine.test.ts", "Docs/Engines/CustomerTestingEngine.md"],
             ["Deployment Readiness", "Backend/HBOS/Engines/DeploymentReadinessEngine.ts", "Backend/HBOS/test/DeploymentReadinessEngine.test.ts", "Docs/Engines/DeploymentReadinessEngine.md"],
-            ["Deployment Contract", "Backend/HBOS/Engines/DeploymentContractEngine.ts", "Backend/HBOS/test/DeploymentContractEngine.test.ts", "Docs/Engines/DeploymentContractEngine.md"]
+            ["Deployment Contract", "Backend/HBOS/Engines/DeploymentContractEngine.ts", "Backend/HBOS/test/DeploymentContractEngine.test.ts", "Docs/Engines/DeploymentContractEngine.md"],
+            ["Cloud Deployment", "Backend/HBOS/Engines/CloudDeploymentEngine.ts", "Backend/HBOS/test/CloudDeploymentEngine.test.ts", "Docs/Engines/CloudDeploymentEngine.md", "Backend/HBOS/Assistant/Autonomous/Production/DeploymentController.ts", "Backend/AI_Runtime/cloud_deployment.py"]
         ];
 
         const missingArtifacts: string[] = [];
@@ -60,9 +56,9 @@ export class CanonicalCapabilityAudit {
         }
 
         const backlogExhausted = mission.nextPlatformMission() === null;
-        const nonAutonomousProductionItems = [
-            "Cloud Deployment"
-        ].filter(item => roadmap.includes(item));
+        const cloudArtifacts = capabilityArtifacts.find(entry => entry[0] === "Cloud Deployment")?.slice(1) ?? [];
+        const cloudComplete = cloudArtifacts.every(artifact => existsSync(join(root, artifact)));
+        const nonAutonomousProductionItems = ["Cloud Deployment"].filter(item => roadmap.includes(item) && !cloudComplete);
 
         return {
             complete: roadmapPresent && backlogExhausted && missingArtifacts.length === 0,
