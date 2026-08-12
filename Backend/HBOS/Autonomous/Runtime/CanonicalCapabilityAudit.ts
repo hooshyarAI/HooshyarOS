@@ -11,6 +11,20 @@ export interface CanonicalCapabilityAuditResult {
 }
 
 export class CanonicalCapabilityAudit {
+    private readonly semanticMethods: Record<string, string[]> = {
+        "User Management": ["registerUser"],
+        "Organization Model": ["createOrganization"],
+        "Security Layer": ["authorize"],
+        "API Gateway": ["route"],
+        "Financial Analysis": ["analyze"],
+        "Budget Intelligence": ["analyze", "describeCapability"],
+        "Tax Intelligence": ["estimate", "describeCapability"],
+        "Risk Intelligence": ["assess", "describeCapability"],
+        "Dashboard": ["snapshot", "describeCapability"],
+        "Reports": ["build", "describeCapability"],
+        "Alerts": ["evaluate", "describeCapability"]
+    };
+
     audit(root: string, mission: AutonomousProjectMission): CanonicalCapabilityAuditResult {
         const roadmapPath = join(root, "Docs", "ROADMAP.md");
         const roadmapPresent = existsSync(roadmapPath);
@@ -52,6 +66,19 @@ export class CanonicalCapabilityAudit {
             if (!roadmap.includes(label)) continue;
             for (const artifact of artifacts) {
                 if (!existsSync(join(root, artifact))) missingArtifacts.push(`${label}: ${artifact}`);
+            }
+
+            const methods = this.semanticMethods[label];
+            if (methods && artifacts[0]) {
+                const sourcePath = join(root, artifacts[0]);
+                if (existsSync(sourcePath)) {
+                    const source = readFileSync(sourcePath, "utf8");
+                    for (const method of methods) {
+                        if (!new RegExp(`\\b${method}\\s*\\(`).test(source)) {
+                            missingArtifacts.push(`${label}: semantic behavior '${method}'`);
+                        }
+                    }
+                }
             }
         }
 
