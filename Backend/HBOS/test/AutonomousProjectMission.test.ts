@@ -32,14 +32,33 @@ describe("AutonomousProjectMission", () => {
         }
     });
 
-    it("recognizes a capability only after implementation, test and documentation evidence exist", () => {
+    it("does not treat identity-only test and documentation as completed behavioral evidence", () => {
+        const root = mkdtempSync(join(tmpdir(), "hooshyar-evidence-incomplete-"));
+        try {
+            mkdirSync(join(root, "Backend", "HBOS", "Engines"), { recursive: true });
+            mkdirSync(join(root, "Backend", "HBOS", "test"), { recursive: true });
+            mkdirSync(join(root, "Docs", "Engines"), { recursive: true });
+            writeFileSync(join(root, "Backend", "HBOS", "Engines", "UserManagementEngine.ts"), "export class UserManagementEngine { registerUser(value: string) { return value; } }\n");
+            writeFileSync(join(root, "Backend", "HBOS", "test", "UserManagementEngine.test.ts"), "describe('UserManagementEngine', () => { expect(true).toBe(true); });\n");
+            writeFileSync(join(root, "Docs", "Engines", "UserManagementEngine.md"), "# User Management Engine\n");
+
+            const mission = new AutonomousProjectMission(root);
+            const next = mission.nextPlatformMission();
+
+            expect(next?.capabilityId).toBe("platform.user-management");
+        } finally {
+            rmSync(root, { recursive: true, force: true });
+        }
+    });
+
+    it("recognizes a capability only after behavioral implementation and focused verification evidence exist", () => {
         const root = mkdtempSync(join(tmpdir(), "hooshyar-evidence-complete-"));
         try {
             mkdirSync(join(root, "Backend", "HBOS", "Engines"), { recursive: true });
             mkdirSync(join(root, "Backend", "HBOS", "test"), { recursive: true });
             mkdirSync(join(root, "Docs", "Engines"), { recursive: true });
-            writeFileSync(join(root, "Backend", "HBOS", "Engines", "UserManagementEngine.ts"), "export class UserManagementEngine {}\n");
-            writeFileSync(join(root, "Backend", "HBOS", "test", "UserManagementEngine.test.ts"), "describe('UserManagementEngine', () => {});\n");
+            writeFileSync(join(root, "Backend", "HBOS", "Engines", "UserManagementEngine.ts"), "export class UserManagementEngine { registerUser(value: string) { return value; } }\n");
+            writeFileSync(join(root, "Backend", "HBOS", "test", "UserManagementEngine.test.ts"), "describe('UserManagementEngine', () => { test('registers', () => { expect(new UserManagementEngine().registerUser('ali')).toBe('ali'); }); });\n");
             writeFileSync(join(root, "Docs", "Engines", "UserManagementEngine.md"), "# User Management Engine\n");
 
             const mission = new AutonomousProjectMission(root);
