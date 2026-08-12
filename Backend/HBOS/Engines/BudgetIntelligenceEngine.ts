@@ -22,4 +22,11 @@ export class BudgetIntelligenceEngine implements Engine {
             status: "READY"
         };
     }
+
+    // Canonical evidence-compatible alias. The capability contract owns one
+    // deterministic analysis operation; callers do not need a second budget
+    // calculation implementation.
+    analyzeBudget(input: BudgetAnalysisInput): BudgetAnalysisResult {
+        return this.analyze(input);
+    }
 }
