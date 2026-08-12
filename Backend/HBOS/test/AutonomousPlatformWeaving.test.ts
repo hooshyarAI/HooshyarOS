@@ -119,7 +119,13 @@ describe("AutonomousPlatformWeaving", () => {
             "Backend/HBOS/test/ProductionReadinessEngine.test.ts",
             "Docs/Engines/ProductionReadinessEngine.md"
         ]);
+        expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.security-audit");
 
+        complete(root, [
+            "Backend/HBOS/Engines/SecurityAuditEngine.ts",
+            "Backend/HBOS/test/SecurityAuditEngine.test.ts",
+            "Docs/Engines/SecurityAuditEngine.md"
+        ]);
         expect(mission.nextPlatformMission()).toBeNull();
     });
 
