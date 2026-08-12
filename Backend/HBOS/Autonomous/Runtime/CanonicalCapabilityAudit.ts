@@ -46,7 +46,8 @@ export class CanonicalCapabilityAudit {
             ["Repository Production Readiness", "Backend/HBOS/Engines/ProductionReadinessEngine.ts", "Backend/HBOS/test/ProductionReadinessEngine.test.ts", "Docs/Engines/ProductionReadinessEngine.md"],
             ["Security Audit", "Backend/HBOS/Engines/SecurityAuditEngine.ts", "Backend/HBOS/test/SecurityAuditEngine.test.ts", "Docs/Engines/SecurityAuditEngine.md"],
             ["Performance Testing", "Backend/HBOS/Engines/PerformanceTestingEngine.ts", "Backend/HBOS/test/PerformanceTestingEngine.test.ts", "Docs/Engines/PerformanceTestingEngine.md"],
-            ["Customer Testing", "Backend/HBOS/Engines/CustomerTestingEngine.ts", "Backend/HBOS/test/CustomerTestingEngine.test.ts", "Docs/Engines/CustomerTestingEngine.md"]
+            ["Customer Testing", "Backend/HBOS/Engines/CustomerTestingEngine.ts", "Backend/HBOS/test/CustomerTestingEngine.test.ts", "Docs/Engines/CustomerTestingEngine.md"],
+            ["Deployment Readiness", "Backend/HBOS/Engines/DeploymentReadinessEngine.ts", "Backend/HBOS/test/DeploymentReadinessEngine.test.ts", "Docs/Engines/DeploymentReadinessEngine.md"]
         ];
 
         const missingArtifacts: string[] = [];
