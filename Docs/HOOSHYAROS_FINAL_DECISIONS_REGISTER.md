@@ -112,17 +112,19 @@ The next capability is the first genuinely missing capability whose dependencies
 
 A completion gate or continuation token is orchestration state, not a product capability.
 
-## 7. Python-First Construction Decision
+## 7. Mandatory Construction Toolchain
 
-Python is the preferred repository-native worker/orchestration layer where it improves speed, determinism and inspectability.
+The HooshyarOS construction process is permanently restricted to three active participants:
 
-Use Python for appropriate repository discovery, auditing, context extraction, planning, deterministic generation, validation, test orchestration, diagnosis, bounded repair, evidence collection and build orchestration.
+1. **Python** — repository-native analysis, discovery, generation, verification, diagnosis, bounded repair and orchestration.
+2. **GitHub** — repository inspection, source control, commit, synchronization, review and publication.
+3. **This Assistant** — architecture reasoning, critical thinking, expert choice, implementation judgment and construction orchestration.
 
-TypeScript/Node remains canonical for platform components that require it.
+External coding assistants, cloud coding agents and alternative code-generation providers are prohibited from the construction process. They must not be invoked, installed, configured or depended upon for autonomous construction.
 
-Python must not be used to duplicate the TypeScript engine architecture.
+This includes Codex, GitHub Copilot, Claude and equivalent coding agents.
 
-The construction fabric is provider-independent. Codex, Copilot and Claude are not required runtime or architectural dependencies.
+This restriction applies to the **construction process**, not to unrelated provider-facing runtime abstractions that may exist in the finished product architecture. Such product abstractions must not become hidden dependencies of the autonomous construction fabric.
 
 ## 8. Autonomous Assistant Contract
 
@@ -132,7 +134,7 @@ The Assistant is complete only when it can reliably:
 - audit repository state;
 - select the next missing canonical capability;
 - select the correct engine boundary;
-- select an appropriate construction tool;
+- select an appropriate construction tool from the mandatory toolchain;
 - generate or modify implementation;
 - run static validation;
 - run focused tests;
@@ -192,7 +194,7 @@ The Assistant is the autonomous engineering executor/verifier.
 
 The human should not have to perform routine mechanical file creation, repetitive test execution, ordinary failure diagnosis, routine repair or manual capability advancement when the repository-native construction fabric can safely perform those tasks.
 
-Human intervention is reserved for genuine product decisions, permission/security boundaries, unresolved architectural contradictions, unavailable external resources or bounded failures that cannot safely be repaired.
+Human intervention is reserved for genuine product decisions, permission/security boundaries, unresolved architectural contradictions, unavailable external infrastructure resources or bounded failures that cannot safely be repaired.
 
 ## 13. Anti-Drift Laws
 
@@ -201,7 +203,7 @@ Never:
 - redesign the frozen architecture merely because implementation is difficult;
 - invent duplicate engines;
 - change the Assistant into an end-user advisor;
-- introduce external coding providers as hidden dependencies;
+- introduce external coding providers into the construction process;
 - declare completion from file existence;
 - skip validation or integration evidence;
 - weaken security, governance, explainability or resilience;
@@ -238,8 +240,10 @@ No future construction cycle should require the product owner to reconstruct hun
 The repository currently encodes the following invariants:
 
 - Assistant identity is construction intelligence only.
-- Python-first local construction is approved.
-- External coding providers are optional and non-required.
+- Python is the canonical construction worker/orchestration layer.
+- GitHub is the canonical repository and publication tool.
+- The Assistant is the architecture/reasoning/orchestration authority.
+- External coding assistants and providers are excluded from the construction path.
 - Completion is evidence-based.
 - Platform continuation is separate from the Assistant completion gate.
 - Platform selection is based on genuinely missing capabilities and satisfied dependencies.
@@ -257,7 +261,8 @@ Before changing code:
 - [ ] Capability proven genuinely missing
 - [ ] Dependencies checked
 - [ ] Reuse opportunities checked
-- [ ] Python/repository-native automation considered
+- [ ] Python/GitHub construction path confirmed
+- [ ] No prohibited external coding agent selected
 - [ ] Security/governance/observability implications checked
 
 Before finalization:
@@ -278,8 +283,7 @@ Before finalization:
 **Reuse what already exists.**  
 **Build only what is genuinely missing.**  
 **Use the correct engine boundary.**  
-**Automate mechanical work.**  
-**Prefer Python workers where they accelerate deterministic construction.**  
+**Use only Python, GitHub and the Assistant for construction.**  
 **Verify before claiming completion.**  
 **Repair from evidence.**  
 **Commit only verified work.**  
