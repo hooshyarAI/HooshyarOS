@@ -90,6 +90,9 @@ describe("AutonomousPlatformWeaving", () => {
         expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.tax-intelligence");
 
         complete(root, ["Backend/HBOS/Engines/TaxIntelligenceEngine.ts", "Backend/HBOS/test/TaxIntelligenceEngine.test.ts", "Docs/Engines/TaxIntelligenceEngine.md"]);
+        expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.risk-intelligence");
+
+        complete(root, ["Backend/HBOS/Engines/RiskIntelligenceEngine.ts", "Backend/HBOS/test/RiskIntelligenceEngine.test.ts"]);
         expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.dashboard");
 
         complete(root, ["Backend/HBOS/Engines/DashboardEngine.ts", "Backend/HBOS/test/DashboardEngine.test.ts", "Docs/Engines/DashboardEngine.md"]);
