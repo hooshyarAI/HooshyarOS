@@ -120,14 +120,17 @@ function focusedTestFor(capabilityId: string): string | null {
     return known[capabilityId] || null;
 }
 
-function productRoadmapPaths(root: string, capabilityId: string): string[] {
+export function productRoadmapPaths(root: string, capabilityId: string): string[] {
     const roadmapPath = join(root, "Docs", "Product", "PRODUCT_CONSTRUCTION_ROADMAP.json");
     if (!existsSync(roadmapPath)) return [];
+    const canonicalCapabilityId = capabilityId.startsWith("repair-")
+        ? capabilityId.slice("repair-".length)
+        : capabilityId;
     try {
         const roadmap = JSON.parse(readFileSync(roadmapPath, "utf8")) as {
             capabilities?: Array<{ capabilityId?: string; implementationPath?: string; testPath?: string; documentationPath?: string }>;
         };
-        const capability = roadmap.capabilities?.find(item => item.capabilityId === capabilityId);
+        const capability = roadmap.capabilities?.find(item => item.capabilityId === canonicalCapabilityId);
         if (!capability) return [];
         return [capability.implementationPath, capability.testPath, capability.documentationPath]
             .filter(Boolean)
@@ -137,7 +140,7 @@ function productRoadmapPaths(root: string, capabilityId: string): string[] {
     }
 }
 
-function declaredArtifactPaths(root: string, capabilityId: string, targetEngine: string): string[] {
+export function declaredArtifactPaths(root: string, capabilityId: string, targetEngine: string): string[] {
     const roadmapPaths = productRoadmapPaths(root, capabilityId);
     if (roadmapPaths.length > 0) return roadmapPaths;
     return [
@@ -298,9 +301,28 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                 if (staged.code === 0) return { ok: false, issue: "GIT_NO_STAGED_CHANGE", artifact: { clean: true, committed: false, pushed: false, changeDetected: false } };
                 const commit = run("git", ["commit", "-m", "feat(hbos): autonomous construction progress"], root);
                 if (!commit.ok) return { ok: false, issue: "GIT_COMMIT_FAILED", artifact: { output: commit.output, error: commit.error } };
-                const push = run("git", ["push", "origin", "main"], root);
-                if (!push.ok) return { ok: false, issue: "GIT_PUSH_FAILED", artifact: { output: push.output, error: push.error } };
-                return { ok: true, artifact: { committed: true, pushed: true, changeDetected: true } };
+                const branchResult = run("git", ["branch", "--show-current"], root);
+                if (!branchResult.ok) return { ok: false, issue: "GIT_BRANCH_DETECTION_FAILED", artifact: { output: branchResult.output, error: branchResult.error } };
+                const branch = branchResult.output.trim();
+                if (!branch) return { ok: false, issue: "GIT_DETACHED_HEAD", artifact: { committed: true, pushed: false, changeDetected: true } };
+                const fetch = run("git", ["fetch", "origin", branch], root);
+                if (!fetch.ok) return { ok: false, issue: "GIT_FETCH_FAILED", artifact: { branch, output: fetch.output, error: fetch.error } };
+                const remoteRef = `origin/${branch}`;
+                const remoteExists = run("git", ["rev-parse", "--verify", remoteRef], root);
+                if (remoteExists.ok) {
+                    const remoteAncestor = run("git", ["merge-base", "--is-ancestor", remoteRef, "HEAD"], root);
+                    if (!remoteAncestor.ok && remoteAncestor.code !== 1) return { ok: false, issue: "GIT_DIVERGENCE_CHECK_FAILED", artifact: { branch, output: remoteAncestor.output, error: remoteAncestor.error } };
+                    if (remoteAncestor.code === 1) {
+                        const rebase = run("git", ["rebase", remoteRef], root);
+                        if (!rebase.ok) {
+                            run("git", ["rebase", "--abort"], root);
+                            return { ok: false, issue: "GIT_REBASE_CONFLICT", artifact: { branch, output: rebase.output, error: rebase.error } };
+                        }
+                    }
+                }
+                const push = run("git", ["push", "origin", branch], root);
+                if (!push.ok) return { ok: false, issue: "GIT_PUSH_FAILED", artifact: { branch, output: push.output, error: push.error } };
+                return { ok: true, artifact: { committed: true, pushed: true, branch, changeDetected: true } };
             }
         }
     ];
