@@ -100,3 +100,5 @@ Tasks:
 - Performance Testing (repository-native readiness and evidence)
 
 - Customer Testing (repository-native readiness and evidence)
+
+- Deployment Readiness (repository-native readiness and evidence; does not perform cloud deployment)
