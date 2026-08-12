@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { resolve, sep } from "node:path";
+import { tmpdir } from "node:os";
 
 export interface PerformanceBudgetSnapshot {
     startedAt: number;
@@ -38,12 +39,20 @@ export class AutonomousPerformanceBudget {
     constructor(options: AutonomousPerformanceBudgetOptions = {}) {
         this.clock = options.clock ?? (() => Date.now());
         this.deadlineMs = Math.max(1, options.deadlineMs ?? AutonomousPerformanceBudget.DEFAULT_DEADLINE_MS);
-        this.statePath = options.statePath;
+        this.statePath = this.resolveStatePath(options.statePath);
         const persisted = this.loadState();
         this.startedAt = persisted?.startedAt ?? this.clock();
         this.cycleCount = persisted?.cycleCount ?? 0;
         this.totalCycleElapsedMs = persisted?.totalCycleElapsedMs ?? 0;
         this.persist();
+    }
+
+    private resolveStatePath(statePath?: string): string | undefined {
+        if (!statePath) return undefined;
+        if (!process.env.JEST_WORKER_ID) return statePath;
+        const resolved = resolve(statePath);
+        const resolvedTmp = resolve(tmpdir());
+        return resolved === resolvedTmp || resolved.startsWith(`${resolvedTmp}${sep}`) ? statePath : undefined;
     }
 
     private loadState(): PersistedPerformanceState | null {
