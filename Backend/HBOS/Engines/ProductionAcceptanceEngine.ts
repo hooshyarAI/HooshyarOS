@@ -60,7 +60,7 @@ export class ProductionAcceptanceEngine implements Engine {
         if (!contract.valid) blockers.push(`deployment-contract:${contract.missing.join(",")}`);
         if (!performance.ready) blockers.push(`performance:${performance.missingArtifacts.join(",")}`);
         if (!customer.ready) blockers.push(`customer-testing:${customer.missingArtifacts.join(",")}`);
-        if (!security.ready) blockers.push(`security:${security.missingArtifacts.join(",")}`);
+        if (!security.secure) blockers.push(`security:${[...security.missingArtifacts, ...security.forbiddenArtifacts].join(",")}`);
         if (!coreArtifacts) blockers.push("core-artifacts:missing");
 
         const internalReady = blockers.length === 0;
@@ -73,10 +73,9 @@ export class ProductionAcceptanceEngine implements Engine {
                 deploymentContract: contract.valid,
                 performanceEvidence: performance.ready,
                 customerEvidence: customer.ready,
-                securityEvidence: security.ready,
+                securityEvidence: security.secure,
                 coreArtifacts
             },
-            // External infrastructure, credentials, live traffic and customer sign-off remain outside repository evidence.
             externalValidationRequired: true,
             blockers
         };
