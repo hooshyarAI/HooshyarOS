@@ -2,7 +2,7 @@
 
 The construction worker consumes the same mission contract used by HBOS:
 capability identity, target engine, dependencies, architecture rules and
-construction directives.  It never invents domain semantics; it only turns a
+construction directives. It never invents domain semantics; it only turns a
 validated contract into the minimum Engine/Test/Documentation boundary.
 """
 from __future__ import annotations
@@ -89,6 +89,59 @@ def generic_artifacts(spec: CapabilitySpec) -> list[tuple[str, str]]:
     if errors:
         raise ValueError("Invalid capability specification: " + "; ".join(errors))
 
+    if spec.class_name == "APIGatewayEngine":
+        engine = '''import { Engine } from "../Core/Engine";
+
+export interface ApiRouteResult {
+    path: string;
+    method: string;
+    status: "READY" | "BLOCKED";
+}
+
+export class APIGatewayEngine implements Engine {
+    name = "APIGatewayEngine";
+    initialize(): void {}
+    health(): boolean { return true; }
+
+    route(path: string, method = "GET"): ApiRouteResult {
+        const normalizedPath = path?.trim() ?? "";
+        const normalizedMethod = method?.trim().toUpperCase() ?? "";
+        if (!normalizedPath || !normalizedMethod) {
+            return { path: normalizedPath, method: normalizedMethod, status: "BLOCKED" };
+        }
+        return { path: normalizedPath, method: normalizedMethod, status: "READY" };
+    }
+
+    describeCapability(): { id: string; capability: string; targetEngine: string } {
+        return {
+            id: "platform.api-gateway",
+            capability: "implement the Phase 2 API Gateway capability",
+            targetEngine: "API Gateway Engine"
+        };
+    }
+}
+'''
+        test = '''import { APIGatewayEngine } from "../Engines/APIGatewayEngine";
+
+describe("APIGatewayEngine", () => {
+    it("routes a canonical request", () => {
+        const result = new APIGatewayEngine().route("/api/health", "get");
+        expect(result).toEqual({ path: "/api/health", method: "GET", status: "READY" });
+    });
+
+    it("blocks an empty request", () => {
+        expect(new APIGatewayEngine().route(" ", " ").status).toBe("BLOCKED");
+    });
+});
+'''
+        docs = """# API Gateway Engine
+
+Canonical autonomous capability: `platform.api-gateway`.
+
+The engine owns deterministic request routing validation while remaining behind the canonical Security Layer boundary.
+"""
+        return [(spec.engine_path, engine), (spec.test_path, test), (spec.docs_path, docs)]
+
     engine = f'''import {{ Engine }} from "../Core/Engine";
 
 export class {spec.class_name} implements Engine {{
@@ -148,12 +201,28 @@ it must not invent business rules or create duplicate engine boundaries.
     return [(spec.engine_path, engine), (spec.test_path, test), (spec.docs_path, docs)]
 
 
+def _needs_reweave(root: Path, artifacts: list[tuple[str, str]]) -> bool:
+    for relative_path, expected in artifacts:
+        target = root / relative_path
+        if not target.exists():
+            return True
+        if relative_path.startswith("Backend/HBOS/Engines/") and "route(" in expected:
+            if "route(" not in target.read_text(encoding="utf-8"):
+                return True
+        if relative_path.startswith("Backend/HBOS/test/") and "route(" in expected:
+            if "route(" not in target.read_text(encoding="utf-8"):
+                return True
+    return False
+
+
 def write_missing(root: Path, artifacts: list[tuple[str, str]]) -> list[str]:
     paths = [relative_path for relative_path, _ in artifacts]
     existing = [relative_path for relative_path in paths if (root / relative_path).exists()]
     if existing and len(existing) != len(paths):
         raise RuntimeError("Refusing partial autonomous construction; existing artifacts: " + ", ".join(existing))
     if existing:
+        if _needs_reweave(root, artifacts):
+            return write_overwrite(root, artifacts)
         return []
 
     generated: list[str] = []
