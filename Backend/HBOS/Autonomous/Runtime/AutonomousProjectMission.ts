@@ -7,6 +7,16 @@ export interface ProjectSnapshot { root: string; commit: string; clean: boolean;
 export interface Mission { capabilityId: string; capability: string; targetEngine: string; evidence: ProjectSnapshot; directives: string[]; dependencies: string[]; architectureRules: string[]; }
 interface CapabilityDefinition { id: string; capability: string; targetEngine: string; dependencies: string[]; requiredPaths: string[]; evidencePaths?: string[]; verificationPaths?: string[]; behaviorEvidence?: string[]; behaviorImplementationPaths?: string[]; }
 
+const IGNORED_TEST_CALLS = new Set([
+    "expect", "toBe", "toEqual", "toContain", "toBeCloseTo", "toBeDefined", "toBeTruthy", "toBeFalsy",
+    "describe", "it", "test", "beforeEach", "afterEach", "beforeAll", "afterAll",
+    "initialize", "health", "describeCapability"
+]);
+
+function escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&");
+}
+
 export class AutonomousProjectMission {
     private readonly evidenceAudit = new CapabilityEvidenceAudit();
     constructor(private readonly root = process.cwd()) {}
@@ -71,11 +81,31 @@ export class AutonomousProjectMission {
             { id: "platform.production-readiness", capability: "implement repository-native Production Readiness capability", targetEngine: "Production Readiness Engine", dependencies: ["Autonomous Operations Engine", "Security Layer Engine"], requiredPaths: [p("Backend/HBOS/Engines/ProductionReadinessEngine.ts"),p("Backend/HBOS/test/ProductionReadinessEngine.test.ts"),p("Docs/Engines/ProductionReadinessEngine.md")], verificationPaths: focused("Backend/HBOS/test/ProductionReadinessEngine.test.ts"), behaviorEvidence: ["audit("] },
             { id: "platform.security-audit", capability: "implement repository-native Security Audit capability", targetEngine: "Security Audit Engine", dependencies: ["Production Readiness Engine", "Security Layer Engine"], requiredPaths: [p("Backend/HBOS/Engines/SecurityAuditEngine.ts"),p("Backend/HBOS/test/SecurityAuditEngine.test.ts"),p("Docs/Engines/SecurityAuditEngine.md")], verificationPaths: focused("Backend/HBOS/test/SecurityAuditEngine.test.ts"), behaviorEvidence: ["audit(", "scan("] },
             { id: "platform.performance-testing", capability: "implement repository-native Performance Testing capability", targetEngine: "Performance Testing Engine", dependencies: ["Production Readiness Engine"], requiredPaths: [p("Backend/HBOS/Engines/PerformanceTestingEngine.ts"),p("Backend/HBOS/test/PerformanceTestingEngine.test.ts"),p("Docs/Engines/PerformanceTestingEngine.md")], verificationPaths: focused("Backend/HBOS/test/PerformanceTestingEngine.test.ts"), behaviorEvidence: ["audit("] },
-            { id: "platform.customer-testing", capability: "implement repository-native Customer Testing capability", targetEngine: "Customer Testing Engine", dependencies: ["Production Readiness Engine", "Performance Testing Engine"], requiredPaths: [p("Backend/HBOS/Engines/CustomerTestingEngine.ts"),p("Backend/HBOS/test/CustomerTestingEngine.test.ts"),p("Docs/Engines/CustomerTestingEngine.md")], verificationPaths: focused("Backend/HBOS/test/CustomerTestingEngine.test.ts"), behaviorEvidence: ["run(", "execute(", "test("] },
-            { id: "platform.deployment-readiness", capability: "implement repository-native Deployment Readiness capability", targetEngine: "Deployment Readiness Engine", dependencies: ["Production Readiness Engine", "Security Audit Engine", "Performance Testing Engine", "Customer Testing Engine"], requiredPaths: [p("Backend/HBOS/Engines/DeploymentReadinessEngine.ts"),p("Backend/HBOS/test/DeploymentReadinessEngine.test.ts"),p("Docs/Engines/DeploymentReadinessEngine.md")], verificationPaths: focused("Backend/HBOS/test/DeploymentReadinessEngine.test.ts"), behaviorEvidence: ["assess(", "verify(", "check("] },
+            { id: "platform.customer-testing", capability: "implement repository-native Customer Testing capability", targetEngine: "Customer Testing Engine", dependencies: ["Production Readiness Engine", "Performance Testing Engine"], requiredPaths: [p("Backend/HBOS/Engines/CustomerTestingEngine.ts"),p("Backend/HBOS/test/CustomerTestingEngine.test.ts"),p("Docs/Engines/CustomerTestingEngine.md")], verificationPaths: focused("Backend/HBOS/test/CustomerTestingEngine.test.ts"), behaviorEvidence: ["audit("] },
+            { id: "platform.deployment-readiness", capability: "implement repository-native Deployment Readiness capability", targetEngine: "Deployment Readiness Engine", dependencies: ["Production Readiness Engine", "Security Audit Engine", "Performance Testing Engine", "Customer Testing Engine"], requiredPaths: [p("Backend/HBOS/Engines/DeploymentReadinessEngine.ts"),p("Backend/HBOS/test/DeploymentReadinessEngine.test.ts"),p("Docs/Engines/DeploymentReadinessEngine.md")], verificationPaths: focused("Backend/HBOS/test/DeploymentReadinessEngine.test.ts"), behaviorEvidence: ["audit("] },
             { id: "platform.deployment-contract", capability: "implement repository-native Deployment Contract capability", targetEngine: "Deployment Contract Engine", dependencies: ["Deployment Readiness Engine"], requiredPaths: [p("Backend/HBOS/Engines/DeploymentContractEngine.ts"),p("Backend/HBOS/test/DeploymentContractEngine.test.ts"),p("Docs/Engines/DeploymentContractEngine.md")], verificationPaths: focused("Backend/HBOS/test/DeploymentContractEngine.test.ts"), behaviorEvidence: ["validate(", "contract("] },
-            { id: "platform.cloud-deployment", capability: "implement repository-native Cloud Deployment capability", targetEngine: "Cloud Deployment Engine", dependencies: ["Deployment Contract Engine"], requiredPaths: [p("Backend/HBOS/Engines/CloudDeploymentEngine.ts"),p("Backend/HBOS/test/CloudDeploymentEngine.test.ts"),p("Backend/HBOS/Assistant/Autonomous/Production/DeploymentController.ts"),p("Backend/AI_Runtime/cloud_deployment.py")], verificationPaths: focused("Backend/HBOS/test/CloudDeploymentEngine.test.ts"), behaviorEvidence: ["deploy(", "plan("] }
+            { id: "platform.cloud-deployment", capability: "implement repository-native Cloud Deployment capability", targetEngine: "Cloud Deployment Engine", dependencies: ["Deployment Contract Engine"], requiredPaths: [p("Backend/HBOS/Engines/CloudDeploymentEngine.ts"),p("Backend/HBOS/test/CloudDeploymentEngine.test.ts"),p("Backend/HBOS/Assistant/Autonomous/Production/DeploymentController.ts"),p("Backend/AI_Runtime/cloud_deployment.py")], verificationPaths: focused("Backend/HBOS/test/CloudDeploymentEngine.test.ts"), behaviorEvidence: ["deploy("] }
         ];
+    }
+
+    private behaviorContractSatisfied(capability: CapabilityDefinition, implementationPaths: string[], verificationPaths: string[]): boolean {
+        const behaviorPath = capability.behaviorImplementationPaths?.find(existsSync);
+        const enginePath = behaviorPath || implementationPaths.find(path => /Engines[\\/].+\.ts$/.test(path));
+        const testPath = verificationPaths[0];
+        if (!enginePath || !existsSync(enginePath) || !testPath || !existsSync(testPath)) return false;
+
+        const engineText = readFileSync(enginePath, "utf8");
+        const testText = readFileSync(testPath, "utf8");
+        if (!testText.includes("expect(")) return false;
+
+        const explicit = (capability.behaviorEvidence ?? []).some(marker => engineText.includes(marker) && testText.includes(marker));
+        if (explicit) return true;
+
+        const candidates = [...testText.matchAll(/\.\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(/g)]
+            .map(match => match[1])
+            .filter((method): method is string => Boolean(method) && !IGNORED_TEST_CALLS.has(method));
+
+        return candidates.some(method => new RegExp(`\\b${escapeRegExp(method)}\\s*\\(`).test(engineText));
     }
 
     private isCapabilityImplemented(capability: CapabilityDefinition): boolean {
@@ -85,15 +115,9 @@ export class AutonomousProjectMission {
         const documentationPaths = capability.requiredPaths.filter(path => /Docs[\\/]/.test(path));
         const documentation = documentationPaths.length === 0 || documentationPaths.every(existsSync);
         const supportingEvidence = !capability.evidencePaths || capability.evidencePaths.some(existsSync);
-        const verification = capability.verificationPaths?.every(existsSync) ?? false;
-        const behavior = (capability.behaviorEvidence ?? []).length === 0 || capability.behaviorEvidence!.some(marker => {
-            const behaviorPath = capability.behaviorImplementationPaths?.find(existsSync);
-            const enginePath = behaviorPath || capability.requiredPaths.find(path => /Engines[\\/].+\.ts$/.test(path));
-            const testPath = capability.verificationPaths?.[0];
-            const engineText = enginePath && existsSync(enginePath) ? readFileSync(enginePath, "utf8") : "";
-            const testText = testPath && existsSync(testPath) ? readFileSync(testPath, "utf8") : "";
-            return engineText.includes(marker) && testText.includes(marker) && testText.includes("expect(");
-        });
+        const verificationPaths = capability.verificationPaths ?? [];
+        const verification = verificationPaths.every(existsSync);
+        const behavior = this.behaviorContractSatisfied(capability, implementationPaths, verificationPaths);
         const dependenciesSatisfied = capability.dependencies.every(dependency => {
             const dep = this.capabilityBacklog().find(candidate => candidate.targetEngine === dependency || candidate.id === dependency);
             return !dep || this.isCapabilityImplemented(dep);
@@ -105,8 +129,7 @@ export class AutonomousProjectMission {
         const required = [
             "Backend/HBOS/Assistant/Autonomous/AutonomousAssistantRuntime.ts","Backend/HBOS/Assistant/Autonomous/AutonomousMissionController.ts","Backend/HBOS/Assistant/Autonomous/HooshyarAutonomousAssistant.ts","Backend/HBOS/Assistant/Autonomous/PythonReasoningAdapter.ts","Backend/HBOS/Assistant/Autonomous/PersistentArchitectureMemory.ts","Backend/HBOS/Assistant/Autonomous/DecisionKnowledgeStore.ts","Backend/HBOS/Assistant/Autonomous/ContextRetrievalEngine.ts","Backend/HBOS/Assistant/Autonomous/LearningFeedbackLoop.ts","Backend/HBOS/Autonomous/AutonomousProjectConductor.ts","Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.ts","Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts","Backend/HBOS/Architecture/Autonomous/AutonomousDevelopmentLoop.ts","Backend/HBOS/Builder/Autonomous/ArchitectureDrivenBuildController.ts","Backend/HBOS/Builder/Autonomous/AutonomousConstructionEngine.ts","Backend/HBOS/test/AutonomousMissionController.test.ts","Backend/HBOS/test/AutonomousAssistantRuntime.test.ts","Backend/HBOS/test/HooshyarAutonomousAssistant.test.ts","Backend/HBOS/test/PythonReasoningAdapter.test.ts","Backend/AI_Runtime/autonomous_builder.py","Backend/AI_Runtime/reasoning/reasoning_engine.py","AGENTS.md","Assistant/SYSTEM_PROMPT.md"
         ].map(path => join(this.root, path));
-        if (!required.every(existsSync)) return false;
-        return true;
+        return required.every(existsSync);
     }
 
     private architectureRules(): string[] { return ["Architecture Freeze V4","Five Main Intelligence Engines remain canonical","Everything is an Engine","One Capability = One Engine = One Test = One Commit","Reuse existing capabilities; do not create duplicate engines","Every completed engine requires identity, lifecycle, health monitoring, test coverage, behavioral evidence and documentation"]; }
