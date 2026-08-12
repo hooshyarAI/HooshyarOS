@@ -30,8 +30,7 @@ export class CommercialProductCompletionAudit {
         ];
         const missingLayers = requiredMarkers.filter(marker => !contract.includes(marker)).map(marker => `contract-marker:${marker}`);
 
-        const requiredRuntimeArtifacts: Array<[string, string]> = [
-            ["web-entrypoint", "package.json"],
+        const requiredArtifacts: Array<[string, string]> = [
             ["api-gateway", "Backend/HBOS/Engines/APIGatewayEngine.ts"],
             ["user-management", "Backend/HBOS/Engines/UserManagementEngine.ts"],
             ["organization-model", "Backend/HBOS/Engines/OrganizationModelEngine.ts"],
@@ -39,9 +38,26 @@ export class CommercialProductCompletionAudit {
             ["reports-engine", "Backend/HBOS/Engines/ReportsEngine.ts"],
             ["deployment-contract", "Backend/HBOS/Engines/DeploymentContractEngine.ts"]
         ];
-        for (const [layer, artifact] of requiredRuntimeArtifacts) {
+        for (const [layer, artifact] of requiredArtifacts) {
             if (!existsSync(join(root, artifact))) missingLayers.push(layer);
         }
+
+        const packagePath = join(root, "package.json");
+        if (!existsSync(packagePath)) {
+            missingLayers.push("web-entrypoint");
+        } else {
+            const packageJson = JSON.parse(readFileSync(packagePath, "utf8")) as { scripts?: Record<string, string> };
+            const scripts = packageJson.scripts ?? {};
+            const hasRunnableWebScript = Boolean(scripts.start || scripts.dev || scripts.serve || scripts.preview);
+            const hasWebSource = ["frontend", "web", "app", "src/app"].some(dir => existsSync(join(root, dir)));
+            if (!hasRunnableWebScript && !hasWebSource) missingLayers.push("web-entrypoint");
+        }
+
+        const persistenceCandidates = ["Backend/HBOS/Infrastructure", "Backend/HBOS/Persistence", "Backend/AI_Runtime/persistence", "prisma", "database"];
+        if (!persistenceCandidates.some(dir => existsSync(join(root, dir)))) missingLayers.push("persistence-boundary");
+
+        const authCandidates = ["Backend/HBOS/Auth", "Backend/HBOS/Security", "Backend/HBOS/Identity"];
+        if (!authCandidates.some(dir => existsSync(join(root, dir)))) missingLayers.push("authentication-authorization-boundary");
 
         const blockedExternalDependencies: string[] = [];
         if (contract.includes("Payment-provider activation is an external dependency")) blockedExternalDependencies.push("payment-provider-activation");
