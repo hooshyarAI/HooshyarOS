@@ -70,6 +70,17 @@ export class AutonomousPlatformContinuation {
                     p("Backend/HBOS/test/DeploymentReadinessEngine.test.ts"),
                     p("Docs/Engines/DeploymentReadinessEngine.md")
                 ]
+            },
+            {
+                capabilityId: "platform.deployment-contract",
+                capability: "implement repository-native Deployment Contract capability",
+                targetEngine: "Deployment Contract Engine",
+                dependencies: ["Deployment Readiness Engine", "Customer Testing Engine"],
+                requiredPaths: [
+                    p("Backend/HBOS/Engines/DeploymentContractEngine.ts"),
+                    p("Backend/HBOS/test/DeploymentContractEngine.test.ts"),
+                    p("Docs/Engines/DeploymentContractEngine.md")
+                ]
             }
         ];
 
