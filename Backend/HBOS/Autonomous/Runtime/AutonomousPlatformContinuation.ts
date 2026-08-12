@@ -37,18 +37,34 @@ export class AutonomousPlatformContinuation {
 
         const root = projectMission.snapshot().root;
         const p = (path: string) => join(root, path);
-        const productionExtension = {
-            capabilityId: "platform.performance-testing",
-            capability: "implement repository-native Performance Testing capability",
-            targetEngine: "Performance Testing Engine",
-            dependencies: ["Production Readiness Engine", "Security Audit Engine"],
-            requiredPaths: [
-                p("Backend/HBOS/Engines/PerformanceTestingEngine.ts"),
-                p("Backend/HBOS/test/PerformanceTestingEngine.test.ts"),
-                p("Docs/Engines/PerformanceTestingEngine.md")
-            ]
-        };
-        const complete = productionExtension.requiredPaths.every(existsSync);
-        return complete ? null : productionExtension;
+        const extensions = [
+            {
+                capabilityId: "platform.performance-testing",
+                capability: "implement repository-native Performance Testing capability",
+                targetEngine: "Performance Testing Engine",
+                dependencies: ["Production Readiness Engine", "Security Audit Engine"],
+                requiredPaths: [
+                    p("Backend/HBOS/Engines/PerformanceTestingEngine.ts"),
+                    p("Backend/HBOS/test/PerformanceTestingEngine.test.ts"),
+                    p("Docs/Engines/PerformanceTestingEngine.md")
+                ]
+            },
+            {
+                capabilityId: "platform.customer-testing",
+                capability: "implement repository-native Customer Testing capability",
+                targetEngine: "Customer Testing Engine",
+                dependencies: ["Performance Testing Engine", "Production Readiness Engine"],
+                requiredPaths: [
+                    p("Backend/HBOS/Engines/CustomerTestingEngine.ts"),
+                    p("Backend/HBOS/test/CustomerTestingEngine.test.ts"),
+                    p("Docs/Engines/CustomerTestingEngine.md")
+                ]
+            }
+        ];
+
+        for (const extension of extensions) {
+            if (!extension.requiredPaths.every(existsSync)) return extension;
+        }
+        return null;
     }
 }
