@@ -35,10 +35,19 @@ function seedAssistantEvidence(root: string): void {
     const controller = join(root, "Backend/HBOS/Builder/Autonomous/ArchitectureDrivenBuildController.ts");
     mkdirSync(join(controller, ".."), { recursive: true });
     writeFileSync(controller, "ARCHITECTURE PLAN", "utf8");
-
     writeFileSync(join(root, "Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.ts"), 'type ImplementationAgent = "python"; Backend/AI_Runtime/autonomous_builder.py GENERATE VERIFY REPAIR FINALIZE', "utf8");
-    writeFileSync(join(root, "Backend/AI_Runtime/autonomous_builder.py"), "CAPABILITIES\nCapability ID:\nplatform.user-management\nplatform.organization-model\nplatform.security-layer\nif not generated:", "utf8");
-    writeFileSync(join(root, "Backend/AI_Runtime/reasoning/reasoning_engine.py"), 'class ReasoningEngine:\n    def reason(self): return {"status": "reasoned"}\n', "utf8");
+}
+
+function completeCapability(root: string, engine: string, method: string): void {
+    for (const [path, content] of [
+        [`Backend/HBOS/Engines/${engine}.ts`, `${method}(value: string) { return value; }\n`],
+        [`Backend/HBOS/test/${engine}.test.ts`, `test("behavior", () => { expect(new ${engine}().${method}("value")).toBe("value"); });\n`],
+        [`Docs/Engines/${engine}.md`, `# ${engine}\n`]
+    ] as const) {
+        const target = join(root, path);
+        mkdirSync(join(target, ".."), { recursive: true });
+        writeFileSync(target, content, "utf8");
+    }
 }
 
 describe("AutonomousProjectMission platform order", () => {
@@ -51,27 +60,9 @@ describe("AutonomousProjectMission platform order", () => {
         const mission = new AutonomousProjectMission(root);
 
         expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.user-management");
-
-        for (const path of [
-            "Backend/HBOS/Engines/UserManagementEngine.ts",
-            "Backend/HBOS/test/UserManagementEngine.test.ts",
-            "Docs/Engines/UserManagementEngine.md"
-        ]) {
-            const target = join(root, path);
-            mkdirSync(join(target, ".."), { recursive: true });
-            writeFileSync(target, "implemented", "utf8");
-        }
+        completeCapability(root, "UserManagementEngine", "registerUser");
         expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.organization-model");
-
-        for (const path of [
-            "Backend/HBOS/Engines/OrganizationModelEngine.ts",
-            "Backend/HBOS/test/OrganizationModelEngine.test.ts",
-            "Docs/Engines/OrganizationModelEngine.md"
-        ]) {
-            const target = join(root, path);
-            mkdirSync(join(target, ".."), { recursive: true });
-            writeFileSync(target, "implemented", "utf8");
-        }
+        completeCapability(root, "OrganizationModelEngine", "createOrganization");
         expect(mission.nextPlatformMission()?.capabilityId).toBe("platform.security-layer");
     });
 });
