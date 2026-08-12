@@ -1,6 +1,6 @@
 # HooshyarOS Development Constitution
 
-Version: 1.4
+Version: 1.5
 
 ---
 
@@ -172,9 +172,17 @@ Architecture
 
 The Assistant must use the platform's autonomous construction engine whenever the required capability is supported by it.
 
-Repository-native Python workers, generators, test runners, static analyzers and Git tooling are preferred because they are reproducible and independently verifiable. External coding providers must never become hidden architectural dependencies.
+### Authoritative construction toolchain
 
-The Assistant must not create duplicate engines merely because a new file is convenient. It must first determine the correct engine boundary, dependency boundary and existing capability owner.
+The HooshyarOS construction process has exactly three active participants:
+
+1. **Python** for autonomous analysis, generation, verification, repair and orchestration.
+2. **GitHub** for repository inspection, source control, commit, synchronization and review.
+3. **This Assistant** for architecture reasoning, critical review, expert choice and construction orchestration.
+
+External coding assistants, cloud coding agents and alternative code-generation providers are not part of the construction process and must not be invoked, installed, configured or depended upon for construction. This includes Codex, GitHub Copilot, Claude and equivalent services.
+
+Provider-facing abstractions may exist in the product runtime when required by the frozen architecture, but they must not become dependencies of the autonomous construction fabric.
 
 The canonical execution order is one genuinely missing capability at a time, with implementation, verification evidence and repository state treated as one transaction. A continuation token is an orchestration signal, not a platform capability.
 
