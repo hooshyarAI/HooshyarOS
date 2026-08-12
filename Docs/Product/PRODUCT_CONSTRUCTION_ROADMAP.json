@@ -1,0 +1,52 @@
+{
+  "version": "1.0",
+  "status": "governing-product-build-input",
+  "rule": "Product capabilities extend existing Architecture Freeze V4 engine owners; do not create duplicate engine hierarchies.",
+  "capabilities": [
+    {
+      "capabilityId": "product.financial-data-ingestion",
+      "capability": "ingest and normalize repository-supported financial/accounting data for the Financial Intelligence Engine",
+      "targetEngine": "Financial Intelligence Engine",
+      "dependencies": ["Knowledge Engine", "Financial Intelligence Engine"],
+      "implementationPath": "Backend/HBOS/Product/FinancialDataIngestionAdapter.ts",
+      "testPath": "Backend/HBOS/test/FinancialDataIngestionAdapter.test.ts",
+      "documentationPath": "Docs/Product/FinancialDataIngestionAdapter.md"
+    },
+    {
+      "capabilityId": "product.financial-statement-analysis",
+      "capability": "analyze normalized financial statements and expose explainable financial intelligence",
+      "targetEngine": "Financial Intelligence Engine",
+      "dependencies": ["Financial Intelligence Engine", "Reasoning Engine"],
+      "implementationPath": "Backend/HBOS/Product/FinancialStatementAnalysisService.ts",
+      "testPath": "Backend/HBOS/test/FinancialStatementAnalysisService.test.ts",
+      "documentationPath": "Docs/Product/FinancialStatementAnalysisService.md"
+    },
+    {
+      "capabilityId": "product.executive-intelligence-workbench",
+      "capability": "compose executive KPI, dashboard and performance intelligence from verified platform evidence",
+      "targetEngine": "Executive Intelligence Engine",
+      "dependencies": ["Executive Intelligence Engine", "Financial Intelligence Engine"],
+      "implementationPath": "Backend/HBOS/Product/ExecutiveIntelligenceWorkbench.ts",
+      "testPath": "Backend/HBOS/test/ExecutiveIntelligenceWorkbench.test.ts",
+      "documentationPath": "Docs/Product/ExecutiveIntelligenceWorkbench.md"
+    },
+    {
+      "capabilityId": "product.decision-workbench",
+      "capability": "provide explainable decision scenarios, expert-choice evaluation and recommendation evidence",
+      "targetEngine": "Decision Intelligence Engine",
+      "dependencies": ["Decision Engine", "Reasoning Engine", "Governance Engine"],
+      "implementationPath": "Backend/HBOS/Product/DecisionWorkbench.ts",
+      "testPath": "Backend/HBOS/test/DecisionWorkbench.test.ts",
+      "documentationPath": "Docs/Product/DecisionWorkbench.md"
+    },
+    {
+      "capabilityId": "product.organizational-execution",
+      "capability": "turn approved managerial decisions into governed workflows, assigned work and outcome evidence",
+      "targetEngine": "Organizational Intelligence Engine",
+      "dependencies": ["Organizational Intelligence Engine", "Governance Engine", "Autonomous Operations Engine"],
+      "implementationPath": "Backend/HBOS/Product/OrganizationalExecutionCoordinator.ts",
+      "testPath": "Backend/HBOS/test/OrganizationalExecutionCoordinator.test.ts",
+      "documentationPath": "Docs/Product/OrganizationalExecutionCoordinator.md"
+    }
+  ]
+}
