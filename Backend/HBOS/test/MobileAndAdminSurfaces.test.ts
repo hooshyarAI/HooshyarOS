@@ -8,8 +8,13 @@ describe("AdminAndMobileSurfaces", () => {
         expect(service.initialize().status).toBe("READY");
     });
 
-    it("keeps its deterministic minimal contract", () => {
-        expect(new AdminAndMobileSurfaces().execute("continue").status).toBe("READY");
-        expect(new AdminAndMobileSurfaces().execute(" ").status).toBe("BLOCKED");
+    it("validates mobile and administration surfaces", () => {
+        const result = new AdminAndMobileSurfaces().validate("mobile=ready;admin=ready");
+        expect(result.status).toBe("READY");
+        expect(result.evidence).toBeDefined();
+    });
+
+    it("blocks empty evidence input", () => {
+        expect(new AdminAndMobileSurfaces().validate(" ").status).toBe("BLOCKED");
     });
 });
