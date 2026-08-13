@@ -8,8 +8,13 @@ describe("GoalExecutionSchedulingService", () => {
         expect(service.initialize().status).toBe("READY");
     });
 
-    it("keeps its deterministic minimal contract", () => {
-        expect(new GoalExecutionSchedulingService().execute("continue").status).toBe("READY");
-        expect(new GoalExecutionSchedulingService().execute(" ").status).toBe("BLOCKED");
+    it("schedules goal and KPI execution evidence", () => {
+        const result = new GoalExecutionSchedulingService().schedule("goal->kpi->project->task->owner");
+        expect(result.status).toBe("READY");
+        expect(result.evidence).toBeDefined();
+    });
+
+    it("blocks empty evidence input", () => {
+        expect(new GoalExecutionSchedulingService().schedule(" ").status).toBe("BLOCKED");
     });
 });

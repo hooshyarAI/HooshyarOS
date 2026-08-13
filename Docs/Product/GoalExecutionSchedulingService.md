@@ -4,10 +4,10 @@ Canonical product capability: `product.goal-kpi-project-task-scheduling`.
 
 Target engine: Organizational Intelligence Engine
 
-Capability: connect organizational goals and KPIs to projects, tasks, owners, deadlines, schedules and measurable outcomes for execution continuity
+Capability: repair commercial quality failure for product.goal-kpi-project-task-scheduling: connect organizational goals and KPIs to projects, tasks, owners, deadlines, schedules and measurable outcomes for execution continuity
 
 Dependencies: product.goal-okr-transformation, Project Pilot Engine, Autonomous Operations Engine
 
-The product artifact is intentionally kept outside the engine implementation boundary.
-The autonomous worker may enrich this contract only from repository architecture,
-tests, dependencies and durable product evidence.
+The product artifact exposes deterministic capability-shaped behavior derived from
+the declared product contract. Repair missions never alter the canonical product
+identity; they only repair and re-verify the same commercial artifact boundary.
