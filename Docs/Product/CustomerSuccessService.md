@@ -1,13 +1,13 @@
 # CustomerSuccessService
 
-Canonical product capability: `product.customer-success`.
+Canonical product capability: `repair-product.customer-success`.
 
 Target engine: Organizational Intelligence Engine
 
-Capability: manage organizational customer onboarding, adoption, value realization, success signals, feedback and renewal-risk evidence
+Capability: repair and re-verify knot repair-product.customer-success from checkpoint 1b554a2
 
 Dependencies: Organization Model, Knowledge Engine, Dashboard Engine
 
-The product artifact is intentionally kept outside the engine implementation boundary.
-The autonomous worker may enrich this contract only from repository architecture,
-tests, dependencies and durable product evidence.
+The product artifact exposes deterministic capability-shaped behavior derived from
+the declared product contract. It validates input and produces explicit evidence
+without inventing external business rules or duplicating engine ownership.
