@@ -1,4 +1,4 @@
-export interface ProductCapabilityResult { status: "READY" | "BLOCKED"; }
+export interface ProductEvidenceResult { status: "READY" | "BLOCKED"; evidence: string[] | number; }
 
 export class CommercialReportBuilder {
     readonly capabilityId = "product.report-builder-and-export";
@@ -8,7 +8,11 @@ export class CommercialReportBuilder {
         return { status: "READY" };
     }
 
-    execute(input: string): ProductCapabilityResult {
-        return { status: input && input.trim() ? "READY" : "BLOCKED" };
+    buildReport(input: string): ProductEvidenceResult {
+        const normalized = input?.trim() ?? "";
+        if (!normalized) return { status: "BLOCKED", evidence: [] };
+        const evidence = input.split("|").map(item => item.trim()).filter(Boolean);
+        const complete = Array.isArray(evidence) ? evidence.length > 0 : Number.isFinite(evidence) && evidence > 0;
+        return { status: complete ? "READY" : "BLOCKED", evidence };
     }
 }

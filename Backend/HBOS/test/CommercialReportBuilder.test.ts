@@ -8,8 +8,13 @@ describe("CommercialReportBuilder", () => {
         expect(service.initialize().status).toBe("READY");
     });
 
-    it("keeps its deterministic minimal contract", () => {
-        expect(new CommercialReportBuilder().execute("continue").status).toBe("READY");
-        expect(new CommercialReportBuilder().execute(" ").status).toBe("BLOCKED");
+    it("builds a governed report evidence set", () => {
+        const result = new CommercialReportBuilder().buildReport("executive|financial|operational");
+        expect(result.status).toBe("READY");
+        expect(result.evidence).toBeDefined();
+    });
+
+    it("blocks empty evidence input", () => {
+        expect(new CommercialReportBuilder().buildReport(" ").status).toBe("BLOCKED");
     });
 });
