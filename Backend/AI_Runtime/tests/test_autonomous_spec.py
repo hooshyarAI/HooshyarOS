@@ -40,6 +40,12 @@ MOBILE_PROMPT = (
 )
 
 
+MOBILE_INDEX_PROMPT = MOBILE_PROMPT.replace(
+    "Frontend/HooshyarWebApp/AdminAndMobileSurfaces ;",
+    "Frontend/HooshyarWebApp/AdminAndMobileSurfaces/index.ts ;",
+)
+
+
 def test_spec_from_prompt_builds_canonical_paths_and_contract():
     spec = spec_from_prompt(PROMPT)
     assert spec is not None
@@ -71,10 +77,23 @@ def test_product_spec_honors_declared_artifact_paths():
 def test_frontend_directory_artifact_uses_index_ts_and_frontend_import():
     spec = spec_from_prompt(MOBILE_PROMPT)
     assert spec is not None
+    assert spec.class_name == "AdminAndMobileSurfaces"
     assert spec.engine_path == "Frontend/HooshyarWebApp/AdminAndMobileSurfaces/index.ts"
     artifacts = dict(generic_artifacts(spec))
     assert "class AdminAndMobileSurfaces" in artifacts[spec.engine_path]
     assert "../../../Frontend/HooshyarWebApp/AdminAndMobileSurfaces" in artifacts[spec.test_path]
+
+
+def test_frontend_index_file_artifact_preserves_parent_capability_symbol():
+    spec = spec_from_prompt(MOBILE_INDEX_PROMPT)
+    assert spec is not None
+    assert spec.class_name == "AdminAndMobileSurfaces"
+    assert spec.engine_path == "Frontend/HooshyarWebApp/AdminAndMobileSurfaces/index.ts"
+    artifacts = dict(generic_artifacts(spec))
+    assert "export class AdminAndMobileSurfaces" in artifacts[spec.engine_path]
+    assert "import { AdminAndMobileSurfaces } from \"../../../Frontend/HooshyarWebApp/AdminAndMobileSurfaces\";" in artifacts[spec.test_path]
+    assert "new AdminAndMobileSurfaces()" in artifacts[spec.test_path]
+    assert "index" not in artifacts[spec.test_path]
 
 
 def test_generic_artifacts_preserve_architecture_contract():
