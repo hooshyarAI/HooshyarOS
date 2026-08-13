@@ -395,8 +395,6 @@ def run_daemon(*, assistant_phase: bool) -> int:
     return_code = process.wait()
     if not assistant_phase and autonomous_blocked_seen:
         recovery_code = run_supervisor_recovery("".join(captured_lines))
-        if recovery_code == 0:
-            return run_daemon(assistant_phase=False)
         return recovery_code
     if not assistant_phase and return_code != 0 and not autonomous_blocked_seen and resume_interrupted_generation():
         return run_daemon(assistant_phase=False)
