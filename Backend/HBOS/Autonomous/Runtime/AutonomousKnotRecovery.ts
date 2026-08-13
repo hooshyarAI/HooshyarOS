@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { AutonomousFailureAnalysisEngine, RepairCluster } from "./AutonomousFailureAnalysisEngine";
 
 export interface KnotCheckpoint {
     capabilityId: string;
@@ -12,6 +13,7 @@ export interface KnotExecutionObservation {
     executionOk: boolean;
     verificationComplete: boolean;
     repositoryChanged: boolean;
+    failures?: string[];
 }
 
 export interface KnotRecoveryDecision {
@@ -20,6 +22,8 @@ export interface KnotRecoveryDecision {
     checkpoint: KnotCheckpoint;
     rationale: string;
     repairCapabilityId?: string;
+    repairCluster?: RepairCluster;
+    repairEvidence?: string[];
     stopConditions: string[];
 }
 
@@ -29,14 +33,9 @@ function canonicalCapabilityId(capabilityId: string): string {
     return canonical;
 }
 
-/**
- * Decides whether the current knot is safe to advance or must be re-woven.
- *
- * A knot is never considered correct merely because generation succeeded.
- * Execution, verification and repository evidence must all agree before the
- * next canonical knot is allowed to start.
- */
 export class AutonomousKnotRecovery {
+    private readonly failureAnalysis = new AutonomousFailureAnalysisEngine();
+
     observe(checkpoint: KnotCheckpoint, observation: KnotExecutionObservation): KnotRecoveryDecision {
         if (observation.executionOk && observation.verificationComplete && observation.repositoryChanged) {
             return {
@@ -52,16 +51,23 @@ export class AutonomousKnotRecovery {
             };
         }
 
+        const cluster = this.failureAnalysis.selectNext(observation.failures ?? []);
+        const repairCapabilityId = cluster?.repairCapabilityId ?? `repair-${canonicalCapabilityId(checkpoint.capabilityId)}`;
         return {
             recover: true,
             action: "REPAIR",
             checkpoint,
-            rationale: "current knot is not trusted; return to the last verified checkpoint and re-weave this knot before continuing",
-            repairCapabilityId: `repair-${canonicalCapabilityId(checkpoint.capabilityId)}`,
+            rationale: cluster
+                ? `current knot is not trusted; root cause selected=${cluster.rootCause}; repair evidence must address that cluster before re-verification`
+                : "current knot is not trusted; no known root cause was classified, so the canonical knot repair remains the safe fallback",
+            repairCapabilityId,
+            repairCluster: cluster ?? undefined,
+            repairEvidence: cluster?.evidence ?? observation.failures ?? [],
             stopConditions: [
                 "repair verification fails",
                 "checkpoint cannot be established",
                 "repository remains inconsistent after repair",
+                "a repeated repair strategy produces the same failure set",
                 "repair would cross an architecture ownership boundary"
             ]
         };
@@ -79,16 +85,10 @@ export class AutonomousKnotRecovery {
         const beforeStatus = execFileSync(
             "git",
             ["status", "--porcelain=v1", "--untracked-files=all", "--", ".", ":(exclude)node_modules"],
-            {
-                cwd: root,
-                encoding: "utf8",
-                stdio: ["ignore", "pipe", "pipe"]
-            }
+            { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }
         ).trim();
 
-        if (head === checkpoint.commit && !beforeStatus) {
-            return;
-        }
+        if (head === checkpoint.commit && !beforeStatus) return;
 
         execFileSync("git", ["reset", "--hard", checkpoint.commit], {
             cwd: root,
@@ -98,34 +98,15 @@ export class AutonomousKnotRecovery {
 
         const canonicalId = canonicalCapabilityId(checkpoint.capabilityId);
         const roadmapPath = join(root, "Docs", "Product", "PRODUCT_CONSTRUCTION_ROADMAP.json");
-
         if (existsSync(roadmapPath)) {
             try {
                 const roadmap = JSON.parse(readFileSync(roadmapPath, "utf8")) as {
-                    capabilities?: Array<{
-                        capabilityId?: string;
-                        implementationPath?: string;
-                        testPath?: string;
-                        documentationPath?: string;
-                    }>;
+                    capabilities?: Array<{ capabilityId?: string; implementationPath?: string; testPath?: string; documentationPath?: string }>;
                 };
-
-                const capability = roadmap.capabilities?.find(
-                    item => item.capabilityId === canonicalId
-                );
-
-                const ownedPaths = [
-                    capability?.implementationPath,
-                    capability?.testPath,
-                    capability?.documentationPath
-                ].filter(Boolean) as string[];
-
+                const capability = roadmap.capabilities?.find(item => item.capabilityId === canonicalId);
+                const ownedPaths = [capability?.implementationPath, capability?.testPath, capability?.documentationPath].filter(Boolean) as string[];
                 for (const relativePath of ownedPaths) {
-                    execFileSync("git", ["clean", "-fd", "--", relativePath], {
-                        cwd: root,
-                        encoding: "utf8",
-                        stdio: ["ignore", "pipe", "pipe"]
-                    });
+                    execFileSync("git", ["clean", "-fd", "--", relativePath], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
                 }
             } catch {
                 // Rollback remains safe even when the product roadmap is unavailable.
@@ -135,17 +116,8 @@ export class AutonomousKnotRecovery {
         const status = execFileSync(
             "git",
             ["status", "--porcelain=v1", "--untracked-files=all", "--", ".", ":(exclude)node_modules"],
-            {
-                cwd: root,
-                encoding: "utf8",
-                stdio: ["ignore", "pipe", "pipe"]
-            }
+            { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }
         ).trim();
-
-        if (status) {
-            throw new Error(
-                `Checkpoint rollback did not restore a clean worktree for ${checkpoint.commit}: ${status}`
-            );
-        }
+        if (status) throw new Error(`Checkpoint rollback did not restore a clean worktree for ${checkpoint.commit}: ${status}`);
     }
 }
