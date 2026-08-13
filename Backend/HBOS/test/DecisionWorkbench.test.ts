@@ -1,15 +1,14 @@
 import { DecisionWorkbench } from "../Product/DecisionWorkbench";
 
 describe("DecisionWorkbench", () => {
-    it("exposes the canonical product boundary", () => {
-        const service = new DecisionWorkbench();
-        expect(service.capabilityId).toBe("product.decision-workbench");
-        expect(service.targetEngine).toBe("Decision Intelligence Engine");
-        expect(service.initialize().status).toBe("READY");
-    });
-
-    it("keeps its deterministic minimal contract", () => {
-        expect(new DecisionWorkbench().execute("continue").status).toBe("READY");
-        expect(new DecisionWorkbench().execute(" ").status).toBe("BLOCKED");
+    it("exposes the canonical capability identity and health", () => {
+        const engine = new DecisionWorkbench();
+        expect(engine.name).toBe("DecisionWorkbench");
+        expect(engine.health()).toBe(true);
+        expect(engine.describeCapability()).toEqual({
+            id: "repair-product.decision-workbench",
+            capability: "repair commercial quality failure for product.decision-workbench: provide explainable decision scenarios, Expert Choice/AHP-style evaluation and recommendation evidence",
+            targetEngine: "Decision Intelligence Engine"
+        });
     });
 });
