@@ -422,6 +422,154 @@ before authenticated runtime/API operations execute.
     ]
 
 
+def commercial_dashboard_artifacts():
+    implementation = """import { AlertsEngine, AlertResult } from "../Engines/AlertsEngine";
+import { DashboardEngine, DashboardSnapshot } from "../Engines/DashboardEngine";
+import { ReportResult, ReportsEngine } from "../Engines/ReportsEngine";
+
+export interface DashboardInput {
+    title: string;
+    metrics: Record<string, number>;
+    sections: string[];
+    alertThresholds?: Record<string, number>;
+}
+
+export interface CommercialDashboardResult {
+    status: "READY" | "BLOCKED";
+    dashboard: DashboardSnapshot;
+    report: ReportResult;
+    alerts: Record<string, AlertResult>;
+}
+
+export class CommercialDashboardApplication {
+    readonly capabilityId = "product.dashboard-and-report-application";
+    readonly targetEngine = "Executive Intelligence Engine";
+
+    private readonly dashboardEngine = new DashboardEngine();
+    private readonly reportsEngine = new ReportsEngine();
+    private readonly alertsEngine = new AlertsEngine();
+
+    initialize(): { status: "READY" } {
+        return { status: "READY" };
+    }
+
+    build(input: DashboardInput): CommercialDashboardResult {
+        const dashboard = this.dashboardEngine.snapshot(input?.metrics);
+        const report = this.reportsEngine.build(
+            input?.title ?? "",
+            input?.sections ?? [],
+        );
+
+        const thresholds = input?.alertThresholds ?? {};
+        const alerts = Object.fromEntries(
+            Object.entries(thresholds).map(([metric, threshold]) => [
+                metric,
+                this.alertsEngine.evaluate(
+                    input?.metrics?.[metric] ?? Number.NaN,
+                    threshold,
+                ),
+            ]),
+        );
+
+        const alertsReady = Object.values(alerts).every(
+            alert => alert.status === "READY",
+        );
+
+        const status =
+            dashboard.status === "READY" &&
+            report.status === "READY" &&
+            alertsReady
+                ? "READY"
+                : "BLOCKED";
+
+        return { status, dashboard, report, alerts };
+    }
+
+    execute(input: DashboardInput): CommercialDashboardResult {
+        return this.build(input);
+    }
+}
+"""
+
+    test = """import {
+    CommercialDashboardApplication,
+    DashboardInput,
+} from "../Product/CommercialDashboardApplication";
+
+describe("CommercialDashboardApplication", () => {
+    it("exposes the canonical product boundary", () => {
+        const service = new CommercialDashboardApplication();
+
+        expect(service.capabilityId).toBe(
+            "product.dashboard-and-report-application",
+        );
+        expect(service.targetEngine).toBe("Executive Intelligence Engine");
+        expect(service.initialize().status).toBe("READY");
+    });
+
+    it("composes metrics, report sections and alert evaluation", () => {
+        const input: DashboardInput = {
+            title: "Executive Overview",
+            metrics: {
+                revenue: 100,
+                cash: 60,
+                risk: 4,
+            },
+            sections: ["Financial", "Risk"],
+            alertThresholds: {
+                risk: 3,
+            },
+        };
+
+        const result = new CommercialDashboardApplication().build(input);
+
+        expect(result.status).toBe("READY");
+        expect(result.dashboard.total).toBe(164);
+        expect(result.report.sections).toEqual(["Financial", "Risk"]);
+        expect(result.alerts.risk.triggered).toBe(true);
+        expect(result.alerts.risk.status).toBe("READY");
+    });
+
+    it("blocks invalid financial input", () => {
+        const result = new CommercialDashboardApplication().build({
+            title: "Executive Overview",
+            metrics: {
+                revenue: Number.NaN,
+            },
+            sections: ["Financial"],
+        });
+
+        expect(result.status).toBe("BLOCKED");
+        expect(result.dashboard.status).toBe("BLOCKED");
+    });
+});
+"""
+
+    docs = """# CommercialDashboardApplication
+
+Canonical product capability: `product.dashboard-and-report-application`.
+
+Target engine: Executive Intelligence Engine.
+
+The product artifact composes the existing Dashboard, Reports and Alerts engines
+without replacing or duplicating them.
+
+It provides deterministic construction of an executive dashboard from:
+- numeric business metrics,
+- report sections,
+- alert thresholds.
+
+The application blocks invalid numeric input and invalid report definitions,
+and preserves the canonical product boundary independently of repair missions.
+"""
+
+    return [
+        ("Backend/HBOS/Product/CommercialDashboardApplication.ts", implementation),
+        ("Backend/HBOS/test/CommercialDashboardApplication.test.ts", test),
+        ("Docs/Product/CommercialDashboardApplication.md", docs),
+    ]
+
+
 CAPABILITIES = {
     **{key: platform_artifacts(key) for key in PLATFORM_CAPABILITIES},
     "engine.reasoning.canonical": reasoning_artifacts(),
@@ -429,6 +577,7 @@ CAPABILITIES = {
     "engine.autonomous-operations.canonical": autonomous_operations_artifacts(),
     "runtime.reasoning.bridge": reasoning_bridge_artifacts(),
     "product.web-application-shell": web_application_artifacts(),
+    "product.dashboard-and-report-application": commercial_dashboard_artifacts(),
 }
 
 CAPABILITY_DEPENDENCIES = {

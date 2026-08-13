@@ -2,12 +2,15 @@
 
 Canonical product capability: `product.dashboard-and-report-application`.
 
-Target engine: Executive Intelligence Engine
+Target engine: Executive Intelligence Engine.
 
-Capability: provide usable executive, financial, KPI, budget, risk, tax, alerts, decision and operational dashboards plus report/export flows
+The product artifact composes the existing Dashboard, Reports and Alerts engines
+without replacing or duplicating them.
 
-Dependencies: Dashboard Engine, Reports Engine, Alerts Engine, product.web-application-shell
+It provides deterministic construction of an executive dashboard from:
+- numeric business metrics,
+- report sections,
+- alert thresholds.
 
-The product artifact is intentionally kept outside the engine implementation boundary.
-The autonomous worker may enrich this contract only from repository architecture,
-tests, dependencies and durable product evidence.
+The application blocks invalid numeric input and invalid report definitions,
+and preserves the canonical product boundary independently of repair missions.
