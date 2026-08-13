@@ -298,9 +298,6 @@ def _needs_reweave(root: Path, artifacts: list[tuple[str, str]]) -> bool:
 def _ensure_parent_directory(target: Path) -> None:
     parent = target.parent
 
-    # A legacy file can occupy any ancestor of the new directory artifact.
-    # Find the nearest blocking file first, migrate it into the directory it
-    # is currently pretending to be, then create the nested path safely.
     cursor = parent
     blocking: Path | None = None
     while cursor != cursor.parent:
@@ -348,11 +345,35 @@ def write_missing(root: Path, artifacts: list[tuple[str, str]]) -> list[str]:
     return generated
 
 
+def _preserve_canonical_product_test_boundary(target: Path, existing: str, generated: str) -> str:
+    if target.suffix not in {".ts", ".tsx"} or "/test/" not in target.as_posix():
+        return generated
+    existing_import = re.search(
+        r'import\s*\{\s*([A-Za-z_$][\w$]*)\s*\}\s*from\s*"(\.\./Product/[^"]+)"\s*;?',
+        existing,
+    )
+    generated_import = re.search(
+        r'import\s*\{\s*([A-Za-z_$][\w$]*)\s*\}\s*from\s*"(\.\./Engines/[^"]+)"\s*;?',
+        generated,
+    )
+    if not existing_import or not generated_import:
+        return generated
+    if existing_import.group(1) != generated_import.group(1):
+        return generated
+    return generated.replace(generated_import.group(0), existing_import.group(0), 1)
+
+
 def write_overwrite(root: Path, artifacts: list[tuple[str, str]]) -> list[str]:
     repaired: list[str] = []
     for relative_path, content in artifacts:
         target = root / relative_path
         _ensure_parent_directory(target)
+        if target.exists() and target.is_file():
+            try:
+                existing = target.read_text(encoding="utf-8")
+                content = _preserve_canonical_product_test_boundary(target, existing, content)
+            except (OSError, UnicodeDecodeError):
+                pass
         target.write_text(content, encoding="utf-8")
         repaired.append(relative_path)
     return repaired
