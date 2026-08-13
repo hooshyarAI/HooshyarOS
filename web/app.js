@@ -9,10 +9,9 @@ function setMessage(message, kind = "info") {
 }
 
 async function api(path, options = {}) {
-  const response = await fetch(path, {
-    headers: { "content-type": "application/json", ...(options.headers || {}) },
-    ...options,
-  });
+  const headers = { "content-type": "application/json", ...(options.headers || {}) };
+  if (state.session?.token && !headers.authorization) headers.authorization = `Bearer ${state.session.token}`;
+  const response = await fetch(path, { ...options, headers });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
   return data;
@@ -48,9 +47,19 @@ async function login() {
   state.session = session;
   $("session").textContent = `فعال: ${session.user.username} / ${session.organization.name}`;
   setMessage("ورود و ایجاد context سازمان با موفقیت انجام شد", "ok");
+  await refresh();
+}
+
+async function logout() {
+  if (!state.session?.token) return;
+  await api("/api/logout", { method: "POST" });
+  state.session = null;
+  $("session").textContent = "نشست منقضی شد";
+  setMessage("نشست با موفقیت پایان یافت", "ok");
 }
 
 async function ingest() {
+  if (!state.session?.token) return setMessage("ابتدا وارد نشست سازمانی شوید", "error");
   const amount = Number($("amount").value);
   const category = $("category").value.trim();
   if (!Number.isFinite(amount) || amount <= 0 || !category) return setMessage("مبلغ و دسته‌بندی معتبر وارد کنید", "error");
@@ -61,6 +70,7 @@ async function ingest() {
 }
 
 async function makeDecision() {
+  if (!state.session?.token) return setMessage("ابتدا وارد نشست سازمانی شوید", "error");
   const title = $("decision").value.trim();
   if (!title) return setMessage("عنوان تصمیم را وارد کنید", "error");
   const result = await api("/api/decision", { method: "POST", body: JSON.stringify({ title, organization: $("organization").value.trim() }) });
@@ -69,7 +79,8 @@ async function makeDecision() {
 }
 
 async function refresh() {
-  const dashboard = await api("/api/dashboard");
+  const path = state.session?.organization?.name ? `/api/dashboard?organization=${encodeURIComponent(state.session.organization.name)}` : "/api/dashboard";
+  const dashboard = await api(path);
   renderDashboard(dashboard);
   const report = await api("/api/report");
   renderReport(report);
@@ -80,7 +91,7 @@ $("demo").addEventListener("click", () => loadDemo().catch(error => setMessage(e
 $("ingest").addEventListener("click", () => ingest().catch(error => setMessage(error.message, "error")));
 $("decision-submit").addEventListener("click", () => makeDecision().catch(error => setMessage(error.message, "error")));
 $("refresh").addEventListener("click", () => refresh().catch(error => setMessage(error.message, "error")));
+if ($("logout")) $("logout").addEventListener("click", () => logout().catch(error => setMessage(error.message, "error")));
 
 api("/api/ready").then(() => setMessage("سامانه آماده استفاده است", "ok")).catch(() => setMessage("سرور هنوز در دسترس نیست", "error"));
-
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
