@@ -3,44 +3,58 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#0f172a">
-  <meta name="description" content="هوشیار.ai — هوش مالی و مدیریتی">
+  <meta name="theme-color" content="#0b1220">
+  <meta name="description" content="هوشیار.ai — پلتفرم هوش مالی و مدیریتی سازمانی">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="stylesheet" href="/styles.css">
-  <title>هوشیار.ai</title>
+  <title>هوشیار.ai | مرکز فرمان مدیریت</title>
 </head>
 <body>
-  <header class="topbar"><div><b>هوشیار.ai</b><span>هوش مالی و مدیریتی</span></div><button id="refresh" class="ghost">به‌روزرسانی</button></header>
-  <main class="shell">
-    <section class="hero card">
-      <div><span class="eyebrow">MVP تجاری قابل تست</span><h1>از داده مالی تا تصمیم اجرایی</h1><p>ورود سازمان، ثبت داده، داشبورد، گزارش و تصمیم در یک مسیر واقعی.</p></div>
-      <div class="actions"><button id="demo">بارگذاری داده نمونه</button><div id="message" class="message">در حال اتصال…</div></div>
-    </section>
-
-    <section class="grid two">
-      <article class="card">
-        <h2>۱. ورود و سازمان</h2>
-        <div class="form-grid"><label>کاربر<input id="username" value="مدیرعامل" autocomplete="username"></label><label>سازمان<input id="organization" value="شرکت نمونه هوشیار"></label></div>
-        <button id="login">ایجاد نشست امن</button><p id="session" class="muted">هنوز نشست ایجاد نشده</p>
-      </article>
-      <article class="card">
-        <h2>۲. ثبت داده مالی</h2>
-        <div class="form-grid"><label>دسته‌بندی<input id="category" value="فروش"></label><label>مبلغ<input id="amount" type="number" value="150000000"></label></div>
-        <button id="ingest">ثبت و تحلیل</button><p id="data-summary" class="muted">داده‌ای ثبت نشده</p>
-      </article>
-    </section>
-
-    <section class="card"><div class="section-head"><h2>۳. داشبورد مدیریت</h2><span id="dashboard-status" class="status">در انتظار داده</span></div>
-      <div class="kpis"><div><span>درآمد</span><strong id="kpi-revenue">۰</strong></div><div><span>سود</span><strong id="kpi-profit">۰</strong></div><div><span>نقدینگی</span><strong id="kpi-cash">۰</strong></div><div><span>ریسک</span><strong id="kpi-risk">۰٪</strong></div></div>
-    </section>
-
-    <section class="grid two">
-      <article class="card"><h2>۴. گزارش اجرایی</h2><div id="report" class="report"><p class="muted">گزارش پس از ورود داده نمایش داده می‌شود.</p></div></article>
-      <article class="card"><h2>۵. مرکز تصمیم</h2><label>عنوان تصمیم<input id="decision" value="آیا بودجه بازاریابی افزایش یابد؟"></label><button id="decision-submit">ثبت تصمیم</button><div id="decision-result" class="decision-result">هنوز تصمیمی ثبت نشده</div></article>
-    </section>
-
-    <section class="card footer-card"><strong>وضعیت محصول:</strong> Web Runtime + PWA + API + Persistence + Tenant Context + Dashboard + Report + Decision</section>
-  </main>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">ه</span><div><b>هوشیار.ai</b><span>Enterprise Intelligence Platform</span></div></div>
+    <div class="top-actions"><span id="connection" class="live-dot">در حال اتصال…</span><button id="refresh" class="ghost">به‌روزرسانی</button></div>
+  </header>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="org-switcher"><span class="label">سازمان فعال</span><strong id="side-org">شرکت نمونه هوشیار</strong><small id="session">بدون نشست فعال</small></div>
+      <nav aria-label="ناوبری اصلی">
+        <button class="nav-item active" data-section="overview">نمای کلی</button>
+        <button class="nav-item" data-section="financial">مالی و نقدینگی</button>
+        <button class="nav-item" data-section="reports">گزارش‌ها</button>
+        <button class="nav-item" data-section="decisions">مرکز تصمیم</button>
+        <button class="nav-item" data-section="alerts">هشدارها</button>
+        <button class="nav-item" data-section="organization">سازمان و دسترسی</button>
+      </nav>
+      <div class="sidebar-footer"><span>نسخه تجاری قابل تست</span><small>PWA · API · Persistence</small></div>
+    </aside>
+    <main class="workspace">
+      <section class="page-intro">
+        <div><span class="eyebrow">مرکز فرمان مدیر</span><h1>تصویر یکپارچه سازمان، از شواهد تا اقدام</h1><p>هوشیار داده را به بینش، بینش را به تصمیم و تصمیم را به اجرای قابل اندازه‌گیری وصل می‌کند.</p></div>
+        <div class="intro-actions"><button id="demo" class="primary">نمایش داده نمونه</button><span id="message" class="message">برای شروع، سازمان را وارد کنید یا داده نمونه را ببینید.</span></div>
+      </section>
+      <section class="kpi-grid" aria-label="شاخص‌های کلیدی">
+        <article class="metric-card accent-revenue"><span>درآمد</span><strong id="kpi-revenue">۰</strong><small>وضعیت فعلی</small></article>
+        <article class="metric-card accent-profit"><span>سود</span><strong id="kpi-profit">۰</strong><small>برآورد بر مبنای داده موجود</small></article>
+        <article class="metric-card accent-cash"><span>نقدینگی</span><strong id="kpi-cash">۰</strong><small>قابل ردیابی در داشبورد</small></article>
+        <article class="metric-card accent-risk"><span>ریسک</span><strong id="kpi-risk">۰٪</strong><small id="dashboard-status">در انتظار داده</small></article>
+      </section>
+      <section class="decision-banner card"><div><span class="eyebrow">اولویت مدیریتی</span><h2 id="priority-title">ابتدا شواهد را کامل کنید</h2><p id="priority-text">داده نمونه را بارگذاری کنید تا تصویر اولیه درآمد، سود، نقدینگی و ریسک ساخته شود.</p></div><div class="priority-score"><span>سطح اطمینان</span><strong id="confidence">۰٪</strong></div></section>
+      <section class="workflow card"><div class="section-head"><div><span class="eyebrow">چرخه ارزش</span><h2>از شناخت تا تاب‌آوری</h2></div><span class="status ready">مسیر محصول</span></div><div class="steps" aria-label="چرخه ارزش سازمانی"><div class="step active"><b>۱</b><span>شناخت</span></div><i>←</i><div class="step"><b>۲</b><span>تشخیص</span></div><i>←</i><div class="step"><b>۳</b><span>اولویت‌بندی</span></div><i>←</i><div class="step"><b>۴</b><span>تصمیم</span></div><i>←</i><div class="step"><b>۵</b><span>تأیید</span></div><i>←</i><div class="step"><b>۶</b><span>اجرا</span></div><i>←</i><div class="step"><b>۷</b><span>اندازه‌گیری</span></div><i>←</i><div class="step"><b>۸</b><span>یادگیری</span></div><i>←</i><div class="step"><b>۹</b><span>رشد و تاب‌آوری</span></div></div></section>
+      <section class="content-grid">
+        <article class="card feature-card" id="organization-section"><div class="section-head"><div><span class="eyebrow">مرحله صفر</span><h2>هویت و سازمان</h2></div><span class="status" id="identity-status">بدون نشست</span></div><div class="form-grid"><label>کاربر<input id="username" value="مدیرعامل" autocomplete="username"></label><label>سازمان<input id="organization" value="شرکت نمونه هوشیار"></label></div><div class="button-row"><button id="login" class="primary">ورود و ایجاد نشست امن</button><button id="logout" class="secondary">خروج</button></div><p class="muted">نشست، سازمان و دسترسی‌ها پیش‌نیاز عملیات حساس هستند.</p></article>
+        <article class="card feature-card" id="financial-section"><div class="section-head"><div><span class="eyebrow">شواهد</span><h2>ورود داده مالی</h2></div><span class="status">Tenant-aware</span></div><div class="form-grid"><label>دسته‌بندی<input id="category" value="فروش"></label><label>مبلغ<input id="amount" type="number" value="150000000"></label></div><button id="ingest" class="primary wide">ثبت و تحلیل</button><p id="data-summary" class="muted">داده‌ای ثبت نشده</p></article>
+      </section>
+      <section class="content-grid">
+        <article class="card feature-card" id="reports-section"><div class="section-head"><div><span class="eyebrow">بینش</span><h2>گزارش اجرایی</h2></div><button class="ghost compact" data-section-target="reports">مشاهده همه</button></div><div id="report" class="report"><p class="muted">گزارش پس از بارگذاری داده نمایش داده می‌شود.</p></div></article>
+        <article class="card feature-card" id="decisions-section"><div class="section-head"><div><span class="eyebrow">تصمیم</span><h2>مرکز تصمیم</h2></div><span class="status">نیازمند تأیید انسان</span></div><label>عنوان تصمیم<input id="decision" value="آیا بودجه بازاریابی افزایش یابد؟"></label><button id="decision-submit" class="primary wide">ثبت برای بررسی</button><div id="decision-result" class="decision-result">هنوز تصمیمی ثبت نشده است.</div></article>
+      </section>
+      <section class="content-grid lower-grid">
+        <article class="card assistant-card"><div class="section-head"><div><span class="eyebrow">محصول</span><h2>دستیار سازمانی</h2></div><span class="status info">سطح کاربر</span></div><p>دستیار سازمانی برای تحلیل، توضیح، پرسش مدیریتی و آماده‌سازی تصمیم در خود محصول قرار می‌گیرد. موتور ساخت خودکار HooshyarOS نقش دیگری دارد و این دو مرز با هم مخلوط نمی‌شوند.</p><div class="prompt-chips"><button class="chip" data-prompt="وضعیت مالی سازمان را خلاصه کن">خلاصه وضعیت مالی</button><button class="chip" data-prompt="مهم‌ترین ریسک فعلی چیست؟">مهم‌ترین ریسک</button><button class="chip" data-prompt="چه تصمیمی اولویت دارد؟">تصمیم اولویت‌دار</button></div><div class="assistant-note"><span class="dot"></span><span id="assistant-note">برای این نسخه، پیشنهادهای نمونه فعال‌اند؛ اتصال کامل گفت‌وگویی در لایه دستیار محصول تکمیل می‌شود.</span></div></article>
+        <article class="card alerts-card" id="alerts-section"><div class="section-head"><div><span class="eyebrow">کنترل</span><h2>هشدار و سلامت</h2></div><span class="status ready">قابل پایش</span></div><div class="alert-row"><span class="alert-icon">!</span><div><strong>هشدارها بعد از ورود شواهد محاسبه می‌شوند.</strong><p>هیچ هشدار مهمی بدون داده کافی به‌عنوان واقعیت نمایش داده نمی‌شود.</p></div></div><div class="alert-row muted-row"><span class="alert-icon ok">✓</span><div><strong>قواعد اعتماد فعال است</strong><p>پاسخ‌ها باید با شواهد، tenant و وضعیت runtime سازگار باشند.</p></div></div></article>
+      </section>
+      <footer class="product-footer"><strong>هوشیار.ai</strong><span>Web Runtime</span><span>PWA</span><span>API</span><span>Persistence</span><span>Tenant Context</span><span>Dashboard</span><span>Reports</span><span>Decision</span></footer>
+    </main>
+  </div>
   <script src="/app.js" defer></script>
 </body>
 </html>
