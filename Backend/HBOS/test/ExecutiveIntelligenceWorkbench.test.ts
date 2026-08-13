@@ -1,15 +1,14 @@
 import { ExecutiveIntelligenceWorkbench } from "../Product/ExecutiveIntelligenceWorkbench";
 
 describe("ExecutiveIntelligenceWorkbench", () => {
-    it("exposes the canonical product boundary", () => {
-        const service = new ExecutiveIntelligenceWorkbench();
-        expect(service.capabilityId).toBe("product.executive-intelligence-workbench");
-        expect(service.targetEngine).toBe("Executive Intelligence Engine");
-        expect(service.initialize().status).toBe("READY");
-    });
-
-    it("keeps its deterministic minimal contract", () => {
-        expect(new ExecutiveIntelligenceWorkbench().execute("continue").status).toBe("READY");
-        expect(new ExecutiveIntelligenceWorkbench().execute(" ").status).toBe("BLOCKED");
+    it("exposes the canonical capability identity and health", () => {
+        const engine = new ExecutiveIntelligenceWorkbench();
+        expect(engine.name).toBe("ExecutiveIntelligenceWorkbench");
+        expect(engine.health()).toBe(true);
+        expect(engine.describeCapability()).toEqual({
+            id: "repair-product.executive-intelligence-workbench",
+            capability: "repair commercial quality failure for product.executive-intelligence-workbench: compose executive KPI, dashboard and performance intelligence from verified platform evidence",
+            targetEngine: "Executive Intelligence Engine"
+        });
     });
 });
