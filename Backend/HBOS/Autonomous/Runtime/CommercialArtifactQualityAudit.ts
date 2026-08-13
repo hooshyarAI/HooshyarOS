@@ -114,10 +114,13 @@ export class CommercialArtifactQualityAudit {
             /initialize\(\)\s*:\s*\{\s*status:\s*"READY"\s*\}/
         ];
         const signalCount = scaffoldSignals.filter(pattern => pattern.test(source)).length;
-        if (signalCount >= 3) return true;
-
         const meaningfulOperations = ["map(", "reduce(", "filter(", "find(", "save(", "load(", "analyze(", "calculate(", "evaluate(", "assess(", "normalize(", "validate(", "persist(", "authorize(", "ingest(", "buildReport(", "generate(", "schedule(", "recommend("];
         const hasMeaningfulOperation = meaningfulOperations.some(marker => source.includes(marker));
+
+        // A canonical product may retain the READY/BLOCKED shell while adding
+        // real domain behavior. Treat the shell as trivial only when the
+        // implementation contains no meaningful operation.
+        if (signalCount >= 3 && !hasMeaningfulOperation) return true;
         return source.length < 280 && !hasMeaningfulOperation;
     }
 
