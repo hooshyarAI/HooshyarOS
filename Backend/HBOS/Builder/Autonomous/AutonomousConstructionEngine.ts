@@ -1,4 +1,5 @@
 import { AutonomousRepairEngine } from "../../Autonomous/RepairEngine/AutonomousRepairEngine";
+import { QualityGate } from "../../Factory/Quality/QualityGate";
 
 export type ConstructionStage = "ARCHITECTURE" | "PLAN" | "GENERATE" | "VERIFY" | "REPAIR" | "FINALIZE";
 
@@ -42,8 +43,10 @@ export interface ConstructionTool {
     };
 }
 
-/** Architecture-driven construction control plane. */
+/** Architecture-driven construction control plane with fail-closed quality approval. */
 export class AutonomousConstructionEngine {
+    private readonly qualityGate = new QualityGate();
+
     constructor(
         private readonly tools: ConstructionTool[],
         private readonly maxRepairAttempts = 3,
@@ -107,6 +110,14 @@ export class AutonomousConstructionEngine {
             return this.blocked("VERIFY", attempt, issues, trace);
         }
 
+        const qualityEvidence = this.collectQualityEvidence(artifacts);
+        const quality = this.qualityGate.check(qualityEvidence);
+        artifacts.QUALITY_GATE = quality;
+        if (!quality.approved) {
+            issues.push(...quality.issues);
+            return this.blocked("VERIFY", attempt, issues, trace);
+        }
+
         trace.push("FINALIZE");
         const finalize = this.execute("FINALIZE", plan, attempt, artifacts, issues);
         if (!finalize.ok) {
@@ -124,6 +135,21 @@ export class AutonomousConstructionEngine {
         }
 
         return this.success(attempt > 0 ? "REPAIRED" : "BUILT", attempt, trace, artifacts.GENERATE !== undefined && this.recordArtifact(artifacts.GENERATE)?.idempotentNoOp === true);
+    }
+
+    private collectQualityEvidence(artifacts: Record<string, unknown>): Record<string, boolean> {
+        const architecture = this.recordArtifact(artifacts.ARCHITECTURE);
+        const generated = this.recordArtifact(artifacts.GENERATE);
+        const verification = this.recordArtifact(artifacts.VERIFY);
+        const finalize = this.recordArtifact(artifacts.FINALIZE);
+        const quality = this.recordArtifact(artifacts.QUALITY_GATE);
+        return {
+            implementationVerified: generated?.changed === true || generated?.idempotentNoOp === true,
+            testVerified: verification?.testsPassed === true,
+            behavioralEvidenceVerified: verification?.behavioralEvidenceVerified === true,
+            integrationVerified: verification?.integrationVerified === true && architecture?.approved === true,
+            cleanRepository: finalize?.clean === true || quality?.cleanRepository === true
+        };
     }
 
     private isIdempotentGenerationNoOp(result: { ok: boolean; artifact?: unknown; issue?: string }): boolean {
@@ -196,15 +222,17 @@ export class AutonomousConstructionEngine {
     static selfTest(): void {
         let verificationCalls = 0;
         const tools: ConstructionTool[] = [
-            { name: "architecture", execute: () => ({ ok: true }) },
+            { name: "architecture", execute: () => ({ ok: true, artifact: { approved: true } }) },
             { name: "python", execute: stage => {
                 if (stage === "VERIFY") {
                     verificationCalls += 1;
-                    return verificationCalls === 1 ? { ok: false, issue: "INTERNAL_CONNECTION_FAILURE" } : { ok: true };
+                    return verificationCalls === 1
+                        ? { ok: false, issue: "INTERNAL_CONNECTION_FAILURE" }
+                        : { ok: true, artifact: { testsPassed: true, behavioralEvidenceVerified: true, integrationVerified: true } };
                 }
-                return { ok: true };
+                return { ok: true, artifact: stage === "GENERATE" ? { changed: true } : undefined };
             } },
-            { name: "git", execute: () => ({ ok: true }) }
+            { name: "git", execute: () => ({ ok: true, artifact: { clean: true } }) }
         ];
         const result = new AutonomousConstructionEngine(tools, 2).build({
             capabilityId: "construction-001", capability: "architecture-driven autonomous construction",
