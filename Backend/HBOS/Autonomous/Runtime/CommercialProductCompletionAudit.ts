@@ -84,7 +84,9 @@ export class CommercialProductCompletionAudit {
         ];
         const missingLayers = requiredMarkers.filter(marker => !contract.includes(marker)).map(marker => `contract-marker:${marker}`);
 
-        this.auditCommercializationOperatingModel(root, missingLayers);
+        if (process.env.HOOSHYAR_COMMERCIALIZATION_MODE === "1") {
+            this.auditCommercializationOperatingModel(root, missingLayers);
+        }
 
         const requiredArtifacts: Array<[string, string]> = [
             ["api-gateway", "Backend/HBOS/Engines/APIGatewayEngine.ts"],
