@@ -16,6 +16,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 DAEMON = ROOT / "Backend" / "HBOS" / "Autonomous" / "Runtime" / "AutonomousBuildDaemon.ts"
+BUILDER = ROOT / "Backend" / "AI_Runtime" / "autonomous_builder.py"
 TSX = ROOT / "node_modules" / ".bin" / ("tsx.cmd" if os.name == "nt" else "tsx")
 HANDOFF_MARKER = '\"type\":\"AUTONOMOUS_PLATFORM_CONTINUATION\"'
 ROADMAP = ROOT / "Docs" / "Product" / "PRODUCT_CONSTRUCTION_ROADMAP.json"
@@ -50,26 +51,111 @@ def status_paths() -> list[str]:
     return paths
 
 
-def resumable_product_paths() -> list[Path]:
+def roadmap_capabilities() -> list[dict]:
     if not ROADMAP.exists():
         return []
     try:
         roadmap = json.loads(ROADMAP.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return []
+    return [c for c in roadmap.get("capabilities", []) if c.get("capabilityId")]
 
+
+def resumable_product_paths() -> list[Path]:
     candidates: list[Path] = []
-    for capability in roadmap.get("capabilities", []):
-        capability_id = str(capability.get("capabilityId", ""))
+    for capability in roadmap_capabilities():
         implementation = capability.get("implementationPath")
         test = capability.get("testPath")
         documentation = capability.get("documentationPath")
-        if not capability_id or not implementation or not test or not documentation:
+        if not implementation or not test or not documentation:
             continue
         expected = [ROOT / str(implementation), ROOT / str(test), ROOT / str(documentation)]
         if all(path.exists() for path in expected):
             candidates.extend(expected)
     return candidates
+
+
+def _path_matches(candidate: Path, declared: Path) -> bool:
+    return candidate == declared or (declared.is_dir() and declared in candidate.parents)
+
+
+def _dirty_overlaps_capability(dirty: list[str], capability: dict) -> bool:
+    declared_values = [
+        capability.get("implementationPath"),
+        capability.get("testPath"),
+        capability.get("documentationPath"),
+    ]
+    declared = [(ROOT / str(value)).resolve() for value in declared_values if value]
+    for relative in dirty:
+        candidate = (ROOT / relative).resolve()
+        if any(_path_matches(candidate, path) or _path_matches(path, candidate) for path in declared):
+            return True
+    return False
+
+
+def _capability_prompt(capability: dict) -> str:
+    dependencies = ", ".join(str(x) for x in capability.get("dependencies", [])) or "none"
+    rules = "; ".join([
+        "Architecture Freeze V4",
+        "One Capability = One Engine",
+        "Engine must be observable",
+        "Engine must be testable",
+        "Engine must be recoverable",
+        "No duplicate capability owner",
+        "Generated artifacts must stay inside the declared capability boundary",
+    ])
+    directives = "; ".join([
+        "Implement exactly one concrete capability from the canonical mission.",
+        "Create or update the focused implementation, focused test and documentation required by the architecture.",
+        "Repair verification failures before finalization.",
+        "Do not redesign Architecture Freeze V4.",
+        "Never modify an existing dependency, engine, test or document merely to make the selected capability appear implemented.",
+        "For a product capability, implement the product artifact paths declared by the durable product roadmap.",
+        "Use only repository-native Python construction.",
+    ])
+    return "\n".join([
+        "You are the repository-native Python implementation worker inside HooshyarOS Autonomous Operations Engine.",
+        "Read AGENTS.md, Docs/ARCHITECTURE.md, and Assistant/SYSTEM_PROMPT.md before changing code.",
+        f"Capability ID: {capability.get('capabilityId')}",
+        f"Capability: {capability.get('capability')}",
+        f"Target Engine: {capability.get('targetEngine')}",
+        f"Dependencies: {dependencies}",
+        "Required artifact paths: " + "; ".join([
+            str(capability.get("implementationPath", "")),
+            str(capability.get("testPath", "")),
+            str(capability.get("documentationPath", "")),
+        ]),
+        f"Architecture rules: {rules}",
+        f"Directives: {directives}",
+        "Reuse existing capabilities and engine boundaries; never invent business semantics that are absent from repository architecture or evidence.",
+    ])
+
+
+def reweave_interrupted_capabilities(dirty: list[str]) -> bool:
+    matched = [c for c in roadmap_capabilities() if _dirty_overlaps_capability(dirty, c)]
+    if not matched:
+        return False
+
+    changed = False
+    for capability in matched:
+        prompt = _capability_prompt(capability)
+        result = subprocess.run(
+            [sys.executable, str(BUILDER), "--prompt", prompt],
+            cwd=ROOT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=15 * 60,
+            check=False,
+            env={**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"},
+        )
+        print(result.stdout, end="")
+        if result.returncode != 0:
+            return False
+        changed = True
+    return changed
 
 
 def is_resumable_generation_state() -> tuple[bool, list[str]]:
@@ -101,8 +187,10 @@ def resume_interrupted_generation() -> bool:
         "type": "AUTONOMOUS_RESUME_GENERATION",
         "status": "detected",
         "changedPaths": dirty,
-        "action": "VERIFY → COMMIT → PUSH → CONTINUE"
+        "action": "REWEAVE → VERIFY → COMMIT → PUSH → CONTINUE"
     }, ensure_ascii=False))
+
+    reweave_interrupted_capabilities(dirty)
 
     verification = run("npm", ["test", "--", "--runInBand"], timeout=45 * 60)
     print(verification.stdout, end="")
@@ -139,7 +227,7 @@ def resume_interrupted_generation() -> bool:
     print(json.dumps({
         "type": "AUTONOMOUS_RESUME_GENERATION",
         "status": "completed",
-        "action": "VERIFY → COMMIT → PUSH → CONTINUE"
+        "action": "REWEAVE → VERIFY → COMMIT → PUSH → CONTINUE"
     }, ensure_ascii=False))
     return True
 
