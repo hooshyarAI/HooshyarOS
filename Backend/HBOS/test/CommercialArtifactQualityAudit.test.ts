@@ -8,30 +8,13 @@ describe("CommercialArtifactQualityAudit", () => {
         try {
             mkdirSync(join(root, "Backend/HBOS/Product"), { recursive: true });
             mkdirSync(join(root, "Backend/HBOS/test"), { recursive: true });
-            writeFileSync(
-                join(root, "Backend/HBOS/Product/FakeProduct.ts"),
-                `export interface ProductCapabilityResult { status: "READY" | "BLOCKED"; }\nexport class FakeProduct { initialize(): { status: "READY" } { return { status: "READY" }; } execute(input: string): ProductCapabilityResult { return { status: input && input.trim() ? "READY" : "BLOCKED" }; } }`,
-                "utf8"
-            );
-            writeFileSync(
-                join(root, "Backend/HBOS/test/FakeProduct.test.ts"),
-                `describe("FakeProduct", () => { it("contract", () => { const value = new FakeProduct(); expect(value.initialize().status).toBe("READY"); expect(value.execute("continue").status).toBe("READY"); expect(value.execute(" ").status).toBe("BLOCKED"); }); });`,
-                "utf8"
-            );
-
-            const result = new CommercialArtifactQualityAudit().auditCapability(
-                root,
-                "product.fake",
-                "Backend/HBOS/Product/FakeProduct.ts",
-                "Backend/HBOS/test/FakeProduct.test.ts"
-            );
-
+            writeFileSync(join(root, "Backend/HBOS/Product/FakeProduct.ts"), `export interface ProductCapabilityResult { status: "READY" | "BLOCKED"; }\nexport class FakeProduct { initialize(): { status: "READY" } { return { status: "READY" }; } execute(input: string): ProductCapabilityResult { return { status: input && input.trim() ? "READY" : "BLOCKED" }; } }`, "utf8");
+            writeFileSync(join(root, "Backend/HBOS/test/FakeProduct.test.ts"), `describe("FakeProduct", () => { it("contract", () => { const value = new FakeProduct(); expect(value.initialize().status).toBe("READY"); expect(value.execute("continue").status).toBe("READY"); expect(value.execute(" ").status).toBe("BLOCKED"); }); });`, "utf8");
+            const result = new CommercialArtifactQualityAudit().auditCapability(root, "product.fake", "Backend/HBOS/Product/FakeProduct.ts", "Backend/HBOS/test/FakeProduct.test.ts");
             expect(result.complete).toBe(false);
             expect(result.failures).toContain("product.fake:trivial-scaffold");
             expect(result.failures).toContain("product.fake:contract-only-test");
-        } finally {
-            rmSync(root, { recursive: true, force: true });
-        }
+        } finally { rmSync(root, { recursive: true, force: true }); }
     });
 
     it("accepts a capability with meaningful data transformation and behavioral assertions", () => {
@@ -39,28 +22,23 @@ describe("CommercialArtifactQualityAudit", () => {
         try {
             mkdirSync(join(root, "Backend/HBOS/Product"), { recursive: true });
             mkdirSync(join(root, "Backend/HBOS/test"), { recursive: true });
-            writeFileSync(
-                join(root, "Backend/HBOS/Product/FinancialProduct.ts"),
-                `export class FinancialProduct { normalize(records: Record<string, number>[]) { return records.map(record => ({ ...record, margin: record.profit / record.revenue })); } }`,
-                "utf8"
-            );
-            writeFileSync(
-                join(root, "Backend/HBOS/test/FinancialProduct.test.ts"),
-                `describe("FinancialProduct", () => { it("calculates margin from evidence", () => { const result = new FinancialProduct().normalize([{ profit: 25, revenue: 100 }]); expect(result[0].margin).toBeCloseTo(0.25); }); });`,
-                "utf8"
-            );
-
-            const result = new CommercialArtifactQualityAudit().auditCapability(
-                root,
-                "product.financial",
-                "Backend/HBOS/Product/FinancialProduct.ts",
-                "Backend/HBOS/test/FinancialProduct.test.ts"
-            );
-
+            writeFileSync(join(root, "Backend/HBOS/Product/FinancialProduct.ts"), `export class FinancialProduct { normalize(records: Record<string, number>[]) { return records.map(record => ({ ...record, margin: record.profit / record.revenue })); } }`, "utf8");
+            writeFileSync(join(root, "Backend/HBOS/test/FinancialProduct.test.ts"), `describe("FinancialProduct", () => { it("calculates margin from evidence", () => { const result = new FinancialProduct().normalize([{ profit: 25, revenue: 100 }]); expect(result[0].margin).toBeCloseTo(0.25); }); });`, "utf8");
+            const result = new CommercialArtifactQualityAudit().auditCapability(root, "product.financial", "Backend/HBOS/Product/FinancialProduct.ts", "Backend/HBOS/test/FinancialProduct.test.ts");
             expect(result.complete).toBe(true);
             expect(result.failures).toEqual([]);
-        } finally {
-            rmSync(root, { recursive: true, force: true });
-        }
+        } finally { rmSync(root, { recursive: true, force: true }); }
+    });
+
+    it("fails closed when an implementationPath points to a directory", () => {
+        const root = mkdtempSync(join(process.cwd(), ".tmp-quality-audit-directory-"));
+        try {
+            mkdirSync(join(root, "Frontend/HooshyarWebApp"), { recursive: true });
+            mkdirSync(join(root, "Backend/HBOS/test"), { recursive: true });
+            writeFileSync(join(root, "Backend/HBOS/test/WebApp.test.ts"), `describe("WebApp", () => { it("has behavioral evidence", () => { expect([1, 2].map(value => value * 2)).toEqual([2, 4]); }); });`, "utf8");
+            const result = new CommercialArtifactQualityAudit().auditCapability(root, "product.web-application-shell", "Frontend/HooshyarWebApp", "Backend/HBOS/test/WebApp.test.ts");
+            expect(result.complete).toBe(false);
+            expect(result.failures).toContain("product.web-application-shell:implementation-not-file");
+        } finally { rmSync(root, { recursive: true, force: true }); }
     });
 });
