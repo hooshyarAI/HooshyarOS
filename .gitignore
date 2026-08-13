@@ -16,3 +16,6 @@ node_modules/
 .aider.tags.cache.v4/
 .vscode-clean/
 .vscode-extensions-clean/
+
+# Local Hooshyar runtime state
+.hooshyar/
