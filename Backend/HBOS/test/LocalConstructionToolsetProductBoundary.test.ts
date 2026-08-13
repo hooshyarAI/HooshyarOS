@@ -1,4 +1,4 @@
-import { createLocalConstructionTools } from "../Autonomous/Runtime/LocalConstructionToolset";
+import { createLocalConstructionTools, evaluateBehavioralEvidence } from "../Autonomous/Runtime/LocalConstructionToolset";
 
 describe("LocalConstructionToolset product artifact boundary", () => {
     it("resolves a repair-product goal to the canonical product artifact paths", () => {
@@ -27,5 +27,18 @@ describe("LocalConstructionToolset product artifact boundary", () => {
                 expect.stringContaining("FinancialDataIngestionAdapter.ts")
             ])
         }));
+    });
+
+    it("derives behavioral evidence from commercial artifact quality for a repaired product capability", () => {
+        const result = evaluateBehavioralEvidence(
+            process.cwd(),
+            "repair-product.financial-statement-analysis",
+            true,
+            ""
+        );
+
+        expect(result.source).toBe("commercial-artifact-quality");
+        expect(result.verified).toBe(true);
+        expect(result.failures).toEqual([]);
     });
 });
