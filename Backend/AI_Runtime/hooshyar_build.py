@@ -14,6 +14,7 @@ DAEMON = ROOT / "Backend" / "HBOS" / "Autonomous" / "Runtime" / "AutonomousBuild
 BUILDER = ROOT / "Backend" / "AI_Runtime" / "autonomous_builder.py"
 TSX = ROOT / "node_modules" / ".bin" / ("tsx.cmd" if os.name == "nt" else "tsx")
 HANDOFF_MARKER = '"type":"AUTONOMOUS_PLATFORM_CONTINUATION"'
+BLOCKED_MARKER = '"type":"AUTONOMOUS_BLOCKED"'
 ROADMAP = ROOT / "Docs" / "Product" / "PRODUCT_CONSTRUCTION_ROADMAP.json"
 
 MAX_SELF_HEAL_ATTEMPTS = 5
@@ -163,9 +164,7 @@ def _repair_generated_product_test(capability: dict) -> bool:
     repaired, count = import_pattern.subn(replacement, content, count=1)
     if count != 1:
         repaired = content
-    # Normalize the common legacy generator symbol in constructor expressions too.
     repaired, ctor_count = re.subn(r'\bnew\s+index\s*\(\)', f"new {class_name}()", repaired)
-    # Also normalize a stale bare identifier when it appears in a generated test body.
     repaired, bare_count = re.subn(r'\bindex\.execute\b', f'{class_name}.execute', repaired)
     if repaired == content:
         return False
@@ -326,9 +325,12 @@ def run_daemon(*, assistant_phase: bool) -> int:
     process = subprocess.Popen([str(TSX), str(DAEMON)], cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", bufsize=1)
     assert process.stdout is not None
     handoff_seen = False
+    autonomous_blocked_seen = False
     try:
         for line in process.stdout:
             print(line, end="")
+            if BLOCKED_MARKER in line:
+                autonomous_blocked_seen = True
             if assistant_phase and HANDOFF_MARKER in line:
                 handoff_seen = True
                 print('{"type":"AUTONOMOUS_ASSISTANT_PHASE_COMPLETE","status":"completed","next":"platform","deadlineDays":7}')
@@ -345,7 +347,7 @@ def run_daemon(*, assistant_phase: bool) -> int:
             return_code = process.wait(timeout=10)
         return 0 if return_code in (0, -15, 1, 130, 143) else return_code
     return_code = process.wait()
-    if not assistant_phase and return_code != 0 and resume_interrupted_generation():
+    if not assistant_phase and return_code != 0 and not autonomous_blocked_seen and resume_interrupted_generation():
         return run_daemon(assistant_phase=False)
     return return_code
 
