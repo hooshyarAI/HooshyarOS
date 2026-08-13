@@ -51,17 +51,20 @@ def last_event(output: str, event_type: str) -> dict | None:
     return None
 
 
+def blocked_event(output: str) -> dict | None:
+    return last_event(output, "AUTONOMOUS_BLOCKED")
+
+
 def fingerprint(output: str) -> str:
-    events = json_events(output)
-    for event in reversed(events):
-        if event.get("type") == "AUTONOMOUS_BLOCKED":
-            result = event.get("result") or {}
-            if isinstance(result, dict):
-                return "BLOCKED:" + json.dumps(
-                    result.get("issues") or result.get("details") or result,
-                    ensure_ascii=False,
-                    sort_keys=True,
-                )
+    event = blocked_event(output)
+    if event:
+        result = event.get("result") or {}
+        if isinstance(result, dict):
+            return "BLOCKED:" + json.dumps(
+                result.get("issues") or result.get("details") or result,
+                ensure_ascii=False,
+                sort_keys=True,
+            )
     return "OUTPUT:" + output[-4000:]
 
 
@@ -89,13 +92,14 @@ def main() -> int:
     for cycle in range(1, MAX_CYCLES + 1):
         print(f"\n=== SUPERVISOR CYCLE {cycle} ===", flush=True)
 
-        build_code, _ = run(["npm.cmd", "run", "build"])
+        build_code, build_output = run(["npm.cmd", "run", "build"])
         if build_code != 0:
             platform_code, platform_output = run([sys.executable, "Backend/AI_Runtime/hooshyar_build.py", "platform"], timeout=90 * 60)
-            if platform_code != 0:
-                key = fingerprint(platform_output)
+            blocked = blocked_event(platform_output)
+            if platform_code != 0 or blocked:
+                key = fingerprint(platform_output or build_output)
                 seen_failures[key] = seen_failures.get(key, 0) + 1
-                if focused_repair(platform_output):
+                if focused_repair(platform_output or build_output):
                     continue
                 if seen_failures[key] >= 3:
                     print("AUTONOMOUS_SUPERVISOR_STOPPED", flush=True)
@@ -104,7 +108,8 @@ def main() -> int:
                 continue
 
         platform_code, platform_output = run([sys.executable, "Backend/AI_Runtime/hooshyar_build.py", "platform"], timeout=90 * 60)
-        if platform_code != 0:
+        blocked = blocked_event(platform_output)
+        if platform_code != 0 or blocked:
             key = fingerprint(platform_output)
             seen_failures[key] = seen_failures.get(key, 0) + 1
             if focused_repair(platform_output):
@@ -123,13 +128,9 @@ def main() -> int:
             continue
 
         if full_regression():
-            # A green regression is not sufficient by itself: the platform audit
-            # remains authoritative, so the next cycle re-audits and continues.
             time.sleep(0.2)
             continue
 
-        # Any regression failure becomes a repair input for the autonomous platform.
-        # We deliberately do not ask the user to identify the failing suite.
         continue
 
     print("AUTONOMOUS_SUPERVISOR_STOPPED", flush=True)
