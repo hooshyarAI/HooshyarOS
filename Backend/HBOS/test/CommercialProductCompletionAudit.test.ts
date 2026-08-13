@@ -11,14 +11,15 @@ describe("CommercialProductCompletionAudit", () => {
         expect(result.missingLayers).not.toContain("commercial-completion-contract");
     });
 
-    it("recognizes the implemented organization identity and tenant persistence boundaries", () => {
+    it("does not claim commercial completion while behavioral quality failures remain", () => {
         const audit = new CommercialProductCompletionAudit();
         const result = audit.audit(process.cwd());
 
         expect(result.missingLayers).not.toContain("persistence-boundary");
         expect(result.missingLayers).not.toContain("authentication-authorization-boundary");
         expect(result.missingLayers.some(layer => layer.startsWith("roadmap:"))).toBe(false);
-        expect(result.complete).toBe(true);
+        expect(result.complete).toBe(false);
+        expect(result.missingLayers.some(layer => layer.startsWith("quality:"))).toBe(true);
     });
 
     it("reports a missing commercial roadmap artifact instead of claiming completion", () => {
