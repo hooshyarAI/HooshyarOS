@@ -1,5 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, join } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { CommercialArtifactQualityAudit } from "./CommercialArtifactQualityAudit";
 
@@ -25,6 +24,8 @@ export class CommercialProductCompletionAudit {
     private readonly applicationScenarioTestPath = "Backend/HBOS/test/CommercialE2EAcceptanceScenario.test.ts";
     private readonly webUxTestPath = "Backend/HBOS/test/CommercialWebUXContract.test.ts";
     private readonly runtimeAcceptanceTestPath = "Backend/HBOS/test/CommercialRuntimeServer.test.ts";
+    private readonly financialIngestionPath = "Backend/HBOS/Product/FinancialDataIngestionAdapter.ts";
+    private readonly financialIngestionTestPath = "Backend/HBOS/test/FinancialDataIngestionAdapter.test.ts";
     private readonly qualityAudit = new CommercialArtifactQualityAudit();
 
     private runRuntimeAcceptance(root: string): boolean {
@@ -58,10 +59,21 @@ export class CommercialProductCompletionAudit {
             "**Hybrid:**",
             "**Mobile:**",
             "**Offline/Intermittent Connectivity:**",
-            "Excel/CSV | PDF/Documents | Manual Evidence | API | ERP/Accounting | Database Adapter",
+            "## 16. Zero Data Entry and No Duplicate Work",
+            "**Automatic acquisition first:**",
+            "**No double entry:**",
+            "**Manual entry is exceptional:**",
+            "**Evidence requirement:**",
+            "ERP/Accounting | CRM | HR/Payroll | POS | Banking/Financial exports | SQL/Database adapters | API | Excel/CSV | PDF | Word/Documents | Images/Scans/OCR | Historical files | Reports | Budgets | Auditor documents",
         ];
         for (const marker of requiredMarkers) {
             if (!model.includes(marker)) missingLayers.push(`commercialization-marker:${marker}`);
+        }
+        for (const [layer, artifact] of [
+            ["automatic-data-acquisition-implementation", this.financialIngestionPath],
+            ["automatic-data-acquisition-test", this.financialIngestionTestPath],
+        ] as Array<[string, string]>) {
+            if (!existsSync(join(root, artifact))) missingLayers.push(layer);
         }
     }
 
