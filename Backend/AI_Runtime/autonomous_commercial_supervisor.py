@@ -14,6 +14,7 @@ if hasattr(sys.stderr, "reconfigure"):
 
 ROOT = Path(__file__).resolve().parents[2]
 ASSISTANT_CONTROLLER = ROOT / "Backend/AI_Runtime/hooshyar_build.py"
+COMMERCIALIZATION_SPEC = ROOT / "Docs/COMMERCIALIZATION_OPERATING_MODEL.md"
 GOVERNING_FILES = [
     ROOT / "Docs/HOOSHYAROS_MASTER_CHARTER.md",
     ROOT / "Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md",
@@ -22,6 +23,7 @@ GOVERNING_FILES = [
     ROOT / "Docs/HOOSHYAROS_FINAL_DECISIONS_REGISTER.md",
     ROOT / "Docs/HOOSHYAROS_COMMERCIAL_SCOPE_RECONCILIATION.md",
     ROOT / "Docs/Product/PRODUCT_CONSTRUCTION_ROADMAP.json",
+    COMMERCIALIZATION_SPEC,
 ]
 GOVERNING_ARTIFACTS = GOVERNING_FILES
 REQUIRED_MARKERS = [
@@ -34,6 +36,13 @@ SUBORDINATE_MARKERS = [
     "Python is the canonical construction worker/orchestration layer",
     "The autonomous Assistant is NOT the platform's future financial, managerial or commercial advisor",
     "Platform continuation", "REPAIR", "RE-PLAN",
+]
+COMMERCIALIZATION_MARKERS = [
+    "Platform is protected. Commercialization is optimizable.",
+    "COLLECT → NORMALIZE → DEDUPLICATE → RECONCILE CONFLICTS → PRIORITIZE → CANONICALIZE → MAKE EXECUTABLE → APPLY → VERIFY → RECORD",
+    "The Assistant is a required part of the commercialization loop.",
+    "Discover → Start → Organization → Identity/Roles → Connect or Import Data → Validate Data → Configure Goals/KPIs → View Dashboard → Understand Insight → Decide → Approve → Execute → Measure → Learn → Improve",
+    "IMPLEMENT → HUMAN REVIEW → IDENTIFY FRICTION/ERROR → CLASSIFY → PRIORITIZE → REPAIR/IMPROVE → VERIFY → RELEASE",
 ]
 
 
@@ -48,13 +57,20 @@ def read_governing_context() -> tuple[bool, str]:
         return False, "assistant-supervisor-subordination-contract-missing"
     if not ASSISTANT_CONTROLLER.is_file():
         return False, "assistant-construction-controller-missing"
+    if os.environ.get("HOOSHYAR_COMMERCIALIZATION_MODE", "0").strip() == "1":
+        if not COMMERCIALIZATION_SPEC.is_file():
+            return False, "commercialization-operating-model-missing"
+        if not all(marker in COMMERCIALIZATION_SPEC.read_text(encoding="utf-8", errors="replace") for marker in COMMERCIALIZATION_MARKERS):
+            return False, "commercialization-operating-model-contract-incomplete"
     return True, "repository-governance-valid"
 
 
 def enforce_construction_toolchain() -> tuple[bool, str]:
     if os.environ.get("HOOSHYAR_AGENT", "python").strip().lower() != "python":
         return False, "python+github+assistant-only"
-    return (True, "python+github+assistant") if ASSISTANT_CONTROLLER.is_file() else (False, "assistant-construction-controller-missing")
+    if not ASSISTANT_CONTROLLER.is_file():
+        return False, "assistant-construction-controller-missing"
+    return True, "python+github+assistant"
 
 
 def validate_plan(output: str) -> tuple[bool, str]:
@@ -98,6 +114,8 @@ def validate_constitution() -> bool:
         "type": "AUTONOMOUS_GOVERNANCE_OK",
         "sourceOfTruthCount": len(GOVERNING_FILES),
         "parentController": str(ASSISTANT_CONTROLLER.relative_to(ROOT)),
+        "commercializationSpec": str(COMMERCIALIZATION_SPEC.relative_to(ROOT)),
+        "commercializationMode": os.environ.get("HOOSHYAR_COMMERCIALIZATION_MODE", "0") == "1",
         "role": "subordinate-recovery-and-verification",
         "independentArchitectureAuthority": False,
         "independentCapabilitySelection": False,
