@@ -19,6 +19,9 @@ interface RoadmapCapability {
 export class CommercialProductCompletionAudit {
     private readonly contractPath = "Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md";
     private readonly roadmapPath = "Docs/Product/PRODUCT_CONSTRUCTION_ROADMAP.json";
+    private readonly applicationScenarioPath = "Backend/HBOS/Product/CommercialE2EAcceptanceScenario.ts";
+    private readonly applicationScenarioTestPath = "Backend/HBOS/test/CommercialE2EAcceptanceScenario.test.ts";
+    private readonly webUxTestPath = "Backend/HBOS/test/CommercialWebUXContract.test.ts";
     private readonly qualityAudit = new CommercialArtifactQualityAudit();
 
     audit(root: string): CommercialProductCompletionAuditResult {
@@ -80,6 +83,15 @@ export class CommercialProductCompletionAudit {
             "Backend/HBOS/Product/OrganizationIdentityService.ts"
         ];
         if (!authCandidates.some(candidate => existsSync(join(root, candidate)))) missingLayers.push("authentication-authorization-boundary");
+
+        const applicationEvidence: Array<[string, string]> = [
+            ["application-e2e-scenario", this.applicationScenarioPath],
+            ["application-e2e-test", this.applicationScenarioTestPath],
+            ["commercial-web-ux-contract", this.webUxTestPath]
+        ];
+        for (const [layer, artifact] of applicationEvidence) {
+            if (!existsSync(join(root, artifact))) missingLayers.push(layer);
+        }
 
         if (existsSync(join(root, this.roadmapPath))) {
             try {
