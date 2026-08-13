@@ -82,8 +82,6 @@ def _capability_complete(capability: dict) -> bool:
 
 
 def _dirty_overlaps_capability(dirty: list[str], capability: dict) -> bool:
-    if _capability_complete(capability):
-        return False
     values = [capability.get("implementationPath"), capability.get("testPath"), capability.get("documentationPath")]
     declared = [(ROOT / str(value)).resolve() for value in values if value]
     return any(
