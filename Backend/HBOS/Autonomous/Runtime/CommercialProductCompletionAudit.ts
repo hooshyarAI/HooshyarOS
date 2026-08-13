@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 import { CommercialArtifactQualityAudit } from "./CommercialArtifactQualityAudit";
 
 export interface CommercialProductCompletionAuditResult {
@@ -22,7 +23,22 @@ export class CommercialProductCompletionAudit {
     private readonly applicationScenarioPath = "Backend/HBOS/Product/CommercialE2EAcceptanceScenario.ts";
     private readonly applicationScenarioTestPath = "Backend/HBOS/test/CommercialE2EAcceptanceScenario.test.ts";
     private readonly webUxTestPath = "Backend/HBOS/test/CommercialWebUXContract.test.ts";
+    private readonly runtimeAcceptanceTestPath = "Backend/HBOS/test/CommercialRuntimeServer.test.ts";
     private readonly qualityAudit = new CommercialArtifactQualityAudit();
+
+    private runRuntimeAcceptance(root: string): boolean {
+        if (process.env.HOOSHYAR_COMMERCIALIZATION_MODE !== "1") return true;
+        const jestCli = join(root, "node_modules", "jest", "bin", "jest.js");
+        if (!existsSync(jestCli)) return false;
+        const result = spawnSync(process.execPath, [jestCli, "--runInBand", this.runtimeAcceptanceTestPath, this.webUxTestPath], {
+            cwd: root,
+            encoding: "utf8",
+            timeout: 20 * 60 * 1000,
+            stdio: "pipe",
+            env: { ...process.env, HOOSHYAR_COMMERCIALIZATION_ACCEPTANCE: "1" },
+        });
+        return !result.error && result.status === 0;
+    }
 
     audit(root: string): CommercialProductCompletionAuditResult {
         const contractFile = join(root, this.contractPath);
@@ -87,7 +103,8 @@ export class CommercialProductCompletionAudit {
         const applicationEvidence: Array<[string, string]> = [
             ["application-e2e-scenario", this.applicationScenarioPath],
             ["application-e2e-test", this.applicationScenarioTestPath],
-            ["commercial-web-ux-contract", this.webUxTestPath]
+            ["commercial-web-ux-contract", this.webUxTestPath],
+            ["commercial-runtime-acceptance-test", this.runtimeAcceptanceTestPath]
         ];
         for (const [layer, artifact] of applicationEvidence) {
             if (!existsSync(join(root, artifact))) missingLayers.push(layer);
@@ -110,6 +127,8 @@ export class CommercialProductCompletionAudit {
         } else {
             missingLayers.push("commercial-roadmap-missing");
         }
+
+        if (!this.runRuntimeAcceptance(root)) missingLayers.push("commercial-runtime-acceptance-failed");
 
         const quality = this.qualityAudit.audit(root);
         for (const failure of quality.failures) missingLayers.push(`quality:${failure}`);
