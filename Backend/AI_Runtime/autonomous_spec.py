@@ -1,11 +1,4 @@
-"""Repository-native capability specification and generic scaffolding.
-
-The construction worker consumes the same mission contract used by HBOS:
-capability identity, target engine, dependencies, architecture rules and
-construction directives. It never invents domain semantics; it only turns a
-validated contract into a deterministic Engine/Test/Documentation boundary
-with capability-shaped behavior for product work.
-"""
+"""Repository-native capability specification and deterministic scaffolding."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -57,9 +50,7 @@ def _normalize_declared_path(path: str) -> str:
     normalized = re.sub(r"^[A-Za-z]:/HooshyarOS/", "", normalized, flags=re.IGNORECASE)
     normalized = re.sub(r"^/HooshyarOS/", "", normalized, flags=re.IGNORECASE)
     marker_match = re.search(r"(?:^|/)((?:Frontend|Backend|Docs)(?:/.*)?)$", normalized, re.IGNORECASE)
-    if marker_match:
-        return marker_match.group(1)
-    return normalized
+    return marker_match.group(1) if marker_match else normalized
 
 
 def _required_artifact_paths(prompt: str) -> tuple[str, str, str] | None:
@@ -67,9 +58,7 @@ def _required_artifact_paths(prompt: str) -> tuple[str, str, str] | None:
     if not match:
         return None
     values = tuple(_normalize_declared_path(item) for item in match.group(1).split(";") if item.strip())
-    if len(values) != 3:
-        return None
-    return values[0], values[1], values[2]
+    return values if len(values) == 3 else None
 
 
 def _is_directory_artifact(path: str) -> bool:
@@ -78,6 +67,10 @@ def _is_directory_artifact(path: str) -> bool:
 
 def _implementation_path(path: str) -> str:
     return f"{path.rstrip('/')}/index.ts" if _is_directory_artifact(path) else path
+
+
+def _canonical_capability_id(capability_id: str) -> str:
+    return re.sub(r"^(?:repair-)+", "", capability_id)
 
 
 def spec_from_prompt(prompt: str) -> CapabilitySpec | None:
@@ -122,19 +115,12 @@ def validate_spec(spec: CapabilitySpec) -> list[str]:
         errors.append("missing capability identity")
     if not spec.target_engine.strip():
         errors.append("missing target engine")
-    if spec.engine_path == spec.test_path or spec.engine_path == spec.docs_path:
+    if spec.engine_path in {spec.test_path, spec.docs_path}:
         errors.append("construction artifacts must remain distinct")
     return errors
 
 
-def _product_behavior(spec: CapabilitySpec) -> tuple[str, str, str, str, str]:
-    """Return method name, input literal, operation expression and test title.
-
-    The implementation remains intentionally deterministic and evidence-first.
-    It does not invent business rules; it validates and transforms the explicit
-    product input into a small evidence result so the capability is behaviorally
-    testable instead of being an identity-only scaffold.
-    """
+def _product_behavior(spec: CapabilitySpec) -> tuple[str, str, str, str]:
     rules = {
         "financial-data-ingestion": ("ingest", " account=100 ; amount=12 ", "input.split(\";\").map(item => item.trim()).filter(Boolean)", "normalizes supported financial records"),
         "financial-statement-analysis": ("analyze", "revenue=100;cost=60", "input.split(\";\").map(item => item.trim()).filter(Boolean)", "analyzes normalized financial statement evidence"),
@@ -158,7 +144,7 @@ def _product_behavior(spec: CapabilitySpec) -> tuple[str, str, str, str, str]:
         "growth-intelligence": ("calculate", "growth=5;capacity=3;constraint=2", "input.split(\";\").map(item => Number(item.split(\"=\")[1] ?? 0)).filter(Number.isFinite).reduce((sum, value) => sum + value, 0)", "calculates growth intelligence evidence"),
         "resilience-continuity-lifecycle": ("assess", "impact=4;mitigation=5;recovery=3", "input.split(\";\").map(item => Number(item.split(\"=\")[1] ?? 0)).filter(Number.isFinite).reduce((sum, value) => sum + value, 0)", "assesses resilience lifecycle evidence"),
     }
-    key = spec.capability_id.removeprefix("product.")
+    key = _canonical_capability_id(spec.capability_id).removeprefix("product.")
     return rules.get(key, ("evaluate", "evidence=ready;scope=defined", "input.split(\";\").map(item => item.trim()).filter(Boolean)", "evaluates the declared product evidence"))
 
 
@@ -168,22 +154,21 @@ def product_artifacts(spec: CapabilitySpec) -> list[tuple[str, str]]:
         raise ValueError("Invalid capability specification: " + "; ".join(errors))
 
     class_name = spec.class_name
+    canonical_id = _canonical_capability_id(spec.capability_id)
     product_name = class_name
     product_dir = Path(spec.engine_path).parent.as_posix()
     method, sample, operation, test_title = _product_behavior(spec)
 
     if product_dir.startswith("Frontend/"):
         test_import = "../../../" + product_dir
-        test_import = test_import.replace("\\", "/")
     else:
-        relative_product_import = "../" + product_dir.split("/")[-1]
-        test_import = f"{relative_product_import}/{class_name}"
+        test_import = f"../{product_dir.split('/')[-1]}/{class_name}"
 
-    interface = "export interface ProductEvidenceResult { status: \"READY\" | \"BLOCKED\"; evidence: string[] | number; }"
+    interface = 'export interface ProductEvidenceResult { status: "READY" | "BLOCKED"; evidence: string[] | number; }'
     engine = f'''{interface}
 
 export class {class_name} {{
-    readonly capabilityId = "{spec.capability_id}";
+    readonly capabilityId = "{canonical_id}";
     readonly targetEngine = "{spec.target_engine}";
 
     initialize(): {{ status: "READY" }} {{
@@ -204,7 +189,7 @@ export class {class_name} {{
 describe("{class_name}", () => {{
     it("exposes the canonical product boundary", () => {{
         const service = new {class_name}();
-        expect(service.capabilityId).toBe("{spec.capability_id}");
+        expect(service.capabilityId).toBe("{canonical_id}");
         expect(service.targetEngine).toBe("{spec.target_engine}");
         expect(service.initialize().status).toBe("READY");
     }});
@@ -220,11 +205,10 @@ describe("{class_name}", () => {{
     }});
 }});
 '''
-
     dependencies = ", ".join(spec.dependencies) if spec.dependencies else "none"
     docs = f'''# {product_name}
 
-Canonical product capability: `{spec.capability_id}`.
+Canonical product capability: `{canonical_id}`.
 
 Target engine: {spec.target_engine}
 
@@ -233,14 +217,14 @@ Capability: {spec.capability}
 Dependencies: {dependencies}
 
 The product artifact exposes deterministic capability-shaped behavior derived from
-the declared product contract. It validates input and produces explicit evidence
-without inventing external business rules or duplicating engine ownership.
+the declared product contract. Repair missions never alter the canonical product
+identity; they only repair and re-verify the same commercial artifact boundary.
 '''
     return [(spec.engine_path, engine), (spec.test_path, test), (spec.docs_path, docs)]
 
 
 def generic_artifacts(spec: CapabilitySpec) -> list[tuple[str, str]]:
-    if spec.capability_id.startswith("product.") or "/Product/" in spec.engine_path or spec.engine_path.startswith("Frontend/"):
+    if _canonical_capability_id(spec.capability_id).startswith("product.") or "/Product/" in spec.engine_path or spec.engine_path.startswith("Frontend/"):
         return product_artifacts(spec)
 
     errors = validate_spec(spec)
@@ -259,11 +243,7 @@ export class {spec.class_name} implements Engine {{
     }}
 
     describeCapability(): {{ id: string; capability: string; targetEngine: string }} {{
-        return {{
-            id: "{spec.capability_id}",
-            capability: "{spec.capability}",
-            targetEngine: "{spec.target_engine}"
-        }};
+        return {{ id: "{spec.capability_id}", capability: "{spec.capability}", targetEngine: "{spec.target_engine}" }};
     }}
 }}
 '''
@@ -274,11 +254,7 @@ describe("{spec.class_name}", () => {{
         const engine = new {spec.class_name}();
         expect(engine.name).toBe("{spec.class_name}");
         expect(engine.health()).toBe(true);
-        expect(engine.describeCapability()).toEqual({{
-            id: "{spec.capability_id}",
-            capability: "{spec.capability}",
-            targetEngine: "{spec.target_engine}"
-        }});
+        expect(engine.describeCapability()).toEqual({{ id: "{spec.capability_id}", capability: "{spec.capability}", targetEngine: "{spec.target_engine}" }});
     }});
 }});
 '''
@@ -322,7 +298,6 @@ def _needs_reweave(root: Path, artifacts: list[tuple[str, str]]) -> bool:
 
 def _ensure_parent_directory(target: Path) -> None:
     parent = target.parent
-
     cursor = parent
     blocking: Path | None = None
     while cursor != cursor.parent:
@@ -331,7 +306,6 @@ def _ensure_parent_directory(target: Path) -> None:
                 blocking = cursor
             break
         cursor = cursor.parent
-
     if blocking is not None:
         legacy_content = blocking.read_text(encoding="utf-8")
         legacy_dir = blocking
@@ -341,7 +315,6 @@ def _ensure_parent_directory(target: Path) -> None:
         legacy_target = legacy_dir / legacy_name
         if not legacy_target.exists():
             legacy_target.write_text(legacy_content, encoding="utf-8")
-
     parent.mkdir(parents=True, exist_ok=True)
 
 
@@ -357,10 +330,7 @@ def write_missing(root: Path, artifacts: list[tuple[str, str]]) -> list[str]:
     if existing and len(existing) != len(paths) and not migration_pending:
         raise RuntimeError("Refusing partial autonomous construction; existing artifacts: " + ", ".join(existing))
     if existing and len(existing) == len(paths):
-        if _needs_reweave(root, artifacts):
-            return write_overwrite(root, artifacts)
-        return []
-
+        return write_overwrite(root, artifacts) if _needs_reweave(root, artifacts) else []
     generated: list[str] = []
     for relative_path, content in artifacts:
         target = root / relative_path
@@ -373,17 +343,9 @@ def write_missing(root: Path, artifacts: list[tuple[str, str]]) -> list[str]:
 def _preserve_canonical_product_test_boundary(target: Path, existing: str, generated: str) -> str:
     if target.suffix not in {".ts", ".tsx"} or "/test/" not in target.as_posix():
         return generated
-    existing_import = re.search(
-        r'import\s*\{\s*([A-Za-z_$][\w$]*)\s*\}\s*from\s*"(\.\./Product/[^"]+)"\s*;?',
-        existing,
-    )
-    generated_import = re.search(
-        r'import\s*\{\s*([A-Za-z_$][\w$]*)\s*\}\s*from\s*"(\.\./Engines/[^"]+)"\s*;?',
-        generated,
-    )
-    if not existing_import or not generated_import:
-        return generated
-    if existing_import.group(1) != generated_import.group(1):
+    existing_import = re.search(r'import\s*\{\s*([A-Za-z_$][\w$]*)\s*\}\s*from\s*"(\.\./Product/[^"]+)"\s*;?', existing)
+    generated_import = re.search(r'import\s*\{\s*([A-Za-z_$][\w$]*)\s*\}\s*from\s*"(\.\./Engines/[^"]+)"\s*;?', generated)
+    if not existing_import or not generated_import or existing_import.group(1) != generated_import.group(1):
         return generated
     return generated.replace(generated_import.group(0), existing_import.group(0), 1)
 
