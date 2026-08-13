@@ -8,8 +8,13 @@ describe("CommercialE2EAcceptanceScenario", () => {
         expect(service.initialize().status).toBe("READY");
     });
 
-    it("keeps its deterministic minimal contract", () => {
-        expect(new CommercialE2EAcceptanceScenario().execute("continue").status).toBe("READY");
-        expect(new CommercialE2EAcceptanceScenario().execute(" ").status).toBe("BLOCKED");
+    it("validates the commercial end-to-end evidence path", () => {
+        const result = new CommercialE2EAcceptanceScenario().validate("onboard->ingest->insight->decision->execute->outcome");
+        expect(result.status).toBe("READY");
+        expect(result.evidence).toBeDefined();
+    });
+
+    it("blocks empty evidence input", () => {
+        expect(new CommercialE2EAcceptanceScenario().validate(" ").status).toBe("BLOCKED");
     });
 });
