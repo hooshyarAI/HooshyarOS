@@ -136,7 +136,7 @@ def _product_behavior(spec: CapabilitySpec) -> tuple[str, str, str, str, str]:
     testable instead of being an identity-only scaffold.
     """
     rules = {
-        "financial-data-ingestion": ("normalize", " account=100 ; amount=12 ", "input.split(\";\").map(item => item.trim()).filter(Boolean)", "normalizes supported financial records"),
+        "financial-data-ingestion": ("ingest", " account=100 ; amount=12 ", "input.split(\";\").map(item => item.trim()).filter(Boolean)", "normalizes supported financial records"),
         "financial-statement-analysis": ("analyze", "revenue=100;cost=60", "input.split(\";\").map(item => item.trim()).filter(Boolean)", "analyzes normalized financial statement evidence"),
         "executive-intelligence-workbench": ("calculate", "revenue=100;cash=60;risk=4", "input.split(\";\").map(item => Number(item.split(\"=\")[1] ?? 0)).filter(Number.isFinite).reduce((sum, value) => sum + value, 0)", "calculates executive evidence from verified metrics"),
         "decision-workbench": ("evaluate", "cost=2;risk=3;benefit=5", "input.split(\";\").map(item => Number(item.split(\"=\")[1] ?? 0)).filter(Number.isFinite).reduce((sum, value) => sum + value, 0)", "evaluates a decision evidence set"),
