@@ -1,4 +1,4 @@
-export interface ProductCapabilityResult { status: "READY" | "BLOCKED"; }
+export interface ProductEvidenceResult { status: "READY" | "BLOCKED"; evidence: string[] | number; }
 
 export class GrowthIntelligenceService {
     readonly capabilityId = "product.growth-intelligence";
@@ -8,7 +8,11 @@ export class GrowthIntelligenceService {
         return { status: "READY" };
     }
 
-    execute(input: string): ProductCapabilityResult {
-        return { status: input && input.trim() ? "READY" : "BLOCKED" };
+    calculate(input: string): ProductEvidenceResult {
+        const normalized = input?.trim() ?? "";
+        if (!normalized) return { status: "BLOCKED", evidence: [] };
+        const evidence = input.split(";").map(item => Number(item.split("=")[1] ?? 0)).filter(Number.isFinite).reduce((sum, value) => sum + value, 0);
+        const complete = Array.isArray(evidence) ? evidence.length > 0 : Number.isFinite(evidence) && evidence > 0;
+        return { status: complete ? "READY" : "BLOCKED", evidence };
     }
 }

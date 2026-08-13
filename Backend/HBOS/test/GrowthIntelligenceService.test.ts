@@ -8,8 +8,13 @@ describe("GrowthIntelligenceService", () => {
         expect(service.initialize().status).toBe("READY");
     });
 
-    it("keeps its deterministic minimal contract", () => {
-        expect(new GrowthIntelligenceService().execute("continue").status).toBe("READY");
-        expect(new GrowthIntelligenceService().execute(" ").status).toBe("BLOCKED");
+    it("calculates growth intelligence evidence", () => {
+        const result = new GrowthIntelligenceService().calculate("growth=5;capacity=3;constraint=2");
+        expect(result.status).toBe("READY");
+        expect(result.evidence).toBeDefined();
+    });
+
+    it("blocks empty evidence input", () => {
+        expect(new GrowthIntelligenceService().calculate(" ").status).toBe("BLOCKED");
     });
 });
