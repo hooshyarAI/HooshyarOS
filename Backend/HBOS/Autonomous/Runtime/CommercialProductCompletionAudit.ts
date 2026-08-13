@@ -19,6 +19,7 @@ interface RoadmapCapability {
 
 export class CommercialProductCompletionAudit {
     private readonly contractPath = "Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md";
+    private readonly commercializationModelPath = "Docs/COMMERCIALIZATION_OPERATING_MODEL.md";
     private readonly roadmapPath = "Docs/Product/PRODUCT_CONSTRUCTION_ROADMAP.json";
     private readonly applicationScenarioPath = "Backend/HBOS/Product/CommercialE2EAcceptanceScenario.ts";
     private readonly applicationScenarioTestPath = "Backend/HBOS/test/CommercialE2EAcceptanceScenario.test.ts";
@@ -40,6 +41,30 @@ export class CommercialProductCompletionAudit {
         return !result.error && result.status === 0;
     }
 
+    private auditCommercializationOperatingModel(root: string, missingLayers: string[]): void {
+        const modelFile = join(root, this.commercializationModelPath);
+        if (!existsSync(modelFile)) {
+            missingLayers.push("commercialization-operating-model");
+            return;
+        }
+        const model = readFileSync(modelFile, "utf8");
+        const requiredMarkers = [
+            "## 15. Zero-IT and deployment compatibility",
+            "**Zero-IT principle:**",
+            "**Deployment-agnostic principle:**",
+            "**Web/SaaS:**",
+            "**Windows On-Premise:**",
+            "**Remote Web Access:**",
+            "**Hybrid:**",
+            "**Mobile:**",
+            "**Offline/Intermittent Connectivity:**",
+            "Excel/CSV | PDF/Documents | Manual Evidence | API | ERP/Accounting | Database Adapter",
+        ];
+        for (const marker of requiredMarkers) {
+            if (!model.includes(marker)) missingLayers.push(`commercialization-marker:${marker}`);
+        }
+    }
+
     audit(root: string): CommercialProductCompletionAuditResult {
         const contractFile = join(root, this.contractPath);
         if (!existsSync(contractFile)) {
@@ -58,6 +83,8 @@ export class CommercialProductCompletionAudit {
             "## Completion states"
         ];
         const missingLayers = requiredMarkers.filter(marker => !contract.includes(marker)).map(marker => `contract-marker:${marker}`);
+
+        this.auditCommercializationOperatingModel(root, missingLayers);
 
         const requiredArtifacts: Array<[string, string]> = [
             ["api-gateway", "Backend/HBOS/Engines/APIGatewayEngine.ts"],
