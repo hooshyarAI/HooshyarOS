@@ -4,10 +4,10 @@ Canonical product capability: `product.resilience-continuity-lifecycle`.
 
 Target engine: Autonomous Operations Engine
 
-Capability: connect early warning, impact assessment, scenario analysis, mitigation, continuity, recovery measurement and lessons learned into one governed resilience lifecycle
+Capability: repair commercial quality failure for product.resilience-continuity-lifecycle: connect early warning, impact assessment, scenario analysis, mitigation, continuity, recovery measurement and lessons learned into one governed resilience lifecycle
 
 Dependencies: Risk Intelligence Engine, Organizational Intelligence Engine, Knowledge Engine, Governance Engine
 
-The product artifact is intentionally kept outside the engine implementation boundary.
-The autonomous worker may enrich this contract only from repository architecture,
-tests, dependencies and durable product evidence.
+The product artifact exposes deterministic capability-shaped behavior derived from
+the declared product contract. Repair missions never alter the canonical product
+identity; they only repair and re-verify the same commercial artifact boundary.

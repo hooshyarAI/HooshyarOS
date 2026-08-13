@@ -8,8 +8,13 @@ describe("ResilienceContinuityLifecycle", () => {
         expect(service.initialize().status).toBe("READY");
     });
 
-    it("keeps its deterministic minimal contract", () => {
-        expect(new ResilienceContinuityLifecycle().execute("continue").status).toBe("READY");
-        expect(new ResilienceContinuityLifecycle().execute(" ").status).toBe("BLOCKED");
+    it("assesses resilience lifecycle evidence", () => {
+        const result = new ResilienceContinuityLifecycle().assess("impact=4;mitigation=5;recovery=3");
+        expect(result.status).toBe("READY");
+        expect(result.evidence).toBeDefined();
+    });
+
+    it("blocks empty evidence input", () => {
+        expect(new ResilienceContinuityLifecycle().assess(" ").status).toBe("BLOCKED");
     });
 });
