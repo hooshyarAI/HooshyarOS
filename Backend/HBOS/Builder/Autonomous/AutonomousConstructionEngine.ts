@@ -33,34 +33,19 @@ export interface ConstructionResult {
 
 export interface ConstructionTool {
     name: string;
-    execute(
-        stage: ConstructionStage,
-        context: ConstructionContext
-    ): {
-        ok: boolean;
-        artifact?: unknown;
-        issue?: string;
-    };
+    execute(stage: ConstructionStage, context: ConstructionContext): { ok: boolean; artifact?: unknown; issue?: string };
 }
 
-/** Architecture-driven construction control plane with fail-closed quality approval. */
 export class AutonomousConstructionEngine {
     private readonly qualityGate = new QualityGate();
 
-    constructor(
-        private readonly tools: ConstructionTool[],
-        private readonly maxRepairAttempts = 3,
-        private readonly repairEngine = new AutonomousRepairEngine()
-    ) {}
+    constructor(private readonly tools: ConstructionTool[], private readonly maxRepairAttempts = 3, private readonly repairEngine = new AutonomousRepairEngine()) {}
 
     build(plan: ArchitecturePlan): ConstructionResult {
         const trace: ConstructionStage[] = [];
         const issues: string[] = [];
         const artifacts: Record<string, unknown> = {};
-
-        if (!plan.capabilityId || !plan.capability || !plan.targetEngine) {
-            return this.blocked("ARCHITECTURE", 0, ["INVALID_ARCHITECTURE_PLAN"], trace);
-        }
+        if (!plan.capabilityId || !plan.capability || !plan.targetEngine) return this.blocked("ARCHITECTURE", 0, ["INVALID_ARCHITECTURE_PLAN"], trace);
 
         let attempt = 0;
         for (const stage of ["ARCHITECTURE", "PLAN", "GENERATE"] as ConstructionStage[]) {
@@ -68,10 +53,7 @@ export class AutonomousConstructionEngine {
             const result = this.execute(stage, plan, attempt, artifacts, issues);
             if (!result.ok) {
                 if (stage === "GENERATE" && this.isIdempotentGenerationNoOp(result)) {
-                    artifacts[stage] = {
-                        ...(this.recordArtifact(result.artifact) ?? {}),
-                        idempotentNoOp: true
-                    };
+                    artifacts[stage] = { ...(this.recordArtifact(result.artifact) ?? {}), idempotentNoOp: true };
                     continue;
                 }
                 issues.push(result.issue || `${stage}_FAILED`);
@@ -83,7 +65,6 @@ export class AutonomousConstructionEngine {
         trace.push("VERIFY");
         issues.length = 0;
         let verification = this.execute("VERIFY", plan, attempt, artifacts, issues);
-
         while (!verification.ok && attempt < this.maxRepairAttempts) {
             attempt += 1;
             trace.push("REPAIR");
@@ -99,23 +80,15 @@ export class AutonomousConstructionEngine {
                 cleanRepository: verificationEvidence?.cleanRepository,
                 unexpectedPaths: verificationEvidence?.unexpectedPaths
             };
-            artifacts.REPAIR_PLAN = this.repairEngine.createPlan(
-                verificationFailure.issue,
-                JSON.stringify(verificationFailure)
-            );
+            artifacts.REPAIR_PLAN = this.repairEngine.createPlan(verificationFailure.issue, JSON.stringify(verificationFailure));
             artifacts.REPAIR_EVIDENCE = verificationFailure;
-
-            const repairPlan: ArchitecturePlan = {
-                ...plan,
-                capability: `${plan.capability}\n\nREPAIR EVIDENCE FROM PREVIOUS VERIFY (AUTHORITATIVE):\n${JSON.stringify(verificationFailure, null, 2)}`
-            };
+            const repairPlan: ArchitecturePlan = { ...plan, capability: `${plan.capability}\n\nREPAIR EVIDENCE FROM PREVIOUS VERIFY (AUTHORITATIVE):\n${JSON.stringify(verificationFailure, null, 2)}` };
             const repair = this.execute("REPAIR", repairPlan, attempt, artifacts, issues);
             if (repair.artifact !== undefined) artifacts.REPAIR = repair.artifact;
             if (!repair.ok) {
                 issues.push(repair.issue || "REPAIR_FAILED");
                 continue;
             }
-
             trace.push("VERIFY");
             issues.length = 0;
             verification = this.execute("VERIFY", plan, attempt, artifacts, issues);
@@ -124,6 +97,12 @@ export class AutonomousConstructionEngine {
 
         if (!verification.ok) {
             issues.push(verification.issue || "VERIFICATION_FAILED");
+            const evidence = this.recordArtifact(verification.artifact);
+            if (evidence) {
+                const evidenceText = typeof evidence.output === "string" ? evidence.output : JSON.stringify(evidence);
+                const compactEvidence = evidenceText.slice(-16000);
+                issues.push(`VERIFY_EVIDENCE:${compactEvidence}`);
+            }
             return this.blocked("VERIFY", attempt, issues, trace);
         }
 
@@ -138,18 +117,12 @@ export class AutonomousConstructionEngine {
         trace.push("FINALIZE");
         const finalize = this.execute("FINALIZE", plan, attempt, artifacts, issues);
         if (!finalize.ok) {
-            if (this.isIdempotentFinalizeNoOp(finalize, artifacts)) {
-                artifacts.FINALIZE = {
-                    ...(this.recordArtifact(finalize.artifact) ?? {}),
-                    idempotentNoOp: true
-                };
-            } else {
+            if (this.isIdempotentFinalizeNoOp(finalize, artifacts)) artifacts.FINALIZE = { ...(this.recordArtifact(finalize.artifact) ?? {}), idempotentNoOp: true };
+            else {
                 issues.push(finalize.issue || "FINALIZE_FAILED");
                 return this.blocked("FINALIZE", attempt, issues, trace);
             }
-        } else if (finalize.artifact !== undefined) {
-            artifacts.FINALIZE = finalize.artifact;
-        }
+        } else if (finalize.artifact !== undefined) artifacts.FINALIZE = finalize.artifact;
 
         return this.success(attempt > 0 ? "REPAIRED" : "BUILT", attempt, trace, artifacts.GENERATE !== undefined && this.recordArtifact(artifacts.GENERATE)?.idempotentNoOp === true);
     }
@@ -175,10 +148,7 @@ export class AutonomousConstructionEngine {
         return artifact.changed === false && artifact.exitCode === 0 && /Already implemented:/i.test(output);
     }
 
-    private isIdempotentFinalizeNoOp(
-        result: { ok: boolean; artifact?: unknown; issue?: string },
-        artifacts: Record<string, unknown>
-    ): boolean {
+    private isIdempotentFinalizeNoOp(result: { ok: boolean; artifact?: unknown; issue?: string }, artifacts: Record<string, unknown>): boolean {
         if (result.ok || result.issue !== "GIT_NO_REPOSITORY_CHANGE") return false;
         const generated = this.recordArtifact(artifacts.GENERATE);
         return generated?.idempotentNoOp === true;
@@ -194,9 +164,7 @@ export class AutonomousConstructionEngine {
 
     private toolFor(stage: ConstructionStage): ConstructionTool {
         const preferredNames: Record<ConstructionStage, string[]> = {
-            ARCHITECTURE: ["architecture"], PLAN: ["architecture", "planner"],
-            GENERATE: ["generator", "python"], VERIFY: ["python", "verifier", "test"],
-            REPAIR: ["python", "repair"], FINALIZE: ["git", "finalizer"]
+            ARCHITECTURE: ["architecture"], PLAN: ["architecture", "planner"], GENERATE: ["generator", "python"], VERIFY: ["python", "verifier", "test"], REPAIR: ["python", "repair"], FINALIZE: ["git", "finalizer"]
         };
         for (const name of preferredNames[stage]) {
             const tool = this.tools.find(candidate => candidate.name === name);
@@ -206,32 +174,11 @@ export class AutonomousConstructionEngine {
     }
 
     private success(status: "BUILT" | "REPAIRED", attempts: number, trace: ConstructionStage[], idempotent = false): ConstructionResult {
-        return {
-            ok: true,
-            status,
-            stage: "FINALIZE",
-            attempts,
-            selectedTool: this.toolFor("FINALIZE").name,
-            issues: [],
-            trace,
-            details: idempotent
-                ? `Construction verified as idempotent and finalized; trace=${trace.join(" -> ")}`
-                : `Construction verified and finalized; trace=${trace.join(" -> ")}`,
-            idempotent
-        };
+        return { ok: true, status, stage: "FINALIZE", attempts, selectedTool: this.toolFor("FINALIZE").name, issues: [], trace, details: idempotent ? `Construction verified as idempotent and finalized; trace=${trace.join(" -> ")}` : `Construction verified and finalized; trace=${trace.join(" -> ")}`, idempotent };
     }
 
     private blocked(stage: ConstructionStage, attempts: number, issues: string[], trace: ConstructionStage[]): ConstructionResult {
-        return {
-            ok: false,
-            status: "BLOCKED",
-            stage,
-            attempts,
-            selectedTool: this.toolFor(stage).name,
-            issues,
-            trace,
-            details: `Construction blocked at ${stage}; trace=${trace.join(" -> ")}`
-        };
+        return { ok: false, status: "BLOCKED", stage, attempts, selectedTool: this.toolFor(stage).name, issues, trace, details: `Construction blocked at ${stage}; trace=${trace.join(" -> ")}` };
     }
 
     static selfTest(): void {
@@ -241,21 +188,13 @@ export class AutonomousConstructionEngine {
             { name: "python", execute: stage => {
                 if (stage === "VERIFY") {
                     verificationCalls += 1;
-                    return verificationCalls === 1
-                        ? { ok: false, issue: "INTERNAL_CONNECTION_FAILURE" }
-                        : { ok: true, artifact: { testsPassed: true, behavioralEvidenceVerified: true, integrationVerified: true, cleanRepository: true } };
+                    return verificationCalls === 1 ? { ok: false, issue: "INTERNAL_CONNECTION_FAILURE", artifact: { output: "internal connection failure" } } : { ok: true, artifact: { testsPassed: true, behavioralEvidenceVerified: true, integrationVerified: true, cleanRepository: true } };
                 }
                 return { ok: true, artifact: stage === "GENERATE" ? { changed: true } : undefined };
             } },
             { name: "git", execute: () => ({ ok: true, artifact: { clean: true } }) }
         ];
-        const result = new AutonomousConstructionEngine(tools, 2).build({
-            capabilityId: "construction-001", capability: "architecture-driven autonomous construction",
-            targetEngine: "Autonomous Operations Engine", dependencies: ["Architecture Brain", "Governance Engine"],
-            architectureRules: ["Architecture Freeze V4", "One Capability = One Engine"]
-        });
-        if (!result.ok || result.status !== "REPAIRED" || result.attempts !== 1 || !result.details || !result.trace.includes("FINALIZE")) {
-            throw new Error("AutonomousConstructionEngine self-test failed");
-        }
+        const result = new AutonomousConstructionEngine(tools, 2).build({ capabilityId: "construction-001", capability: "architecture-driven autonomous construction", targetEngine: "Autonomous Operations Engine", dependencies: ["Architecture Brain", "Governance Engine"], architectureRules: ["Architecture Freeze V4", "One Capability = One Engine"] });
+        if (!result.ok || result.status !== "REPAIRED" || result.attempts !== 1 || !result.details || !result.trace.includes("FINALIZE")) throw new Error("AutonomousConstructionEngine self-test failed");
     }
 }
