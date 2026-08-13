@@ -86,11 +86,13 @@ def run(command: list[str], timeout: int = 45 * 60) -> None:
         text=True,
         encoding="utf-8",
         errors="replace",
-        stdout=sys.stdout,
-        stderr=subprocess.STDOUT,
         timeout=timeout,
         check=False,
     )
+    if result.stdout:
+        print(result.stdout, end="")
+    if result.stderr:
+        print(result.stderr, end="")
     if result.returncode != 0:
         raise SystemExit(result.returncode)
 
