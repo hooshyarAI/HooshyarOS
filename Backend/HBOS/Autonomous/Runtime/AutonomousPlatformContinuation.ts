@@ -2,6 +2,7 @@ import { AutonomousProjectMission, Mission } from "./AutonomousProjectMission";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { AutonomousCapabilityDiscovery } from "./AutonomousCapabilityDiscovery";
+import { CommercialProductCompletionAudit } from "./CommercialProductCompletionAudit";
 
 export interface PlatformContinuationMission {
     capabilityId: "platform.continuation";
@@ -30,6 +31,7 @@ type CommercialRoadmapCapability = {
  */
 export class AutonomousPlatformContinuation {
     private readonly discovery = new AutonomousCapabilityDiscovery();
+    private readonly commercialAudit = new CommercialProductCompletionAudit();
 
     createMission(): PlatformContinuationMission {
         return {
@@ -38,6 +40,37 @@ export class AutonomousPlatformContinuation {
             instruction: "AUDIT → DISCOVER → SELECT NEXT GENUINELY MISSING CAPABILITY → IMPLEMENT → TEST → INTEGRATE → VERIFY → COMMIT → PUSH → AUDIT AGAIN",
             source: "assistant.completion.gate"
         };
+    }
+
+    private selectCommercialQualityRepairMission(root: string): PlatformCapabilityMission | null {
+        const audit = this.commercialAudit.audit(root);
+        if (audit.complete) return null;
+
+        const qualityFailureIds = audit.missingLayers
+            .filter(layer => layer.startsWith("quality:"))
+            .map(layer => layer.split(":")[1])
+            .filter((value): value is string => typeof value === "string" && value.length > 0);
+        if (qualityFailureIds.length === 0) return null;
+
+        const roadmapPath = join(root, "Docs", "Product", "PRODUCT_CONSTRUCTION_ROADMAP.json");
+        if (!existsSync(roadmapPath)) return null;
+
+        try {
+            const parsed = JSON.parse(readFileSync(roadmapPath, "utf8")) as { capabilities?: CommercialRoadmapCapability[] };
+            for (const failureId of qualityFailureIds) {
+                const candidate = (parsed.capabilities ?? []).find(item => item.capabilityId === failureId);
+                if (!candidate) continue;
+                return {
+                    capabilityId: `repair-${candidate.capabilityId}`,
+                    capability: `repair commercial quality failure for ${candidate.capabilityId}: ${candidate.capability}`,
+                    targetEngine: candidate.targetEngine,
+                    dependencies: candidate.dependencies
+                };
+            }
+        } catch {
+            return null;
+        }
+        return null;
     }
 
     private selectCommercialRoadmapCapability(root: string): PlatformCapabilityMission | null {
@@ -134,6 +167,9 @@ export class AutonomousPlatformContinuation {
                 dependencies: missingDiscovered.dependencies
             };
         }
+
+        const qualityRepair = this.selectCommercialQualityRepairMission(root);
+        if (qualityRepair) return qualityRepair;
 
         // Once the legacy/canonical platform-engine backlog is exhausted,
         // continue directly into the governed commercial product roadmap.
