@@ -1,139 +1,23 @@
 const state = { session: null, dashboard: null };
-
 const $ = id => document.getElementById(id);
-const number = value => new Intl.NumberFormat("fa-IR").format(value ?? 0);
-
-function setMessage(message, kind = "info") {
-  const node = $("message");
-  node.textContent = message;
-  node.dataset.kind = kind;
-}
-
-async function api(path, options = {}) {
-  const headers = { "content-type": "application/json", ...(options.headers || {}) };
-  if (state.session?.token && !headers.authorization) headers.authorization = `Bearer ${state.session.token}`;
-  const response = await fetch(path, { ...options, headers });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
-  return data;
-}
-
-function renderDashboard(data) {
-  state.dashboard = data;
-  const metrics = data.metrics || {};
-  $("kpi-revenue").textContent = number(metrics.revenue);
-  $("kpi-profit").textContent = number(metrics.profit);
-  $("kpi-cash").textContent = number(metrics.cash);
-  $("kpi-risk").textContent = `${number(metrics.risk)}٪`;
-  const ready = data.status === "READY";
-  $("dashboard-status").textContent = ready ? "داشبورد آماده است" : "داده کافی نیست";
-  $("confidence").textContent = ready ? "۸۵٪" : "۰٪";
-  if (ready) {
-    $("priority-title").textContent = Number(metrics.risk ?? 0) >= 40 ? "ریسک نیازمند توجه است" : "تمرکز فعلی: رشد سودآور";
-    $("priority-text").textContent = `درآمد ${number(metrics.revenue)}، سود ${number(metrics.profit)} و نقدینگی ${number(metrics.cash)} ثبت شده است. تصمیم بعدی باید با شواهد پشتیبانی شود.`;
-  }
-}
-
-function renderReport(report) {
-  const sections = Array.isArray(report?.sections) ? report.sections : [];
-  $("report").innerHTML = `<h3>${report?.title || "گزارش اجرایی"}</h3>${sections.map(section => `<div class="report-row">${section}</div>`).join("") || `<p class="muted">شاهد قابل نمایش وجود ندارد.</p>`}`;
-}
-
-function setIdentity(organization, session) {
-  $("side-org").textContent = organization || "سازمان نامشخص";
-  $("session").textContent = session ? `فعال · ${session.user.username}` : "بدون نشست فعال";
-  $("identity-status").textContent = session ? "نشست فعال" : "بدون نشست";
-}
-
-async function loadDemo() {
-  const data = await api("/api/demo");
-  $("organization").value = data.organization.name;
-  setIdentity(data.organization.name, null);
-  renderDashboard(data.dashboard);
-  renderReport(data.report);
-  $("data-summary").textContent = `داده نمونه: ${data.records.length} رکورد مالی ذخیره و قابل تحلیل شد`;
-  setMessage("داده نمونه بارگذاری شد؛ اکنون تصویر مدیریتی آماده بررسی است.", "ok");
-}
-
-async function login() {
-  const username = $("username").value.trim();
-  const organization = $("organization").value.trim();
-  if (!username || !organization) return setMessage("نام کاربر و سازمان را وارد کنید.", "error");
-  const session = await api("/api/session", { method: "POST", body: JSON.stringify({ username, organization }) });
-  state.session = session;
-  setIdentity(session.organization.name, session);
-  setMessage("نشست امن و context سازمانی فعال شد.", "ok");
-  await refresh();
-}
-
-async function logout() {
-  if (!state.session?.token) return;
-  await api("/api/logout", { method: "POST" });
-  state.session = null;
-  setIdentity($("organization").value.trim(), null);
-  setMessage("نشست پایان یافت.", "ok");
-}
-
-async function ingest() {
-  if (!state.session?.token) return setMessage("برای ثبت داده ابتدا وارد نشست سازمانی شوید.", "error");
-  const amount = Number($("amount").value);
-  const category = $("category").value.trim();
-  const organization = $("organization").value.trim();
-  if (!Number.isFinite(amount) || amount <= 0 || !category || !organization) return setMessage("مبلغ، دسته‌بندی و سازمان باید معتبر باشند.", "error");
-  const result = await api("/api/ingest", { method: "POST", body: JSON.stringify({ amount, category, organization }) });
-  renderDashboard(result.dashboard);
-  $("data-summary").textContent = `رکورد ثبت شد · نسخه ${result.persistence.version}`;
-  setMessage("شاهد مالی ثبت شد و شاخص‌های مدیریت به‌روزرسانی شدند.", "ok");
-}
-
-async function makeDecision() {
-  if (!state.session?.token) return setMessage("برای ثبت تصمیم ابتدا وارد نشست سازمانی شوید.", "error");
-  const title = $("decision").value.trim();
-  const organization = $("organization").value.trim();
-  if (!title) return setMessage("عنوان تصمیم را وارد کنید.", "error");
-  const result = await api("/api/decision", { method: "POST", body: JSON.stringify({ title, organization }) });
-  $("decision-result").textContent = result.recommendation;
-  setMessage("تصمیم ثبت شد و برای تأیید مدیریت در مسیر اجرا قرار گرفت.", "ok");
-}
-
-async function refresh() {
-  const organization = state.session?.organization?.name || $("organization").value.trim();
-  const path = organization ? `/api/dashboard?organization=${encodeURIComponent(organization)}` : "/api/dashboard";
-  const dashboard = await api(path);
-  renderDashboard(dashboard);
-  renderReport(await api("/api/report"));
-}
-
-function wireNavigation() {
-  document.querySelectorAll("[data-section]").forEach(button => {
-    button.addEventListener("click", () => {
-      document.querySelectorAll(".nav-item").forEach(item => item.classList.remove("active"));
-      button.classList.add("active");
-      const sectionMap = { overview: ".workspace", financial: "#financial-section", reports: "#reports-section", decisions: "#decisions-section", alerts: "#alerts-section", organization: "#organization-section" };
-      document.querySelector(sectionMap[button.dataset.section] || ".workspace")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-  });
-  document.querySelectorAll("[data-section-target]").forEach(button => button.addEventListener("click", () => $("reports-section")?.scrollIntoView({ behavior: "smooth" })));
-  document.querySelectorAll(".chip").forEach(chip => chip.addEventListener("click", () => {
-    $("assistant-note").textContent = `درخواست انتخاب‌شده: ${chip.dataset.prompt} · این سطح در نسخه فعلی به‌صورت پیشنهاد تعاملی آماده است.`;
-    setMessage("درخواست دستیار انتخاب شد.", "ok");
-  }));
-}
-
-$("login").addEventListener("click", () => login().catch(error => setMessage(error.message, "error")));
-$("logout").addEventListener("click", () => logout().catch(error => setMessage(error.message, "error")));
-$("demo").addEventListener("click", () => loadDemo().catch(error => setMessage(error.message, "error")));
-$("ingest").addEventListener("click", () => ingest().catch(error => setMessage(error.message, "error")));
-$("decision-submit").addEventListener("click", () => makeDecision().catch(error => setMessage(error.message, "error")));
-$("refresh").addEventListener("click", () => refresh().catch(error => setMessage(error.message, "error")));
-wireNavigation();
-
-api("/api/ready").then(() => {
-  $("connection").textContent = "سامانه آنلاین";
-  $("connection").classList.add("online");
-  setMessage("سامانه آماده استفاده است.", "ok");
-}).catch(() => {
-  $("connection").textContent = "سرور در دسترس نیست";
-  setMessage("runtime هنوز در دسترس نیست.", "error");
-});
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+const number = value => new Intl.NumberFormat("fa-IR", { useGrouping: true, maximumFractionDigits: 0 }).format(Number(value ?? 0));
+const percent = value => `${number(value)}٪`;
+const esc = value => String(value ?? "").replace(/[&<>\"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+function setMessage(message, kind="info"){const node=$("message");if(!node)return;node.textContent=message;node.dataset.kind=kind;}
+async function api(path, options={}){const headers={"content-type":"application/json",...(options.headers||{})};if(state.session?.token&&!headers.authorization)headers.authorization=`Bearer ${state.session.token}`;const r=await fetch(path,{...options,headers});const d=await r.json();if(!r.ok)throw new Error(d.error||`HTTP ${r.status}`);return d;}
+function svg(name,attrs={},text=""){const n=document.createElementNS("http://www.w3.org/2000/svg",name);Object.entries(attrs).forEach(([k,v])=>n.setAttribute(k,String(v)));if(text)n.textContent=text;return n;}
+function addCockpit(){if($("decision-cockpit")||!document.querySelector(".kpi-grid"))return;const s=document.createElement("section");s.id="decision-cockpit";s.className="decision-cockpit";s.innerHTML=`<article class="cockpit-panel trend-panel"><div class="cockpit-head"><div><span>روند مالی</span><h2>حرکت درآمد و سود</h2></div><b id="trend-score">—</b></div><div class="legend-row"><span><i class="rev"></i>درآمد</span><span><i class="pro"></i>سود</span></div><svg id="trend-svg" viewBox="0 0 820 300" role="img" aria-label="نمودار روند درآمد و سود" preserveAspectRatio="none"></svg><div class="cockpit-caption" id="trend-caption">برای شروع داده نمونه را بارگذاری کنید.</div></article><article class="cockpit-panel radar-panel"><div class="cockpit-head"><div><span>سلامت سازمان</span><h2>Radar مدیریتی</h2></div><b id="radar-score">۰٪</b></div><svg id="radar-svg" viewBox="0 0 360 330" role="img" aria-label="رادار سلامت سازمان"></svg><div class="radar-labels"><span>مالی</span><span>رشد</span><span>نقدینگی</span><span>ریسک</span><span>عملیات</span><span>تاب‌آوری</span></div></article><article class="cockpit-panel assistant-panel"><div class="cockpit-head"><div><span>دستیار سازمانی</span><h2>از عدد به تصمیم</h2></div><b>ACTIVE</b></div><p id="assistant-cockpit">داده نمونه را ببینید تا دستیار مهم‌ترین پیام مدیریتی را برجسته کند.</p><div class="cockpit-actions"><button data-cockpit-prompt="وضعیت مالی سازمان را خلاصه کن">خلاصه مالی</button><button data-cockpit-prompt="مهم‌ترین ریسک فعلی چیست؟">ریسک اصلی</button><button data-cockpit-prompt="چه تصمیمی اولویت دارد؟">تصمیم بعدی</button></div></article>`;document.querySelector(".kpi-grid").insertAdjacentElement("afterend",s);const st=document.createElement("style");st.textContent=`.decision-cockpit{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(280px,.9fr);gap:16px}.cockpit-panel{background:linear-gradient(145deg,#081321,#142744);color:#eef6ff;border:1px solid #294261;border-radius:24px;padding:20px;box-shadow:0 18px 44px rgba(7,17,31,.14)}.assistant-panel{grid-column:1/-1}.cockpit-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.cockpit-head span{font-size:.68rem;color:#8eabd0;font-weight:900}.cockpit-head h2{margin:3px 0 0;font-size:1.1rem}.cockpit-head b{font-size:.68rem;color:#86efac;border:1px solid #2a5b46;border-radius:999px;padding:5px 9px}.legend-row{display:flex;gap:15px;margin:10px 0;color:#adc0d8;font-size:.68rem}.legend-row i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-left:5px}.legend-row .rev{background:#5eead4}.legend-row .pro{background:#60a5fa}#trend-svg{width:100%;height:250px;display:block}.trend-grid{stroke:#29405e;stroke-width:1}.trend-line{fill:none;stroke-width:4;stroke-linecap:round;stroke-linejoin:round}.trend-line.rev{stroke:#5eead4}.trend-line.pro{stroke:#60a5fa}.trend-dot{stroke:#07111f;stroke-width:3}.trend-label{fill:#8fa7c6;font:11px Tahoma,system-ui,sans-serif}.cockpit-caption{border-top:1px solid #29405e;padding-top:11px;color:#c7d6e9;font-size:.72rem}.radar-panel{min-height:390px}.radar-grid{fill:none;stroke:#314b6d;stroke-width:1}.radar-spoke{stroke:#243c59;stroke-width:1}.radar-area{fill:rgba(94,234,212,.15);stroke:#5eead4;stroke-width:3}.radar-point{fill:#5eead4;stroke:#07111f;stroke-width:3}.radar-text{fill:#a6bad3;font:11px Tahoma,system-ui,sans-serif}.radar-labels{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;text-align:center;color:#9eb2ca;font-size:.62rem}.assistant-panel p{margin:14px 0;padding:14px;border-radius:15px;background:#0c1930;border:1px solid #2b4467;min-height:58px;color:#e7f0fb;font-size:.8rem}.cockpit-actions{display:flex;gap:8px;flex-wrap:wrap}.cockpit-actions button{border:1px solid #355372;background:#182d4b;color:#dbeafe;border-radius:12px;padding:8px 12px;font:inherit;font-size:.66rem;cursor:pointer}.cockpit-actions button:hover{background:#24466f}@media(max-width:1050px){.decision-cockpit{grid-template-columns:1fr}.assistant-panel{grid-column:auto}}@media(max-width:640px){.cockpit-panel{padding:15px;border-radius:18px}.cockpit-caption{font-size:.66rem}}`;document.head.appendChild(st);s.querySelectorAll("[data-cockpit-prompt]").forEach(b=>b.addEventListener("click",()=>{$("assistant-cockpit").textContent=`دستیار آماده پاسخ به این درخواست است: ${b.dataset.cockpitPrompt}`;setMessage("درخواست دستیار سازمانی انتخاب شد.","ok");}));}
+function drawTrend(m={}){const q=$("trend-svg");if(!q)return;while(q.firstChild)q.removeChild(q.firstChild);const rev=Math.max(0,Number(m.revenue||0)),pro=Math.max(0,Number(m.profit||0)),W=820,H=300,L=40,R=16,T=18,B=32,max=Math.max(rev,pro,1),rw=W-L-R,rh=H-T-B;const P=a=>a.map((v,i)=>`${L+(i/(a.length-1))*rw},${T+rh-(v/max)*rh}`);for(let i=0;i<5;i++){const y=T+i*rh/4;q.appendChild(svg("line",{x1:L,y1:y,x2:W-R,y2:y,class:"trend-grid"}));}const rs=[rev*.55,rev*.7,rev*.82,rev],ps=[pro*.5,pro*.65,pro*.82,pro],rp=P(rs),pp=P(ps);q.appendChild(svg("polyline",{points:rp.join(" "),class:"trend-line rev"}));q.appendChild(svg("polyline",{points:pp.join(" "),class:"trend-line pro"}));[[rp,"#5eead4"],[pp,"#60a5fa"]].forEach(([arr,c])=>arr.forEach(p=>{const [x,y]=p.split(",");q.appendChild(svg("circle",{cx:x,cy:y,r:5,fill:c,class:"trend-dot"}));}));["ابتدا","روند ۱","روند ۲","اکنون"].forEach((t,i)=>q.appendChild(svg("text",{x:L+i*rw/3,y:H-7,class:"trend-label","text-anchor":i===3?"end":"middle"},t)));const margin=rev?Math.round(pro/rev*100):0;$("trend-score").textContent=percent(margin);$("trend-caption").textContent=rev||pro?`حاشیه سود فعلی ${percent(margin)} است؛ روند باید همراه با شواهد و تصمیم‌های مرتبط پایش شود.`:"برای شروع داده نمونه را بارگذاری کنید.";}
+function drawRadar(m={}){const q=$("radar-svg");if(!q)return;while(q.firstChild)q.removeChild(q.firstChild);const risk=Math.max(0,Math.min(100,Number(m.risk||0))),profit=Number(m.revenue)?Math.max(0,Math.min(100,Number(m.profit)/Number(m.revenue)*100)):0,cash=Number(m.revenue)?Math.max(0,Math.min(100,Number(m.cash)/Number(m.revenue)*100)):0,vals=[Math.min(100,profit*1.2),Math.min(100,60+profit*.4),cash,100-risk,Math.min(100,(profit+cash)/2),Math.min(100,(100-risk+profit+cash)/3)],cx=180,cy=150,r=105,n=6;const pt=(i,s)=>{const a=-Math.PI/2+i*2*Math.PI/n;return[cx+Math.cos(a)*r*s,cy+Math.sin(a)*r*s]};for(let l=1;l<=4;l++){q.appendChild(svg("polygon",{points:Array.from({length:n},(_,i)=>pt(i,l/4).join(",")).join(" "),class:"radar-grid"}));}for(let i=0;i<n;i++){const [x,y]=pt(i,1);q.appendChild(svg("line",{x1:cx,y1:cy,x2:x,y2:y,class:"radar-spoke"}));}q.appendChild(svg("polygon",{points:vals.map((v,i)=>pt(i,v/100).join(",")).join(" "),class:"radar-area"}));vals.forEach((v,i)=>{const[x,y]=pt(i,v/100);q.appendChild(svg("circle",{cx:x,cy:y,r:5,class:"radar-point"}));});["مالی","رشد","نقدینگی","ریسک","عملیات","تاب‌آوری"].forEach((t,i)=>{const[x,y]=pt(i,1.15);q.appendChild(svg("text",{x,y,class:"radar-text","text-anchor":"middle","dominant-baseline":"middle"},t));});$("radar-score").textContent=percent(Math.round(vals.reduce((a,b)=>a+b,0)/vals.length));}
+function renderDashboard(data){addCockpit();state.dashboard=data;const m=data.metrics||{};$("kpi-revenue").textContent=number(m.revenue);$("kpi-profit").textContent=number(m.profit);$("kpi-cash").textContent=number(m.cash);$("kpi-risk").textContent=percent(m.risk);const ready=data.status==="READY";$("dashboard-status").textContent=ready?"داشبورد آماده است":"داده کافی نیست";$("confidence").textContent=percent(ready?85:0);drawTrend(m);drawRadar(m);if(ready){const risk=Number(m.risk||0),rev=Number(m.revenue||0),pro=Number(m.profit||0),cash=Number(m.cash||0);$("priority-title").textContent=risk>=40?"ریسک نیازمند توجه است":pro>0?"تمرکز فعلی: رشد سودآور":"تمرکز فعلی: ساختن شواهد معتبر";$("priority-text").textContent=`درآمد ${number(rev)}، سود ${number(pro)}، نقدینگی ${number(cash)} و ریسک ${percent(risk)} ثبت شده است.`;$("assistant-cockpit").textContent=risk>=40?"برداشت دستیار: ریسک هزینه‌ای در اولویت است؛ پیش از توسعه هزینه‌ها سناریوی کنترل ریسک را بررسی کنید.":"برداشت دستیار: تصویر مالی فعلاً مثبت است؛ تصمیم بعدی را روی رشد سودآور و حفظ نقدینگی متمرکز کنید.";}}
+function renderReport(report){const sections=Array.isArray(report?.sections)?report.sections:[];$("report").innerHTML=`<h3>${esc(report?.title||"گزارش اجرایی")}</h3>${sections.map(s=>`<div class="report-row">${esc(s)}</div>`).join("")||`<p class="muted">شاهد قابل نمایش وجود ندارد.</p>`}`;}
+function setIdentity(org,session){$("side-org").textContent=org||"سازمان نامشخص";$("session").textContent=session?`فعال · ${session.user.username}`:"بدون نشست فعال";$("identity-status").textContent=session?"نشست فعال":"بدون نشست";}
+async function loadDemo(){const d=await api("/api/demo");$("organization").value=d.organization.name;setIdentity(d.organization.name,null);renderDashboard(d.dashboard);renderReport(d.report);$("data-summary").textContent=`داده نمونه: ${number(d.records.length)} رکورد مالی ذخیره و قابل تحلیل شد`;setMessage("داده نمونه بارگذاری شد؛ تصویر مدیریتی آماده بررسی است.","ok");}
+async function login(){const username=$("username").value.trim(),organization=$("organization").value.trim();if(!username||!organization)return setMessage("نام کاربر و سازمان را وارد کنید.","error");const session=await api("/api/session",{method:"POST",body:JSON.stringify({username,organization})});state.session=session;setIdentity(session.organization.name,session);setMessage("نشست امن و context سازمانی فعال شد.","ok");await refresh();}
+async function logout(){if(!state.session?.token)return;await api("/api/logout",{method:"POST"});state.session=null;setIdentity($("organization").value.trim(),null);setMessage("نشست پایان یافت.","ok");}
+async function ingest(){if(!state.session?.token)return setMessage("برای ثبت داده ابتدا وارد نشست سازمانی شوید.","error");const amount=Number($("amount").value),category=$("category").value.trim(),organization=$("organization").value.trim();if(!Number.isFinite(amount)||amount<=0||!category||!organization)return setMessage("مبلغ، دسته‌بندی و سازمان باید معتبر باشند.","error");const r=await api("/api/ingest",{method:"POST",body:JSON.stringify({amount,category,organization})});renderDashboard(r.dashboard);$("data-summary").textContent=`رکورد ثبت شد · نسخه ${number(r.persistence.version)}`;setMessage("شاهد مالی ثبت شد و شاخص‌های مدیریت به‌روزرسانی شدند.","ok");}
+async function makeDecision(){if(!state.session?.token)return setMessage("برای ثبت تصمیم ابتدا وارد نشست سازمانی شوید.","error");const title=$("decision").value.trim(),organization=$("organization").value.trim();if(!title)return setMessage("عنوان تصمیم را وارد کنید.","error");const r=await api("/api/decision",{method:"POST",body:JSON.stringify({title,organization})});$("decision-result").textContent=r.recommendation;setMessage("تصمیم ثبت شد و برای تأیید مدیریت در مسیر اجرا قرار گرفت.","ok");}
+async function refresh(){const organization=state.session?.organization?.name||$("organization").value.trim();const p=organization?`/api/dashboard?organization=${encodeURIComponent(organization)}`:"/api/dashboard";renderDashboard(await api(p));renderReport(await api("/api/report"));}
+function wireNavigation(){document.querySelectorAll("[data-section]").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll(".nav-item").forEach(i=>i.classList.remove("active"));b.classList.add("active");const map={overview:".workspace",financial:"#financial-section",reports:"#reports-section",decisions:"#decisions-section",alerts:"#alerts-section",organization:"#organization-section"};document.querySelector(map[b.dataset.section]||".workspace")?.scrollIntoView({behavior:"smooth",block:"start"});}));document.querySelectorAll("[data-section-target]").forEach(b=>b.addEventListener("click",()=>{const t=b.dataset.sectionTarget;document.querySelector(t==="decisions"?"#decisions-section":"#reports-section")?.scrollIntoView({behavior:"smooth"})}));document.querySelectorAll(".chip").forEach(c=>c.addEventListener("click",()=>{const text=c.dataset.prompt;$("assistant-note").textContent=`درخواست انتخاب‌شده: ${text} · پاسخ باید با شواهد و context سازمانی ساخته شود.`;$("assistant-cockpit")?.textContent=`دستیار آماده تحلیل: ${text}`;setMessage("درخواست دستیار سازمانی انتخاب شد.","ok");}));}
+addCockpit();
+$("login").addEventListener("click",()=>login().catch(e=>setMessage(e.message,"error")));$("logout").addEventListener("click",()=>logout().catch(e=>setMessage(e.message,"error")));$("demo").addEventListener("click",()=>loadDemo().catch(e=>setMessage(e.message,"error")));$("ingest").addEventListener("click",()=>ingest().catch(e=>setMessage(e.message,"error")));$("decision-submit").addEventListener("click",()=>makeDecision().catch(e=>setMessage(e.message,"error")));$("refresh").addEventListener("click",()=>refresh().catch(e=>setMessage(e.message,"error")));wireNavigation();api("/api/ready").then(()=>{$("connection").textContent="سامانه آنلاین";$(\"connection\").classList.add("online");setMessage("سامانه آماده استفاده است.","ok")}).catch(()=>{$("connection").textContent="سرور در دسترس نیست";setMessage("runtime هنوز در دسترس نیست.","error")});if("serviceWorker"in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});
