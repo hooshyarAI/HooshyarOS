@@ -4,6 +4,7 @@ export interface ArchitectureRequirement {
     targetEngine: string;
     dependencies?: string[];
     requiredPaths?: string[];
+    repairOf?: string;
 }
 
 export interface ArchitectureDecision {
@@ -17,6 +18,7 @@ export interface ArchitectureDecision {
         dependencies: string[];
         architectureRules: string[];
         requiredPaths: string[];
+        repairOf?: string;
     };
     reasons: string[];
 }
@@ -49,6 +51,7 @@ export class ArchitectureDecisionEngine {
         reasons.push("architecture rules attached");
         reasons.push("construction plan is deterministic");
         reasons.push(requirement.requiredPaths?.length ? "capability artifact boundary attached" : "no explicit artifact boundary declared");
+        if (requirement.repairOf) reasons.push("repair scope remains attached to the canonical parent capability");
 
         return {
             requirement,
@@ -60,7 +63,8 @@ export class ArchitectureDecisionEngine {
                 targetEngine: requirement.targetEngine,
                 dependencies,
                 architectureRules,
-                requiredPaths: requirement.requiredPaths || []
+                requiredPaths: requirement.requiredPaths || [],
+                ...(requirement.repairOf ? { repairOf: requirement.repairOf } : {})
             },
             reasons
         };
@@ -68,12 +72,13 @@ export class ArchitectureDecisionEngine {
 
     static selfTest(): void {
         const result = new ArchitectureDecisionEngine().decide({
-            capabilityId: "test-001",
-            capability: "architecture-driven construction",
+            capabilityId: "repair-test-001",
+            repairOf: "product.test-001",
+            capability: "repair architecture-driven construction",
             targetEngine: "Autonomous Operations Engine"
         });
 
-        if (result.decision !== "approved" || !result.plan || result.plan.architectureRules.length < 3) {
+        if (result.decision !== "approved" || !result.plan || result.plan.architectureRules.length < 3 || result.plan.repairOf !== "product.test-001") {
             throw new Error("ArchitectureDecisionEngine self-test failed");
         }
     }
