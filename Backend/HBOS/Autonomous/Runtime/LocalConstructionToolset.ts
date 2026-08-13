@@ -17,24 +17,13 @@ function run(command: string, args: string[], cwd: string, timeout = 15 * 60 * 1
                 executableArgs = ["/d", "/s", "/c", "npx.cmd", ...args];
             }
         }
-        const output = execFileSync(executable, executableArgs, {
-            cwd,
-            encoding: "utf8",
-            timeout,
-            shell: false,
-            windowsHide: true,
-            stdio: ["ignore", "pipe", "pipe"]
-        });
+        const output = execFileSync(executable, executableArgs, { cwd, encoding: "utf8", timeout, shell: false, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
         return { ok: true, code: 0, output: String(output), error: null, elapsedMs: Date.now() - started };
     } catch (error: any) {
         const stdout = String(error?.stdout || "");
         const stderr = String(error?.stderr || "");
         const exitCode = error?.status ?? 1;
-        const expectedGitDiffQuiet = command === "git"
-            && args[0] === "diff"
-            && args[1] === "--cached"
-            && args[2] === "--quiet"
-            && exitCode === 1;
+        const expectedGitDiffQuiet = command === "git" && args[0] === "diff" && args[1] === "--cached" && args[2] === "--quiet" && exitCode === 1;
         if (expectedGitDiffQuiet) return { ok: true, code: 1, output: `${stdout}${stderr}`, error: null, elapsedMs: Date.now() - started };
         console.error(JSON.stringify({ type: "AUTONOMOUS_TOOL_ERROR", command, args, cwd, exitCode, stdout, stderr, elapsedMs: Date.now() - started, message: error?.message ?? `${command} failed` }, null, 2));
         return { ok: false, code: exitCode, output: `${stdout}\n${stderr}`, error: error?.message ?? `${command} failed`, elapsedMs: Date.now() - started };
@@ -222,13 +211,15 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                 const jest = run("node", jestArgs, root);
                 const statusAfterTests = run("git", REPOSITORY_STATUS_ARGS, root);
                 const declared = declaredArtifactPaths(root, context.plan.capabilityId, context.plan.targetEngine).map(path => normalize(path));
+                const changedPaths = statusAfterTests.ok ? relativeStatusPaths(statusAfterTests.output, root) : [];
+                const unexpectedPaths = changedPaths.filter(path => !declared.includes(path));
+                const allowedChangesOnly = unexpectedPaths.length === 0;
                 const verificationTouchesDeclaredArtifact = declared.some(path => existsSync(path));
-                const behavioralEvidenceVerified = verificationTouchesDeclaredArtifact && (jest.code === 0) && /(?:behavior|analy|calculat|evaluat|assess|transform|ingest|persist|authorize|decision|kpi|financial|variance|evidence|ready)/i.test(jest.output);
-                const integrationVerified = jest.code === 0 && (fullVerify || Boolean(focused)) && context.plan.dependencies.length >= 0;
-                const cleanRepository = statusAfterTests.ok && statusAfterTests.output.trim() !== "" && statusAfterTests.output.split(/\r?\n/).filter(Boolean).every(line => line.includes("\t"));
-                const artifact = { type: "AUTONOMOUS_VERIFY_RESULT", verificationMode: fullVerify ? "full" : focused ? "focused" : "syntax+autonomous-tests", focusedTest: focused, fullVerify, fullVerifyEvery: FULL_VERIFY_EVERY, builderTestsRun: runBuilderTests, builderTestEvery: BUILDER_TEST_EVERY, builderTestsRequired, syntaxVerified: true, pytestBootstrapped: bootstrap.installed, builderTestsVerified: !runBuilderTests || builderTests.code === 0, jestVerified: jest.code === 0, testsPassed: jest.code === 0 && (!runBuilderTests || builderTests.code === 0), behavioralEvidenceVerified, integrationVerified, cleanRepository, verificationTouchesDeclaredArtifact, syntaxElapsedMs: syntax.elapsedMs, builderTestsElapsedMs: builderTests.elapsedMs, jestElapsedMs: jest.elapsedMs, totalVerifyElapsedMs: syntax.elapsedMs + builderTests.elapsedMs + jest.elapsedMs, timestamp: new Date().toISOString(), output: `${syntax.output}\n${bootstrap.output}\n${builderTests.output}\n${jest.output}`, error: jest.error };
+                const behavioralEvidenceVerified = verificationTouchesDeclaredArtifact && jest.code === 0 && /(?:behavior|analy|calculat|evaluat|assess|transform|ingest|persist|authorize|decision|kpi|financial|variance|evidence|ready)/i.test(jest.output);
+                const integrationVerified = jest.code === 0 && (fullVerify || Boolean(focused));
+                const artifact = { type: "AUTONOMOUS_VERIFY_RESULT", verificationMode: fullVerify ? "full" : focused ? "focused" : "syntax+autonomous-tests", focusedTest: focused, fullVerify, fullVerifyEvery: FULL_VERIFY_EVERY, builderTestsRun: runBuilderTests, builderTestEvery: BUILDER_TEST_EVERY, builderTestsRequired, syntaxVerified: true, pytestBootstrapped: bootstrap.installed, builderTestsVerified: !runBuilderTests || builderTests.code === 0, jestVerified: jest.code === 0, testsPassed: jest.code === 0 && (!runBuilderTests || builderTests.code === 0), behavioralEvidenceVerified, integrationVerified, cleanRepository: allowedChangesOnly, unexpectedPaths, verificationTouchesDeclaredArtifact, syntaxElapsedMs: syntax.elapsedMs, builderTestsElapsedMs: builderTests.elapsedMs, jestElapsedMs: jest.elapsedMs, totalVerifyElapsedMs: syntax.elapsedMs + builderTests.elapsedMs + jest.elapsedMs, timestamp: new Date().toISOString(), output: `${syntax.output}\n${bootstrap.output}\n${builderTests.output}\n${jest.output}`, error: jest.error };
                 console.log(JSON.stringify(artifact, null, 2));
-                return artifact.testsPassed && behavioralEvidenceVerified && integrationVerified
+                return artifact.testsPassed && behavioralEvidenceVerified && integrationVerified && allowedChangesOnly
                     ? { ok: true, artifact }
                     : { ok: false, issue: "AUTONOMOUS_VERIFY_FAILED", artifact: { ...artifact, repairRequired: true } };
             }
