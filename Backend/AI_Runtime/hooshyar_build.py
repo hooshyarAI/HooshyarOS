@@ -20,6 +20,7 @@ ROADMAP = ROOT / "Docs" / "Product" / "PRODUCT_CONSTRUCTION_ROADMAP.json"
 SUPERVISOR = ROOT / "Backend" / "AI_Runtime" / "autonomous_commercial_supervisor.py"
 
 MAX_SELF_HEAL_ATTEMPTS = 5
+MAX_PARENT_RECOVERY_HANDOFFS = 5
 
 
 def run(command: str, args: list[str], timeout: int = 30 * 60) -> subprocess.CompletedProcess[str]:
@@ -395,6 +396,49 @@ def run_daemon(*, assistant_phase: bool) -> int:
     return_code = process.wait()
     if not assistant_phase and autonomous_blocked_seen:
         recovery_code = run_supervisor_recovery("".join(captured_lines))
+
+        if recovery_code == 0:
+            try:
+                handoff_depth = int(os.environ.get("HOOSHYAR_PARENT_RECOVERY_HANDOFF_DEPTH", "0"))
+            except ValueError:
+                handoff_depth = 0
+
+            if handoff_depth < MAX_PARENT_RECOVERY_HANDOFFS:
+                print(
+                    json.dumps(
+                        {
+                            "type": "AUTONOMOUS_PARENT_HANDOFF",
+                            "parentController": "Backend\\AI_Runtime\\hooshyar_build.py",
+                            "action": "RETURN_TO_ASSISTANT ? CONTINUE_PLATFORM",
+                            "handoffDepth": handoff_depth + 1,
+                            "maxHandoffDepth": MAX_PARENT_RECOVERY_HANDOFFS,
+                            "independentCapabilitySelection": False,
+                            "independentArchitectureAuthority": False,
+                        },
+                        ensure_ascii=False,
+                    ),
+                    flush=True,
+                )
+
+                env = os.environ.copy()
+                env["HOOSHYAR_PARENT_RECOVERY_HANDOFF_DEPTH"] = str(handoff_depth + 1)
+                env["HOOSHYAR_CONSTRUCTION_PARENT"] = "assistant"
+                env["HOOSHYAR_SUPERVISOR_ROLE"] = "subordinate-recovery-and-verification"
+                env["HOOSHYAR_AGENT"] = "python"
+                env["PYTHONUTF8"] = "1"
+                env["PYTHONIOENCODING"] = "utf-8"
+
+                continuation = subprocess.run(
+                    [sys.executable, str(Path(__file__).resolve()), "platform"],
+                    cwd=ROOT,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    env=env,
+                    check=False,
+                )
+                return continuation.returncode
+
         return recovery_code
     if not assistant_phase and return_code != 0 and not autonomous_blocked_seen and resume_interrupted_generation():
         return run_daemon(assistant_phase=False)
