@@ -14,6 +14,7 @@ if hasattr(sys.stderr, "reconfigure"):
 
 ROOT = Path(__file__).resolve().parents[2]
 MAX_CYCLES = int(os.environ.get("HOOSHYAR_AUTONOMOUS_MAX_CYCLES", "50"))
+ASSISTANT_CONTROLLER = ROOT / "Backend/AI_Runtime/hooshyar_build.py"
 GOVERNING_ARTIFACTS = [
     ROOT / "Docs/HOOSHYAROS_MASTER_CHARTER.md",
     ROOT / "Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md",
@@ -23,13 +24,25 @@ GOVERNING_ARTIFACTS = [
     ROOT / "Docs/HOOSHYAROS_COMMERCIAL_SCOPE_RECONCILIATION.md",
     ROOT / "Docs/Product/PRODUCT_CONSTRUCTION_ROADMAP.json",
 ]
+SUBORDINATE_MARKERS = [
+    "The Assistant is the autonomous engineering executor",
+    "Python is the canonical construction worker/orchestration layer",
+    "The autonomous Assistant is NOT the platform's future financial, managerial or commercial advisor",
+    "Platform continuation",
+    "REPAIR",
+    "RE-PLAN",
+]
 
 
-def run(command: list[str], timeout: int = 45 * 60) -> tuple[int, str]:
+def run(command: list[str], timeout: int = 45 * 60, *, child_of_assistant: bool = False) -> tuple[int, str]:
     print(f"\n>>> {' '.join(command)}", flush=True)
     env = os.environ.copy()
     env["PYTHONUTF8"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
+    if child_of_assistant:
+        env["HOOSHYAR_CONSTRUCTION_PARENT"] = "assistant"
+        env["HOOSHYAR_SUPERVISOR_ROLE"] = "subordinate-recovery-and-verification"
+        env["HOOSHYAR_AGENT"] = "python"
     completed = subprocess.run(
         command,
         cwd=ROOT,
@@ -52,14 +65,32 @@ def validate_constitution() -> bool:
     if missing:
         print(json.dumps({"type": "AUTONOMOUS_GOVERNANCE_BLOCKED", "missing": missing}, ensure_ascii=False), flush=True)
         return False
+    if not ASSISTANT_CONTROLLER.exists():
+        print(json.dumps({"type": "AUTONOMOUS_GOVERNANCE_BLOCKED", "reason": "assistant construction controller missing", "path": str(ASSISTANT_CONTROLLER.relative_to(ROOT))}, ensure_ascii=False), flush=True)
+        return False
     architecture = (ROOT / "Docs/ARCHITECTURE.md").read_text(encoding="utf-8", errors="replace")
     charter = (ROOT / "Docs/HOOSHYAROS_MASTER_CHARTER.md").read_text(encoding="utf-8", errors="replace")
     constitution = (ROOT / "Assistant/SYSTEM_PROMPT.md").read_text(encoding="utf-8", errors="replace")
-    required = ["Architecture Freeze V4", "Everything is an Engine", "One Capability", "Reasoning Engine", "Governance Engine", "Executive Intelligence Engine", "Organizational Intelligence Engine", "Autonomous Operations Engine"]
-    if not all(token in architecture or token in charter or token in constitution for token in required):
+    merged = "\n".join([architecture, charter, constitution])
+    required = [
+        "Architecture Freeze V4", "Everything is an Engine", "One Capability",
+        "Reasoning Engine", "Governance Engine", "Executive Intelligence Engine",
+        "Organizational Intelligence Engine", "Autonomous Operations Engine",
+    ]
+    if not all(token in merged for token in required):
         print(json.dumps({"type": "AUTONOMOUS_GOVERNANCE_BLOCKED", "reason": "governing architecture markers missing"}, ensure_ascii=False), flush=True)
         return False
-    print(json.dumps({"type": "AUTONOMOUS_GOVERNANCE_OK", "sourceOfTruthCount": len(GOVERNING_ARTIFACTS)}, ensure_ascii=False), flush=True)
+    if not all(marker in merged or marker in (ROOT / "Docs/HOOSHYAROS_FINAL_DECISIONS_REGISTER.md").read_text(encoding="utf-8", errors="replace") for marker in SUBORDINATE_MARKERS):
+        print(json.dumps({"type": "AUTONOMOUS_GOVERNANCE_BLOCKED", "reason": "assistant-supervisor subordination contract missing"}, ensure_ascii=False), flush=True)
+        return False
+    print(json.dumps({
+        "type": "AUTONOMOUS_GOVERNANCE_OK",
+        "sourceOfTruthCount": len(GOVERNING_ARTIFACTS),
+        "parentController": str(ASSISTANT_CONTROLLER.relative_to(ROOT)),
+        "role": "subordinate-recovery-and-verification",
+        "independentArchitectureAuthority": False,
+        "independentCapabilitySelection": False,
+    }, ensure_ascii=False), flush=True)
     return True
 
 
@@ -99,7 +130,7 @@ def fingerprint(output: str) -> str:
 
 
 def construction_self_heal() -> bool:
-    code, _ = run([sys.executable, "Backend/AI_Runtime/repair_construction_idempotency.py"], timeout=10 * 60)
+    code, _ = run([sys.executable, "Backend/AI_Runtime/repair_construction_idempotency.py"], timeout=10 * 60, child_of_assistant=True)
     return code == 0
 
 
@@ -108,16 +139,16 @@ def focused_repair(output: str) -> bool:
     if "AUTONOMOUS_AGENT_NO_REPOSITORY_CHANGE" in output or "AUTONOMOUS_BEHAVIORAL_EVIDENCE_INCOMPLETE" in output:
         repaired = construction_self_heal() or repaired
     if "product.web-application-shell" in output:
-        code, _ = run([sys.executable, "Backend/AI_Runtime/commercial_autorepair.py"], timeout=45 * 60)
+        code, _ = run([sys.executable, "Backend/AI_Runtime/commercial_autorepair.py"], timeout=45 * 60, child_of_assistant=True)
         repaired = code == 0 or repaired
     return repaired
 
 
 def full_regression() -> bool:
-    code, _ = run(["npm.cmd", "run", "build"])
+    code, _ = run(["npm.cmd", "run", "build"], child_of_assistant=True)
     if code != 0:
         return False
-    code, _ = run(["npm.cmd", "test", "--", "--runInBand"], timeout=90 * 60)
+    code, _ = run(["npm.cmd", "test", "--", "--runInBand"], timeout=90 * 60, child_of_assistant=True)
     return code == 0
 
 
@@ -136,9 +167,9 @@ def main() -> int:
 
         construction_self_heal()
 
-        build_code, build_output = run(["npm.cmd", "run", "build"])
+        build_code, build_output = run(["npm.cmd", "run", "build"], child_of_assistant=True)
         if build_code != 0:
-            platform_code, platform_output = run([sys.executable, "Backend/AI_Runtime/hooshyar_build.py", "platform"], timeout=90 * 60)
+            platform_code, platform_output = run([sys.executable, str(ASSISTANT_CONTROLLER), "platform"], timeout=90 * 60, child_of_assistant=True)
             blocked = blocked_event(platform_output)
             if platform_code != 0 or blocked:
                 key = fingerprint(platform_output or build_output)
@@ -151,7 +182,7 @@ def main() -> int:
                     return 2
                 continue
 
-        platform_code, platform_output = run([sys.executable, "Backend/AI_Runtime/hooshyar_build.py", "platform"], timeout=90 * 60)
+        platform_code, platform_output = run([sys.executable, str(ASSISTANT_CONTROLLER), "platform"], timeout=90 * 60, child_of_assistant=True)
         blocked = blocked_event(platform_output)
         if platform_code != 0 or blocked:
             key = fingerprint(platform_output)
