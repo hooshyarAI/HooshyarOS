@@ -10,10 +10,17 @@ export interface AutonomousBuildRequest extends ArchitectureRequirement {
     requestedBy?: string;
 }
 
+export interface AutonomousBuildRunResult {
+    request: AutonomousBuildRequest;
+    lifecycle: string[];
+    result: ReturnType<ArchitectureDrivenBuildController["construct"]>;
+    status: "completed" | "blocked";
+}
+
 export class AutonomousBuilderLoop {
     constructor(private readonly tools: ConstructionTool[]) {}
 
-    run(request: AutonomousBuildRequest) {
+    run(request: AutonomousBuildRequest): AutonomousBuildRunResult {
         const controller = new ArchitectureDrivenBuildController(this.tools);
         const result = controller.construct(request);
 
