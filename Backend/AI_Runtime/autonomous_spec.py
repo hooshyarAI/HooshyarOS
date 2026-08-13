@@ -185,6 +185,28 @@ def _needs_reweave(root: Path, artifacts: list[tuple[str, str]]) -> bool:
     return False
 
 
+def _ensure_parent_directory(target: Path) -> None:
+    """Ensure a file-artifact parent can evolve into a directory safely.
+
+    The commercial roadmap may legitimately extend an existing frontend shell
+    with nested mobile/admin surfaces. Older builder generations could have
+    materialized the shell as a file named ``HooshyarWebApp``. Preserve that
+    artifact as a named legacy child before creating the directory required by
+    the new nested capability.
+    """
+    parent = target.parent
+    if parent.exists() and parent.is_file():
+        legacy_content = parent.read_text(encoding="utf-8")
+        legacy_name = parent.name + ".legacy.ts"
+        parent.unlink()
+        parent.mkdir(parents=True, exist_ok=True)
+        legacy_target = parent / legacy_name
+        if not legacy_target.exists():
+            legacy_target.write_text(legacy_content, encoding="utf-8")
+        return
+    parent.mkdir(parents=True, exist_ok=True)
+
+
 def write_missing(root: Path, artifacts: list[tuple[str, str]]) -> list[str]:
     paths = [relative_path for relative_path, _ in artifacts]
     existing = [relative_path for relative_path in paths if (root / relative_path).exists()]
@@ -198,7 +220,7 @@ def write_missing(root: Path, artifacts: list[tuple[str, str]]) -> list[str]:
     generated: list[str] = []
     for relative_path, content in artifacts:
         target = root / relative_path
-        target.parent.mkdir(parents=True, exist_ok=True)
+        _ensure_parent_directory(target)
         target.write_text(content, encoding="utf-8")
         generated.append(relative_path)
     return generated
@@ -209,7 +231,7 @@ def write_overwrite(root: Path, artifacts: list[tuple[str, str]]) -> list[str]:
     repaired: list[str] = []
     for relative_path, content in artifacts:
         target = root / relative_path
-        target.parent.mkdir(parents=True, exist_ok=True)
+        _ensure_parent_directory(target)
         target.write_text(content, encoding="utf-8")
         repaired.append(relative_path)
     return repaired
