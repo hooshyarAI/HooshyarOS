@@ -39,6 +39,7 @@ jobs:
           node ./node_modules/jest/bin/jest.js --runInBand
           Backend/HBOS/test/CommercialArtifactQualityAudit.test.ts
           Backend/HBOS/test/CommercialProductCompletionAudit.test.ts
+          Backend/HBOS/Factory/Quality/QualityGate.test.ts
 
       - name: Focused autonomous tests
         run: >-
