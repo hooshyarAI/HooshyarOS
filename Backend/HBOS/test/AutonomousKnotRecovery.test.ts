@@ -20,7 +20,7 @@ describe("AutonomousKnotRecovery", () => {
 
         expect(decision.recover).toBe(true);
         expect(decision.action).toBe("REPAIR");
-        expect(decision.repairCapabilityId).toBe("repair-commercial-runtime-server");
+        expect(decision.repairCapabilityId).toBe("repair-platform.user-management");
         expect(decision.repairCluster?.rootCause).toBe("commercial-runtime-request-or-test-lifecycle-contract");
         expect(decision.repairEvidence).toEqual(expect.arrayContaining([expect.stringContaining("CommercialRuntimeServer")]));
     });
