@@ -1,24 +1,15 @@
-import { existsSync, readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { HooshyarWebApp } from "../../../Frontend/HooshyarWebApp";
 
-describe("HooshyarWebApplication commercial shell", () => {
-    const root = join(process.cwd(), "Frontend", "HooshyarWebApp");
-
-    it("uses the canonical frontend application path", () => {
-        expect(root.endsWith(join("Frontend", "HooshyarWebApp"))).toBe(true);
+describe("HooshyarWebApp", () => {
+    it("exposes the canonical product boundary", () => {
+        const service = new HooshyarWebApp();
+        expect(service.capabilityId).toBe("product.web-application-shell");
+        expect(service.targetEngine).toBe("Assistant Engine");
+        expect(service.initialize().status).toBe("READY");
     });
 
-    it("is represented by a generated frontend artifact when the shell has been generated", () => {
-        if (!existsSync(root)) {
-            return;
-        }
-
-        const stat = statSync(root);
-        if (stat.isDirectory()) {
-            expect(readdirSync(root).length).toBeGreaterThan(0);
-            return;
-        }
-
-        expect(stat.isFile()).toBe(true);
+    it("keeps its deterministic minimal contract", () => {
+        expect(new HooshyarWebApp().execute("continue").status).toBe("READY");
+        expect(new HooshyarWebApp().execute(" ").status).toBe("BLOCKED");
     });
 });
