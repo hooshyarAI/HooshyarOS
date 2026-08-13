@@ -1,10 +1,4 @@
-"""Two-command autonomous HooshyarOS construction entrypoint.
-
-The Assistant phase runs the canonical autonomous daemon until the Assistant
-completion gate hands off to platform construction. The platform phase then
-runs the same daemon to exhaustion. Python remains the repository-native worker
-and this wrapper does not replace the TypeScript HBOS architecture.
-"""
+"""Two-command autonomous HooshyarOS construction entrypoint."""
 from __future__ import annotations
 
 import argparse
@@ -23,19 +17,10 @@ ROADMAP = ROOT / "Docs" / "Product" / "PRODUCT_CONSTRUCTION_ROADMAP.json"
 
 
 def run(command: str, args: list[str], timeout: int = 30 * 60) -> subprocess.CompletedProcess[str]:
-    executable = command
-    if os.name == "nt" and command == "npm":
-        executable = "npm.cmd"
+    executable = "npm.cmd" if os.name == "nt" and command == "npm" else command
     return subprocess.run(
-        [executable, *args],
-        cwd=ROOT,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        timeout=timeout,
-        check=False,
+        [executable, *args], cwd=ROOT, text=True, encoding="utf-8", errors="replace",
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout, check=False,
         env={**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"},
     )
 
@@ -44,11 +29,7 @@ def status_paths() -> list[str]:
     result = run("git", ["status", "--porcelain=v1", "--untracked-files=all"])
     if result.returncode != 0:
         return []
-    paths: list[str] = []
-    for line in result.stdout.splitlines():
-        if len(line) >= 4:
-            paths.append(line[3:].strip().replace("/", os.sep))
-    return paths
+    return [line[3:].strip().replace("/", os.sep) for line in result.stdout.splitlines() if len(line) >= 4]
 
 
 def roadmap_capabilities() -> list[dict]:
@@ -61,6 +42,12 @@ def roadmap_capabilities() -> list[dict]:
     return [c for c in roadmap.get("capabilities", []) if c.get("capabilityId")]
 
 
+def _artifact_is_complete(path: Path) -> bool:
+    if not path.exists():
+        return False
+    return path.is_dir() if path.suffix == "" else path.is_file()
+
+
 def resumable_product_paths() -> list[Path]:
     candidates: list[Path] = []
     for capability in roadmap_capabilities():
@@ -70,7 +57,7 @@ def resumable_product_paths() -> list[Path]:
         if not implementation or not test or not documentation:
             continue
         expected = [ROOT / str(implementation), ROOT / str(test), ROOT / str(documentation)]
-        if all(path.exists() for path in expected):
+        if all(_artifact_is_complete(path) for path in expected):
             candidates.extend(expected)
     return candidates
 
@@ -79,36 +66,40 @@ def _path_matches(candidate: Path, declared: Path) -> bool:
     return candidate == declared or (declared.is_dir() and declared in candidate.parents)
 
 
+def _capability_complete(capability: dict) -> bool:
+    implementation = capability.get("implementationPath")
+    test = capability.get("testPath")
+    documentation = capability.get("documentationPath")
+    return bool(
+        implementation and test and documentation and
+        _artifact_is_complete(ROOT / str(implementation)) and
+        _artifact_is_complete(ROOT / str(test)) and
+        _artifact_is_complete(ROOT / str(documentation))
+    )
+
+
 def _dirty_overlaps_capability(dirty: list[str], capability: dict) -> bool:
-    declared_values = [
-        capability.get("implementationPath"),
-        capability.get("testPath"),
-        capability.get("documentationPath"),
-    ]
-    declared = [(ROOT / str(value)).resolve() for value in declared_values if value]
-    for relative in dirty:
-        candidate = (ROOT / relative).resolve()
-        if any(_path_matches(candidate, path) or _path_matches(path, candidate) for path in declared):
-            return True
-    return False
+    if _capability_complete(capability):
+        return False
+    values = [capability.get("implementationPath"), capability.get("testPath"), capability.get("documentationPath")]
+    declared = [(ROOT / str(value)).resolve() for value in values if value]
+    return any(
+        any(_path_matches((ROOT / relative).resolve(), path) or _path_matches(path, (ROOT / relative).resolve()) for path in declared)
+        for relative in dirty
+    )
 
 
 def _capability_prompt(capability: dict) -> str:
     dependencies = ", ".join(str(x) for x in capability.get("dependencies", [])) or "none"
     rules = "; ".join([
-        "Architecture Freeze V4",
-        "One Capability = One Engine",
-        "Engine must be observable",
-        "Engine must be testable",
-        "Engine must be recoverable",
-        "No duplicate capability owner",
+        "Architecture Freeze V4", "One Capability = One Engine", "Engine must be observable",
+        "Engine must be testable", "Engine must be recoverable", "No duplicate capability owner",
         "Generated artifacts must stay inside the declared capability boundary",
     ])
     directives = "; ".join([
         "Implement exactly one concrete capability from the canonical mission.",
         "Create or update the focused implementation, focused test and documentation required by the architecture.",
-        "Repair verification failures before finalization.",
-        "Do not redesign Architecture Freeze V4.",
+        "Repair verification failures before finalization.", "Do not redesign Architecture Freeze V4.",
         "Never modify an existing dependency, engine, test or document merely to make the selected capability appear implemented.",
         "For a product capability, implement the product artifact paths declared by the durable product roadmap.",
         "Use only repository-native Python construction.",
@@ -121,12 +112,9 @@ def _capability_prompt(capability: dict) -> str:
         f"Target Engine: {capability.get('targetEngine')}",
         f"Dependencies: {dependencies}",
         "Required artifact paths: " + "; ".join([
-            str(capability.get("implementationPath", "")),
-            str(capability.get("testPath", "")),
-            str(capability.get("documentationPath", "")),
+            str(capability.get("implementationPath", "")), str(capability.get("testPath", "")), str(capability.get("documentationPath", ""))
         ]),
-        f"Architecture rules: {rules}",
-        f"Directives: {directives}",
+        f"Architecture rules: {rules}", f"Directives: {directives}",
         "Reuse existing capabilities and engine boundaries; never invent business semantics that are absent from repository architecture or evidence.",
     ])
 
@@ -135,27 +123,17 @@ def reweave_interrupted_capabilities(dirty: list[str]) -> bool:
     matched = [c for c in roadmap_capabilities() if _dirty_overlaps_capability(dirty, c)]
     if not matched:
         return False
-
-    changed = False
     for capability in matched:
-        prompt = _capability_prompt(capability)
         result = subprocess.run(
-            [sys.executable, str(BUILDER), "--prompt", prompt],
-            cwd=ROOT,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            timeout=15 * 60,
-            check=False,
+            [sys.executable, str(BUILDER), "--prompt", _capability_prompt(capability)],
+            cwd=ROOT, text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, timeout=15 * 60, check=False,
             env={**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"},
         )
         print(result.stdout, end="")
         if result.returncode != 0:
             return False
-        changed = True
-    return changed
+    return True
 
 
 def is_resumable_generation_state() -> tuple[bool, list[str]]:
@@ -165,15 +143,9 @@ def is_resumable_generation_state() -> tuple[bool, list[str]]:
     expected = [p.resolve() for p in resumable_product_paths()]
     if not expected:
         return False, dirty
-
     for relative in dirty:
         candidate = (ROOT / relative).resolve()
-        allowed = any(
-            candidate == path
-            or (path.is_dir() and path in candidate.parents)
-            for path in expected
-        )
-        if not allowed:
+        if not any(candidate == path or (path.is_dir() and path in candidate.parents) for path in expected):
             return False, dirty
     return True, dirty
 
@@ -182,53 +154,31 @@ def resume_interrupted_generation() -> bool:
     resumable, dirty = is_resumable_generation_state()
     if not resumable:
         return False
-
-    print(json.dumps({
-        "type": "AUTONOMOUS_RESUME_GENERATION",
-        "status": "detected",
-        "changedPaths": dirty,
-        "action": "REWEAVE → VERIFY → COMMIT → PUSH → CONTINUE"
-    }, ensure_ascii=False))
-
+    print(json.dumps({"type": "AUTONOMOUS_RESUME_GENERATION", "status": "detected", "changedPaths": dirty, "action": "REWEAVE → VERIFY → COMMIT → PUSH → CONTINUE"}, ensure_ascii=False))
     reweave_interrupted_capabilities(dirty)
-
     verification = run("npm", ["test", "--", "--runInBand"], timeout=45 * 60)
     print(verification.stdout, end="")
     if verification.returncode != 0:
-        print(json.dumps({
-            "type": "AUTONOMOUS_RESUME_GENERATION",
-            "status": "blocked",
-            "reason": "verification failed",
-            "exitCode": verification.returncode
-        }, ensure_ascii=False))
+        print(json.dumps({"type": "AUTONOMOUS_RESUME_GENERATION", "status": "blocked", "reason": "verification failed", "exitCode": verification.returncode}, ensure_ascii=False))
         return False
-
     add = run("git", ["add", "-A"])
     print(add.stdout, end="")
     if add.returncode != 0:
         return False
-
     commit = run("git", ["commit", "-m", "feat(hbos): autonomous construction progress"])
     print(commit.stdout, end="")
     if commit.returncode != 0:
         return False
-
     branch = run("git", ["branch", "--show-current"])
     print(branch.stdout, end="")
     branch_name = branch.stdout.strip()
     if branch.returncode != 0 or not branch_name:
         return False
-
     push = run("git", ["push", "origin", branch_name])
     print(push.stdout, end="")
     if push.returncode != 0:
         return False
-
-    print(json.dumps({
-        "type": "AUTONOMOUS_RESUME_GENERATION",
-        "status": "completed",
-        "action": "REWEAVE → VERIFY → COMMIT → PUSH → CONTINUE"
-    }, ensure_ascii=False))
+    print(json.dumps({"type": "AUTONOMOUS_RESUME_GENERATION", "status": "completed", "action": "REWEAVE → VERIFY → COMMIT → PUSH → CONTINUE"}, ensure_ascii=False))
     return True
 
 
@@ -239,29 +189,15 @@ def run_daemon(*, assistant_phase: bool) -> int:
     if not TSX.exists():
         print(f"ERROR: missing local tsx executable: {TSX}", file=sys.stderr)
         return 2
-
     env = os.environ.copy()
     env["HOOSHYAR_AGENT"] = "python"
     env["HOOSHYAR_AUTONOMOUS_DEADLINE_DAYS"] = "7"
     env["HOOSHYAR_BUILD_PHASE"] = "assistant" if assistant_phase else "platform"
     env["PYTHONIOENCODING"] = "utf-8"
     env["PYTHONUTF8"] = "1"
-
-    process = subprocess.Popen(
-        [str(TSX), str(DAEMON)],
-        cwd=ROOT,
-        env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        bufsize=1,
-    )
-
+    process = subprocess.Popen([str(TSX), str(DAEMON)], cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", bufsize=1)
     assert process.stdout is not None
     handoff_seen = False
-
     try:
         for line in process.stdout:
             print(line, end="")
@@ -273,17 +209,13 @@ def run_daemon(*, assistant_phase: bool) -> int:
     finally:
         if process.stdout is not None:
             process.stdout.close()
-
     if assistant_phase and handoff_seen:
         try:
             return_code = process.wait(timeout=10)
         except subprocess.TimeoutExpired:
             process.kill()
             return_code = process.wait(timeout=10)
-        if return_code not in (0, -15, 1, 130, 143):
-            return return_code
-        return 0
-
+        return 0 if return_code in (0, -15, 1, 130, 143) else return_code
     return_code = process.wait()
     if not assistant_phase and return_code != 0 and resume_interrupted_generation():
         return run_daemon(assistant_phase=False)
@@ -294,10 +226,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="HooshyarOS two-command autonomous builder")
     parser.add_argument("phase", choices=("assistant", "platform"))
     args = parser.parse_args()
-
-    if args.phase == "assistant":
-        return run_daemon(assistant_phase=True)
-    return run_daemon(assistant_phase=False)
+    return run_daemon(assistant_phase=args.phase == "assistant")
 
 
 if __name__ == "__main__":
