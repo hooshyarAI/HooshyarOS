@@ -32,8 +32,13 @@ def _class_name(target_engine: str) -> str:
 
 
 def _path_class_name(path: str, fallback: str) -> str:
-    name = Path(path).stem
-    return name or fallback
+    normalized = path.replace("\\", "/").rstrip("/")
+    name = Path(normalized).name
+    if name in {"index", "index.ts"}:
+        parent = Path(normalized).parent.name
+        return parent or fallback
+    stem = Path(normalized).stem
+    return stem or fallback
 
 
 def _list_field(prompt: str, name: str, separator: str = ",") -> tuple[str, ...]:
@@ -83,10 +88,7 @@ def spec_from_prompt(prompt: str) -> CapabilitySpec | None:
     declared = _required_artifact_paths(prompt)
     if declared:
         declared_engine_path, test_path, docs_path = declared
-        if _is_directory_artifact(declared_engine_path):
-            class_name = _path_class_name(declared_engine_path.rstrip("/"), class_name)
-        else:
-            class_name = _path_class_name(declared_engine_path, class_name)
+        class_name = _path_class_name(declared_engine_path, class_name)
         engine_path = _implementation_path(declared_engine_path)
 
     return CapabilitySpec(
