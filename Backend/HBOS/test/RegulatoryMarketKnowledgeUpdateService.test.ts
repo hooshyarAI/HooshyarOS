@@ -8,8 +8,13 @@ describe("RegulatoryMarketKnowledgeUpdateService", () => {
         expect(service.initialize().status).toBe("READY");
     });
 
-    it("keeps its deterministic minimal contract", () => {
-        expect(new RegulatoryMarketKnowledgeUpdateService().execute("continue").status).toBe("READY");
-        expect(new RegulatoryMarketKnowledgeUpdateService().execute(" ").status).toBe("BLOCKED");
+    it("normalizes governed regulatory knowledge evidence", () => {
+        const result = new RegulatoryMarketKnowledgeUpdateService().normalize("source=tax;version=2026;status=approved");
+        expect(result.status).toBe("READY");
+        expect(result.evidence).toBeDefined();
+    });
+
+    it("blocks empty evidence input", () => {
+        expect(new RegulatoryMarketKnowledgeUpdateService().normalize(" ").status).toBe("BLOCKED");
     });
 });

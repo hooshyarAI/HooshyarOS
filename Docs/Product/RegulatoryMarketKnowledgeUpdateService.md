@@ -4,10 +4,10 @@ Canonical product capability: `product.regulatory-standards-and-market-knowledge
 
 Target engine: Knowledge Engine
 
-Capability: maintain governed, versioned updates for Iranian accounting/tax/regulatory standards and authorized economic/market knowledge used by intelligence features
+Capability: repair commercial quality failure for product.regulatory-standards-and-market-knowledge-updates: maintain governed, versioned updates for Iranian accounting/tax/regulatory standards and authorized economic/market knowledge used by intelligence features
 
 Dependencies: Knowledge Engine, Governance Engine, Reasoning Engine
 
-The product artifact is intentionally kept outside the engine implementation boundary.
-The autonomous worker may enrich this contract only from repository architecture,
-tests, dependencies and durable product evidence.
+The product artifact exposes deterministic capability-shaped behavior derived from
+the declared product contract. Repair missions never alter the canonical product
+identity; they only repair and re-verify the same commercial artifact boundary.
