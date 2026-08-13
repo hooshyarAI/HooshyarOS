@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DAEMON = ROOT / "Backend" / "HBOS" / "Autonomous" / "Runtime" / "AutonomousBuildDaemon.ts"
 BUILDER = ROOT / "Backend" / "AI_Runtime" / "autonomous_builder.py"
 TSX = ROOT / "node_modules" / ".bin" / ("tsx.cmd" if os.name == "nt" else "tsx")
-HANDOFF_MARKER = '\"type\":\"AUTONOMOUS_PLATFORM_CONTINUATION\"'
+HANDOFF_MARKER = '"type":"AUTONOMOUS_PLATFORM_CONTINUATION"'
 ROADMAP = ROOT / "Docs" / "Product" / "PRODUCT_CONSTRUCTION_ROADMAP.json"
 
 MAX_SELF_HEAL_ATTEMPTS = 3
@@ -124,7 +124,24 @@ def _frontend_directory_import(implementation: str) -> str | None:
     normalized = implementation.replace("\\", "/").rstrip("/")
     if not normalized.startswith("Frontend/"):
         return None
+    if normalized.endswith("/index.ts"):
+        normalized = normalized[: -len("/index.ts")]
+    elif normalized.endswith("/index"):
+        normalized = normalized[: -len("/index")]
+    if not normalized:
+        return None
     return "../../../" + normalized
+
+
+def _frontend_product_symbol(implementation: str) -> str | None:
+    normalized = implementation.replace("\\", "/").rstrip("/")
+    if not normalized.startswith("Frontend/"):
+        return None
+    if normalized.endswith("/index.ts"):
+        return Path(normalized.split("/")[-2]).name
+    if normalized.endswith("/index"):
+        return Path(normalized.split("/")[-2]).name
+    return Path(normalized.split("/")[-1]).stem
 
 
 def _repair_generated_product_test(capability: dict) -> bool:
@@ -136,9 +153,9 @@ def _repair_generated_product_test(capability: dict) -> bool:
     if not test_path.exists() or not test_path.is_file():
         return False
     import_target = _frontend_directory_import(implementation)
-    if not import_target:
+    class_name = _frontend_product_symbol(implementation)
+    if not import_target or not class_name:
         return False
-    class_name = Path(implementation.rstrip("/")).name
     content = test_path.read_text(encoding="utf-8", errors="replace")
     import_pattern = re.compile(r'^import\s*\{[^}]+\}\s*from\s*"[^"]+";?$', re.MULTILINE)
     replacement = f'import {{ {class_name} }} from "{import_target}";'
