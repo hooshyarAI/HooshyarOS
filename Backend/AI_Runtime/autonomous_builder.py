@@ -340,12 +340,95 @@ test("PythonReasoningAdapter uses the repository-owned Python reasoning runtime"
     return [("Backend/HBOS/Assistant/Autonomous/PythonReasoningAdapter.ts", adapter), ("Backend/HBOS/test/PythonReasoningAdapter.test.ts", test)]
 
 
+def web_application_artifacts():
+    implementation = """export interface WebApplicationResult {
+    status: "READY" | "BLOCKED";
+    path: string;
+    routes: string[];
+}
+
+export class HooshyarWebApp {
+    readonly capabilityId = "product.web-application-shell";
+    readonly targetEngine = "Assistant Engine";
+
+    initialize(): { status: "READY" } {
+        return { status: "READY" };
+    }
+
+    navigation(): string[] {
+        return ["dashboard", "financial", "reports", "decisions", "alerts"]
+            .map(item => item.trim())
+            .filter(Boolean);
+    }
+
+    execute(path: string): WebApplicationResult {
+        const routes = this.navigation();
+        const normalized = path?.trim().toLowerCase() ?? "";
+        return {
+            status: routes.includes(normalized) ? "READY" : "BLOCKED",
+            path: normalized,
+            routes,
+        };
+    }
+}
+"""
+
+    test = """import { HooshyarWebApp } from "../../../Frontend/HooshyarWebApp";
+
+describe("HooshyarWebApp", () => {
+    it("exposes the canonical product boundary", () => {
+        const app = new HooshyarWebApp();
+        expect(app.capabilityId).toBe("product.web-application-shell");
+        expect(app.targetEngine).toBe("Assistant Engine");
+        expect(app.initialize().status).toBe("READY");
+    });
+
+    it("builds a deterministic commercial navigation surface", () => {
+        expect(new HooshyarWebApp().navigation()).toEqual([
+            "dashboard",
+            "financial",
+            "reports",
+            "decisions",
+            "alerts",
+        ]);
+    });
+
+    it("accepts supported routes and rejects unknown routes", () => {
+        const app = new HooshyarWebApp();
+        expect(app.execute(" dashboard ")).toMatchObject({
+            status: "READY",
+            path: "dashboard",
+        });
+        expect(app.execute("unknown").status).toBe("BLOCKED");
+    });
+});
+"""
+
+    docs = """# Hooshyar Web Application
+
+Canonical commercial capability: `product.web-application-shell`.
+
+Target engine: Assistant Engine.
+
+The application shell owns the browser/mobile application boundary. It exposes a
+stable deterministic navigation surface and validates supported application routes
+before authenticated runtime/API operations execute.
+"""
+
+    return [
+        ("Frontend/HooshyarWebApp/index.ts", implementation),
+        ("Backend/HBOS/test/HooshyarWebApplication.test.ts", test),
+        ("Docs/Product/HooshyarWebApplication.md", docs),
+    ]
+
+
 CAPABILITIES = {
     **{key: platform_artifacts(key) for key in PLATFORM_CAPABILITIES},
     "engine.reasoning.canonical": reasoning_artifacts(),
     "engine.organizational.canonical": organizational_artifacts(),
     "engine.autonomous-operations.canonical": autonomous_operations_artifacts(),
     "runtime.reasoning.bridge": reasoning_bridge_artifacts(),
+    "product.web-application-shell": web_application_artifacts(),
 }
 
 CAPABILITY_DEPENDENCIES = {
