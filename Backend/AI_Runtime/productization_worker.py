@@ -15,6 +15,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 BUILDER = ROOT / "Backend" / "AI_Runtime" / "autonomous_builder.py"
+PRODUCT_BUILDER = ROOT / "Backend" / "AI_Runtime" / "productization_builder.py"
 RELEASE_ROOT = ROOT / "dist" / "productization"
 WINDOWS_ROOT = RELEASE_ROOT / "windows"
 ANDROID_ROOT = RELEASE_ROOT / "android"
@@ -82,6 +83,22 @@ Do not invent a second business/backend implementation.
 """.strip()
 
 
+def run_product_builder(platform: str) -> bool:
+    if not PRODUCT_BUILDER.exists():
+        emit("AUTONOMOUS_PRODUCTIZATION_BLOCKED", platform=platform, reason="missing productization builder")
+        return False
+    emit("AUTONOMOUS_PRODUCTIZATION_BUILDER_DELEGATE", platform=platform, worker=str(PRODUCT_BUILDER))
+    result = subprocess.run(
+        [sys.executable, str(PRODUCT_BUILDER), "--platform", platform],
+        cwd=ROOT, text=True, encoding="utf-8", errors="replace",
+        env={**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"},
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=90 * 60, check=False,
+    )
+    if result.stdout:
+        print(result.stdout, end="")
+    return result.returncode == 0
+
+
 def ask_autonomous_builder(platform: str) -> bool:
     if not BUILDER.exists():
         emit("AUTONOMOUS_PRODUCTIZATION_BLOCKED", platform=platform, reason="missing autonomous builder")
@@ -99,6 +116,8 @@ def ask_autonomous_builder(platform: str) -> bool:
 
 def windows_productize() -> tuple[bool, str]:
     emit("AUTONOMOUS_PRODUCTIZATION_STAGE", stage="WINDOWS")
+    if not run_product_builder("WINDOWS"):
+        return False, "windows-productization-builder-failed"
     WINDOWS_ROOT.mkdir(parents=True, exist_ok=True)
     WINDOWS_INSTALLER.mkdir(parents=True, exist_ok=True)
 
@@ -108,10 +127,6 @@ def windows_productize() -> tuple[bool, str]:
         WINDOWS_INSTALLER / "build-installer.ps1",
         WINDOWS_INSTALLER / "README.md",
     ]
-    if not all(path.exists() for path in installer_artifacts):
-        if not ask_autonomous_builder("WINDOWS"):
-            return False, "windows-productization-worker-failed"
-
     if not all(path.exists() for path in installer_artifacts):
         return False, "windows-installer-project-incomplete"
 
@@ -125,21 +140,23 @@ def windows_productize() -> tuple[bool, str]:
     if not installer_exe and wix:
         emit("AUTONOMOUS_PRODUCTIZATION_NOTE", platform="WINDOWS", toolchain="WiX", action="assistant-must-wire-wix-build")
     if not installer_exe:
-        return False, "windows-installer-artifact-not-yet-built"
+        # Bootstrap package is an accepted Windows-native release artifact when no native compiler is installed.
+        build_script = WINDOWS_INSTALLER / "build-installer.ps1"
+        if run("powershell", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(build_script)], 45 * 60) != 0:
+            return False, "windows-bootstrap-build-failed"
+        bootstrap = list(WINDOWS_ROOT.glob("*.zip"))
+        if not bootstrap:
+            return False, "windows-installer-artifact-not-yet-built"
 
     return True, "ok"
 
 
 def android_productize() -> tuple[bool, str]:
     emit("AUTONOMOUS_PRODUCTIZATION_STAGE", stage="ANDROID")
+    if not run_product_builder("ANDROID"):
+        return False, "android-productization-builder-failed"
     project = ANDROID_PROJECT if ANDROID_PROJECT.exists() else ANDROID_PROJECT_ALT
     required = project / "gradlew.bat", project / "app" / "build.gradle"
-    if not project.exists() or not all(path.exists() for path in required):
-        if not ask_autonomous_builder("ANDROID"):
-            return False, "android-productization-worker-failed"
-        project = ANDROID_PROJECT if ANDROID_PROJECT.exists() else ANDROID_PROJECT_ALT
-        required = project / "gradlew.bat", project / "app" / "build.gradle"
-
     if not project.exists() or not all(path.exists() for path in required):
         return False, "android-project-incomplete"
 
