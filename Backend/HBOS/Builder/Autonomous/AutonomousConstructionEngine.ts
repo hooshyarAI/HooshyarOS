@@ -87,12 +87,29 @@ export class AutonomousConstructionEngine {
         while (!verification.ok && attempt < this.maxRepairAttempts) {
             attempt += 1;
             trace.push("REPAIR");
+            const verificationEvidence = this.recordArtifact(verification.artifact);
+            const verificationFailure = {
+                issue: verification.issue || "VERIFY_FAILED",
+                output: verificationEvidence?.output,
+                issues: verificationEvidence?.issues,
+                testsPassed: verificationEvidence?.testsPassed,
+                jestVerified: verificationEvidence?.jestVerified,
+                behavioralEvidenceVerified: verificationEvidence?.behavioralEvidenceVerified,
+                integrationVerified: verificationEvidence?.integrationVerified,
+                cleanRepository: verificationEvidence?.cleanRepository,
+                unexpectedPaths: verificationEvidence?.unexpectedPaths
+            };
             artifacts.REPAIR_PLAN = this.repairEngine.createPlan(
-                verification.issue || "VERIFY_FAILED",
-                JSON.stringify(verification)
+                verificationFailure.issue,
+                JSON.stringify(verificationFailure)
             );
+            artifacts.REPAIR_EVIDENCE = verificationFailure;
 
-            const repair = this.execute("REPAIR", plan, attempt, artifacts, issues);
+            const repairPlan: ArchitecturePlan = {
+                ...plan,
+                capability: `${plan.capability}\n\nREPAIR EVIDENCE FROM PREVIOUS VERIFY (AUTHORITATIVE):\n${JSON.stringify(verificationFailure, null, 2)}`
+            };
+            const repair = this.execute("REPAIR", repairPlan, attempt, artifacts, issues);
             if (repair.artifact !== undefined) artifacts.REPAIR = repair.artifact;
             if (!repair.ok) {
                 issues.push(repair.issue || "REPAIR_FAILED");
