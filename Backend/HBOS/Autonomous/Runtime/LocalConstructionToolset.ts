@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, normalize } from "node:path";
 import { ConstructionContext, ConstructionTool } from "../../Builder/Autonomous/AutonomousConstructionEngine";
 import { ensurePytest } from "./PythonVerificationBootstrap";
+import { CommercialArtifactQualityAudit } from "./CommercialArtifactQualityAudit";
 
 function run(command: string, args: string[], cwd: string, timeout = 15 * 60 * 1000) {
     const started = Date.now();
@@ -75,14 +76,10 @@ function focusedTestFor(capabilityId: string, root = process.cwd()): string | nu
     const roadmapPath = join(root, "Docs", "Product", "PRODUCT_CONSTRUCTION_ROADMAP.json");
     if (existsSync(roadmapPath)) {
         try {
-            const roadmap = JSON.parse(readFileSync(roadmapPath, "utf8")) as {
-                capabilities?: Array<{ capabilityId?: string; testPath?: string }>
-            };
+            const roadmap = JSON.parse(readFileSync(roadmapPath, "utf8")) as { capabilities?: Array<{ capabilityId?: string; testPath?: string }> };
             const capability = roadmap.capabilities?.find(item => item.capabilityId === canonicalCapabilityId);
             if (capability?.testPath) return capability.testPath;
-        } catch {
-            // Fall back to the static map below when roadmap parsing is unavailable.
-        }
+        } catch {}
     }
     const known: Record<string, string> = {
         "platform.user-management": "Backend/HBOS/test/UserManagementEngine.test.ts",
@@ -113,7 +110,7 @@ function focusedTestFor(capabilityId: string, root = process.cwd()): string | nu
 export function productRoadmapPaths(root: string, capabilityId: string): string[] {
     const roadmapPath = join(root, "Docs", "Product", "PRODUCT_CONSTRUCTION_ROADMAP.json");
     if (!existsSync(roadmapPath)) return [];
-    const canonicalCapabilityId = capabilityId.startsWith("repair-") ? capabilityId.slice("repair-".length) : capabilityId;
+    const canonicalCapabilityId = capabilityId.replace(/^(repair-)+/, "");
     try {
         const roadmap = JSON.parse(readFileSync(roadmapPath, "utf8")) as { capabilities?: Array<{ capabilityId?: string; implementationPath?: string; testPath?: string; documentationPath?: string }> };
         const capability = roadmap.capabilities?.find(item => item.capabilityId === canonicalCapabilityId);
@@ -136,6 +133,27 @@ export function declaredArtifactPaths(root: string, capabilityId: string, target
 
 function relativeStatusPaths(statusOutput: string, root: string): string[] {
     return statusOutput.split(/\r?\n/).map(line => line.slice(3).trim()).filter(Boolean).map(path => normalize(join(root, path)));
+}
+
+export function evaluateBehavioralEvidence(root: string, capabilityId: string, jestPassed: boolean, jestOutput: string): { verified: boolean; source: "commercial-artifact-quality" | "test-output"; failures: string[] } {
+    const canonicalCapabilityId = capabilityId.replace(/^(repair-)+/, "");
+    if (canonicalCapabilityId.startsWith("product.")) {
+        const paths = productRoadmapPaths(root, canonicalCapabilityId);
+        if (paths.length >= 2) {
+            const quality = new CommercialArtifactQualityAudit().auditCapability(
+                root,
+                canonicalCapabilityId,
+                paths[0].slice(root.length + 1),
+                paths[1].slice(root.length + 1)
+            );
+            return { verified: jestPassed && quality.complete, source: "commercial-artifact-quality", failures: quality.failures };
+        }
+    }
+    return {
+        verified: jestPassed && /(?:behavior|analy|calculat|evaluat|assess|transform|ingest|persist|authorize|decision|kpi|financial|variance|evidence|ready)/i.test(jestOutput),
+        source: "test-output",
+        failures: []
+    };
 }
 
 function buildAgentPrompt(context: ConstructionContext): string {
@@ -228,11 +246,11 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                 const unexpectedPaths = changedPaths.filter(path => !declared.includes(path));
                 const allowedChangesOnly = unexpectedPaths.length === 0;
                 const verificationTouchesDeclaredArtifact = declared.some(path => existsSync(path));
-                const behavioralEvidenceVerified = verificationTouchesDeclaredArtifact && jest.code === 0 && /(?:behavior|analy|calculat|evaluat|assess|transform|ingest|persist|authorize|decision|kpi|financial|variance|evidence|ready)/i.test(jest.output);
+                const behavioral = evaluateBehavioralEvidence(root, context.plan.capabilityId, jest.code === 0, jest.output);
                 const integrationVerified = jest.code === 0 && (fullVerify || Boolean(focused));
-                const artifact = { type: "AUTONOMOUS_VERIFY_RESULT", verificationMode: fullVerify ? "full" : focused ? "focused" : "syntax+autonomous-tests", focusedTest: focused, fullVerify, fullVerifyEvery: FULL_VERIFY_EVERY, builderTestsRun: runBuilderTests, builderTestEvery: BUILDER_TEST_EVERY, builderTestsRequired, syntaxVerified: true, pytestBootstrapped: bootstrap.installed, builderTestsVerified: !runBuilderTests || builderTests.code === 0, jestVerified: jest.code === 0, testsPassed: jest.code === 0 && (!runBuilderTests || builderTests.code === 0), behavioralEvidenceVerified, integrationVerified, cleanRepository: allowedChangesOnly, unexpectedPaths, verificationTouchesDeclaredArtifact, syntaxElapsedMs: syntax.elapsedMs, builderTestsElapsedMs: builderTests.elapsedMs, jestElapsedMs: jest.elapsedMs, totalVerifyElapsedMs: syntax.elapsedMs + builderTests.elapsedMs + jest.elapsedMs, timestamp: new Date().toISOString(), output: `${syntax.output}\n${bootstrap.output}\n${builderTests.output}\n${jest.output}`, error: jest.error };
+                const artifact = { type: "AUTONOMOUS_VERIFY_RESULT", verificationMode: fullVerify ? "full" : focused ? "focused" : "syntax+autonomous-tests", focusedTest: focused, fullVerify, fullVerifyEvery: FULL_VERIFY_EVERY, builderTestsRun: runBuilderTests, builderTestEvery: BUILDER_TEST_EVERY, builderTestsRequired, syntaxVerified: true, pytestBootstrapped: bootstrap.installed, builderTestsVerified: !runBuilderTests || builderTests.code === 0, jestVerified: jest.code === 0, testsPassed: jest.code === 0 && (!runBuilderTests || builderTests.code === 0), behavioralEvidenceVerified: behavioral.verified, behavioralEvidenceSource: behavioral.source, behavioralEvidenceFailures: behavioral.failures, integrationVerified, cleanRepository: allowedChangesOnly, unexpectedPaths, verificationTouchesDeclaredArtifact, syntaxElapsedMs: syntax.elapsedMs, builderTestsElapsedMs: builderTests.elapsedMs, jestElapsedMs: jest.elapsedMs, totalVerifyElapsedMs: syntax.elapsedMs + builderTests.elapsedMs + jest.elapsedMs, timestamp: new Date().toISOString(), output: `${syntax.output}\n${bootstrap.output}\n${builderTests.output}\n${jest.output}`, error: jest.error };
                 console.log(JSON.stringify(artifact, null, 2));
-                return artifact.testsPassed && behavioralEvidenceVerified && integrationVerified && allowedChangesOnly
+                return artifact.testsPassed && artifact.behavioralEvidenceVerified && integrationVerified && allowedChangesOnly
                     ? { ok: true, artifact }
                     : { ok: false, issue: "AUTONOMOUS_VERIFY_FAILED", artifact: { ...artifact, repairRequired: true } };
             }
