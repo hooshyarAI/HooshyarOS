@@ -121,7 +121,16 @@ def main() -> int:
     run(["git", "status", "--short"])
 
     run(["git", "add", "Frontend/HooshyarWebApp/index.ts", "Backend/HBOS/test/HooshyarWebApplication.test.ts", "Docs/Product/HooshyarWebApplication.md"])
-    run(["git", "commit", "-m", "fix(commercial): repair web application shell behavioral contract"])
+
+    status = subprocess.run(
+        ["git", "diff", "--cached", "--quiet"],
+        cwd=ROOT,
+        check=False,
+    )
+    if status.returncode != 0:
+        run(["git", "commit", "-m", "fix(commercial): repair web application shell behavioral contract"])
+    else:
+        print("No new commercial web changes to commit; existing verified commit is retained.")
 
     branch = subprocess.check_output(["git", "branch", "--show-current"], cwd=ROOT, text=True).strip()
     if not branch:
