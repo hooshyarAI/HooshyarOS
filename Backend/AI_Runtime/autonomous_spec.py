@@ -51,11 +51,21 @@ def _list_field(prompt: str, name: str, separator: str = ",") -> tuple[str, ...]
     return tuple(item.strip() for item in value.split(separator) if item.strip())
 
 
+def _normalize_declared_path(path: str) -> str:
+    normalized = path.strip().replace("\\", "/")
+    normalized = re.sub(r"^[A-Za-z]:/HooshyarOS/", "", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"^/HooshyarOS/", "", normalized, flags=re.IGNORECASE)
+    marker_match = re.search(r"(?:^|/)((?:Frontend|Backend|Docs)(?:/.*)?)$", normalized, re.IGNORECASE)
+    if marker_match:
+        return marker_match.group(1)
+    return normalized
+
+
 def _required_artifact_paths(prompt: str) -> tuple[str, str, str] | None:
     match = re.search(r"^Required artifact paths:\s*(.+)$", prompt, re.MULTILINE)
     if not match:
         return None
-    values = tuple(item.strip() for item in match.group(1).split(";") if item.strip())
+    values = tuple(_normalize_declared_path(item) for item in match.group(1).split(";") if item.strip())
     if len(values) != 3:
         return None
     return values[0], values[1], values[2]
