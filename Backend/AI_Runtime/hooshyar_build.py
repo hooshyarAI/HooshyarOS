@@ -20,7 +20,6 @@ ROADMAP = ROOT / "Docs" / "Product" / "PRODUCT_CONSTRUCTION_ROADMAP.json"
 SUPERVISOR = ROOT / "Backend" / "AI_Runtime" / "autonomous_commercial_supervisor.py"
 
 MAX_SELF_HEAL_ATTEMPTS = 5
-MAX_PARENT_RECOVERY_HANDOFFS = 5
 
 
 def run(command: str, args: list[str], timeout: int = 30 * 60) -> subprocess.CompletedProcess[str]:
@@ -403,17 +402,18 @@ def run_daemon(*, assistant_phase: bool) -> int:
             except ValueError:
                 handoff_depth = 0
 
-            if handoff_depth < MAX_PARENT_RECOVERY_HANDOFFS:
+            if handoff_depth == 0:
                 print(
                     json.dumps(
                         {
                             "type": "AUTONOMOUS_PARENT_HANDOFF",
                             "parentController": "Backend\\AI_Runtime\\hooshyar_build.py",
-                            "action": "RETURN_TO_ASSISTANT ? CONTINUE_PLATFORM",
-                            "handoffDepth": handoff_depth + 1,
-                            "maxHandoffDepth": MAX_PARENT_RECOVERY_HANDOFFS,
+                            "action": "RECOVERY_VERIFIED ? SINGLE_CONTINUATION",
+                            "handoffDepth": 1,
+                            "maxHandoffDepth": 1,
                             "independentCapabilitySelection": False,
                             "independentArchitectureAuthority": False,
+                            "fullVerificationRequired": True,
                         },
                         ensure_ascii=False,
                     ),
@@ -421,7 +421,8 @@ def run_daemon(*, assistant_phase: bool) -> int:
                 )
 
                 env = os.environ.copy()
-                env["HOOSHYAR_PARENT_RECOVERY_HANDOFF_DEPTH"] = str(handoff_depth + 1)
+                env["HOOSHYAR_PARENT_RECOVERY_HANDOFF_DEPTH"] = "1"
+                env["HOOSHYAR_FULL_VERIFY"] = "1"
                 env["HOOSHYAR_CONSTRUCTION_PARENT"] = "assistant"
                 env["HOOSHYAR_SUPERVISOR_ROLE"] = "subordinate-recovery-and-verification"
                 env["HOOSHYAR_AGENT"] = "python"
@@ -439,6 +440,18 @@ def run_daemon(*, assistant_phase: bool) -> int:
                 )
                 return continuation.returncode
 
+        print(
+            json.dumps(
+                {
+                    "type": "AUTONOMOUS_RECOVERY_TERMINAL",
+                    "recoveryCode": recovery_code,
+                    "reason": "single bounded continuation already consumed or recovery failed",
+                    "returnToAssistant": True,
+                },
+                ensure_ascii=False,
+            ),
+            flush=True,
+        )
         return recovery_code
     if not assistant_phase and return_code != 0 and not autonomous_blocked_seen and resume_interrupted_generation():
         return run_daemon(assistant_phase=False)
