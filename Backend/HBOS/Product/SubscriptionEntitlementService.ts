@@ -7,6 +7,13 @@ export type CommercialPlanId =
 
 export type BillingPeriod = "monthly" | "quarterly" | "annual";
 
+export type OrganizationCategory =
+    | "commercial"
+    | "school"
+    | "charity"
+    | "civil-society-nonprofit"
+    | "public-benefit-nonprofit";
+
 export interface CommercialPlan {
     id: CommercialPlanId;
     audience: string;
@@ -14,6 +21,13 @@ export interface CommercialPlan {
     variableUsageBilling: false;
     fullTrialDays: 30;
     pricingSource: "managed-commercial-price-catalog";
+}
+
+export interface ProductEntitlement {
+    status: "FREE" | "TRIAL" | "PAID" | "BLOCKED";
+    planId?: CommercialPlanId;
+    perpetual: boolean;
+    reason: string;
 }
 
 export interface ProductEvidenceResult {
@@ -27,6 +41,7 @@ export class SubscriptionEntitlementService {
     readonly trialDays = 30;
     readonly pricingModel = "FIXED_TIER_SUBSCRIPTION" as const;
     readonly variableUsageBilling = false as const;
+    readonly perpetualNonprofitAccess = true as const;
 
     private readonly plans: Record<CommercialPlanId, CommercialPlan> = {
         starter: {
@@ -81,6 +96,51 @@ export class SubscriptionEntitlementService {
 
     listPlans(): CommercialPlan[] {
         return Object.values(this.plans);
+    }
+
+    resolveEntitlement(input: {
+        organizationCategory: OrganizationCategory;
+        planId?: CommercialPlanId;
+        trialActive?: boolean;
+    }): ProductEntitlement {
+        const nonprofit = [
+            "school",
+            "charity",
+            "civil-society-nonprofit",
+            "public-benefit-nonprofit",
+        ].includes(input.organizationCategory);
+
+        if (nonprofit) {
+            return {
+                status: "FREE",
+                perpetual: true,
+                reason: "eligible educational, charitable or nonprofit public-benefit organization",
+            };
+        }
+
+        if (input.trialActive) {
+            return {
+                status: "TRIAL",
+                planId: input.planId ?? "starter",
+                perpetual: false,
+                reason: "30-day full product trial",
+            };
+        }
+
+        if (input.planId) {
+            return {
+                status: "PAID",
+                planId: input.planId,
+                perpetual: false,
+                reason: "fixed-tier subscription",
+            };
+        }
+
+        return {
+            status: "BLOCKED",
+            perpetual: false,
+            reason: "no active trial or subscription plan",
+        };
     }
 
     authorize(input: string): ProductEvidenceResult {
