@@ -16,6 +16,7 @@ TSX = ROOT / "node_modules" / ".bin" / ("tsx.cmd" if os.name == "nt" else "tsx")
 HANDOFF_MARKER = '"type":"AUTONOMOUS_PLATFORM_CONTINUATION"'
 BLOCKED_MARKER = '"type":"AUTONOMOUS_BLOCKED"'
 ROADMAP = ROOT / "Docs" / "Product" / "PRODUCT_CONSTRUCTION_ROADMAP.json"
+SUPERVISOR = ROOT / "Backend" / "AI_Runtime" / "autonomous_commercial_supervisor.py"
 
 MAX_SELF_HEAL_ATTEMPTS = 5
 
@@ -309,6 +310,36 @@ def resume_interrupted_generation() -> bool:
     return True
 
 
+def run_supervisor_recovery(failure_output: str) -> int:
+    if not SUPERVISOR.exists():
+        return 2
+
+    failure_file = ROOT / ".hooshyar_autonomous_failure.txt"
+    failure_file.write_text(failure_output, encoding="utf-8")
+
+    env = os.environ.copy()
+    env["PYTHONUTF8"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"
+    env["HOOSHYAR_CONSTRUCTION_PARENT"] = "assistant"
+    env["HOOSHYAR_SUPERVISOR_ROLE"] = "subordinate-recovery-and-verification"
+    env["HOOSHYAR_AGENT"] = "python"
+
+    result = subprocess.run(
+        [sys.executable, str(SUPERVISOR), "--failure-file", str(failure_file)],
+        cwd=ROOT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        timeout=90 * 60,
+        check=False,
+        env=env,
+    )
+    print(result.stdout, end="")
+    return result.returncode
+
+
 def run_daemon(*, assistant_phase: bool) -> int:
     if not DAEMON.exists():
         print(f"ERROR: missing autonomous daemon: {DAEMON}", file=sys.stderr)
@@ -326,8 +357,10 @@ def run_daemon(*, assistant_phase: bool) -> int:
     assert process.stdout is not None
     handoff_seen = False
     autonomous_blocked_seen = False
+    captured_lines: list[str] = []
     try:
         for line in process.stdout:
+            captured_lines.append(line)
             print(line, end="")
             if BLOCKED_MARKER in line:
                 autonomous_blocked_seen = True
@@ -347,6 +380,11 @@ def run_daemon(*, assistant_phase: bool) -> int:
             return_code = process.wait(timeout=10)
         return 0 if return_code in (0, -15, 1, 130, 143) else return_code
     return_code = process.wait()
+    if not assistant_phase and autonomous_blocked_seen:
+        recovery_code = run_supervisor_recovery("".join(captured_lines))
+        if recovery_code == 0:
+            return run_daemon(assistant_phase=False)
+        return recovery_code
     if not assistant_phase and return_code != 0 and not autonomous_blocked_seen and resume_interrupted_generation():
         return run_daemon(assistant_phase=False)
     return return_code
