@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="description" content="هوشیار.ai — داشبورد هوشمند مالی و مدیریتی" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="stylesheet" href="/styles.css" />
+  <title>هوشیار.ai</title>
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Hooshyar.ai</p>
+        <h1>مرکز هوشمندی مالی و مدیریتی</h1>
+        <p class="subtitle">از داده مالی معتبر تا داشبورد، بینش و تصمیم قابل اجرا.</p>
+      </div>
+      <a class="primary" href="#workspace">شروع کار</a>
+    </header>
+
+    <section id="workspace" class="grid">
+      <article class="card">
+        <h2>وضعیت سامانه</h2>
+        <p id="readiness">در حال بررسی...</p>
+      </article>
+      <article class="card">
+        <h2>داشبورد مالی</h2>
+        <div class="metrics">
+          <div><span>درآمد</span><strong id="revenue">—</strong></div>
+          <div><span>سود</span><strong id="profit">—</strong></div>
+          <div><span>ریسک هزینه</span><strong id="risk">—</strong></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="card onboarding">
+      <h2>ورود به مسیر ارزش</h2>
+      <form id="session-form">
+        <label>نام کاربری<input id="username" value="مدیرعامل" required /></label>
+        <label>سازمان<input id="organization" value="تست هوشیار" required /></label>
+        <button class="primary" type="submit">ایجاد نشست</button>
+      </form>
+      <p id="session-result" class="result" aria-live="polite"></p>
+    </section>
+  </main>
+  <script src="/app.js" defer></script>
+</body>
+</html>
