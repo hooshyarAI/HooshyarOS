@@ -52,14 +52,17 @@ export class AutonomousKnotRecovery {
         }
 
         const cluster = this.failureAnalysis.selectNext(observation.failures ?? []);
-        const repairCapabilityId = cluster?.repairCapabilityId ?? `repair-${canonicalCapabilityId(checkpoint.capabilityId)}`;
+        const parentCapabilityId = canonicalCapabilityId(checkpoint.capabilityId);
+        const repairCapabilityId = `repair-${parentCapabilityId}`;
+        const clusterReason = cluster
+            ? `root cause selected=${cluster.rootCause}; repair evidence must address that cluster before re-verification`
+            : "no known root cause was classified, so the canonical knot repair remains the safe fallback";
+
         return {
             recover: true,
             action: "REPAIR",
             checkpoint,
-            rationale: cluster
-                ? `current knot is not trusted; root cause selected=${cluster.rootCause}; repair evidence must address that cluster before re-verification`
-                : "current knot is not trusted; no known root cause was classified, so the canonical knot repair remains the safe fallback",
+            rationale: `current knot is not trusted; ${clusterReason}; repair owner remains the original canonical knot`,
             repairCapabilityId,
             repairCluster: cluster ?? undefined,
             repairEvidence: cluster?.evidence ?? observation.failures ?? [],
