@@ -1,14 +1,19 @@
-export interface ProductCapabilityResult { status: "READY" | "BLOCKED"; }
+import { Engine } from "../Core/Engine";
 
-export class OrganizationalExecutionCoordinator {
-    readonly capabilityId = "product.organizational-execution";
-    readonly targetEngine = "Organizational Intelligence Engine";
+export class OrganizationalExecutionCoordinator implements Engine {
+    name = "OrganizationalExecutionCoordinator";
 
-    initialize(): { status: "READY" } {
-        return { status: "READY" };
+    initialize(): void {}
+
+    health(): boolean {
+        return true;
     }
 
-    execute(input: string): ProductCapabilityResult {
-        return { status: input && input.trim() ? "READY" : "BLOCKED" };
+    describeCapability(): { id: string; capability: string; targetEngine: string } {
+        return {
+            id: "repair-product.organizational-execution",
+            capability: "repair commercial quality failure for product.organizational-execution: turn approved managerial decisions into governed workflows, assigned work and outcome evidence",
+            targetEngine: "Organizational Intelligence Engine"
+        };
     }
 }
