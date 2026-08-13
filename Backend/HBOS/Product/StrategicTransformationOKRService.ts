@@ -1,4 +1,7 @@
-export interface ProductCapabilityResult { status: "READY" | "BLOCKED"; }
+export interface ProductEvidenceResult {
+    status: "READY" | "BLOCKED";
+    evidence: string[];
+}
 
 export class StrategicTransformationOKRService {
     readonly capabilityId = "product.goal-okr-transformation";
@@ -8,7 +11,11 @@ export class StrategicTransformationOKRService {
         return { status: "READY" };
     }
 
-    execute(input: string): ProductCapabilityResult {
-        return { status: input && input.trim() ? "READY" : "BLOCKED" };
+    transform(input: string): ProductEvidenceResult {
+        const normalized = input?.trim() ?? "";
+        if (!normalized) return { status: "BLOCKED", evidence: [] };
+        const evidence = normalized.split("->").map(item => item.trim()).filter(Boolean);
+        const complete = evidence.length >= 3;
+        return { status: complete ? "READY" : "BLOCKED", evidence };
     }
 }
