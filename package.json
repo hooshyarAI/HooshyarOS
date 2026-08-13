@@ -5,6 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "node ./node_modules/jest/bin/jest.js",
+    "build": "tsc --noEmit",
+    "start": "tsx Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts",
+    "serve": "tsx Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts",
     "autonomous:build": "tsx Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts",
     "autonomous:assistant": "python Backend/AI_Runtime/hooshyar_build.py assistant",
     "autonomous:platform": "python Backend/AI_Runtime/hooshyar_build.py platform"

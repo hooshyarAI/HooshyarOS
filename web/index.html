@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="fa">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Hooshyar.ai</title>
+  <style>body{font-family:system-ui,sans-serif;margin:0;padding:2rem;max-width:760px}main{display:grid;gap:1rem}.card{padding:1rem;border:1px solid #ddd;border-radius:12px}</style>
+</head>
+<body>
+<main>
+  <h1>هوشیار.ai</h1>
+  <p>Financial &amp; Management Intelligence</p>
+  <section class="card"><strong id="ready">در حال بررسی وضعیت سامانه…</strong></section>
+  <section class="card"><strong>مسیر MVP تجاری</strong><p>سازمان → داده → داشبورد → گزارش → تصمیم → اجرا</p></section>
+</main>
+<script>
+fetch('/api/ready').then(r=>r.json()).then(x=>document.getElementById('ready').textContent=x.status==='READY'?'سامانه آماده است':'سامانه نیاز به بررسی دارد').catch(()=>document.getElementById('ready').textContent='سامانه در دسترس نیست');
+</script>
+</body>
+</html>
