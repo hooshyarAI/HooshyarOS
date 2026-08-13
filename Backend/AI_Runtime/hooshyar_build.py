@@ -7,6 +7,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -314,30 +315,42 @@ def run_supervisor_recovery(failure_output: str) -> int:
     if not SUPERVISOR.exists():
         return 2
 
-    failure_file = ROOT / ".hooshyar_autonomous_failure.txt"
-    failure_file.write_text(failure_output, encoding="utf-8")
-
-    env = os.environ.copy()
-    env["PYTHONUTF8"] = "1"
-    env["PYTHONIOENCODING"] = "utf-8"
-    env["HOOSHYAR_CONSTRUCTION_PARENT"] = "assistant"
-    env["HOOSHYAR_SUPERVISOR_ROLE"] = "subordinate-recovery-and-verification"
-    env["HOOSHYAR_AGENT"] = "python"
-
-    result = subprocess.run(
-        [sys.executable, str(SUPERVISOR), "--failure-file", str(failure_file)],
-        cwd=ROOT,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        timeout=90 * 60,
-        check=False,
-        env=env,
+    fd, failure_path = tempfile.mkstemp(
+        prefix="hooshyar-autonomous-failure-",
+        suffix=".txt",
     )
-    print(result.stdout, end="")
-    return result.returncode
+    os.close(fd)
+    failure_file = Path(failure_path)
+
+    try:
+        failure_file.write_text(failure_output, encoding="utf-8")
+
+        env = os.environ.copy()
+        env["PYTHONUTF8"] = "1"
+        env["PYTHONIOENCODING"] = "utf-8"
+        env["HOOSHYAR_CONSTRUCTION_PARENT"] = "assistant"
+        env["HOOSHYAR_SUPERVISOR_ROLE"] = "subordinate-recovery-and-verification"
+        env["HOOSHYAR_AGENT"] = "python"
+
+        result = subprocess.run(
+            [sys.executable, str(SUPERVISOR), "--failure-file", str(failure_file)],
+            cwd=ROOT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=90 * 60,
+            check=False,
+            env=env,
+        )
+        print(result.stdout, end="")
+        return result.returncode
+    finally:
+        try:
+            failure_file.unlink()
+        except FileNotFoundError:
+            pass
 
 
 def run_daemon(*, assistant_phase: bool) -> int:
