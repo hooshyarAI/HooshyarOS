@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 export interface CommercialArtifactQualityResult {
@@ -50,8 +50,17 @@ export class CommercialArtifactQualityAudit {
                 continue;
             }
 
-            const source = readFileSync(implementationFile, "utf8");
-            const test = readFileSync(testFile, "utf8");
+            const source = this.readArtifactSource(implementationFile);
+            const test = this.readArtifactSource(testFile);
+            if (source === null) {
+                failures.push(`${capability.capabilityId ?? implementationPath}:implementation-not-file`);
+                continue;
+            }
+            if (test === null) {
+                failures.push(`${capability.capabilityId ?? implementationPath}:test-not-file`);
+                continue;
+            }
+
             const normalized = source.replace(/\s+/g, " ").trim();
             const normalizedTest = test.replace(/\s+/g, " ").trim();
 
@@ -75,11 +84,26 @@ export class CommercialArtifactQualityAudit {
         if (!existsSync(testFile)) failures.push(`${capabilityId}:test-missing`);
         if (failures.length > 0) return { complete: false, checked, failures };
 
-        const source = readFileSync(implementationFile, "utf8").replace(/\s+/g, " ").trim();
-        const test = readFileSync(testFile, "utf8").replace(/\s+/g, " ").trim();
-        if (this.isTrivialProductScaffold(source)) failures.push(`${capabilityId}:trivial-scaffold`);
-        if (this.isContractOnlyTest(test)) failures.push(`${capabilityId}:contract-only-test`);
+        const source = this.readArtifactSource(implementationFile);
+        const test = this.readArtifactSource(testFile);
+        if (source === null) failures.push(`${capabilityId}:implementation-not-file`);
+        if (test === null) failures.push(`${capabilityId}:test-not-file`);
+        if (failures.length > 0) return { complete: false, checked, failures };
+
+        const normalized = source.replace(/\s+/g, " ").trim();
+        const normalizedTest = test.replace(/\s+/g, " ").trim();
+        if (this.isTrivialProductScaffold(normalized)) failures.push(`${capabilityId}:trivial-scaffold`);
+        if (this.isContractOnlyTest(normalizedTest)) failures.push(`${capabilityId}:contract-only-test`);
         return { complete: failures.length === 0, checked, failures };
+    }
+
+    private readArtifactSource(path: string): string | null {
+        try {
+            if (!statSync(path).isFile()) return null;
+            return readFileSync(path, "utf8");
+        } catch {
+            return null;
+        }
     }
 
     private isTrivialProductScaffold(source: string): boolean {
