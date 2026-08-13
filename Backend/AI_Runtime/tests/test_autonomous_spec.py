@@ -5,6 +5,7 @@ from Backend.AI_Runtime.autonomous_spec import (
     spec_from_prompt,
     validate_spec,
     write_missing,
+    write_overwrite,
 )
 
 
@@ -146,3 +147,26 @@ def test_write_missing_migrates_file_parent_for_nested_artifact(tmp_path: Path):
     assert shell_dir.is_dir()
     assert (shell_dir / "HooshyarWebApp.legacy.ts").read_text(encoding="utf-8") == "legacy-shell"
     assert (shell_dir / "AdminAndMobileSurfaces" / "index.ts").is_file()
+
+
+def test_write_overwrite_preserves_existing_canonical_product_import(tmp_path: Path):
+    spec = spec_from_prompt(PRODUCT_PROMPT)
+    artifacts = generic_artifacts(spec)
+    test_path = spec.test_path
+    target = tmp_path / test_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        'import { FinancialDataIngestionAdapter } from "../Product/FinancialDataIngestionAdapter";\n'
+        'describe("FinancialDataIngestionAdapter", () => {});\n',
+        encoding="utf-8",
+    )
+
+    generated = dict(artifacts)[test_path].replace(
+        'from "../Product/FinancialDataIngestionAdapter"',
+        'from "../Engines/FinancialDataIngestionAdapter"',
+    )
+    write_overwrite(tmp_path, [(test_path, generated)])
+
+    content = target.read_text(encoding="utf-8")
+    assert 'from "../Product/FinancialDataIngestionAdapter"' in content
+    assert 'from "../Engines/FinancialDataIngestionAdapter"' not in content
