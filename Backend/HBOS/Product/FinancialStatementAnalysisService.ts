@@ -68,9 +68,9 @@ export class FinancialStatementAnalysisService {
             warnings.push("HIGH_LEVERAGE");
             explanations.push("Liabilities exceed two times equity, indicating elevated financial leverage.");
         }
-        if (statement.cash !== undefined && statement.cash < statement.currentLiabilities * 0.1) {
+        if (statement.cash !== undefined && statement.cash < statement.currentLiabilities * 0.25) {
             warnings.push("LOW_CASH_COVERAGE");
-            explanations.push("Cash covers less than 10% of current liabilities.");
+            explanations.push("Cash covers less than 25% of current liabilities.");
         }
         if (warnings.length === 0) {
             explanations.push("The supplied statement shows no threshold breach in the configured liquidity, margin or leverage checks.");
