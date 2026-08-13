@@ -29,6 +29,17 @@ PRODUCT_PROMPT = (
 )
 
 
+MOBILE_PROMPT = (
+    "Capability ID: product.mobile-and-admin-surfaces\n"
+    "Capability: provide responsive phone experience plus organizational administration surfaces\n"
+    "Target Engine: Assistant Engine\n"
+    "Dependencies: Web Application Shell, Organization Identity and RBAC, API Gateway\n"
+    "Required artifact paths: Frontend/HooshyarWebApp/AdminAndMobileSurfaces ; Backend/HBOS/test/MobileAndAdminSurfaces.test.ts ; Docs/Product/MobileAndAdminSurfaces.md\n"
+    "Architecture rules: Preserve Architecture Freeze V4\n"
+    "Directives: Implement exactly ONE concrete capability\n"
+)
+
+
 def test_spec_from_prompt_builds_canonical_paths_and_contract():
     spec = spec_from_prompt(PROMPT)
     assert spec is not None
@@ -55,6 +66,15 @@ def test_product_spec_honors_declared_artifact_paths():
     assert "ingest(" in artifacts[spec.engine_path]
     assert "../Product/FinancialDataIngestionAdapter" in artifacts[spec.test_path]
     assert "product.financial-data-ingestion" in artifacts[spec.docs_path]
+
+
+def test_frontend_directory_artifact_uses_index_ts_and_frontend_import():
+    spec = spec_from_prompt(MOBILE_PROMPT)
+    assert spec is not None
+    assert spec.engine_path == "Frontend/HooshyarWebApp/AdminAndMobileSurfaces/index.ts"
+    artifacts = dict(generic_artifacts(spec))
+    assert "class AdminAndMobileSurfaces" in artifacts[spec.engine_path]
+    assert "../../../Frontend/HooshyarWebApp/AdminAndMobileSurfaces" in artifacts[spec.test_path]
 
 
 def test_generic_artifacts_preserve_architecture_contract():
@@ -93,15 +113,7 @@ def test_write_missing_refuses_partial_construction(tmp_path: Path):
 
 
 def test_write_missing_migrates_file_parent_for_nested_artifact(tmp_path: Path):
-    spec = spec_from_prompt(
-        "Capability ID: product.mobile-and-admin-surfaces\n"
-        "Capability: provide responsive phone experience plus organizational administration surfaces\n"
-        "Target Engine: Assistant Engine\n"
-        "Dependencies: Web Application Shell, Organization Identity and RBAC, API Gateway\n"
-        "Required artifact paths: Frontend/HooshyarWebApp/AdminAndMobileSurfaces ; Backend/HBOS/test/MobileAndAdminSurfaces.test.ts ; Docs/Product/MobileAndAdminSurfaces.md\n"
-        "Architecture rules: Preserve Architecture Freeze V4\n"
-        "Directives: Implement exactly ONE concrete capability\n"
-    )
+    spec = spec_from_prompt(MOBILE_PROMPT)
     artifacts = generic_artifacts(spec)
 
     legacy_shell = tmp_path / "Frontend/HooshyarWebApp"
@@ -114,4 +126,4 @@ def test_write_missing_migrates_file_parent_for_nested_artifact(tmp_path: Path):
     shell_dir = tmp_path / "Frontend/HooshyarWebApp"
     assert shell_dir.is_dir()
     assert (shell_dir / "HooshyarWebApp.legacy.ts").read_text(encoding="utf-8") == "legacy-shell"
-    assert (shell_dir / "AdminAndMobileSurfaces").is_file()
+    assert (shell_dir / "AdminAndMobileSurfaces" / "index.ts").is_file()
