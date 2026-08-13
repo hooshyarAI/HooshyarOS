@@ -181,6 +181,7 @@ function buildAgentPrompt(context: ConstructionContext): string {
 
 export function createLocalConstructionTools(root = process.cwd()): ConstructionTool[] {
     let verificationCount = 0;
+    let builderTestsRequired = false;
     return [
         {
             name: "architecture",
@@ -246,16 +247,23 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                 verificationCount += 1;
                 const focused = focusedTestFor(context.plan.capabilityId);
                 const fullVerify = verificationCount % FULL_VERIFY_EVERY === 0 || process.env.HOOSHYAR_FULL_VERIFY === "1";
-                const runBuilderTests = verificationCount % BUILDER_TEST_EVERY === 0 || fullVerify || process.env.HOOSHYAR_BUILDER_VERIFY === "1";
+                const runBuilderTests = builderTestsRequired || verificationCount % BUILDER_TEST_EVERY === 0 || fullVerify || process.env.HOOSHYAR_BUILDER_VERIFY === "1";
                 const syntax = run("python", ["-m", "compileall", "-q", "Backend/AI_Runtime"], root);
                 if (!syntax.ok) return { ok: false, issue: "AUTONOMOUS_PYTHON_SYNTAX_VERIFY_FAILED", artifact: { syntaxVerified: false, elapsedMs: syntax.elapsedMs, output: syntax.output, error: syntax.error } };
                 let bootstrap = { ok: true, installed: false, output: "pytest verification skipped", error: null as string | null };
                 let builderTests = { ok: true, code: 0, output: "builder verification skipped", error: null as string | null, elapsedMs: 0 };
                 if (runBuilderTests) {
                     bootstrap = ensurePytest(root);
-                    if (!bootstrap.ok) return { ok: false, issue: "AUTONOMOUS_PYTEST_BOOTSTRAP_FAILED", artifact: { syntaxVerified: true, pytestBootstrapped: false, syntaxElapsedMs: syntax.elapsedMs, output: bootstrap.output, error: bootstrap.error } };
+                    if (!bootstrap.ok) {
+                        builderTestsRequired = true;
+                        return { ok: false, issue: "AUTONOMOUS_PYTEST_BOOTSTRAP_FAILED", artifact: { syntaxVerified: true, pytestBootstrapped: false, syntaxElapsedMs: syntax.elapsedMs, output: bootstrap.output, error: bootstrap.error } };
+                    }
                     builderTests = run("python", ["-m", "pytest", "Backend/AI_Runtime/tests/test_autonomous_builder_platform.py", "Backend/AI_Runtime/tests/test_autonomous_spec.py", "-q"], root);
-                    if (!builderTests.ok) return { ok: false, issue: "AUTONOMOUS_BUILDER_TESTS_FAILED", artifact: { syntaxVerified: true, pytestBootstrapped: true, builderTestsVerified: false, syntaxElapsedMs: syntax.elapsedMs, builderTestsElapsedMs: builderTests.elapsedMs, output: builderTests.output, error: builderTests.error } };
+                    if (!builderTests.ok) {
+                        builderTestsRequired = true;
+                        return { ok: false, issue: "AUTONOMOUS_BUILDER_TESTS_FAILED", artifact: { syntaxVerified: true, pytestBootstrapped: true, builderTestsVerified: false, syntaxElapsedMs: syntax.elapsedMs, builderTestsElapsedMs: builderTests.elapsedMs, output: builderTests.output, error: builderTests.error } };
+                    }
+                    builderTestsRequired = false;
                 }
                 const jestArgs = ["./node_modules/jest/bin/jest.js", "--config", "./jest.config.js", "--maxWorkers=50%"];
                 if (!fullVerify && focused) jestArgs.push(focused);
@@ -268,11 +276,12 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                     fullVerifyEvery: FULL_VERIFY_EVERY,
                     builderTestsRun: runBuilderTests,
                     builderTestEvery: BUILDER_TEST_EVERY,
+                    builderTestsRequired,
                     syntaxVerified: true,
                     pytestBootstrapped: bootstrap.installed,
-                    builderTestsVerified: runBuilderTests && builderTests.code === 0,
+                    builderTestsVerified: !runBuilderTests || builderTests.code === 0,
                     jestVerified: jest.code === 0,
-                    verified: jest.code === 0,
+                    verified: jest.code === 0 && (!runBuilderTests || builderTests.code === 0),
                     syntaxElapsedMs: syntax.elapsedMs,
                     builderTestsElapsedMs: builderTests.elapsedMs,
                     jestElapsedMs: jest.elapsedMs,
@@ -282,7 +291,7 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                     error: jest.error
                 };
                 console.log(JSON.stringify(artifact, null, 2));
-                return jest.code === 0
+                return jest.code === 0 && (!runBuilderTests || builderTests.code === 0)
                     ? { ok: true, artifact }
                     : { ok: false, issue: "AUTONOMOUS_VERIFY_FAILED", artifact: { ...artifact, repairRequired: true } };
             }
