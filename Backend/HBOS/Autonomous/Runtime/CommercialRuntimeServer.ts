@@ -32,7 +32,9 @@ function mime(path: string): string {
 function serveWeb(pathname: string, response: ServerResponse): void {
     const relative = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
     const candidate = resolve(webRoot, relative);
-    if (!candidate.startsWith(`${webRoot}\`) && !candidate.startsWith(`${webRoot}/`)) return json(response, 403, { error: "forbidden" });
+    const windowsPrefix = webRoot + "\\";
+    const posixPrefix = webRoot + "/";
+    if (candidate !== webRoot && !candidate.startsWith(windowsPrefix) && !candidate.startsWith(posixPrefix)) return json(response, 403, { error: "forbidden" });
     if (!existsSync(candidate)) return json(response, 404, { error: "not_found" });
     response.writeHead(200, { "content-type": mime(candidate), "cache-control": "no-cache" });
     createReadStream(candidate).pipe(response);
