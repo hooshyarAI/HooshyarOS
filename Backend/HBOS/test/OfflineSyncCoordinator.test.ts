@@ -8,8 +8,13 @@ describe("OfflineSyncCoordinator", () => {
         expect(service.initialize().status).toBe("READY");
     });
 
-    it("keeps its deterministic minimal contract", () => {
-        expect(new OfflineSyncCoordinator().execute("continue").status).toBe("READY");
-        expect(new OfflineSyncCoordinator().execute(" ").status).toBe("BLOCKED");
+    it("reconciles offline synchronization evidence", () => {
+        const result = new OfflineSyncCoordinator().reconcile("local=10;remote=12;conflict=1");
+        expect(result.status).toBe("READY");
+        expect(result.evidence).toBeDefined();
+    });
+
+    it("blocks empty evidence input", () => {
+        expect(new OfflineSyncCoordinator().reconcile(" ").status).toBe("BLOCKED");
     });
 });
