@@ -7,12 +7,20 @@ import sys
 import time
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 ROOT = Path(__file__).resolve().parents[2]
 MAX_CYCLES = int(os.environ.get("HOOSHYAR_AUTONOMOUS_MAX_CYCLES", "50"))
 
 
 def run(command: list[str], timeout: int = 45 * 60) -> tuple[int, str]:
     print(f"\n>>> {' '.join(command)}", flush=True)
+    env = os.environ.copy()
+    env["PYTHONUTF8"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"
     completed = subprocess.run(
         command,
         cwd=ROOT,
@@ -23,6 +31,7 @@ def run(command: list[str], timeout: int = 45 * 60) -> tuple[int, str]:
         stderr=subprocess.STDOUT,
         timeout=timeout,
         check=False,
+        env=env,
     )
     output = completed.stdout or ""
     print(output, end="", flush=True)
