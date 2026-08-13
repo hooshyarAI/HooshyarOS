@@ -80,6 +80,9 @@ before authenticated runtime/API operations execute.
 
 def run(command: list[str], timeout: int = 45 * 60) -> None:
     print(f"\n>>> {' '.join(command)}")
+    env = __import__("os").environ.copy()
+    env["PYTHONUTF8"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"
     result = subprocess.run(
         command,
         cwd=ROOT,
@@ -88,6 +91,7 @@ def run(command: list[str], timeout: int = 45 * 60) -> None:
         errors="replace",
         timeout=timeout,
         check=False,
+        env=env,
     )
     if result.stdout:
         print(result.stdout, end="")
@@ -95,6 +99,28 @@ def run(command: list[str], timeout: int = 45 * 60) -> None:
         print(result.stderr, end="")
     if result.returncode != 0:
         raise SystemExit(result.returncode)
+
+
+def git_push_with_recovery(branch: str) -> None:
+    push = subprocess.run(
+        ["git", "push", "origin", branch],
+        cwd=ROOT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        env={**__import__("os").environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"},
+    )
+    print(push.stdout or "", end="")
+    if push.returncode == 0:
+        return
+
+    print("REMOTE_AHEAD: fetching and rebasing local verified commit before retry")
+    run(["git", "fetch", "origin", branch])
+    run(["git", "rebase", f"origin/{branch}"], timeout=30 * 60)
+    run(["git", "push", "origin", branch])
 
 
 def main() -> int:
@@ -135,7 +161,7 @@ def main() -> int:
     branch = subprocess.check_output(["git", "branch", "--show-current"], cwd=ROOT, text=True).strip()
     if not branch:
         raise SystemExit("Cannot determine current git branch")
-    run(["git", "push", "origin", branch])
+    git_push_with_recovery(branch)
 
     print("\nCOMMERCIAL_AUTOREPAIR_COMPLETED")
     return 0
