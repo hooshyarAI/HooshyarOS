@@ -31,10 +31,22 @@ export interface AcquisitionRecord {
     validated: boolean;
     provenance: string;
     requiresManualEntry: boolean;
+    duplicateKey: string;
+}
+
+export interface AcquisitionPolicy {
+    automaticFirst: true;
+    noDoubleEntry: true;
+    manualEntryExceptional: true;
 }
 
 export class FinancialDataIngestionAdapter implements Engine {
     name = "FinancialDataIngestionAdapter";
+    readonly acquisitionPolicy: AcquisitionPolicy = {
+        automaticFirst: true,
+        noDoubleEntry: true,
+        manualEntryExceptional: true,
+    };
 
     initialize(): void {}
 
@@ -70,16 +82,29 @@ export class FinancialDataIngestionAdapter implements Engine {
         ];
     }
 
+    preferredAcquisitionMode(source: AcquisitionSource): "AUTOMATIC" | "MANUAL_CONFIRMATION" {
+        return source.automatic ? "AUTOMATIC" : "MANUAL_CONFIRMATION";
+    }
+
     acquire(source: AcquisitionSource, rawReference: string): AcquisitionRecord {
+        const normalizedReference = rawReference.trim();
         const requiresManualEntry = !source.automatic;
+        const duplicateKey = `${source.kind}:${source.location}:${normalizedReference}`;
         return {
             source,
             receivedAt: new Date().toISOString(),
             rawReference,
-            normalizedReference: rawReference.trim(),
-            validated: rawReference.trim().length > 0,
+            normalizedReference,
+            validated: normalizedReference.length > 0,
             provenance: `${source.kind}:${source.location}`,
             requiresManualEntry,
+            duplicateKey,
         };
+    }
+
+    shouldCreateManualTask(record: AcquisitionRecord, knownDuplicateKeys: ReadonlySet<string>): boolean {
+        if (!record.validated) return false;
+        if (knownDuplicateKeys.has(record.duplicateKey)) return false;
+        return record.requiresManualEntry;
     }
 }
