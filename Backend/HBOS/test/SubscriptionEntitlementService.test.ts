@@ -8,8 +8,13 @@ describe("SubscriptionEntitlementService", () => {
         expect(service.initialize().status).toBe("READY");
     });
 
-    it("keeps its deterministic minimal contract", () => {
-        expect(new SubscriptionEntitlementService().execute("continue").status).toBe("READY");
-        expect(new SubscriptionEntitlementService().execute(" ").status).toBe("BLOCKED");
+    it("authorizes commercial subscription entitlement evidence", () => {
+        const result = new SubscriptionEntitlementService().authorize("plan=annual;tenant=hooshyar;active=true");
+        expect(result.status).toBe("READY");
+        expect(result.evidence).toBeDefined();
+    });
+
+    it("blocks empty evidence input", () => {
+        expect(new SubscriptionEntitlementService().authorize(" ").status).toBe("BLOCKED");
     });
 });
