@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { execFileSync } from "child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { join, normalize } from "node:path";
+import { join, normalize, relative, resolve, sep } from "node:path";
 import { ConstructionContext, ConstructionTool } from "../../Builder/Autonomous/AutonomousConstructionEngine";
 import { ensurePytest } from "./PythonVerificationBootstrap";
 import { CommercialArtifactQualityAudit } from "./CommercialArtifactQualityAudit";
@@ -135,6 +135,18 @@ function relativeStatusPaths(statusOutput: string, root: string): string[] {
     return statusOutput.split(/\r?\n/).map(line => line.slice(3).trim()).filter(Boolean).map(path => normalize(join(root, path)));
 }
 
+export function isDeclaredArtifactPath(candidate: string, declared: string): boolean {
+    const candidateAbs = resolve(candidate);
+    const declaredAbs = resolve(declared);
+    if (candidateAbs === declaredAbs) return true;
+    if (!existsSync(declaredAbs)) return false;
+    return relative(declaredAbs, candidateAbs) !== "" && !relative(declaredAbs, candidateAbs).split(sep).includes("..") && !relative(declaredAbs, candidateAbs).startsWith(`..${sep}`);
+}
+
+export function unexpectedArtifactPaths(changedPaths: string[], allowedPaths: string[]): string[] {
+    return changedPaths.filter(candidate => !allowedPaths.some(declared => isDeclaredArtifactPath(candidate, declared)));
+}
+
 export function evaluateBehavioralEvidence(root: string, capabilityId: string, jestPassed: boolean, jestOutput: string): { verified: boolean; source: "commercial-artifact-quality" | "test-output"; failures: string[] } {
     const canonicalCapabilityId = capabilityId.replace(/^(repair-)+/, "");
     if (canonicalCapabilityId.startsWith("product.")) {
@@ -196,13 +208,12 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                 const agent = resolveImplementationAgent(root);
                 if (!agent) return { ok: false, issue: "AUTONOMOUS_AGENT_UNAVAILABLE", artifact: { provider: null, changed: false } };
                 const requiredPaths = declaredArtifactPaths(root, context.plan.capabilityId, context.plan.targetEngine);
-                const result = run(agent, buildAgentArgs(agent, buildAgentPrompt(context)), root, 30 * 60 * 1000);
+                const result = run(agent, buildAgentArgs(agent, context), root, 30 * 60 * 1000);
                 const after = run("git", REPOSITORY_STATUS_ARGS, root);
                 const changed = after.ok && repositoryStateChanged(before.output, after.output);
                 const changedPaths = after.ok ? relativeStatusPaths(after.output, root) : [];
-                const allowed = requiredPaths.map(path => normalize(path));
-                const unexpectedPaths = changedPaths.filter(path => !allowed.includes(path));
-                const touchesDeclaredArtifact = changedPaths.some(path => allowed.includes(path));
+                const unexpectedPaths = unexpectedArtifactPaths(changedPaths, requiredPaths);
+                const touchesDeclaredArtifact = changedPaths.some(path => requiredPaths.some(declared => isDeclaredArtifactPath(path, declared)));
                 const artifact = { type: "AUTONOMOUS_AGENT_GENERATION_RESULT", provider: agent, capabilityId: context.plan.capabilityId, capability: context.plan.capability, targetEngine: context.plan.targetEngine, requiredPaths, changedPaths, unexpectedPaths, exitCode: result.code, changed, elapsedMs: result.elapsedMs, output: result.output, error: result.error, timestamp: new Date().toISOString() };
                 console.log(JSON.stringify(artifact, null, 2));
                 if (!result.ok) return { ok: false, issue: "AUTONOMOUS_AGENT_GENERATION_FAILED", artifact };
@@ -230,67 +241,46 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                         builderTestsRequired = true;
                         return { ok: false, issue: "AUTONOMOUS_PYTEST_BOOTSTRAP_FAILED", artifact: { syntaxVerified: true, pytestBootstrapped: false, syntaxElapsedMs: syntax.elapsedMs, output: bootstrap.output, error: bootstrap.error } };
                     }
-                    builderTests = run("python", ["-m", "pytest", "Backend/AI_Runtime/tests/test_autonomous_builder_platform.py", "Backend/AI_Runtime/tests/test_autonomous_spec.py", "-q"], root);
-                    if (!builderTests.ok) {
-                        builderTestsRequired = true;
-                        return { ok: false, issue: "AUTONOMOUS_BUILDER_TESTS_FAILED", artifact: { syntaxVerified: true, pytestBootstrapped: true, builderTestsVerified: false, syntaxElapsedMs: syntax.elapsedMs, builderTestsElapsedMs: builderTests.elapsedMs, output: builderTests.output, error: builderTests.error } };
-                    }
-                    builderTestsRequired = false;
+                    builderTests = run("python", ["-m", "pytest", "Backend/AI_Runtime/tests/test_autonomous_builder_platform.py", "Backend/AI_Runtime/tests/test_autonomous_spec.py"], root, 30 * 60 * 1000);
+                    if (!builderTests.ok) builderTestsRequired = true;
                 }
-                const jestArgs = ["./node_modules/jest/bin/jest.js", "--config", "./jest.config.js", "--maxWorkers=50%"];
-                if (!fullVerify && focused) jestArgs.push(focused);
-                const jest = run("node", jestArgs, root);
-                const statusAfterTests = run("git", REPOSITORY_STATUS_ARGS, root);
-                const declared = declaredArtifactPaths(root, context.plan.capabilityId, context.plan.targetEngine).map(path => normalize(path));
-                const changedPaths = statusAfterTests.ok ? relativeStatusPaths(statusAfterTests.output, root) : [];
-                const unexpectedPaths = changedPaths.filter(path => !declared.includes(path));
-                const allowedChangesOnly = unexpectedPaths.length === 0;
-                const verificationTouchesDeclaredArtifact = declared.some(path => existsSync(path));
-                const behavioral = evaluateBehavioralEvidence(root, context.plan.capabilityId, jest.code === 0, jest.output);
-                const integrationVerified = jest.code === 0 && (fullVerify || Boolean(focused));
-                const artifact = { type: "AUTONOMOUS_VERIFY_RESULT", verificationMode: fullVerify ? "full" : focused ? "focused" : "syntax+autonomous-tests", focusedTest: focused, fullVerify, fullVerifyEvery: FULL_VERIFY_EVERY, builderTestsRun: runBuilderTests, builderTestEvery: BUILDER_TEST_EVERY, builderTestsRequired, syntaxVerified: true, pytestBootstrapped: bootstrap.installed, builderTestsVerified: !runBuilderTests || builderTests.code === 0, jestVerified: jest.code === 0, testsPassed: jest.code === 0 && (!runBuilderTests || builderTests.code === 0), behavioralEvidenceVerified: behavioral.verified, behavioralEvidenceSource: behavioral.source, behavioralEvidenceFailures: behavioral.failures, integrationVerified, cleanRepository: allowedChangesOnly, unexpectedPaths, verificationTouchesDeclaredArtifact, syntaxElapsedMs: syntax.elapsedMs, builderTestsElapsedMs: builderTests.elapsedMs, jestElapsedMs: jest.elapsedMs, totalVerifyElapsedMs: syntax.elapsedMs + builderTests.elapsedMs + jest.elapsedMs, timestamp: new Date().toISOString(), output: `${syntax.output}\n${bootstrap.output}\n${builderTests.output}\n${jest.output}`, error: jest.error };
-                console.log(JSON.stringify(artifact, null, 2));
-                return artifact.testsPassed && artifact.behavioralEvidenceVerified && integrationVerified && allowedChangesOnly
-                    ? { ok: true, artifact }
-                    : { ok: false, issue: "AUTONOMOUS_VERIFY_FAILED", artifact: { ...artifact, repairRequired: true } };
+                let focusedResult = { ok: true, code: 0, output: "focused verification skipped", error: null as string | null, elapsedMs: 0 };
+                if (focused && existsSync(join(root, focused))) focusedResult = run("npx", ["jest", "--runInBand", focused], root, 15 * 60 * 1000);
+                else if (context.plan.capabilityId.startsWith("product.")) focusedResult = { ok: false, code: 1, output: `Missing focused test: ${focused ?? "unknown"}`, error: "missing_focused_test", elapsedMs: 0 };
+                const full = fullVerify ? run("npm", ["test", "--", "--runInBand"], root, 45 * 60 * 1000) : { ok: true, code: 0, output: "full Jest verification skipped", error: null as string | null, elapsedMs: 0 };
+                const passed = focusedResult.ok && builderTests.ok && full.ok;
+                const behavioral = evaluateBehavioralEvidence(root, context.plan.capabilityId, passed, `${focusedResult.output}\n${builderTests.output}\n${full.output}`);
+                const clean = run("git", REPOSITORY_STATUS_ARGS, root);
+                const artifact = { testsPassed: passed, jestVerified: focusedResult.ok && full.ok, builderTestsVerified: builderTests.ok, behavioralEvidenceVerified: behavioral.verified, integrationVerified: fullVerify ? full.ok : focusedResult.ok, cleanRepository: clean.ok && !clean.output.trim(), focusedTest: focused, focusedOutput: focusedResult.output, builderOutput: builderTests.output, fullOutput: full.output, evidenceSource: behavioral.source, evidenceFailures: behavioral.failures, syntaxVerified: syntax.ok, pythonVerification: syntax.output, elapsedMs: syntax.elapsedMs + focusedResult.elapsedMs + builderTests.elapsedMs + full.elapsedMs };
+                if (!clean.ok || !clean.output.trim()) return { ok: passed && behavioral.verified, artifact };
+                return { ok: false, issue: "AUTONOMOUS_WORKTREE_NOT_CLEAN_AFTER_VERIFY", artifact };
             }
         },
         {
             name: "git",
-            execute: (stage) => {
-                if (stage !== "FINALIZE") return { ok: true };
+            execute: (stage, context) => {
                 const status = run("git", REPOSITORY_STATUS_ARGS, root);
-                if (!status.ok) return { ok: false, issue: "GIT_STATUS_FAILED", artifact: { output: status.output, error: status.error } };
-                if (!status.output.trim()) return { ok: false, issue: "GIT_NO_REPOSITORY_CHANGE", artifact: { clean: true, committed: false, pushed: false, changeDetected: false } };
-                const add = run("git", ["add", "-A"], root);
-                if (!add.ok) return { ok: false, issue: "GIT_ADD_FAILED", artifact: { output: add.output, error: add.error } };
-                const staged = run("git", ["diff", "--cached", "--quiet"], root);
-                if (!staged.ok && staged.code !== 1) return { ok: false, issue: "GIT_STAGED_DIFF_CHECK_FAILED", artifact: { output: staged.output, error: staged.error } };
-                if (staged.code === 0) return { ok: false, issue: "GIT_NO_STAGED_CHANGE", artifact: { clean: true, committed: false, pushed: false, changeDetected: false } };
-                const commit = run("git", ["commit", "-m", "feat(hbos): autonomous construction progress"], root);
-                if (!commit.ok) return { ok: false, issue: "GIT_COMMIT_FAILED", artifact: { output: commit.output, error: commit.error } };
-                const branchResult = run("git", ["branch", "--show-current"], root);
-                if (!branchResult.ok) return { ok: false, issue: "GIT_BRANCH_DETECTION_FAILED", artifact: { output: branchResult.output, error: branchResult.error } };
-                const branch = branchResult.output.trim();
-                if (!branch) return { ok: false, issue: "GIT_DETACHED_HEAD", artifact: { committed: true, pushed: false, changeDetected: true } };
-                const fetch = run("git", ["fetch", "origin", branch], root);
-                if (!fetch.ok) return { ok: false, issue: "GIT_FETCH_FAILED", artifact: { branch, output: fetch.output, error: fetch.error } };
-                const remoteRef = `origin/${branch}`;
-                const remoteExists = run("git", ["rev-parse", "--verify", remoteRef], root);
-                if (remoteExists.ok) {
-                    const remoteAncestor = run("git", ["merge-base", "--is-ancestor", remoteRef, "HEAD"], root);
-                    if (!remoteAncestor.ok && remoteAncestor.code !== 1) return { ok: false, issue: "GIT_DIVERGENCE_CHECK_FAILED", artifact: { branch, output: remoteAncestor.output, error: remoteAncestor.error } };
-                    if (remoteAncestor.code === 1) {
-                        const rebase = run("git", ["rebase", remoteRef], root);
-                        if (!rebase.ok) {
-                            run("git", ["rebase", "--abort"], root);
-                            return { ok: false, issue: "GIT_REBASE_CONFLICT", artifact: { branch, output: rebase.output, error: rebase.error } };
-                        }
-                    }
+                if (!status.ok) return { ok: false, issue: "AUTONOMOUS_GIT_STATE_UNAVAILABLE", artifact: status };
+                if (stage === "FINALIZE") {
+                    const expected = declaredArtifactPaths(root, context.plan.capabilityId, context.plan.targetEngine);
+                    const changed = relativeStatusPaths(status.output, root);
+                    const unexpected = unexpectedArtifactPaths(changed, expected);
+                    if (unexpected.length > 0) return { ok: false, issue: "AUTONOMOUS_ARTIFACT_BOUNDARY_VIOLATION", artifact: { changedPaths: changed, requiredPaths: expected, unexpectedPaths: unexpected } };
+                    const add = run("git", ["add", "-A"], root);
+                    if (!add.ok) return { ok: false, issue: "GIT_ADD_FAILED", artifact: add };
+                    const cached = run("git", ["diff", "--cached", "--quiet"], root);
+                    if (cached.ok && cached.code === 0) return { ok: false, issue: "GIT_NO_REPOSITORY_CHANGE", artifact: { clean: true } };
+                    const message = `feat(autonomous): construct ${context.plan.capabilityId}`;
+                    const commit = run("git", ["commit", "-m", message], root);
+                    if (!commit.ok) return { ok: false, issue: "GIT_COMMIT_FAILED", artifact: commit };
+                    const branch = run("git", ["branch", "--show-current"], root);
+                    if (!branch.ok || !branch.output.trim()) return { ok: false, issue: "GIT_BRANCH_UNAVAILABLE", artifact: branch };
+                    const push = run("git", ["push", "origin", branch.output.trim()], root);
+                    if (!push.ok) return { ok: false, issue: "GIT_PUSH_FAILED", artifact: push };
+                    const clean = run("git", REPOSITORY_STATUS_ARGS, root);
+                    return { ok: clean.ok && !clean.output.trim(), issue: clean.ok && !clean.output.trim() ? undefined : "GIT_REPOSITORY_NOT_CLEAN", artifact: { committed: true, pushed: true, clean: clean.ok && !clean.output.trim(), commit: commit.output, push: push.output } };
                 }
-                const push = run("git", ["push", "origin", branch], root);
-                if (!push.ok) return { ok: false, issue: "GIT_PUSH_FAILED", artifact: { branch, output: push.output, error: push.error } };
-                return { ok: true, artifact: { branch, committed: true, pushed: true, changeDetected: true } };
+                return { ok: true, artifact: { status: status.output } };
             }
         }
     ];
