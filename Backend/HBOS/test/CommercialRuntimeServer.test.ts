@@ -1,10 +1,12 @@
 import { createCommercialRuntimeServer } from "../Autonomous/Runtime/CommercialRuntimeServer";
 
-async function request(port: number, path: string, method = "GET", payload?: unknown): Promise<{ status: number; body: string; contentType: string }> {
+async function request(port: number, path: string, method = "GET", payload?: unknown, token?: string): Promise<{ status: number; body: string; contentType: string }> {
     return new Promise((resolve, reject) => {
         const http = require("node:http") as typeof import("node:http");
         const body = payload === undefined ? undefined : JSON.stringify(payload);
-        const request = http.request(`http://127.0.0.1:${port}${path}`, { method, headers: body ? { "content-type": "application/json" } : {} }, response => {
+        const headers: Record<string, string> = body ? { "content-type": "application/json" } : {};
+        if (token) headers.authorization = `Bearer ${token}`;
+        const request = http.request(`http://127.0.0.1:${port}${path}`, { method, headers }, response => {
             let text = "";
             response.setEncoding("utf8");
             response.on("data", chunk => { text += chunk; });
@@ -37,13 +39,30 @@ describe("Commercial runtime application path", () => {
         const dashboard = await request(port, "/api/dashboard"); const report = await request(port, "/api/report"); const plans = await request(port, "/api/plans");
         expect(dashboard.status).toBe(200); expect(JSON.parse(dashboard.body).status).toBe("READY"); expect(report.status).toBe(200); expect(JSON.parse(report.body).status).toBe("READY"); expect(plans.status).toBe(200); expect(JSON.parse(plans.body).plans.length).toBeGreaterThanOrEqual(3);
     });
-    test("supports the commercial vertical slice from session through ingest and decision", async () => {
+    test("supports authenticated commercial flow and rejects cross-tenant operations", async () => {
+        const anonymous = await request(port, "/api/ingest", "POST", { amount: 1, category: "فروش", organization: "تست هوشیار" });
+        expect(anonymous.status).toBe(401);
+
         const session = await request(port, "/api/session", "POST", { username: "مدیرعامل", organization: "تست هوشیار" });
-        expect(session.status).toBe(200); expect(JSON.parse(session.body).organization.name).toBe("تست هوشیار");
-        const ingest = await request(port, "/api/ingest", "POST", { amount: 500000, category: "فروش", organization: "تست هوشیار" });
+        const sessionPayload = JSON.parse(session.body);
+        const token = sessionPayload.token as string;
+        expect(session.status).toBe(200);
+        expect(sessionPayload.organization.name).toBe("تست هوشیار");
+        expect(sessionPayload.user.role).toBe("OWNER");
+
+        const ingest = await request(port, "/api/ingest", "POST", { amount: 500000, category: "فروش", organization: "تست هوشیار" }, token);
         expect(ingest.status).toBe(200); expect(JSON.parse(ingest.body).persistence.version).toBeGreaterThan(0); expect(JSON.parse(ingest.body).dashboard.metrics.revenue).toBe(500000);
-        const decision = await request(port, "/api/decision", "POST", { title: "افزایش بودجه فروش", organization: "تست هوشیار" });
+
+        const crossTenant = await request(port, "/api/ingest", "POST", { amount: 100, category: "فروش", organization: "سازمان دیگر" }, token);
+        expect(crossTenant.status).toBe(401);
+
+        const decision = await request(port, "/api/decision", "POST", { title: "افزایش بودجه فروش", organization: "تست هوشیار" }, token);
         expect(decision.status).toBe(200); expect(JSON.parse(decision.body).status).toBe("READY");
+
+        const logout = await request(port, "/api/logout", "POST", undefined, token);
+        expect(logout.status).toBe(200);
+        const afterLogout = await request(port, "/api/ingest", "POST", { amount: 10, category: "فروش", organization: "تست هوشیار" }, token);
+        expect(afterLogout.status).toBe(401);
     });
     test("loads representative demo evidence into the product path", async () => {
         const demo = await request(port, "/api/demo"); expect(demo.status).toBe(200); const payload = JSON.parse(demo.body); expect(payload.records.length).toBeGreaterThanOrEqual(3); expect(payload.dashboard.metrics.revenue).toBeGreaterThan(0); expect(payload.report.status).toBe("READY");
