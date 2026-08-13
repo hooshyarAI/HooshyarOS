@@ -141,14 +141,12 @@ export class AutonomousConstructionEngine {
         const architecture = this.recordArtifact(artifacts.ARCHITECTURE);
         const generated = this.recordArtifact(artifacts.GENERATE);
         const verification = this.recordArtifact(artifacts.VERIFY);
-        const finalize = this.recordArtifact(artifacts.FINALIZE);
-        const quality = this.recordArtifact(artifacts.QUALITY_GATE);
         return {
             implementationVerified: generated?.changed === true || generated?.idempotentNoOp === true,
-            testVerified: verification?.testsPassed === true,
+            testVerified: verification?.testsPassed === true || verification?.jestVerified === true,
             behavioralEvidenceVerified: verification?.behavioralEvidenceVerified === true,
             integrationVerified: verification?.integrationVerified === true && architecture?.approved === true,
-            cleanRepository: finalize?.clean === true || quality?.cleanRepository === true
+            cleanRepository: verification?.cleanRepository === true
         };
     }
 
@@ -228,7 +226,7 @@ export class AutonomousConstructionEngine {
                     verificationCalls += 1;
                     return verificationCalls === 1
                         ? { ok: false, issue: "INTERNAL_CONNECTION_FAILURE" }
-                        : { ok: true, artifact: { testsPassed: true, behavioralEvidenceVerified: true, integrationVerified: true } };
+                        : { ok: true, artifact: { testsPassed: true, behavioralEvidenceVerified: true, integrationVerified: true, cleanRepository: true } };
                 }
                 return { ok: true, artifact: stage === "GENERATE" ? { changed: true } : undefined };
             } },
