@@ -1,4 +1,8 @@
-export interface ProductCapabilityResult { status: "READY" | "BLOCKED"; }
+export interface WebApplicationResult {
+    status: "READY" | "BLOCKED";
+    path: string;
+    routes: string[];
+}
 
 export class HooshyarWebApp {
     readonly capabilityId = "product.web-application-shell";
@@ -8,7 +12,19 @@ export class HooshyarWebApp {
         return { status: "READY" };
     }
 
-    execute(input: string): ProductCapabilityResult {
-        return { status: input && input.trim() ? "READY" : "BLOCKED" };
+    navigation(): string[] {
+        return ["dashboard", "financial", "reports", "decisions", "alerts"]
+            .map(item => item.trim())
+            .filter(Boolean);
+    }
+
+    execute(path: string): WebApplicationResult {
+        const routes = this.navigation();
+        const normalized = path?.trim().toLowerCase() ?? "";
+        return {
+            status: routes.includes(normalized) ? "READY" : "BLOCKED",
+            path: normalized,
+            routes,
+        };
     }
 }

@@ -2,14 +2,25 @@ import { HooshyarWebApp } from "../../../Frontend/HooshyarWebApp";
 
 describe("HooshyarWebApp", () => {
     it("exposes the canonical product boundary", () => {
-        const service = new HooshyarWebApp();
-        expect(service.capabilityId).toBe("product.web-application-shell");
-        expect(service.targetEngine).toBe("Assistant Engine");
-        expect(service.initialize().status).toBe("READY");
+        const app = new HooshyarWebApp();
+        expect(app.capabilityId).toBe("product.web-application-shell");
+        expect(app.targetEngine).toBe("Assistant Engine");
+        expect(app.initialize().status).toBe("READY");
     });
 
-    it("keeps its deterministic minimal contract", () => {
-        expect(new HooshyarWebApp().execute("continue").status).toBe("READY");
-        expect(new HooshyarWebApp().execute(" ").status).toBe("BLOCKED");
+    it("builds a deterministic commercial navigation surface", () => {
+        expect(new HooshyarWebApp().navigation()).toEqual([
+            "dashboard",
+            "financial",
+            "reports",
+            "decisions",
+            "alerts",
+        ]);
+    });
+
+    it("accepts supported routes and rejects unknown routes", () => {
+        const app = new HooshyarWebApp();
+        expect(app.execute(" dashboard ")).toMatchObject({ status: "READY", path: "dashboard" });
+        expect(app.execute("unknown").status).toBe("BLOCKED");
     });
 });
