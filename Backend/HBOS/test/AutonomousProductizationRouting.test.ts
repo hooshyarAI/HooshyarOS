@@ -1,4 +1,4 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 
 describe("Autonomous productization routing", () => {
@@ -22,7 +22,11 @@ describe("Autonomous productization routing", () => {
 
         expect(worker).toContain("AUTONOMOUS_PRODUCTIZATION_BLOCKED");
         expect(worker).toContain("AUTONOMOUS_PRODUCTIZATION_COMPLETE");
-        expect(worker).toContain("no supported Windows installer toolchain detected");
-        expect(worker).toContain("no Android application project exists yet");
+        expect(worker).toContain("AUTONOMOUS_PRODUCTIZATION_DELEGATE");
+        expect(worker).toContain("AUTONOMOUS_PRODUCTIZATION_START");
+        expect(worker).toContain("windows-installer-artifact-not-yet-built");
+        expect(worker).toContain("android-project-incomplete");
+        expect(worker).not.toContain("no supported Windows installer toolchain detected");
+        expect(worker).not.toContain("no Android application project exists yet");
     });
 });
