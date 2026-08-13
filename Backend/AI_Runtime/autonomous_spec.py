@@ -126,9 +126,7 @@ def product_artifacts(spec: CapabilitySpec) -> list[tuple[str, str]]:
     product_dir = Path(spec.engine_path).parent.as_posix()
 
     if product_dir.startswith("Frontend/"):
-        test_import = "../../../" + spec.engine_path
-        if test_import.endswith(".ts"):
-            test_import = test_import[:-3]
+        test_import = "../../../" + product_dir
         test_import = test_import.replace("\\", "/")
     else:
         relative_product_import = "../" + product_dir.split("/")[-1]
@@ -299,15 +297,29 @@ def _needs_reweave(root: Path, artifacts: list[tuple[str, str]]) -> bool:
 
 def _ensure_parent_directory(target: Path) -> None:
     parent = target.parent
-    if parent.exists() and parent.is_file():
-        legacy_content = parent.read_text(encoding="utf-8")
-        legacy_name = parent.name + ".legacy.ts"
-        parent.unlink()
-        parent.mkdir(parents=True, exist_ok=True)
-        legacy_target = parent / legacy_name
+
+    # A legacy file can occupy any ancestor of the new directory artifact.
+    # Find the nearest blocking file first, migrate it into the directory it
+    # is currently pretending to be, then create the nested path safely.
+    cursor = parent
+    blocking: Path | None = None
+    while cursor != cursor.parent:
+        if cursor.exists():
+            if cursor.is_file():
+                blocking = cursor
+            break
+        cursor = cursor.parent
+
+    if blocking is not None:
+        legacy_content = blocking.read_text(encoding="utf-8")
+        legacy_dir = blocking
+        legacy_name = blocking.name + ".legacy.ts"
+        blocking.unlink()
+        legacy_dir.mkdir(parents=True, exist_ok=True)
+        legacy_target = legacy_dir / legacy_name
         if not legacy_target.exists():
             legacy_target.write_text(legacy_content, encoding="utf-8")
-        return
+
     parent.mkdir(parents=True, exist_ok=True)
 
 
