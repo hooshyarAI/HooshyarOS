@@ -118,13 +118,14 @@ def product_artifacts(spec: CapabilitySpec) -> list[tuple[str, str]]:
         raise ValueError("Invalid capability specification: " + "; ".join(errors))
 
     class_name = spec.class_name
-    product_dir = Path(spec.engine_path).parent.as_posix()
     product_name = Path(spec.engine_path).stem
+    product_dir = Path(spec.engine_path).parent.as_posix()
 
     if product_dir.startswith("Frontend/"):
-        relative_product_import = "../../../" + spec.engine_path
-        relative_product_import = relative_product_import[:-3] if relative_product_import.endswith(".ts") else relative_product_import
-        test_import = relative_product_import.replace("\\", "/")
+        test_import = "../../../" + spec.engine_path
+        if test_import.endswith(".ts"):
+            test_import = test_import[:-3]
+        test_import = test_import.replace("\\", "/")
     else:
         relative_product_import = "../" + product_dir.split("/")[-1]
         test_import = f"{relative_product_import}/{class_name}"
@@ -309,9 +310,15 @@ def _ensure_parent_directory(target: Path) -> None:
 def write_missing(root: Path, artifacts: list[tuple[str, str]]) -> list[str]:
     paths = [relative_path for relative_path, _ in artifacts]
     existing = [relative_path for relative_path in paths if (root / relative_path).exists()]
-    if existing and len(existing) != len(paths):
+    migration_pending = [
+        relative_path for relative_path in paths
+        if not (root / relative_path).exists()
+        and (root / relative_path).parent.exists()
+        and (root / relative_path).parent.is_file()
+    ]
+    if existing and len(existing) != len(paths) and not migration_pending:
         raise RuntimeError("Refusing partial autonomous construction; existing artifacts: " + ", ".join(existing))
-    if existing:
+    if existing and len(existing) == len(paths):
         if _needs_reweave(root, artifacts):
             return write_overwrite(root, artifacts)
         return []
