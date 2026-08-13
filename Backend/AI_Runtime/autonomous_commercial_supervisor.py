@@ -77,11 +77,19 @@ def fingerprint(output: str) -> str:
     return "OUTPUT:" + output[-4000:]
 
 
+def construction_self_heal() -> bool:
+    code, _ = run([sys.executable, "Backend/AI_Runtime/repair_construction_idempotency.py"], timeout=10 * 60)
+    return code == 0
+
+
 def focused_repair(output: str) -> bool:
+    repaired = False
+    if "AUTONOMOUS_AGENT_NO_REPOSITORY_CHANGE" in output or "AUTONOMOUS_BEHAVIORAL_EVIDENCE_INCOMPLETE" in output:
+        repaired = construction_self_heal() or repaired
     if "product.web-application-shell" in output:
-        code, _ = run([sys.executable, "Backend/AI_Runtime/commercial_autorepair.py"])
-        return code == 0
-    return False
+        code, _ = run([sys.executable, "Backend/AI_Runtime/commercial_autorepair.py"], timeout=45 * 60)
+        repaired = code == 0 or repaired
+    return repaired
 
 
 def full_regression() -> bool:
@@ -100,6 +108,8 @@ def main() -> int:
     seen_failures: dict[str, int] = {}
     for cycle in range(1, MAX_CYCLES + 1):
         print(f"\n=== SUPERVISOR CYCLE {cycle} ===", flush=True)
+
+        construction_self_heal()
 
         build_code, build_output = run(["npm.cmd", "run", "build"])
         if build_code != 0:
