@@ -1,9 +1,8 @@
 """Explicit HooshyarOS productization worker.
 
-This worker is intentionally separate from platform construction. In productization
-mode it may only report completion after real release artifacts and their
-acceptance evidence exist. It never treats platform/backlog completion as
-installer or mobile completion.
+Productization is a distinct phase from platform construction. In productization
+mode the assistant must build release artifacts, exercise acceptance evidence,
+and must never report completion from backlog exhaustion alone.
 """
 from __future__ import annotations
 
@@ -15,9 +14,13 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+BUILDER = ROOT / "Backend" / "AI_Runtime" / "autonomous_builder.py"
 RELEASE_ROOT = ROOT / "dist" / "productization"
 WINDOWS_ROOT = RELEASE_ROOT / "windows"
 ANDROID_ROOT = RELEASE_ROOT / "android"
+WINDOWS_INSTALLER = WINDOWS_ROOT / "installer"
+ANDROID_PROJECT = ROOT / "android"
+ANDROID_PROJECT_ALT = ROOT / "Android"
 
 
 def emit(kind: str, **payload: object) -> None:
@@ -29,17 +32,11 @@ def env_true(name: str) -> bool:
 
 
 def run(command: str, args: list[str], timeout: int = 45 * 60) -> int:
-    executable = command
-    if os.name == "nt" and command in {"npm", "npx"}:
-        executable = f"{command}.cmd"
+    executable = f"{command}.cmd" if os.name == "nt" and command in {"npm", "npx"} else command
     result = subprocess.run(
-        [executable, *args],
-        cwd=ROOT,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
+        [executable, *args], cwd=ROOT, text=True, encoding="utf-8", errors="replace",
         env={**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"},
-        check=False,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout, check=False,
     )
     if result.stdout:
         print(result.stdout, end="")
@@ -52,49 +49,114 @@ def tool_exists(name: str) -> bool:
 
 def run_required_verification() -> bool:
     emit("AUTONOMOUS_PRODUCTIZATION_STAGE", stage="BUILD_VERIFY")
-    if run("npm", ["run", "build"], 45 * 60) != 0:
+    return run("npm", ["run", "build"], 45 * 60) == 0 and run("npm", ["test", "--", "--runInBand"], 60 * 60) == 0
+
+
+def build_worker_prompt(platform: str) -> str:
+    common = """
+You are executing the HooshyarOS productization mission inside the repository-native autonomous worker.
+Do not redesign Architecture Freeze V4 and do not modify the existing product/business engine hierarchy.
+Productization is successful only when a real release artifact exists and acceptance evidence can be produced.
+Never claim completion because unit tests, backlog exhaustion, or platform construction are complete.
+The resulting product must remain deployment-agnostic, zero-IT for the customer where possible, and preserve the No Double Entry / Automatic Data Acquisition policy.
+""".strip()
+    if platform == "WINDOWS":
+        return common + """
+
+Build the Windows production package for the existing HooshyarOS web runtime.
+Create a real installer project under dist/productization/windows/installer and a deterministic build script.
+The installer must install the existing runtime/web application, create the required local data/runtime directories,
+provide a start mechanism, and be uninstallable/reinstallable.
+Prefer a real native installer toolchain when available; otherwise create a Windows-native bootstrap installer package
+that can be built and exercised on the target Windows machine without changing the core platform architecture.
+Create focused acceptance evidence for install, start, web reachability, uninstall and reinstall.
+""".strip()
+    return common + """
+
+Build the Android application for the existing HooshyarOS backend/runtime.
+Create a real Android project under android/ (preferred) using a stable native Android/WebView or equivalent shell
+around the existing web application/API boundary, with login, authenticated product shell, dashboard access,
+offline/online state handling and explicit backend endpoint configuration.
+Create Gradle build configuration and focused acceptance evidence for APK generation and installation.
+Do not invent a second business/backend implementation.
+""".strip()
+
+
+def ask_autonomous_builder(platform: str) -> bool:
+    if not BUILDER.exists():
+        emit("AUTONOMOUS_PRODUCTIZATION_BLOCKED", platform=platform, reason="missing autonomous builder")
         return False
-    return run("npm", ["test", "--", "--runInBand"], 60 * 60) == 0
+    prompt = build_worker_prompt(platform)
+    emit("AUTONOMOUS_PRODUCTIZATION_DELEGATE", platform=platform, worker=str(BUILDER))
+    result = subprocess.run(
+        [sys.executable, str(BUILDER), "--prompt", prompt], cwd=ROOT,
+        text=True, encoding="utf-8", errors="replace", env={**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"},
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=90 * 60, check=False,
+    )
+    print(result.stdout, end="")
+    return result.returncode == 0
 
 
 def windows_productize() -> tuple[bool, str]:
     emit("AUTONOMOUS_PRODUCTIZATION_STAGE", stage="WINDOWS")
     WINDOWS_ROOT.mkdir(parents=True, exist_ok=True)
+    WINDOWS_INSTALLER.mkdir(parents=True, exist_ok=True)
 
-    # Prefer a real installer toolchain when available.
+    installer_artifacts = [
+        WINDOWS_INSTALLER / "install.ps1",
+        WINDOWS_INSTALLER / "uninstall.ps1",
+        WINDOWS_INSTALLER / "build-installer.ps1",
+        WINDOWS_INSTALLER / "README.md",
+    ]
+    if not all(path.exists() for path in installer_artifacts):
+        if not ask_autonomous_builder("WINDOWS"):
+            return False, "windows-productization-worker-failed"
+
+    if not all(path.exists() for path in installer_artifacts):
+        return False, "windows-installer-project-incomplete"
+
     inno = tool_exists("iscc") or tool_exists("ISCC")
     wix = tool_exists("wix")
-    if not inno and not wix:
-        emit(
-            "AUTONOMOUS_PRODUCTIZATION_BLOCKED",
-            platform="WINDOWS",
-            reason="no supported Windows installer toolchain detected",
-            requiredTools=["Inno Setup (iscc)", "WiX (wix)"],
-        )
-        return False, "missing-windows-installer-toolchain"
+    installer_exe = list(WINDOWS_ROOT.glob("*.exe"))
+    if not installer_exe and inno:
+        if run("iscc", [str(WINDOWS_INSTALLER / "HooshyarOS.iss")], 45 * 60) != 0:
+            return False, "inno-build-failed"
+        installer_exe = list(WINDOWS_ROOT.glob("*.exe"))
+    if not installer_exe and wix:
+        emit("AUTONOMOUS_PRODUCTIZATION_NOTE", platform="WINDOWS", toolchain="WiX", action="assistant-must-wire-wix-build")
+    if not installer_exe:
+        return False, "windows-installer-artifact-not-yet-built"
 
-    return False, "installer-project-generation-required"
+    return True, "ok"
 
 
 def android_productize() -> tuple[bool, str]:
     emit("AUTONOMOUS_PRODUCTIZATION_STAGE", stage="ANDROID")
-    if not (ROOT / "android").exists() and not (ROOT / "Android").exists():
-        emit(
-            "AUTONOMOUS_PRODUCTIZATION_BLOCKED",
-            platform="ANDROID",
-            reason="no Android application project exists yet",
-            required="real Android application project and Gradle build",
-        )
-        return False, "missing-android-project"
-    gradle = "gradlew.bat" if os.name == "nt" else "./gradlew"
-    if not (ROOT / gradle).exists() and not tool_exists("gradle"):
-        emit(
-            "AUTONOMOUS_PRODUCTIZATION_BLOCKED",
-            platform="ANDROID",
-            reason="Android Gradle toolchain not available",
-        )
-        return False, "missing-gradle-toolchain"
-    return False, "android-build-project-not-yet-wired"
+    project = ANDROID_PROJECT if ANDROID_PROJECT.exists() else ANDROID_PROJECT_ALT
+    required = project / "gradlew.bat", project / "app" / "build.gradle"
+    if not project.exists() or not all(path.exists() for path in required):
+        if not ask_autonomous_builder("ANDROID"):
+            return False, "android-productization-worker-failed"
+        project = ANDROID_PROJECT if ANDROID_PROJECT.exists() else ANDROID_PROJECT_ALT
+        required = project / "gradlew.bat", project / "app" / "build.gradle"
+
+    if not project.exists() or not all(path.exists() for path in required):
+        return False, "android-project-incomplete"
+
+    gradle = project / "gradlew.bat" if os.name == "nt" else project / "gradlew"
+    if gradle.exists():
+        if run(str(gradle), ["assembleDebug"], 90 * 60) != 0:
+            return False, "android-build-failed"
+    elif tool_exists("gradle"):
+        if run("gradle", ["-p", str(project), "assembleDebug"], 90 * 60) != 0:
+            return False, "android-build-failed"
+    else:
+        return False, "android-gradle-toolchain-missing"
+
+    apks = list((project / "app" / "build" / "outputs" / "apk").rglob("*.apk"))
+    if not apks:
+        return False, "android-apk-not-produced"
+    return True, "ok"
 
 
 def main() -> int:
@@ -102,43 +164,31 @@ def main() -> int:
         emit("AUTONOMOUS_PRODUCTIZATION_SKIPPED", reason="productization mode disabled")
         return 0
 
-    emit(
-        "AUTONOMOUS_PRODUCTIZATION_START",
-        windowsRequired=env_true("HOOSHYAR_WINDOWS_INSTALLER"),
-        androidRequired=env_true("HOOSHYAR_ANDROID_APP"),
-        webRuntimeRequired=env_true("HOOSHYAR_REQUIRE_WEB_RUNTIME_ACCEPTANCE"),
-    )
+    windows_required = env_true("HOOSHYAR_WINDOWS_INSTALLER")
+    android_required = env_true("HOOSHYAR_ANDROID_APP")
+    emit("AUTONOMOUS_PRODUCTIZATION_START", windowsRequired=windows_required, androidRequired=android_required,
+         webRuntimeRequired=env_true("HOOSHYAR_REQUIRE_WEB_RUNTIME_ACCEPTANCE"))
 
     if not run_required_verification():
-        emit("AUTONOMOUS_PRODUCTIZATION_BLOCKED", stage="BUILD_VERIFY", reason="verification failed")
+        emit("AUTONOMOUS_PRODUCTIZATION_BLOCKED", stage="BUILD_VERIFY", reason="verification failed", productComplete=False)
         return 21
 
     failures: list[str] = []
-    if env_true("HOOSHYAR_WINDOWS_INSTALLER"):
+    if windows_required:
         ok, reason = windows_productize()
         if not ok:
             failures.append(reason)
-
-    if env_true("HOOSHYAR_ANDROID_APP"):
+    if android_required:
         ok, reason = android_productize()
         if not ok:
             failures.append(reason)
 
     if failures:
-        emit(
-            "AUTONOMOUS_PRODUCTIZATION_BLOCKED",
-            stage="PACKAGE",
-            reasons=failures,
-            productComplete=False,
-        )
+        emit("AUTONOMOUS_PRODUCTIZATION_BLOCKED", stage="PACKAGE", reasons=failures, productComplete=False)
         return 22
 
-    emit(
-        "AUTONOMOUS_PRODUCTIZATION_COMPLETE",
-        productComplete=True,
-        windowsInstaller=True,
-        android=True,
-    )
+    emit("AUTONOMOUS_PRODUCTIZATION_COMPLETE", productComplete=True,
+         windowsInstaller=windows_required, android=android_required)
     return 0
 
 
