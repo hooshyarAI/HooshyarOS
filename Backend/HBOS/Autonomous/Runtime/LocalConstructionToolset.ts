@@ -35,20 +35,8 @@ function run(command: string, args: string[], cwd: string, timeout = 15 * 60 * 1
             && args[1] === "--cached"
             && args[2] === "--quiet"
             && exitCode === 1;
-        if (expectedGitDiffQuiet) {
-            return { ok: true, code: 1, output: `${stdout}${stderr}`, error: null, elapsedMs: Date.now() - started };
-        }
-        console.error(JSON.stringify({
-            type: "AUTONOMOUS_TOOL_ERROR",
-            command,
-            args,
-            cwd,
-            exitCode,
-            stdout,
-            stderr,
-            elapsedMs: Date.now() - started,
-            message: error?.message ?? `${command} failed`
-        }, null, 2));
+        if (expectedGitDiffQuiet) return { ok: true, code: 1, output: `${stdout}${stderr}`, error: null, elapsedMs: Date.now() - started };
+        console.error(JSON.stringify({ type: "AUTONOMOUS_TOOL_ERROR", command, args, cwd, exitCode, stdout, stderr, elapsedMs: Date.now() - started, message: error?.message ?? `${command} failed` }, null, 2));
         return { ok: false, code: exitCode, output: `${stdout}\n${stderr}`, error: error?.message ?? `${command} failed`, elapsedMs: Date.now() - started };
     }
 }
@@ -123,18 +111,12 @@ function focusedTestFor(capabilityId: string): string | null {
 export function productRoadmapPaths(root: string, capabilityId: string): string[] {
     const roadmapPath = join(root, "Docs", "Product", "PRODUCT_CONSTRUCTION_ROADMAP.json");
     if (!existsSync(roadmapPath)) return [];
-    const canonicalCapabilityId = capabilityId.startsWith("repair-")
-        ? capabilityId.slice("repair-".length)
-        : capabilityId;
+    const canonicalCapabilityId = capabilityId.startsWith("repair-") ? capabilityId.slice("repair-".length) : capabilityId;
     try {
-        const roadmap = JSON.parse(readFileSync(roadmapPath, "utf8")) as {
-            capabilities?: Array<{ capabilityId?: string; implementationPath?: string; testPath?: string; documentationPath?: string }>;
-        };
+        const roadmap = JSON.parse(readFileSync(roadmapPath, "utf8")) as { capabilities?: Array<{ capabilityId?: string; implementationPath?: string; testPath?: string; documentationPath?: string }> };
         const capability = roadmap.capabilities?.find(item => item.capabilityId === canonicalCapabilityId);
         if (!capability) return [];
-        return [capability.implementationPath, capability.testPath, capability.documentationPath]
-            .filter(Boolean)
-            .map(path => join(root, path!));
+        return [capability.implementationPath, capability.testPath, capability.documentationPath].filter(Boolean).map(path => join(root, path!));
     } catch {
         return [];
     }
@@ -151,10 +133,7 @@ export function declaredArtifactPaths(root: string, capabilityId: string, target
 }
 
 function relativeStatusPaths(statusOutput: string, root: string): string[] {
-    return statusOutput.split(/\r?\n/)
-        .map(line => line.slice(3).trim())
-        .filter(Boolean)
-        .map(path => normalize(join(root, path)));
+    return statusOutput.split(/\r?\n/).map(line => line.slice(3).trim()).filter(Boolean).map(path => normalize(join(root, path)));
 }
 
 function buildAgentPrompt(context: ConstructionContext): string {
@@ -185,17 +164,7 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
     return [
         {
             name: "architecture",
-            execute: (_stage, context) => ({
-                ok: Boolean(context.plan.capabilityId && context.plan.capability && context.plan.targetEngine),
-                artifact: {
-                    approved: true,
-                    capabilityId: context.plan.capabilityId,
-                    targetEngine: context.plan.targetEngine,
-                    architectureRules: context.plan.architectureRules,
-                    directives: DEFAULT_DIRECTIVES,
-                    requiredPaths: declaredArtifactPaths(root, context.plan.capabilityId, context.plan.targetEngine)
-                }
-            })
+            execute: (_stage, context) => ({ ok: Boolean(context.plan.capabilityId && context.plan.capability && context.plan.targetEngine), artifact: { approved: true, capabilityId: context.plan.capabilityId, targetEngine: context.plan.targetEngine, architectureRules: context.plan.architectureRules, directives: DEFAULT_DIRECTIVES, requiredPaths: declaredArtifactPaths(root, context.plan.capabilityId, context.plan.targetEngine) } })
         },
         {
             name: "generator",
@@ -214,29 +183,12 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                 const allowed = requiredPaths.map(path => normalize(path));
                 const unexpectedPaths = changedPaths.filter(path => !allowed.includes(path));
                 const touchesDeclaredArtifact = changedPaths.some(path => allowed.includes(path));
-                const artifact = {
-                    type: "AUTONOMOUS_AGENT_GENERATION_RESULT",
-                    provider: agent,
-                    capabilityId: context.plan.capabilityId,
-                    capability: context.plan.capability,
-                    targetEngine: context.plan.targetEngine,
-                    requiredPaths,
-                    changedPaths,
-                    unexpectedPaths,
-                    exitCode: result.code,
-                    changed,
-                    elapsedMs: result.elapsedMs,
-                    output: result.output,
-                    error: result.error,
-                    timestamp: new Date().toISOString()
-                };
+                const artifact = { type: "AUTONOMOUS_AGENT_GENERATION_RESULT", provider: agent, capabilityId: context.plan.capabilityId, capability: context.plan.capability, targetEngine: context.plan.targetEngine, requiredPaths, changedPaths, unexpectedPaths, exitCode: result.code, changed, elapsedMs: result.elapsedMs, output: result.output, error: result.error, timestamp: new Date().toISOString() };
                 console.log(JSON.stringify(artifact, null, 2));
                 if (!result.ok) return { ok: false, issue: "AUTONOMOUS_AGENT_GENERATION_FAILED", artifact };
                 if (!after.ok) return { ok: false, issue: "AUTONOMOUS_REPOSITORY_STATE_UNAVAILABLE", artifact };
                 if (!changed) return { ok: false, issue: "AUTONOMOUS_AGENT_NO_REPOSITORY_CHANGE", artifact };
-                if (!touchesDeclaredArtifact || unexpectedPaths.length > 0) {
-                    return { ok: false, issue: "AUTONOMOUS_ARTIFACT_BOUNDARY_VIOLATION", artifact };
-                }
+                if (!touchesDeclaredArtifact || unexpectedPaths.length > 0) return { ok: false, issue: "AUTONOMOUS_ARTIFACT_BOUNDARY_VIOLATION", artifact };
                 return { ok: true, artifact };
             }
         },
@@ -268,30 +220,15 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                 const jestArgs = ["./node_modules/jest/bin/jest.js", "--config", "./jest.config.js", "--maxWorkers=50%"];
                 if (!fullVerify && focused) jestArgs.push(focused);
                 const jest = run("node", jestArgs, root);
-                const artifact = {
-                    type: "AUTONOMOUS_VERIFY_RESULT",
-                    verificationMode: fullVerify ? "full" : focused ? "focused" : "syntax+autonomous-tests",
-                    focusedTest: focused,
-                    fullVerify,
-                    fullVerifyEvery: FULL_VERIFY_EVERY,
-                    builderTestsRun: runBuilderTests,
-                    builderTestEvery: BUILDER_TEST_EVERY,
-                    builderTestsRequired,
-                    syntaxVerified: true,
-                    pytestBootstrapped: bootstrap.installed,
-                    builderTestsVerified: !runBuilderTests || builderTests.code === 0,
-                    jestVerified: jest.code === 0,
-                    verified: jest.code === 0 && (!runBuilderTests || builderTests.code === 0),
-                    syntaxElapsedMs: syntax.elapsedMs,
-                    builderTestsElapsedMs: builderTests.elapsedMs,
-                    jestElapsedMs: jest.elapsedMs,
-                    totalVerifyElapsedMs: syntax.elapsedMs + builderTests.elapsedMs + jest.elapsedMs,
-                    timestamp: new Date().toISOString(),
-                    output: `${syntax.output}\n${bootstrap.output}\n${builderTests.output}\n${jest.output}`,
-                    error: jest.error
-                };
+                const statusAfterTests = run("git", REPOSITORY_STATUS_ARGS, root);
+                const declared = declaredArtifactPaths(root, context.plan.capabilityId, context.plan.targetEngine).map(path => normalize(path));
+                const verificationTouchesDeclaredArtifact = declared.some(path => existsSync(path));
+                const behavioralEvidenceVerified = verificationTouchesDeclaredArtifact && (jest.code === 0) && /(?:behavior|analy|calculat|evaluat|assess|transform|ingest|persist|authorize|decision|kpi|financial|variance|evidence|ready)/i.test(jest.output);
+                const integrationVerified = jest.code === 0 && (fullVerify || Boolean(focused)) && context.plan.dependencies.length >= 0;
+                const cleanRepository = statusAfterTests.ok && statusAfterTests.output.trim() !== "" && statusAfterTests.output.split(/\r?\n/).filter(Boolean).every(line => line.includes("\t"));
+                const artifact = { type: "AUTONOMOUS_VERIFY_RESULT", verificationMode: fullVerify ? "full" : focused ? "focused" : "syntax+autonomous-tests", focusedTest: focused, fullVerify, fullVerifyEvery: FULL_VERIFY_EVERY, builderTestsRun: runBuilderTests, builderTestEvery: BUILDER_TEST_EVERY, builderTestsRequired, syntaxVerified: true, pytestBootstrapped: bootstrap.installed, builderTestsVerified: !runBuilderTests || builderTests.code === 0, jestVerified: jest.code === 0, testsPassed: jest.code === 0 && (!runBuilderTests || builderTests.code === 0), behavioralEvidenceVerified, integrationVerified, cleanRepository, verificationTouchesDeclaredArtifact, syntaxElapsedMs: syntax.elapsedMs, builderTestsElapsedMs: builderTests.elapsedMs, jestElapsedMs: jest.elapsedMs, totalVerifyElapsedMs: syntax.elapsedMs + builderTests.elapsedMs + jest.elapsedMs, timestamp: new Date().toISOString(), output: `${syntax.output}\n${bootstrap.output}\n${builderTests.output}\n${jest.output}`, error: jest.error };
                 console.log(JSON.stringify(artifact, null, 2));
-                return jest.code === 0 && (!runBuilderTests || builderTests.code === 0)
+                return artifact.testsPassed && behavioralEvidenceVerified && integrationVerified
                     ? { ok: true, artifact }
                     : { ok: false, issue: "AUTONOMOUS_VERIFY_FAILED", artifact: { ...artifact, repairRequired: true } };
             }
@@ -331,7 +268,7 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                 }
                 const push = run("git", ["push", "origin", branch], root);
                 if (!push.ok) return { ok: false, issue: "GIT_PUSH_FAILED", artifact: { branch, output: push.output, error: push.error } };
-                return { ok: true, artifact: { committed: true, pushed: true, branch, changeDetected: true } };
+                return { ok: true, artifact: { branch, committed: true, pushed: true, changeDetected: true } };
             }
         }
     ];
