@@ -56,6 +56,14 @@ def _required_artifact_paths(prompt: str) -> tuple[str, str, str] | None:
     return values[0], values[1], values[2]
 
 
+def _is_directory_artifact(path: str) -> bool:
+    return Path(path).suffix == ""
+
+
+def _implementation_path(path: str) -> str:
+    return f"{path.rstrip('/')}/index.ts" if _is_directory_artifact(path) else path
+
+
 def spec_from_prompt(prompt: str) -> CapabilitySpec | None:
     def field(name: str) -> str:
         match = re.search(rf"^{re.escape(name)}:\s*(.+)$", prompt, re.MULTILINE)
@@ -75,7 +83,9 @@ def spec_from_prompt(prompt: str) -> CapabilitySpec | None:
     declared = _required_artifact_paths(prompt)
     if declared:
         engine_path, test_path, docs_path = declared
-        class_name = _path_class_name(engine_path, class_name)
+        implementation_path = _implementation_path(engine_path)
+        class_name = _path_class_name(implementation_path, class_name)
+        engine_path = implementation_path
 
     return CapabilitySpec(
         capability_id=capability_id,
@@ -99,18 +109,7 @@ def validate_spec(spec: CapabilitySpec) -> list[str]:
         errors.append("missing target engine")
     if spec.engine_path == spec.test_path or spec.engine_path == spec.docs_path:
         errors.append("construction artifacts must remain distinct")
-
-    rules = " ".join(spec.architecture_rules).lower()
-    if "one capability" in rules and "one engine" in rules and "one test" in rules:
-        pass
-    if any("duplicate" in rule.lower() and "engine" in rule.lower() for rule in spec.architecture_rules):
-        pass
     return errors
-
-
-def _artifact_dir(path: str) -> str:
-    parent = Path(path).parent.as_posix()
-    return f"../{parent.split('/')[-1]}" if parent else ".."
 
 
 def product_artifacts(spec: CapabilitySpec) -> list[tuple[str, str]]:
@@ -120,54 +119,162 @@ def product_artifacts(spec: CapabilitySpec) -> list[tuple[str, str]]:
 
     class_name = spec.class_name
     product_dir = Path(spec.engine_path).parent.as_posix()
-    relative_product_import = "../" + product_dir.split("/")[-1]
-    test_import = f"{relative_product_import}/{class_name}"
+    product_name = Path(spec.engine_path).stem
+
+    if product_dir.startswith("Frontend/"):
+        relative_product_import = "../../../" + spec.engine_path
+        relative_product_import = relative_product_import[:-3] if relative_product_import.endswith(".ts") else relative_product_import
+        test_import = relative_product_import.replace("\\", "/")
+    else:
+        relative_product_import = "../" + product_dir.split("/")[-1]
+        test_import = f"{relative_product_import}/{class_name}"
 
     if class_name == "FinancialDataIngestionAdapter":
         method = "ingest"
         interface = "export interface NormalizedFinancialRecord { [key: string]: unknown; }"
-        method_body = """        return records.map((record) => Object.fromEntries(Object.entries(record).map(([key, value]) => [key.trim(), value])));"""
+        method_body = "        return records.map((record) => Object.fromEntries(Object.entries(record).map(([key, value]) => [key.trim(), value])));"
         argument = "records: Record<string, unknown>[]"
         result_type = "NormalizedFinancialRecord[]"
     else:
         method = "execute"
         interface = "export interface ProductCapabilityResult { status: \"READY\" | \"BLOCKED\"; }"
-        method_body = """        return { status: input && input.trim() ? \"READY\" : \"BLOCKED\" };"""
+        method_body = "        return { status: input && input.trim() ? \"READY\" : \"BLOCKED\" };"
         argument = "input: string"
         result_type = "ProductCapabilityResult"
 
-    engine = f'''{interface}\n\nexport class {class_name} {{\n    readonly capabilityId = "{spec.capability_id}";\n    readonly targetEngine = "{spec.target_engine}";\n\n    initialize(): {{ status: "READY" }} {{\n        return {{ status: "READY" }};\n    }}\n\n    {method}({argument}): {result_type} {{\n{method_body}\n    }}\n}}\n'''
+    engine = f'''{interface}
+
+export class {class_name} {{
+    readonly capabilityId = "{spec.capability_id}";
+    readonly targetEngine = "{spec.target_engine}";
+
+    initialize(): {{ status: "READY" }} {{
+        return {{ status: "READY" }};
+    }}
+
+    {method}({argument}): {result_type} {{
+{method_body}
+    }}
+}}
+'''
 
     if class_name == "FinancialDataIngestionAdapter":
-        test = f'''import {{ {class_name} }} from "{test_import}";\n\ndescribe("{class_name}", () => {{\n    it("exposes the canonical product boundary", () => {{\n        const adapter = new {class_name}();\n        expect(adapter.capabilityId).toBe("{spec.capability_id}");\n        expect(adapter.targetEngine).toBe("{spec.target_engine}");\n        expect(adapter.initialize().status).toBe("READY");\n    }});\n\n    it("normalizes repository-supported record keys without inventing domain semantics", () => {{\n        const result = new {class_name}().ingest([{{ " account ": "100", amount: 12 }}]);\n        expect(result).toEqual([{{ account: "100", amount: 12 }}]);\n    }});\n}});\n'''
+        test = f'''import {{ {class_name} }} from "{test_import}";
+
+describe("{class_name}", () => {{
+    it("exposes the canonical product boundary", () => {{
+        const adapter = new {class_name}();
+        expect(adapter.capabilityId).toBe("{spec.capability_id}");
+        expect(adapter.targetEngine).toBe("{spec.target_engine}");
+        expect(adapter.initialize().status).toBe("READY");
+    }});
+
+    it("normalizes repository-supported record keys without inventing domain semantics", () => {{
+        const result = new {class_name}().ingest([{{ " account ": "100", amount: 12 }}]);
+        expect(result).toEqual([{{ account: "100", amount: 12 }}]);
+    }});
+}});
+'''
     else:
-        test = f'''import {{ {class_name} }} from "{test_import}";\n\ndescribe("{class_name}", () => {{\n    it("exposes the canonical product boundary", () => {{\n        const service = new {class_name}();\n        expect(service.capabilityId).toBe("{spec.capability_id}");\n        expect(service.targetEngine).toBe("{spec.target_engine}");\n        expect(service.initialize().status).toBe("READY");\n    }});\n\n    it("keeps its deterministic minimal contract", () => {{\n        expect(new {class_name}().execute("continue").status).toBe("READY");\n        expect(new {class_name}().execute(" ").status).toBe("BLOCKED");\n    }});\n}});\n'''
+        test = f'''import {{ {class_name} }} from "{test_import}";
+
+describe("{class_name}", () => {{
+    it("exposes the canonical product boundary", () => {{
+        const service = new {class_name}();
+        expect(service.capabilityId).toBe("{spec.capability_id}");
+        expect(service.targetEngine).toBe("{spec.target_engine}");
+        expect(service.initialize().status).toBe("READY");
+    }});
+
+    it("keeps its deterministic minimal contract", () => {{
+        expect(new {class_name}().execute("continue").status).toBe("READY");
+        expect(new {class_name}().execute(" ").status).toBe("BLOCKED");
+    }});
+}});
+'''
 
     dependencies = ", ".join(spec.dependencies) if spec.dependencies else "none"
-    docs = f'''# {spec.class_name}\n\nCanonical product capability: `{spec.capability_id}`.\n\nTarget engine: {spec.target_engine}\n\nCapability: {spec.capability}\n\nDependencies: {dependencies}\n\nThe product artifact is intentionally kept outside the engine implementation boundary.\nThe autonomous worker may enrich this contract only from repository architecture,\ntests, dependencies and durable product evidence.\n'''
+    docs = f'''# {product_name}
+
+Canonical product capability: `{spec.capability_id}`.
+
+Target engine: {spec.target_engine}
+
+Capability: {spec.capability}
+
+Dependencies: {dependencies}
+
+The product artifact is intentionally kept outside the engine implementation boundary.
+The autonomous worker may enrich this contract only from repository architecture,
+tests, dependencies and durable product evidence.
+'''
     return [(spec.engine_path, engine), (spec.test_path, test), (spec.docs_path, docs)]
 
 
 def generic_artifacts(spec: CapabilitySpec) -> list[tuple[str, str]]:
-    if spec.capability_id.startswith("product.") or "/Product/" in spec.engine_path:
+    if spec.capability_id.startswith("product.") or "/Product/" in spec.engine_path or spec.engine_path.startswith("Frontend/"):
         return product_artifacts(spec)
 
     errors = validate_spec(spec)
     if errors:
         raise ValueError("Invalid capability specification: " + "; ".join(errors))
 
-    if spec.class_name == "APIGatewayEngine":
-        engine = '''import { Engine } from "../Core/Engine";\n\nexport interface ApiRouteResult {\n    path: string;\n    method: string;\n    status: "READY" | "BLOCKED";\n}\n\nexport class APIGatewayEngine implements Engine {\n    name = "APIGatewayEngine";\n    initialize(): void {}\n    health(): boolean { return true; }\n\n    route(path: string, method = "GET"): ApiRouteResult {\n        const normalizedPath = path?.trim() ?? "";\n        const normalizedMethod = method?.trim().toUpperCase() ?? "";\n        if (!normalizedPath || !normalizedMethod) {\n            return { path: normalizedPath, method: normalizedMethod, status: "BLOCKED" };\n        }\n        return { path: normalizedPath, method: normalizedMethod, status: "READY" };\n    }\n\n    describeCapability(): { id: string; capability: string; targetEngine: string } {\n        return {\n            id: "platform.api-gateway",\n            capability: "implement the Phase 2 API Gateway capability",\n            targetEngine: "API Gateway Engine"\n        };\n    }\n}\n'''
-        test = '''import { APIGatewayEngine } from "../Engines/APIGatewayEngine";\n\ndescribe("APIGatewayEngine", () => {\n    it("routes a canonical request", () => {\n        const result = new APIGatewayEngine().route("/api/health", "get");\n        expect(result).toEqual({ path: "/api/health", method: "GET", status: "READY" });\n    });\n\n    it("blocks an empty request", () => {\n        expect(new APIGatewayEngine().route(" ", " ").status).toBe("BLOCKED");\n    });\n});\n'''
-        docs = """# API Gateway Engine\n\nCanonical autonomous capability: `platform.api-gateway`.\n\nThe engine owns deterministic request routing validation while remaining behind the canonical Security Layer boundary.\n"""
-        return [(spec.engine_path, engine), (spec.test_path, test), (spec.docs_path, docs)]
+    engine = f'''import {{ Engine }} from "../Core/Engine";
 
-    engine = f'''import {{ Engine }} from "../Core/Engine";\n\nexport class {spec.class_name} implements Engine {{\n    name = "{spec.class_name}";\n\n    initialize(): void {{}}\n\n    health(): boolean {{\n        return true;\n    }}\n\n    describeCapability(): {{ id: string; capability: string; targetEngine: string }} {{\n        return {{\n            id: "{spec.capability_id}",\n            capability: "{spec.capability}",\n            targetEngine: "{spec.target_engine}"\n        }};\n    }}\n}}\n'''
-    test = f'''import {{ {spec.class_name} }} from "../Engines/{spec.class_name}";\n\ndescribe("{spec.class_name}", () => {{\n    it("exposes the canonical capability identity and health", () => {{\n        const engine = new {spec.class_name}();\n        expect(engine.name).toBe("{spec.class_name}");\n        expect(engine.health()).toBe(true);\n        expect(engine.describeCapability()).toEqual({{\n            id: "{spec.capability_id}",\n            capability: "{spec.capability}",\n            targetEngine: "{spec.target_engine}"\n        }});\n    }});\n}});\n'''
+export class {spec.class_name} implements Engine {{
+    name = "{spec.class_name}";
+
+    initialize(): void {{}}
+
+    health(): boolean {{
+        return true;
+    }}
+
+    describeCapability(): {{ id: string; capability: string; targetEngine: string }} {{
+        return {{
+            id: "{spec.capability_id}",
+            capability: "{spec.capability}",
+            targetEngine: "{spec.target_engine}"
+        }};
+    }}
+}}
+'''
+    test = f'''import {{ {spec.class_name} }} from "../Engines/{spec.class_name}";
+
+describe("{spec.class_name}", () => {{
+    it("exposes the canonical capability identity and health", () => {{
+        const engine = new {spec.class_name}();
+        expect(engine.name).toBe("{spec.class_name}");
+        expect(engine.health()).toBe(true);
+        expect(engine.describeCapability()).toEqual({{
+            id: "{spec.capability_id}",
+            capability: "{spec.capability}",
+            targetEngine: "{spec.target_engine}"
+        }});
+    }});
+}});
+'''
     dependencies = ", ".join(spec.dependencies) if spec.dependencies else "none"
     rules = "\n".join(f"- {rule}" for rule in spec.architecture_rules) or "- Preserve Architecture Freeze V4 and existing engine boundaries."
     directives = "\n".join(f"- {directive}" for directive in spec.directives) or "- Implement exactly one concrete capability and verify it before finalization."
-    docs = f'''# {spec.target_engine}\n\nCanonical autonomous capability: `{spec.capability_id}`.\n\nCapability: {spec.capability}\n\nDependencies: {dependencies}\n\n## Architecture contract\n{rules}\n\n## Construction directives\n{directives}\n\nThis scaffold is intentionally semantic-neutral. The autonomous construction loop\nmust enrich it only from repository architecture, dependencies, tests and evidence;\nit must not invent business rules or create duplicate engine boundaries.\n'''
+    docs = f'''# {spec.target_engine}
+
+Canonical autonomous capability: `{spec.capability_id}`.
+
+Capability: {spec.capability}
+
+Dependencies: {dependencies}
+
+## Architecture contract
+{rules}
+
+## Construction directives
+{directives}
+
+This scaffold is intentionally semantic-neutral. The autonomous construction loop
+must enrich it only from repository architecture, dependencies, tests and evidence;
+it must not invent business rules or create duplicate engine boundaries.
+'''
     return [(spec.engine_path, engine), (spec.test_path, test), (spec.docs_path, docs)]
 
 
@@ -176,24 +283,16 @@ def _needs_reweave(root: Path, artifacts: list[tuple[str, str]]) -> bool:
         target = root / relative_path
         if not target.exists():
             return True
-        if relative_path.startswith("Backend/HBOS/Engines/") and "route(" in expected:
-            if "route(" not in target.read_text(encoding="utf-8"):
-                return True
-        if relative_path.startswith("Backend/HBOS/test/") and "route(" in expected:
-            if "route(" not in target.read_text(encoding="utf-8"):
-                return True
+        try:
+            current = target.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            return True
+        if current != expected:
+            return True
     return False
 
 
 def _ensure_parent_directory(target: Path) -> None:
-    """Ensure a file-artifact parent can evolve into a directory safely.
-
-    The commercial roadmap may legitimately extend an existing frontend shell
-    with nested mobile/admin surfaces. Older builder generations could have
-    materialized the shell as a file named ``HooshyarWebApp``. Preserve that
-    artifact as a named legacy child before creating the directory required by
-    the new nested capability.
-    """
     parent = target.parent
     if parent.exists() and parent.is_file():
         legacy_content = parent.read_text(encoding="utf-8")
@@ -227,7 +326,6 @@ def write_missing(root: Path, artifacts: list[tuple[str, str]]) -> list[str]:
 
 
 def write_overwrite(root: Path, artifacts: list[tuple[str, str]]) -> list[str]:
-    """Repair only the exact deterministic artifacts owned by this capability."""
     repaired: list[str] = []
     for relative_path, content in artifacts:
         target = root / relative_path
