@@ -1,20 +1,46 @@
 <!doctype html>
-<html lang="fa">
+<html lang="fa" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Hooshyar.ai</title>
-  <style>body{font-family:system-ui,sans-serif;margin:0;padding:2rem;max-width:760px}main{display:grid;gap:1rem}.card{padding:1rem;border:1px solid #ddd;border-radius:12px}</style>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="description" content="هوشیار.ai — هوش مالی و مدیریتی">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/styles.css">
+  <title>هوشیار.ai</title>
 </head>
 <body>
-<main>
-  <h1>هوشیار.ai</h1>
-  <p>Financial &amp; Management Intelligence</p>
-  <section class="card"><strong id="ready">در حال بررسی وضعیت سامانه…</strong></section>
-  <section class="card"><strong>مسیر MVP تجاری</strong><p>سازمان → داده → داشبورد → گزارش → تصمیم → اجرا</p></section>
-</main>
-<script>
-fetch('/api/ready').then(r=>r.json()).then(x=>document.getElementById('ready').textContent=x.status==='READY'?'سامانه آماده است':'سامانه نیاز به بررسی دارد').catch(()=>document.getElementById('ready').textContent='سامانه در دسترس نیست');
-</script>
+  <header class="topbar"><div><b>هوشیار.ai</b><span>هوش مالی و مدیریتی</span></div><button id="refresh" class="ghost">به‌روزرسانی</button></header>
+  <main class="shell">
+    <section class="hero card">
+      <div><span class="eyebrow">MVP تجاری قابل تست</span><h1>از داده مالی تا تصمیم اجرایی</h1><p>ورود سازمان، ثبت داده، داشبورد، گزارش و تصمیم در یک مسیر واقعی.</p></div>
+      <div class="actions"><button id="demo">بارگذاری داده نمونه</button><div id="message" class="message">در حال اتصال…</div></div>
+    </section>
+
+    <section class="grid two">
+      <article class="card">
+        <h2>۱. ورود و سازمان</h2>
+        <div class="form-grid"><label>کاربر<input id="username" value="مدیرعامل" autocomplete="username"></label><label>سازمان<input id="organization" value="شرکت نمونه هوشیار"></label></div>
+        <button id="login">ایجاد نشست امن</button><p id="session" class="muted">هنوز نشست ایجاد نشده</p>
+      </article>
+      <article class="card">
+        <h2>۲. ثبت داده مالی</h2>
+        <div class="form-grid"><label>دسته‌بندی<input id="category" value="فروش"></label><label>مبلغ<input id="amount" type="number" value="150000000"></label></div>
+        <button id="ingest">ثبت و تحلیل</button><p id="data-summary" class="muted">داده‌ای ثبت نشده</p>
+      </article>
+    </section>
+
+    <section class="card"><div class="section-head"><h2>۳. داشبورد مدیریت</h2><span id="dashboard-status" class="status">در انتظار داده</span></div>
+      <div class="kpis"><div><span>درآمد</span><strong id="kpi-revenue">۰</strong></div><div><span>سود</span><strong id="kpi-profit">۰</strong></div><div><span>نقدینگی</span><strong id="kpi-cash">۰</strong></div><div><span>ریسک</span><strong id="kpi-risk">۰٪</strong></div></div>
+    </section>
+
+    <section class="grid two">
+      <article class="card"><h2>۴. گزارش اجرایی</h2><div id="report" class="report"><p class="muted">گزارش پس از ورود داده نمایش داده می‌شود.</p></div></article>
+      <article class="card"><h2>۵. مرکز تصمیم</h2><label>عنوان تصمیم<input id="decision" value="آیا بودجه بازاریابی افزایش یابد؟"></label><button id="decision-submit">ثبت تصمیم</button><div id="decision-result" class="decision-result">هنوز تصمیمی ثبت نشده</div></article>
+    </section>
+
+    <section class="card footer-card"><strong>وضعیت محصول:</strong> Web Runtime + PWA + API + Persistence + Tenant Context + Dashboard + Report + Decision</section>
+  </main>
+  <script src="/app.js" defer></script>
 </body>
 </html>
