@@ -70,7 +70,20 @@ const REPOSITORY_STATUS_ARGS = ["status", "--porcelain=v1", "--untracked-files=a
 const FULL_VERIFY_EVERY = Math.max(1, Number.parseInt(process.env.HOOSHYAR_FULL_VERIFY_EVERY || "10", 10) || 10);
 const BUILDER_TEST_EVERY = Math.max(1, Number.parseInt(process.env.HOOSHYAR_BUILDER_TEST_EVERY || "5", 10) || 5);
 
-function focusedTestFor(capabilityId: string): string | null {
+function focusedTestFor(capabilityId: string, root = process.cwd()): string | null {
+    const canonicalCapabilityId = capabilityId.replace(/^(repair-)+/, "");
+    const roadmapPath = join(root, "Docs", "Product", "PRODUCT_CONSTRUCTION_ROADMAP.json");
+    if (existsSync(roadmapPath)) {
+        try {
+            const roadmap = JSON.parse(readFileSync(roadmapPath, "utf8")) as {
+                capabilities?: Array<{ capabilityId?: string; testPath?: string }>
+            };
+            const capability = roadmap.capabilities?.find(item => item.capabilityId === canonicalCapabilityId);
+            if (capability?.testPath) return capability.testPath;
+        } catch {
+            // Fall back to the static map below when roadmap parsing is unavailable.
+        }
+    }
     const known: Record<string, string> = {
         "platform.user-management": "Backend/HBOS/test/UserManagementEngine.test.ts",
         "platform.organization-model": "Backend/HBOS/test/OrganizationModelEngine.test.ts",
@@ -94,7 +107,7 @@ function focusedTestFor(capabilityId: string): string | null {
         "platform.deployment-readiness": "Backend/HBOS/test/DeploymentReadinessEngine.test.ts",
         "platform.deployment-contract": "Backend/HBOS/test/DeploymentContractEngine.test.ts"
     };
-    return known[capabilityId] || null;
+    return known[canonicalCapabilityId] || null;
 }
 
 export function productRoadmapPaths(root: string, capabilityId: string): string[] {
@@ -186,7 +199,7 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
             execute: (stage, context) => {
                 if (stage !== "VERIFY") return { ok: true };
                 verificationCount += 1;
-                const focused = focusedTestFor(context.plan.capabilityId);
+                const focused = focusedTestFor(context.plan.capabilityId, root);
                 const fullVerify = verificationCount % FULL_VERIFY_EVERY === 0 || process.env.HOOSHYAR_FULL_VERIFY === "1";
                 const runBuilderTests = builderTestsRequired || verificationCount % BUILDER_TEST_EVERY === 0 || fullVerify || process.env.HOOSHYAR_BUILDER_VERIFY === "1";
                 const syntax = run("python", ["-m", "compileall", "-q", "Backend/AI_Runtime"], root);
