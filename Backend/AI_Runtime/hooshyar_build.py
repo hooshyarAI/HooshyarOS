@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -14,6 +15,8 @@ BUILDER = ROOT / "Backend" / "AI_Runtime" / "autonomous_builder.py"
 TSX = ROOT / "node_modules" / ".bin" / ("tsx.cmd" if os.name == "nt" else "tsx")
 HANDOFF_MARKER = '\"type\":\"AUTONOMOUS_PLATFORM_CONTINUATION\"'
 ROADMAP = ROOT / "Docs" / "Product" / "PRODUCT_CONSTRUCTION_ROADMAP.json"
+
+MAX_SELF_HEAL_ATTEMPTS = 3
 
 
 def run(command: str, args: list[str], timeout: int = 30 * 60) -> subprocess.CompletedProcess[str]:
@@ -119,10 +122,47 @@ def _capability_prompt(capability: dict) -> str:
     ])
 
 
+def _frontend_directory_import(implementation: str) -> str | None:
+    normalized = implementation.replace("\\", "/").rstrip("/")
+    if not normalized.startswith("Frontend/"):
+        return None
+    return "../../../" + normalized
+
+
+def _repair_generated_product_test(capability: dict) -> bool:
+    implementation = str(capability.get("implementationPath", "")).replace("\\", "/")
+    test_path_value = capability.get("testPath")
+    if not test_path_value or not implementation.startswith("Frontend/"):
+        return False
+    test_path = ROOT / str(test_path_value)
+    if not test_path.exists() or not test_path.is_file():
+        return False
+    import_target = _frontend_directory_import(implementation)
+    if not import_target:
+        return False
+    class_name = Path(implementation.rstrip("/")).name
+    content = test_path.read_text(encoding="utf-8", errors="replace")
+    import_pattern = re.compile(r'^import\s*\{[^}]+\}\s*from\s*"[^"]+";?$', re.MULTILINE)
+    replacement = f'import {{ {class_name} }} from "{import_target}";'
+    repaired, count = import_pattern.subn(replacement, content, count=1)
+    if count != 1 or repaired == content:
+        return False
+    test_path.write_text(repaired, encoding="utf-8")
+    print(json.dumps({
+        "type": "AUTONOMOUS_SELF_HEAL",
+        "capabilityId": capability.get("capabilityId"),
+        "repair": "normalize frontend directory artifact import",
+        "testPath": str(test_path),
+        "import": replacement,
+    }, ensure_ascii=False))
+    return True
+
+
 def reweave_interrupted_capabilities(dirty: list[str]) -> bool:
     matched = [c for c in roadmap_capabilities() if _dirty_overlaps_capability(dirty, c)]
     if not matched:
         return False
+    changed = False
     for capability in matched:
         result = subprocess.run(
             [sys.executable, str(BUILDER), "--prompt", _capability_prompt(capability)],
@@ -133,7 +173,13 @@ def reweave_interrupted_capabilities(dirty: list[str]) -> bool:
         print(result.stdout, end="")
         if result.returncode != 0:
             return False
-    return True
+        changed = True
+        _repair_generated_product_test(capability)
+    return changed
+
+
+def _matching_dirty_capabilities(dirty: list[str]) -> list[dict]:
+    return [c for c in roadmap_capabilities() if _dirty_overlaps_capability(dirty, c)]
 
 
 def is_resumable_generation_state() -> tuple[bool, list[str]]:
@@ -150,16 +196,43 @@ def is_resumable_generation_state() -> tuple[bool, list[str]]:
     return True, dirty
 
 
+def _verify_and_self_heal(dirty: list[str]) -> subprocess.CompletedProcess[str]:
+    verification = run("npm", ["test", "--", "--runInBand"], timeout=45 * 60)
+    print(verification.stdout, end="")
+    if verification.returncode == 0:
+        return verification
+
+    for attempt in range(1, MAX_SELF_HEAL_ATTEMPTS + 1):
+        latest_dirty = status_paths()
+        matched = _matching_dirty_capabilities(latest_dirty or dirty)
+        if not matched:
+            break
+        print(json.dumps({
+            "type": "AUTONOMOUS_SELF_HEAL_RETRY",
+            "attempt": attempt,
+            "maxAttempts": MAX_SELF_HEAL_ATTEMPTS,
+            "capabilities": [c.get("capabilityId") for c in matched],
+            "action": "DIAGNOSE → REWEAVE → NORMALIZE → VERIFY",
+        }, ensure_ascii=False))
+        if not reweave_interrupted_capabilities(latest_dirty or dirty):
+            break
+        verification = run("npm", ["test", "--", "--runInBand"], timeout=45 * 60)
+        print(verification.stdout, end="")
+        if verification.returncode == 0:
+            return verification
+    return verification
+
+
 def resume_interrupted_generation() -> bool:
     resumable, dirty = is_resumable_generation_state()
     if not resumable:
         return False
     print(json.dumps({"type": "AUTONOMOUS_RESUME_GENERATION", "status": "detected", "changedPaths": dirty, "action": "REWEAVE → VERIFY → COMMIT → PUSH → CONTINUE"}, ensure_ascii=False))
-    reweave_interrupted_capabilities(dirty)
-    verification = run("npm", ["test", "--", "--runInBand"], timeout=45 * 60)
-    print(verification.stdout, end="")
+    if not reweave_interrupted_capabilities(dirty):
+        return False
+    verification = _verify_and_self_heal(dirty)
     if verification.returncode != 0:
-        print(json.dumps({"type": "AUTONOMOUS_RESUME_GENERATION", "status": "blocked", "reason": "verification failed", "exitCode": verification.returncode}, ensure_ascii=False))
+        print(json.dumps({"type": "AUTONOMOUS_RESUME_GENERATION", "status": "blocked", "reason": "verification failed after self-heal", "exitCode": verification.returncode}, ensure_ascii=False))
         return False
     add = run("git", ["add", "-A"])
     print(add.stdout, end="")
