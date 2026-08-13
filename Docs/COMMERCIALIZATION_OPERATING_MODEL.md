@@ -223,6 +223,9 @@ The product should be considered commercially ready only when repository and app
 - explicit treatment of external dependencies
 - deployment compatibility for organizations with different IT maturity and infrastructure
 - a default path that does not require customer-owned dedicated hardware or a specialized IT team
+- automatic data acquisition from existing systems and files is the primary path
+- employees are not required to enter the same operational data in Hooshyar and another system
+- manual data entry is exceptional, not the normal customer workflow
 
 External cloud resources, payment-provider activation or third-party credentials must remain explicit external dependencies when unavailable.
 
@@ -298,10 +301,41 @@ Approved input paths should minimize dependency on a customer's existing softwar
 
 All such sources must converge through the existing canonical validation, normalization and evidence flow.
 
+## 16. Zero Data Entry and No Duplicate Work
+
+HooshyarOS must not make employees re-enter information that already exists in another approved company system or record.
+
+**Automatic acquisition first:** whenever information already exists, the preferred source is the existing system or artifact, not manual re-entry.
+
+Approved acquisition paths include, where supported:
+
+`ERP/Accounting | CRM | HR/Payroll | POS | Banking/Financial exports | SQL/Database adapters | API | Excel/CSV | PDF | Word/Documents | Images/Scans/OCR | Historical files | Reports | Budgets | Auditor documents`
+
+The commercial product must converge these sources through the existing canonical validation, normalization and evidence/provenance flow.
+
+**No double entry:** if an employee has already recorded an operational fact in another system, Hooshyar should consume or synchronize that fact rather than asking the employee to record it again.
+
+**Manual entry is exceptional:** manual entry is allowed only when:
+
+- the information does not exist in an accessible source;
+- a user is intentionally creating a new record or decision;
+- or explicit human confirmation is required because automated extraction has uncertainty.
+
+When manual confirmation is required, the preferred interaction is prefilled extraction + review/approval, not retyping.
+
+**Zero-entry target:** the default onboarding journey should maximize connection/import/extraction and minimize manual data entry. A product workflow that depends on routine duplicate entry fails this commercialization principle even when the underlying capability exists.
+
+**Evidence requirement:** commercial completion must include evidence that representative existing company information can be acquired from at least one machine-readable source and one document/file source, validated, normalized and surfaced to the user without duplicate manual re-entry.
+
+**Future integration rule:** deeper integrations should reduce customer effort; an integration that creates a second operational record or parallel employee workflow should be rejected or redesigned.
+
+## 17. Commercial completion interpretation
+
 Commercial completion must distinguish:
 
 1. repository-native capability readiness;
 2. deployment compatibility readiness;
-3. customer/provider-specific production activation.
+3. automatic data acquisition and no-duplicate-work readiness;
+4. customer/provider-specific production activation.
 
 External DNS, certificates, payment credentials, customer network approvals and infrastructure accounts remain explicit external dependencies. They must never be silently treated as evidence that the product itself is incomplete or that an external provider has been activated.
