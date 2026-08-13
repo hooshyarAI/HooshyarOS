@@ -8,8 +8,22 @@ describe("StrategicTransformationOKRService", () => {
         expect(service.initialize().status).toBe("READY");
     });
 
-    it("keeps its deterministic minimal contract", () => {
-        expect(new StrategicTransformationOKRService().execute("continue").status).toBe("READY");
-        expect(new StrategicTransformationOKRService().execute(" ").status).toBe("BLOCKED");
+    it("transforms strategic goals into execution evidence", () => {
+        const result = new StrategicTransformationOKRService().transform(
+            "vision->mission->okr->project->task",
+        );
+        expect(result.status).toBe("READY");
+        expect(result.evidence).toEqual([
+            "vision",
+            "mission",
+            "okr",
+            "project",
+            "task",
+        ]);
+    });
+
+    it("blocks incomplete transformation evidence", () => {
+        expect(new StrategicTransformationOKRService().transform("vision->mission").status).toBe("BLOCKED");
+        expect(new StrategicTransformationOKRService().transform(" ").status).toBe("BLOCKED");
     });
 });
