@@ -35,4 +35,16 @@ describe("AutonomousKnotRecovery", () => {
         }));
         expect(decision.rationale).toContain("last verified checkpoint");
     });
+
+    it("does not create nested repair prefixes when a repair knot fails again", () => {
+        const repairCheckpoint = { capabilityId: "repair-product.financial-statement-analysis", commit: "abc123" };
+        const decision = recovery.observe(repairCheckpoint, {
+            capabilityId: repairCheckpoint.capabilityId,
+            executionOk: true,
+            verificationComplete: false,
+            repositoryChanged: true
+        });
+
+        expect(decision.repairCapabilityId).toBe("repair-product.financial-statement-analysis");
+    });
 });
