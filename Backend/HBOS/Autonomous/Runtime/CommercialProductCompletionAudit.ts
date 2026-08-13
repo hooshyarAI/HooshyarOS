@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { CommercialArtifactQualityAudit } from "./CommercialArtifactQualityAudit";
 
 export interface CommercialProductCompletionAuditResult {
     complete: boolean;
@@ -18,6 +19,7 @@ interface RoadmapCapability {
 export class CommercialProductCompletionAudit {
     private readonly contractPath = "Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md";
     private readonly roadmapPath = "Docs/Product/PRODUCT_CONSTRUCTION_ROADMAP.json";
+    private readonly qualityAudit = new CommercialArtifactQualityAudit();
 
     audit(root: string): CommercialProductCompletionAuditResult {
         const contractFile = join(root, this.contractPath);
@@ -97,10 +99,13 @@ export class CommercialProductCompletionAudit {
             missingLayers.push("commercial-roadmap-missing");
         }
 
+        const quality = this.qualityAudit.audit(root);
+        for (const failure of quality.failures) missingLayers.push(`quality:${failure}`);
+
         const blockedExternalDependencies: string[] = [];
         if (contract.includes("Payment-provider activation is an external dependency")) blockedExternalDependencies.push("payment-provider-activation");
         if (contract.includes("Cloud deployment may remain externally blocked")) blockedExternalDependencies.push("production-cloud-resources");
 
-        return { complete: missingLayers.length === 0, contractPresent: true, missingLayers, blockedExternalDependencies };
+        return { complete: missingLayers.length === 0 && quality.complete, contractPresent: true, missingLayers, blockedExternalDependencies };
     }
 }
