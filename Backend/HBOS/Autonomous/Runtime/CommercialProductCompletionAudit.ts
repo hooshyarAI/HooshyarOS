@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, join } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { CommercialArtifactQualityAudit } from "./CommercialArtifactQualityAudit";
 
