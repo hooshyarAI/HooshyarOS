@@ -99,8 +99,22 @@ export class CommercialArtifactQualityAudit {
 
     private readArtifactSource(path: string): string | null {
         try {
-            if (!statSync(path).isFile()) return null;
-            return readFileSync(path, "utf8");
+            const stats = statSync(path);
+
+            if (stats.isFile()) {
+                return readFileSync(path, "utf8");
+            }
+
+            if (stats.isDirectory()) {
+                for (const name of ["index.ts", "index.tsx", "index.js", "index.jsx"]) {
+                    const candidate = join(path, name);
+                    if (existsSync(candidate) && statSync(candidate).isFile()) {
+                        return readFileSync(candidate, "utf8");
+                    }
+                }
+            }
+
+            return null;
         } catch {
             return null;
         }
