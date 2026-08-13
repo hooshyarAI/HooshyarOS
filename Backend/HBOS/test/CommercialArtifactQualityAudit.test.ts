@@ -30,6 +30,19 @@ describe("CommercialArtifactQualityAudit", () => {
         } finally { rmSync(root, { recursive: true, force: true }); }
     });
 
+    it("accepts a real product implementation that retains the canonical contract shell", () => {
+        const root = mkdtempSync(join(process.cwd(), ".tmp-quality-audit-canonical-"));
+        try {
+            mkdirSync(join(root, "Backend/HBOS/Product"), { recursive: true });
+            mkdirSync(join(root, "Backend/HBOS/test"), { recursive: true });
+            writeFileSync(join(root, "Backend/HBOS/Product/FinancialStatementAnalysisService.ts"), `export interface ProductCapabilityResult { status: "READY" | "BLOCKED"; }\nexport class FinancialStatementAnalysisService { initialize(): { status: "READY" } { return { status: "READY" }; } execute(input: string): ProductCapabilityResult { return { status: input && input.trim() ? "READY" : "BLOCKED" }; } analyze(statement: { revenue: number; cost: number }) { const grossProfit = statement.revenue - statement.cost; return { grossProfit, grossMargin: grossProfit / statement.revenue }; } }`, "utf8");
+            writeFileSync(join(root, "Backend/HBOS/test/FinancialStatementAnalysisService.test.ts"), `describe("FinancialStatementAnalysisService", () => { it("proves calculation behavior", () => { const result = new FinancialStatementAnalysisService().analyze({ revenue: 100, cost: 60 }); expect(result.grossProfit).toBe(40); expect(result.grossMargin).toBeCloseTo(0.4); }); });`, "utf8");
+            const result = new CommercialArtifactQualityAudit().auditCapability(root, "product.financial-statement-analysis", "Backend/HBOS/Product/FinancialStatementAnalysisService.ts", "Backend/HBOS/test/FinancialStatementAnalysisService.test.ts");
+            expect(result.complete).toBe(true);
+            expect(result.failures).toEqual([]);
+        } finally { rmSync(root, { recursive: true, force: true }); }
+    });
+
     it("fails closed when an implementationPath points to a directory", () => {
         const root = mkdtempSync(join(process.cwd(), ".tmp-quality-audit-directory-"));
         try {
