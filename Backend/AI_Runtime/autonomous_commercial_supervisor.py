@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -13,9 +13,8 @@ if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 ROOT = Path(__file__).resolve().parents[2]
-MAX_CYCLES = int(os.environ.get("HOOSHYAR_AUTONOMOUS_MAX_CYCLES", "50"))
 ASSISTANT_CONTROLLER = ROOT / "Backend/AI_Runtime/hooshyar_build.py"
-GOVERNING_ARTIFACTS = [
+GOVERNING_FILES = [
     ROOT / "Docs/HOOSHYAROS_MASTER_CHARTER.md",
     ROOT / "Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md",
     ROOT / "Docs/ARCHITECTURE.md",
@@ -24,77 +23,41 @@ GOVERNING_ARTIFACTS = [
     ROOT / "Docs/HOOSHYAROS_COMMERCIAL_SCOPE_RECONCILIATION.md",
     ROOT / "Docs/Product/PRODUCT_CONSTRUCTION_ROADMAP.json",
 ]
+GOVERNING_ARTIFACTS = GOVERNING_FILES
+REQUIRED_MARKERS = [
+    "Architecture Freeze V4", "Everything is an Engine", "One Capability",
+    "Reasoning Engine", "Governance Engine", "Executive Intelligence Engine",
+    "Organizational Intelligence Engine", "Autonomous Operations Engine",
+]
 SUBORDINATE_MARKERS = [
     "The Assistant is the autonomous engineering executor",
     "Python is the canonical construction worker/orchestration layer",
     "The autonomous Assistant is NOT the platform's future financial, managerial or commercial advisor",
-    "Platform continuation",
-    "REPAIR",
-    "RE-PLAN",
+    "Platform continuation", "REPAIR", "RE-PLAN",
 ]
 
 
-def run(command: list[str], timeout: int = 45 * 60, *, child_of_assistant: bool = False) -> tuple[int, str]:
-    print(f"\n>>> {' '.join(command)}", flush=True)
-    env = os.environ.copy()
-    env["PYTHONUTF8"] = "1"
-    env["PYTHONIOENCODING"] = "utf-8"
-    if child_of_assistant:
-        env["HOOSHYAR_CONSTRUCTION_PARENT"] = "assistant"
-        env["HOOSHYAR_SUPERVISOR_ROLE"] = "subordinate-recovery-and-verification"
-        env["HOOSHYAR_AGENT"] = "python"
-    completed = subprocess.run(
-        command,
-        cwd=ROOT,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        timeout=timeout,
-        check=False,
-        env=env,
-    )
-    output = completed.stdout or ""
-    print(output, end="", flush=True)
-    return completed.returncode, output
-
-
-def validate_constitution() -> bool:
-    missing = [str(path.relative_to(ROOT)) for path in GOVERNING_ARTIFACTS if not path.exists()]
+def read_governing_context() -> tuple[bool, str]:
+    missing = [str(path.relative_to(ROOT)) for path in GOVERNING_FILES if not path.is_file()]
     if missing:
-        print(json.dumps({"type": "AUTONOMOUS_GOVERNANCE_BLOCKED", "missing": missing}, ensure_ascii=False), flush=True)
-        return False
-    if not ASSISTANT_CONTROLLER.exists():
-        print(json.dumps({"type": "AUTONOMOUS_GOVERNANCE_BLOCKED", "reason": "assistant construction controller missing", "path": str(ASSISTANT_CONTROLLER.relative_to(ROOT))}, ensure_ascii=False), flush=True)
-        return False
-    architecture = (ROOT / "Docs/ARCHITECTURE.md").read_text(encoding="utf-8", errors="replace")
-    charter = (ROOT / "Docs/HOOSHYAROS_MASTER_CHARTER.md").read_text(encoding="utf-8", errors="replace")
-    constitution = (ROOT / "Assistant/SYSTEM_PROMPT.md").read_text(encoding="utf-8", errors="replace")
-    merged = "\n".join([architecture, charter, constitution])
-    required = [
-        "Architecture Freeze V4", "Everything is an Engine", "One Capability",
-        "Reasoning Engine", "Governance Engine", "Executive Intelligence Engine",
-        "Organizational Intelligence Engine", "Autonomous Operations Engine",
-    ]
-    if not all(token in merged for token in required):
-        print(json.dumps({"type": "AUTONOMOUS_GOVERNANCE_BLOCKED", "reason": "governing architecture markers missing"}, ensure_ascii=False), flush=True)
-        return False
-    if not all(marker in merged or marker in (ROOT / "Docs/HOOSHYAROS_FINAL_DECISIONS_REGISTER.md").read_text(encoding="utf-8", errors="replace") for marker in SUBORDINATE_MARKERS):
-        print(json.dumps({"type": "AUTONOMOUS_GOVERNANCE_BLOCKED", "reason": "assistant-supervisor subordination contract missing"}, ensure_ascii=False), flush=True)
-        return False
-    print(json.dumps({
-        "type": "AUTONOMOUS_GOVERNANCE_OK",
-        "sourceOfTruthCount": len(GOVERNING_ARTIFACTS),
-        "parentController": str(ASSISTANT_CONTROLLER.relative_to(ROOT)),
-        "role": "subordinate-recovery-and-verification",
-        "independentArchitectureAuthority": False,
-        "independentCapabilitySelection": False,
-    }, ensure_ascii=False), flush=True)
-    return True
+        return False, "missing:" + ",".join(missing)
+    merged = "\n".join(path.read_text(encoding="utf-8", errors="replace") for path in GOVERNING_FILES)
+    if not all(token in merged for token in REQUIRED_MARKERS):
+        return False, "governing-architecture-markers-missing"
+    if not all(marker in merged for marker in SUBORDINATE_MARKERS):
+        return False, "assistant-supervisor-subordination-contract-missing"
+    if not ASSISTANT_CONTROLLER.is_file():
+        return False, "assistant-construction-controller-missing"
+    return True, "repository-governance-valid"
 
 
-def json_events(output: str) -> list[dict]:
+def enforce_construction_toolchain() -> tuple[bool, str]:
+    if os.environ.get("HOOSHYAR_AGENT", "python").strip().lower() != "python":
+        return False, "python+github+assistant-only"
+    return (True, "python+github+assistant") if ASSISTANT_CONTROLLER.is_file() else (False, "assistant-construction-controller-missing")
+
+
+def validate_plan(output: str) -> tuple[bool, str]:
     events: list[dict] = []
     for line in output.splitlines():
         line = line.strip()
@@ -106,109 +69,102 @@ def json_events(output: str) -> list[dict]:
             continue
         if isinstance(value, dict):
             events.append(value)
-    return events
+    weaving = next((event for event in reversed(events) if event.get("type") == "AUTONOMOUS_WEAVING_PLAN"), None)
+    mission = next((event for event in reversed(events) if event.get("type") == "AUTONOMOUS_MISSION"), None)
+    if not weaving or not mission:
+        return False, "missing-weaving-plan-or-mission"
+    plan = weaving.get("plan") or {}
+    capability_id = str(plan.get("capabilityId") or "")
+    if capability_id == "platform.continuation":
+        return False, "continuation-token-selected-as-capability"
+    for field in ("dependencyOrder", "verificationOrder", "stopConditions"):
+        if not isinstance(plan.get(field), list) or not plan[field]:
+            return False, f"missing-{field}"
+    if not str(mission.get("commit") or "").strip():
+        return False, "missing-trusted-checkpoint"
+    return (False, "missing-capability-id") if not capability_id else (True, capability_id)
 
 
-def last_event(output: str, event_type: str) -> dict | None:
-    for event in reversed(json_events(output)):
-        if event.get("type") == event_type:
-            return event
-    return None
-
-
-def blocked_event(output: str) -> dict | None:
-    return last_event(output, "AUTONOMOUS_BLOCKED")
-
-
-def fingerprint(output: str) -> str:
-    event = blocked_event(output)
-    if event:
-        result = event.get("result") or {}
-        if isinstance(result, dict):
-            return "BLOCKED:" + json.dumps(result.get("issues") or result.get("details") or result, ensure_ascii=False, sort_keys=True)
-    return "OUTPUT:" + output[-4000:]
-
-
-def construction_self_heal() -> bool:
-    code, _ = run([sys.executable, "Backend/AI_Runtime/repair_construction_idempotency.py"], timeout=10 * 60, child_of_assistant=True)
-    return code == 0
-
-
-def focused_repair(output: str) -> bool:
-    repaired = False
-    if "AUTONOMOUS_AGENT_NO_REPOSITORY_CHANGE" in output or "AUTONOMOUS_BEHAVIORAL_EVIDENCE_INCOMPLETE" in output:
-        repaired = construction_self_heal() or repaired
-    if "product.web-application-shell" in output:
-        code, _ = run([sys.executable, "Backend/AI_Runtime/commercial_autorepair.py"], timeout=45 * 60, child_of_assistant=True)
-        repaired = code == 0 or repaired
-    return repaired
-
-
-def full_regression() -> bool:
-    code, _ = run(["npm.cmd", "run", "build"], child_of_assistant=True)
-    if code != 0:
+def validate_constitution() -> bool:
+    ok, reason = read_governing_context()
+    if not ok:
+        print(json.dumps({"type": "AUTONOMOUS_GOVERNANCE_BLOCKED", "reason": reason}, ensure_ascii=False), flush=True)
         return False
-    code, _ = run(["npm.cmd", "test", "--", "--runInBand"], timeout=90 * 60, child_of_assistant=True)
-    return code == 0
+    tool_ok, tool_reason = enforce_construction_toolchain()
+    if not tool_ok:
+        print(json.dumps({"type": "AUTONOMOUS_GOVERNANCE_BLOCKED", "reason": tool_reason}, ensure_ascii=False), flush=True)
+        return False
+    print(json.dumps({
+        "type": "AUTONOMOUS_GOVERNANCE_OK",
+        "sourceOfTruthCount": len(GOVERNING_FILES),
+        "parentController": str(ASSISTANT_CONTROLLER.relative_to(ROOT)),
+        "role": "subordinate-recovery-and-verification",
+        "independentArchitectureAuthority": False,
+        "independentCapabilitySelection": False,
+    }, ensure_ascii=False), flush=True)
+    return True
+
+
+def run(command: list[str], timeout: int = 45 * 60) -> int:
+    env = os.environ.copy()
+    env["PYTHONUTF8"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"
+    env["HOOSHYAR_CONSTRUCTION_PARENT"] = "assistant"
+    env["HOOSHYAR_SUPERVISOR_ROLE"] = "subordinate-recovery-and-verification"
+    print(f"\n>>> {' '.join(command)}", flush=True)
+    result = subprocess.run(command, cwd=ROOT, text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout, check=False, env=env)
+    print(result.stdout or "", end="", flush=True)
+    return result.returncode
+
+
+def perform_recovery(failure_output: str) -> int:
+    plan_ok, plan_reason = validate_plan(failure_output)
+    if not plan_ok:
+        print(json.dumps({"type": "AUTONOMOUS_SUPERVISOR_BLOCKED", "reason": plan_reason}, ensure_ascii=False), flush=True)
+        return 6
+    repaired = False
+    repair_markers = (
+        "AUTONOMOUS_AGENT_NO_REPOSITORY_CHANGE",
+        "AUTONOMOUS_BEHAVIORAL_EVIDENCE_INCOMPLETE",
+        "AUTONOMOUS_WORKTREE_DIRTY",
+        "AUTONOMOUS_WORKTREE_DIRTY_AFTER_VERIFY",
+        "AUTONOMOUS_ARTIFACT_BOUNDARY_VIOLATION",
+    )
+    if any(marker in failure_output for marker in repair_markers):
+        repaired = run([sys.executable, "Backend/AI_Runtime/repair_construction_idempotency.py"], timeout=10 * 60) == 0 or repaired
+    if "product.web-application-shell" in failure_output:
+        repaired = run([sys.executable, "Backend/AI_Runtime/commercial_autorepair.py"], timeout=45 * 60) == 0 or repaired
+    if not repaired:
+        print(json.dumps({"type": "AUTONOMOUS_SUPERVISOR_BLOCKED", "reason": "no-safe-repair-strategy-matched"}, ensure_ascii=False), flush=True)
+        return 7
+    if run(["npm.cmd", "run", "build"], timeout=30 * 60) != 0:
+        return 8
+    if run(["npm.cmd", "test", "--", "--runInBand"], timeout=90 * 60) != 0:
+        return 9
+    print(json.dumps({
+        "type": "AUTONOMOUS_SUPERVISOR_RECOVERY_COMPLETE",
+        "parentController": str(ASSISTANT_CONTROLLER.relative_to(ROOT)),
+        "action": "REPAIR → VERIFY → RETURN_TO_ASSISTANT",
+        "independentCapabilitySelection": False,
+        "independentArchitectureAuthority": False,
+    }, ensure_ascii=False), flush=True)
+    return 0
 
 
 def main() -> int:
-    print("AUTONOMOUS_COMMERCIAL_SUPERVISOR_START", flush=True)
-    print(f"ROOT={ROOT}", flush=True)
-    print(f"MAX_CYCLES={MAX_CYCLES}", flush=True)
+    parser = argparse.ArgumentParser(description="Assistant-subordinate HooshyarOS recovery supervisor")
+    parser.add_argument("--failure-file", required=True)
+    args = parser.parse_args()
+    if os.environ.get("HOOSHYAR_CONSTRUCTION_PARENT") != "assistant":
+        print(json.dumps({"type": "AUTONOMOUS_SUPERVISOR_BLOCKED", "reason": "supervisor-must-be-launched-by-construction-assistant"}, ensure_ascii=False), flush=True)
+        return 5
     if not validate_constitution():
         return 5
-
-    seen_failures: dict[str, int] = {}
-    for cycle in range(1, MAX_CYCLES + 1):
-        print(f"\n=== SUPERVISOR CYCLE {cycle} ===", flush=True)
-        if not validate_constitution():
-            return 5
-
-        construction_self_heal()
-
-        build_code, build_output = run(["npm.cmd", "run", "build"], child_of_assistant=True)
-        if build_code != 0:
-            platform_code, platform_output = run([sys.executable, str(ASSISTANT_CONTROLLER), "platform"], timeout=90 * 60, child_of_assistant=True)
-            blocked = blocked_event(platform_output)
-            if platform_code != 0 or blocked:
-                key = fingerprint(platform_output or build_output)
-                seen_failures[key] = seen_failures.get(key, 0) + 1
-                if focused_repair(platform_output or build_output):
-                    continue
-                if seen_failures[key] >= 3:
-                    print("AUTONOMOUS_SUPERVISOR_STOPPED", flush=True)
-                    print("REASON=REPEATED_UNRESOLVED_BUILD_FAILURE", flush=True)
-                    return 2
-                continue
-
-        platform_code, platform_output = run([sys.executable, str(ASSISTANT_CONTROLLER), "platform"], timeout=90 * 60, child_of_assistant=True)
-        blocked = blocked_event(platform_output)
-        if platform_code != 0 or blocked:
-            key = fingerprint(platform_output)
-            seen_failures[key] = seen_failures.get(key, 0) + 1
-            if focused_repair(platform_output):
-                continue
-            if seen_failures[key] >= 3:
-                print("AUTONOMOUS_SUPERVISOR_STOPPED", flush=True)
-                print("REASON=REPEATED_UNRESOLVED_PLATFORM_FAILURE", flush=True)
-                return 3
-            continue
-
-        complete_event = last_event(platform_output, "AUTONOMOUS_PLATFORM_CONSTRUCTION_COMPLETE")
-        if complete_event:
-            if full_regression():
-                print("AUTONOMOUS_COMMERCIAL_SUPERVISOR_COMPLETE", flush=True)
-                return 0
-            continue
-
-        if full_regression():
-            time.sleep(0.2)
-            continue
-
-    print("AUTONOMOUS_SUPERVISOR_STOPPED", flush=True)
-    print("REASON=MAX_CYCLES_EXCEEDED", flush=True)
-    return 4
+    failure_file = Path(args.failure_file)
+    if not failure_file.is_file():
+        print(json.dumps({"type": "AUTONOMOUS_SUPERVISOR_BLOCKED", "reason": "failure-context-missing"}, ensure_ascii=False), flush=True)
+        return 6
+    return perform_recovery(failure_file.read_text(encoding="utf-8", errors="replace"))
 
 
 if __name__ == "__main__":
