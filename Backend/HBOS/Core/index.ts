@@ -2,6 +2,9 @@ import { HBOS } from "./HBOS";
 
 const system = new HBOS();
 
-system.initialize();
+const ready = system.boot();
 
-console.log(system.status());
+console.log({
+    status: ready ? "READY" : "BLOCKED",
+    health: system.health()
+});
