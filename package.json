@@ -6,6 +6,8 @@
   "scripts": {
     "test": "node ./node_modules/jest/bin/jest.js",
     "build": "tsc --noEmit",
+    "product": "tsx Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts",
+    "product:test": "node ./node_modules/jest/bin/jest.js --runInBand Backend/HBOS/test/CommercialRuntimeServer.test.ts",
     "start": "tsx Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts",
     "serve": "tsx Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts",
     "autonomous:build": "tsx Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts",
