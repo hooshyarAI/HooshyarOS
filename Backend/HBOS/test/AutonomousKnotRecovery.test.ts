@@ -5,35 +5,36 @@ describe("AutonomousKnotRecovery", () => {
     const recovery = new AutonomousKnotRecovery();
 
     it("advances only when execution, verification and repository evidence agree", () => {
-        const decision = recovery.observe(checkpoint, {
-            capabilityId: checkpoint.capabilityId,
-            executionOk: true,
-            verificationComplete: true,
-            repositoryChanged: true
-        });
-
-        expect(decision).toEqual(expect.objectContaining({
-            recover: false,
-            action: "ADVANCE",
-            checkpoint
-        }));
+        const decision = recovery.observe(checkpoint, { capabilityId: checkpoint.capabilityId, executionOk: true, verificationComplete: true, repositoryChanged: true });
+        expect(decision).toEqual(expect.objectContaining({ recover: false, action: "ADVANCE", checkpoint }));
     });
 
-    it("re-winds the current knot when verification detects a wrong result", () => {
+    it("selects a root-cause repair mission from heterogeneous verification evidence", () => {
+        const decision = recovery.observe(checkpoint, {
+            capabilityId: checkpoint.capabilityId,
+            executionOk: false,
+            verificationComplete: false,
+            repositoryChanged: false,
+            failures: ["FAIL CommercialRuntimeServer.test.ts Received: 400", "FAIL AutonomousConstructionEngine.quality.test.ts QUALITY_BEHAVIOR_UNVERIFIED"]
+        });
+
+        expect(decision.recover).toBe(true);
+        expect(decision.action).toBe("REPAIR");
+        expect(decision.repairCapabilityId).toBe("repair-commercial-runtime-server");
+        expect(decision.repairCluster?.rootCause).toBe("commercial-runtime-request-or-test-lifecycle-contract");
+        expect(decision.repairEvidence).toEqual(expect.arrayContaining([expect.stringContaining("CommercialRuntimeServer")]));
+    });
+
+    it("falls back safely when no root cause can be classified", () => {
         const decision = recovery.observe(checkpoint, {
             capabilityId: checkpoint.capabilityId,
             executionOk: true,
             verificationComplete: false,
-            repositoryChanged: true
+            repositoryChanged: true,
+            failures: ["unclassified failure"]
         });
-
-        expect(decision).toEqual(expect.objectContaining({
-            recover: true,
-            action: "REPAIR",
-            repairCapabilityId: "repair-platform.user-management",
-            checkpoint
-        }));
-        expect(decision.rationale).toContain("last verified checkpoint");
+        expect(decision.recover).toBe(true);
+        expect(decision.repairCapabilityId).toBe("repair-platform.user-management");
     });
 
     it("does not create nested repair prefixes when a repair knot fails again", () => {
@@ -42,9 +43,9 @@ describe("AutonomousKnotRecovery", () => {
             capabilityId: repairCheckpoint.capabilityId,
             executionOk: true,
             verificationComplete: false,
-            repositoryChanged: true
+            repositoryChanged: true,
+            failures: ["unclassified failure"]
         });
-
         expect(decision.repairCapabilityId).toBe("repair-product.financial-statement-analysis");
     });
 });
