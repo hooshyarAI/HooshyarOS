@@ -90,3 +90,28 @@ def test_write_missing_refuses_partial_construction(tmp_path: Path):
         assert "partial autonomous construction" in str(error)
     else:
         raise AssertionError("partial construction must be rejected")
+
+
+def test_write_missing_migrates_file_parent_for_nested_artifact(tmp_path: Path):
+    spec = spec_from_prompt(
+        "Capability ID: product.mobile-and-admin-surfaces\n"
+        "Capability: provide responsive phone experience plus organizational administration surfaces\n"
+        "Target Engine: Assistant Engine\n"
+        "Dependencies: Web Application Shell, Organization Identity and RBAC, API Gateway\n"
+        "Required artifact paths: Frontend/HooshyarWebApp/AdminAndMobileSurfaces ; Backend/HBOS/test/MobileAndAdminSurfaces.test.ts ; Docs/Product/MobileAndAdminSurfaces.md\n"
+        "Architecture rules: Preserve Architecture Freeze V4\n"
+        "Directives: Implement exactly ONE concrete capability\n"
+    )
+    artifacts = generic_artifacts(spec)
+
+    legacy_shell = tmp_path / "Frontend/HooshyarWebApp"
+    legacy_shell.parent.mkdir(parents=True, exist_ok=True)
+    legacy_shell.write_text("legacy-shell", encoding="utf-8")
+
+    generated = write_missing(tmp_path, artifacts)
+
+    assert generated == [path for path, _ in artifacts]
+    shell_dir = tmp_path / "Frontend/HooshyarWebApp"
+    assert shell_dir.is_dir()
+    assert (shell_dir / "HooshyarWebApp.legacy.ts").read_text(encoding="utf-8") == "legacy-shell"
+    assert (shell_dir / "AdminAndMobileSurfaces").is_file()
