@@ -8,8 +8,13 @@ describe("TalentSuccessionService", () => {
         expect(service.initialize().status).toBe("READY");
     });
 
-    it("keeps its deterministic minimal contract", () => {
-        expect(new TalentSuccessionService().execute("continue").status).toBe("READY");
-        expect(new TalentSuccessionService().execute(" ").status).toBe("BLOCKED");
+    it("assesses talent and succession evidence", () => {
+        const result = new TalentSuccessionService().assess("coverage=4;continuity=5;transfer=3");
+        expect(result.status).toBe("READY");
+        expect(result.evidence).toBeDefined();
+    });
+
+    it("blocks empty evidence input", () => {
+        expect(new TalentSuccessionService().assess(" ").status).toBe("BLOCKED");
     });
 });
