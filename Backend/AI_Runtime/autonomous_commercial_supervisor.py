@@ -14,6 +14,15 @@ if hasattr(sys.stderr, "reconfigure"):
 
 ROOT = Path(__file__).resolve().parents[2]
 MAX_CYCLES = int(os.environ.get("HOOSHYAR_AUTONOMOUS_MAX_CYCLES", "50"))
+GOVERNING_ARTIFACTS = [
+    ROOT / "Docs/HOOSHYAROS_MASTER_CHARTER.md",
+    ROOT / "Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md",
+    ROOT / "Docs/ARCHITECTURE.md",
+    ROOT / "Assistant/SYSTEM_PROMPT.md",
+    ROOT / "Docs/HOOSHYAROS_FINAL_DECISIONS_REGISTER.md",
+    ROOT / "Docs/HOOSHYAROS_COMMERCIAL_SCOPE_RECONCILIATION.md",
+    ROOT / "Docs/Product/PRODUCT_CONSTRUCTION_ROADMAP.json",
+]
 
 
 def run(command: list[str], timeout: int = 45 * 60) -> tuple[int, str]:
@@ -36,6 +45,22 @@ def run(command: list[str], timeout: int = 45 * 60) -> tuple[int, str]:
     output = completed.stdout or ""
     print(output, end="", flush=True)
     return completed.returncode, output
+
+
+def validate_constitution() -> bool:
+    missing = [str(path.relative_to(ROOT)) for path in GOVERNING_ARTIFACTS if not path.exists()]
+    if missing:
+        print(json.dumps({"type": "AUTONOMOUS_GOVERNANCE_BLOCKED", "missing": missing}, ensure_ascii=False), flush=True)
+        return False
+    architecture = (ROOT / "Docs/ARCHITECTURE.md").read_text(encoding="utf-8", errors="replace")
+    charter = (ROOT / "Docs/HOOSHYAROS_MASTER_CHARTER.md").read_text(encoding="utf-8", errors="replace")
+    constitution = (ROOT / "Assistant/SYSTEM_PROMPT.md").read_text(encoding="utf-8", errors="replace")
+    required = ["Architecture Freeze V4", "Everything is an Engine", "One Capability", "Reasoning Engine", "Governance Engine", "Executive Intelligence Engine", "Organizational Intelligence Engine", "Autonomous Operations Engine"]
+    if not all(token in architecture or token in charter or token in constitution for token in required):
+        print(json.dumps({"type": "AUTONOMOUS_GOVERNANCE_BLOCKED", "reason": "governing architecture markers missing"}, ensure_ascii=False), flush=True)
+        return False
+    print(json.dumps({"type": "AUTONOMOUS_GOVERNANCE_OK", "sourceOfTruthCount": len(GOVERNING_ARTIFACTS)}, ensure_ascii=False), flush=True)
+    return True
 
 
 def json_events(output: str) -> list[dict]:
@@ -69,11 +94,7 @@ def fingerprint(output: str) -> str:
     if event:
         result = event.get("result") or {}
         if isinstance(result, dict):
-            return "BLOCKED:" + json.dumps(
-                result.get("issues") or result.get("details") or result,
-                ensure_ascii=False,
-                sort_keys=True,
-            )
+            return "BLOCKED:" + json.dumps(result.get("issues") or result.get("details") or result, ensure_ascii=False, sort_keys=True)
     return "OUTPUT:" + output[-4000:]
 
 
@@ -104,10 +125,14 @@ def main() -> int:
     print("AUTONOMOUS_COMMERCIAL_SUPERVISOR_START", flush=True)
     print(f"ROOT={ROOT}", flush=True)
     print(f"MAX_CYCLES={MAX_CYCLES}", flush=True)
+    if not validate_constitution():
+        return 5
 
     seen_failures: dict[str, int] = {}
     for cycle in range(1, MAX_CYCLES + 1):
         print(f"\n=== SUPERVISOR CYCLE {cycle} ===", flush=True)
+        if not validate_constitution():
+            return 5
 
         construction_self_heal()
 
@@ -149,8 +174,6 @@ def main() -> int:
         if full_regression():
             time.sleep(0.2)
             continue
-
-        continue
 
     print("AUTONOMOUS_SUPERVISOR_STOPPED", flush=True)
     print("REASON=MAX_CYCLES_EXCEEDED", flush=True)
