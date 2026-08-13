@@ -82,10 +82,12 @@ def spec_from_prompt(prompt: str) -> CapabilitySpec | None:
 
     declared = _required_artifact_paths(prompt)
     if declared:
-        engine_path, test_path, docs_path = declared
-        implementation_path = _implementation_path(engine_path)
-        class_name = _path_class_name(implementation_path, class_name)
-        engine_path = implementation_path
+        declared_engine_path, test_path, docs_path = declared
+        if _is_directory_artifact(declared_engine_path):
+            class_name = _path_class_name(declared_engine_path.rstrip("/"), class_name)
+        else:
+            class_name = _path_class_name(declared_engine_path, class_name)
+        engine_path = _implementation_path(declared_engine_path)
 
     return CapabilitySpec(
         capability_id=capability_id,
@@ -118,7 +120,7 @@ def product_artifacts(spec: CapabilitySpec) -> list[tuple[str, str]]:
         raise ValueError("Invalid capability specification: " + "; ".join(errors))
 
     class_name = spec.class_name
-    product_name = Path(spec.engine_path).stem
+    product_name = class_name
     product_dir = Path(spec.engine_path).parent.as_posix()
 
     if product_dir.startswith("Frontend/"):
