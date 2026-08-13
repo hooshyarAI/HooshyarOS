@@ -16,7 +16,7 @@ TSX = ROOT / "node_modules" / ".bin" / ("tsx.cmd" if os.name == "nt" else "tsx")
 HANDOFF_MARKER = '"type":"AUTONOMOUS_PLATFORM_CONTINUATION"'
 ROADMAP = ROOT / "Docs" / "Product" / "PRODUCT_CONSTRUCTION_ROADMAP.json"
 
-MAX_SELF_HEAL_ATTEMPTS = 3
+MAX_SELF_HEAL_ATTEMPTS = 5
 
 
 def run(command: str, args: list[str], timeout: int = 30 * 60) -> subprocess.CompletedProcess[str]:
@@ -124,10 +124,10 @@ def _frontend_directory_import(implementation: str) -> str | None:
     normalized = implementation.replace("\\", "/").rstrip("/")
     if not normalized.startswith("Frontend/"):
         return None
-    if normalized.endswith("/index.ts"):
-        normalized = normalized[: -len("/index.ts")]
-    elif normalized.endswith("/index"):
-        normalized = normalized[: -len("/index")]
+    for suffix in ("/index.ts", "/index"):
+        if normalized.endswith(suffix):
+            normalized = normalized[: -len(suffix)]
+            break
     if not normalized:
         return None
     return "../../../" + normalized
@@ -137,11 +137,12 @@ def _frontend_product_symbol(implementation: str) -> str | None:
     normalized = implementation.replace("\\", "/").rstrip("/")
     if not normalized.startswith("Frontend/"):
         return None
-    if normalized.endswith("/index.ts"):
-        return Path(normalized.split("/")[-2]).name
-    if normalized.endswith("/index"):
-        return Path(normalized.split("/")[-2]).name
-    return Path(normalized.split("/")[-1]).stem
+    parts = [part for part in normalized.split("/") if part]
+    if not parts:
+        return None
+    if parts[-1] in {"index", "index.ts"} and len(parts) >= 2:
+        return parts[-2]
+    return Path(parts[-1]).stem
 
 
 def _repair_generated_product_test(capability: dict) -> bool:
@@ -160,15 +161,53 @@ def _repair_generated_product_test(capability: dict) -> bool:
     import_pattern = re.compile(r'^import\s*\{[^}]+\}\s*from\s*"[^"]+";?$', re.MULTILINE)
     replacement = f'import {{ {class_name} }} from "{import_target}";'
     repaired, count = import_pattern.subn(replacement, content, count=1)
-    if count != 1 or repaired == content:
+    if count != 1:
+        repaired = content
+    # Normalize the common legacy generator symbol in constructor expressions too.
+    repaired, ctor_count = re.subn(r'\bnew\s+index\s*\(\)', f"new {class_name}()", repaired)
+    # Also normalize a stale bare identifier when it appears in a generated test body.
+    repaired, bare_count = re.subn(r'\bindex\.execute\b', f'{class_name}.execute', repaired)
+    if repaired == content:
         return False
     test_path.write_text(repaired, encoding="utf-8")
     print(json.dumps({
         "type": "AUTONOMOUS_SELF_HEAL",
         "capabilityId": capability.get("capabilityId"),
-        "repair": "normalize frontend directory artifact import",
+        "repair": "normalize frontend directory artifact import and constructor symbols",
         "testPath": str(test_path),
         "import": replacement,
+        "constructorReplacements": ctor_count,
+        "bareIdentifierReplacements": bare_count,
+    }, ensure_ascii=False))
+    return True
+
+
+def _repair_frontend_artifact_export(capability: dict) -> bool:
+    implementation = str(capability.get("implementationPath", "")).replace("\\", "/")
+    if not implementation.startswith("Frontend/"):
+        return False
+    class_name = _frontend_product_symbol(implementation)
+    if not class_name:
+        return False
+    target = ROOT / implementation
+    if target.suffix == "":
+        target = target / "index.ts"
+    if not target.exists() or not target.is_file():
+        return False
+    content = target.read_text(encoding="utf-8", errors="replace")
+    if re.search(rf'export\s+class\s+{re.escape(class_name)}\b', content):
+        return False
+    export_pattern = re.compile(r'export\s+class\s+[A-Za-z_$][\w$]*')
+    repaired, count = export_pattern.subn(f'export class {class_name}', content, count=1)
+    if count != 1:
+        return False
+    target.write_text(repaired, encoding="utf-8")
+    print(json.dumps({
+        "type": "AUTONOMOUS_SELF_HEAL",
+        "capabilityId": capability.get("capabilityId"),
+        "repair": "normalize frontend artifact exported symbol",
+        "implementation": str(target),
+        "symbol": class_name,
     }, ensure_ascii=False))
     return True
 
@@ -189,6 +228,7 @@ def reweave_interrupted_capabilities(dirty: list[str]) -> bool:
         if result.returncode != 0:
             return False
         changed = True
+        _repair_frontend_artifact_export(capability)
         _repair_generated_product_test(capability)
     return changed
 
