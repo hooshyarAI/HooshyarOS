@@ -221,6 +221,8 @@ The product should be considered commercially ready only when repository and app
 - security and observability readiness evidence
 - release/recovery procedure
 - explicit treatment of external dependencies
+- deployment compatibility for organizations with different IT maturity and infrastructure
+- a default path that does not require customer-owned dedicated hardware or a specialized IT team
 
 External cloud resources, payment-provider activation or third-party credentials must remain explicit external dependencies when unavailable.
 
@@ -266,3 +268,40 @@ When these conditions cannot be proven, preserve the existing artifact and open 
 **Make the complexity invisible to the user, not invisible to verification.**
 
 The final commercial product should feel simple, clear and trustworthy while remaining rigorous, explainable, testable and governed underneath.
+
+## 15. Zero-IT and deployment compatibility
+
+HooshyarOS must be commercially usable by organizations with different sizes, IT maturity, operating models and infrastructure budgets.
+
+**Zero-IT principle:** the default commercial path must not require a customer to purchase dedicated servers, specialized hardware or a dedicated IT team merely to start using HooshyarOS.
+
+**Deployment-agnostic principle:** Cloud is an optional hosting target, not a product prerequisite.
+
+The supported commercialization delivery modes are:
+
+- **Web/SaaS:** browser-first access without customer-managed application infrastructure.
+- **Windows On-Premise:** installation on a company Windows Server or suitable Windows PC with browser access over LAN.
+- **Remote Web Access:** secure browser access to a customer-hosted installation over the internet when enabled by company network/security policy.
+- **Hybrid:** approved combination of local/customer-controlled boundaries and remote services without duplicating business logic.
+- **Mobile:** mobile application experience using the same canonical API/application semantics rather than parallel business logic.
+- **Offline/Intermittent Connectivity:** local workspace/evidence behavior plus explicit synchronization and conflict resolution when offline operation is in scope.
+
+The preferred customer path is:
+
+`Provision/Start → Open Web → Create/Join Organization → Import/Connect Data → Validate → Configure → Use`
+
+Customers with existing IT systems should gain deeper integration options, not a harder minimum entry path.
+
+Approved input paths should minimize dependency on a customer's existing software stack, including where supported:
+
+`Excel/CSV | PDF/Documents | Manual Evidence | API | ERP/Accounting | Database Adapter`
+
+All such sources must converge through the existing canonical validation, normalization and evidence flow.
+
+Commercial completion must distinguish:
+
+1. repository-native capability readiness;
+2. deployment compatibility readiness;
+3. customer/provider-specific production activation.
+
+External DNS, certificates, payment credentials, customer network approvals and infrastructure accounts remain explicit external dependencies. They must never be silently treated as evidence that the product itself is incomplete or that an external provider has been activated.
