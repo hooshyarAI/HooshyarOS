@@ -23,6 +23,12 @@ export interface KnotRecoveryDecision {
     stopConditions: string[];
 }
 
+function canonicalCapabilityId(capabilityId: string): string {
+    let canonical = capabilityId;
+    while (canonical.startsWith("repair-")) canonical = canonical.slice("repair-".length);
+    return canonical;
+}
+
 /**
  * Decides whether the current knot is safe to advance or must be re-woven.
  *
@@ -51,7 +57,7 @@ export class AutonomousKnotRecovery {
             action: "REPAIR",
             checkpoint,
             rationale: "current knot is not trusted; return to the last verified checkpoint and re-weave this knot before continuing",
-            repairCapabilityId: `repair-${checkpoint.capabilityId}`,
+            repairCapabilityId: `repair-${canonicalCapabilityId(checkpoint.capabilityId)}`,
             stopConditions: [
                 "repair verification fails",
                 "checkpoint cannot be established",
@@ -90,10 +96,7 @@ export class AutonomousKnotRecovery {
             stdio: ["ignore", "pipe", "pipe"]
         });
 
-        const canonicalId = checkpoint.capabilityId.startsWith("repair-")
-            ? checkpoint.capabilityId.slice("repair-".length)
-            : checkpoint.capabilityId;
-
+        const canonicalId = canonicalCapabilityId(checkpoint.capabilityId);
         const roadmapPath = join(root, "Docs", "Product", "PRODUCT_CONSTRUCTION_ROADMAP.json");
 
         if (existsSync(roadmapPath)) {
