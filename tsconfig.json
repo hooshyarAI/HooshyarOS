@@ -5,5 +5,9 @@
     "moduleResolution": "Node",
     "esModuleInterop": true,
     "skipLibCheck": true
-  }
+  },
+  "exclude": [
+    "templates/**/*.ts",
+    "templates/**/*.tsx"
+  ]
 }
