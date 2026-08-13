@@ -34,12 +34,13 @@ jobs:
           --noEmit --target ES2022 --module Node16 --moduleResolution Node16
           --esModuleInterop --skipLibCheck --pretty false
 
-      - name: Commercial artifact quality gate
+      - name: Construction quality gate
         run: >-
           node ./node_modules/jest/bin/jest.js --runInBand
+          Backend/HBOS/test/QualityGate.test.ts
+          Backend/HBOS/test/AutonomousConstructionEngine.quality.test.ts
           Backend/HBOS/test/CommercialArtifactQualityAudit.test.ts
           Backend/HBOS/test/CommercialProductCompletionAudit.test.ts
-          Backend/HBOS/Factory/Quality/QualityGate.test.ts
 
       - name: Focused autonomous tests
         run: >-
