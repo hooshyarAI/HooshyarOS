@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { declaredArtifactPaths, productRoadmapPaths } from "../Autonomous/Runtime/LocalConstructionToolset";
 
 describe("Autonomous repair product boundary", () => {
@@ -5,9 +6,9 @@ describe("Autonomous repair product boundary", () => {
         const root = process.cwd();
         const paths = productRoadmapPaths(root, "repair-product.financial-data-ingestion");
         expect(paths).toEqual([
-            expect.stringContaining("Backend\\HBOS\\Product\\FinancialDataIngestionAdapter.ts"),
-            expect.stringContaining("Backend\\HBOS\\test\\FinancialDataIngestionAdapter.test.ts"),
-            expect.stringContaining("Docs\\Product\\FinancialDataIngestionAdapter.md")
+            join(root, "Backend", "HBOS", "Product", "FinancialDataIngestionAdapter.ts"),
+            join(root, "Backend", "HBOS", "test", "FinancialDataIngestionAdapter.test.ts"),
+            join(root, "Docs", "Product", "FinancialDataIngestionAdapter.md")
         ]);
     });
 
