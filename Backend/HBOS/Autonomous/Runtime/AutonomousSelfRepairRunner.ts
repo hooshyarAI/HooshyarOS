@@ -31,13 +31,13 @@ export class AutonomousSelfRepairRunner {
             evidence: context.failures,
             architectureBoundary: context.targetEngine
         };
-        const strategies = this.createStrategies(context, () => lastResult);
+        const strategies = this.createStrategies(context, result => { lastResult = result; });
         const capability = new SelfRepairCapability(strategies);
         const repairCase = capability.repair(failure);
         return { repairCase, developmentResult: lastResult };
     }
 
-    private createStrategies(context: SelfRepairRunnerContext, resultRef: () => AutonomousDevelopmentResult | undefined): RepairStrategy[] {
+    private createStrategies(context: SelfRepairRunnerContext, recordResult: (result: AutonomousDevelopmentResult) => void): RepairStrategy[] {
         const make = (kind: RepairStrategyKind, description: string, risk: number, fit: number, reversibility: number): RepairStrategy => ({
             id: kind,
             description,
@@ -58,7 +58,7 @@ export class AutonomousSelfRepairRunner {
                 };
                 const result = context.development.execute(goal);
                 const after = context.snapshot();
-                lastResult = result;
+                recordResult(result);
                 const changed = before.commit !== after.commit || result.result.idempotent === true;
                 return {
                     ok: result.result.ok,
@@ -82,7 +82,7 @@ export class AutonomousSelfRepairRunner {
             make("ARCHITECTURAL_REPAIR", "Repair the failure at its architectural contract boundary without changing unrelated capabilities.", 4, 9, 8),
             make("DEPENDENCY_PROVISIONING", "Resolve the required dependency or toolchain through the governed provisioning boundary.", 5, 8, 7),
             make("ISOLATION_OR_FALLBACK", "Isolate the failing external path or activate a governed fallback while preserving the canonical contract.", 6, 8, 7),
-            make("DEEP_REDESIGN", "Reassess the repair strategy and redesign only the failing construction path when prior strategies are exhausted.", 8, 8, 5)
+            make("DEEPER_REDESIGN", "Reassess the repair strategy and redesign only the failing construction path when prior strategies are exhausted.", 8, 8, 5)
         ];
     }
 }
