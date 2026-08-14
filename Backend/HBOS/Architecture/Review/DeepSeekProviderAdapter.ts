@@ -80,6 +80,7 @@ export class DeepSeekProviderAdapter {
 
         const safeRequest: DeepSeekReviewRequest = {
             ...request,
+            decisionId: security.sanitized.decisionId,
             category: this.toReviewCategory(security.sanitized.category),
             evidence: security.sanitized.evidence,
             alternatives: security.sanitized.alternatives,
