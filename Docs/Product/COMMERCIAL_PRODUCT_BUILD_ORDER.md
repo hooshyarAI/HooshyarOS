@@ -14,6 +14,22 @@ Completion requires repository evidence across:
 3. application/runtime
 4. acceptance/user-value
 
+## Non-bypassable autonomous repair rule
+
+The autonomous repair law applies to the **entire product lifecycle**, not only to construction-time failures.
+
+Every build, test, integration, productization, release, deployment, application/runtime or customer-usage defect is treated as an autonomous engineering problem first:
+
+**DETECT → ISOLATE → DIAGNOSE → PLAN → REPAIR → VERIFY → CANARY → RESUME → LEARN/OPTIMIZE → RE-AUDIT**
+
+The Assistant must use the frozen architecture, existing Engine ownership, canonical mission, governed tools, root-cause analysis and proportional repair strategies before requesting human intervention.
+
+For customer-facing runtime failures, autonomous repair is mandatory where technically and safely possible. The repair system must preserve tenant isolation, data integrity, security controls and acceptance contracts; use a reversible repair path; verify through health/canary evidence; automatically rollback a failed repair; and persist durable audit/observability evidence.
+
+Automatic customer-service resume is forbidden until mandatory verification succeeds. A repair that merely suppresses an error, weakens a gate, bypasses an architecture boundary, risks another tenant, corrupts data, or hides evidence is **not a valid repair**.
+
+Manual/external escalation is a last resort and requires durable proof that governed autonomous strategies were exhausted or that the remaining action is genuinely outside autonomous authority. This rule is codified in `Backend/HBOS/Assistant/Autonomous/AutonomousRepairLaw.ts` and enforced through `SelfRepairGovernance`.
+
 ## Required order
 
 ### Phase 0 — Governance and evidence foundation
@@ -23,6 +39,8 @@ Completion requires repository evidence across:
 - Commercial scope must remain organizational/business focused; personal-life and personal-finance coaching are out of scope unless explicitly approved.
 - Every product capability has implementation, test, documentation and acceptance evidence.
 - Repairs remain inside the product artifact boundary.
+- Autonomous repair law is mandatory for construction and production/customer operation.
+- Runtime repair must preserve tenant isolation, data integrity, security and rollback guarantees.
 
 ### Phase 1 — Runnable product foundation
 
@@ -204,6 +222,10 @@ The autonomous builder must:
 
 **AUDIT → DISCOVER → SELECT NEXT MISSING COMMERCIAL OUTCOME → CHECK OWNER → REUSE EXISTING ENGINE → IMPLEMENT → TEST → INTEGRATE → APPLICATION VERIFY → ACCEPTANCE VERIFY → COMMIT → PUSH → RE-AUDIT**
 
+When a defect appears at any point, the builder must switch into the autonomous repair loop before selecting a new capability:
+
+**AUDIT FAILURE → CLASSIFY ROOT CAUSE → SELECT PROPORTIONAL REPAIR → EXECUTE WITH GOVERNANCE → VERIFY → ROLLBACK IF REQUIRED → RESUME ONLY WHEN SAFE → CAPTURE LESSON → CONTINUE**
+
 The builder must not:
 
 - declare product completion from canonical backlog exhaustion alone
@@ -212,6 +234,9 @@ The builder must not:
 - substitute a unit test for application or acceptance evidence
 - silently skip missing runtime/application layers
 - claim a capability is complete solely because implementation files exist
+- weaken verification, security, architecture, tenant isolation or data-integrity gates to make a failure disappear
+- require human intervention for a defect that governed autonomous tools can safely diagnose and repair
+- resume a customer-facing service after an unverified repair
 
 ## Priority rule
 
