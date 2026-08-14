@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#111827">
+  <title>HooshyarOS</title>
+  <style>
+    :root{font-family:Segoe UI,Tahoma,sans-serif;color:#111827;background:#f3f4f6}
+    body{margin:0}.shell{max-width:1100px;margin:auto;padding:32px}
+    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+    .card{background:#fff;border-radius:14px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+    .value{font-size:28px;font-weight:700;margin-top:8px}.status{font-weight:600}
+    .actions{margin-top:20px;display:flex;gap:10px;flex-wrap:wrap}button{border:0;border-radius:10px;padding:10px 16px;cursor:pointer}
+    pre{white-space:pre-wrap;background:#111827;color:#f9fafb;padding:16px;border-radius:12px;overflow:auto}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header><div><h1>هوشیارOS</h1><div>Commercial Runtime</div></div><div id="status" class="status">در حال بررسی...</div></header>
+    <section class="grid">
+      <div class="card"><div>درآمد</div><div id="revenue" class="value">—</div></div>
+      <div class="card"><div>سود</div><div id="profit" class="value">—</div></div>
+      <div class="card"><div>وجه نقد</div><div id="cash" class="value">—</div></div>
+      <div class="card"><div>ریسک</div><div id="risk" class="value">—</div></div>
+    </section>
+    <div class="actions"><button onclick="loadDemo()">بارگذاری داده نمونه</button><button onclick="loadReady()">بررسی سلامت</button></div>
+    <h2>گزارش</h2><pre id="report">—</pre>
+  </main>
+<script>
+const money=n=>new Intl.NumberFormat('fa-IR').format(n??0);
+async function loadReady(){const r=await fetch('/api/ready');const d=await r.json();document.getElementById('status').textContent=d.status==='READY'?'آماده':'متوقف';document.getElementById('report').textContent=JSON.stringify(d,null,2)}
+async function loadDemo(){const r=await fetch('/api/demo');const d=await r.json();const s=d.dashboard||{};document.getElementById('revenue').textContent=money(s.revenue);document.getElementById('profit').textContent=money(s.profit);document.getElementById('cash').textContent=money(s.cash);document.getElementById('risk').textContent=(s.risk??0)+'٪';document.getElementById('status').textContent='آماده';document.getElementById('report').textContent=JSON.stringify(d.report??{},null,2)}
+loadReady();
+</script>
+</body>
+</html>
