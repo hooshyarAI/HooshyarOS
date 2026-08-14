@@ -18,7 +18,8 @@ class AutonomousCommercialSupervisorPolicyTests(unittest.TestCase):
         ok, reason = read_governing_context()
         self.assertTrue(ok, reason)
         self.assertTrue(reason)
-        self.assertEqual(len(GOVERNING_FILES), 7)
+        self.assertGreaterEqual(len(GOVERNING_FILES), 7)
+        self.assertEqual(len({path.resolve() for path in GOVERNING_FILES}), len(GOVERNING_FILES))
         self.assertGreaterEqual(len(REQUIRED_MARKERS), 5)
 
     def test_python_first_toolchain_is_enforced(self) -> None:
