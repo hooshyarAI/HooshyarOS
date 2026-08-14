@@ -78,19 +78,24 @@ export class DeepSeekProviderAdapter {
             throw new Error(`external review blocked by security boundary: ${security.reasons.join("; ")}`);
         }
 
-        if (!this.isCategory(security.sanitized.category)) {
-            throw new Error("external review security boundary returned an invalid governed category");
-        }
-
         const safeRequest: DeepSeekReviewRequest = {
             ...request,
-            ...security.sanitized,
-            category: security.sanitized.category,
+            category: this.toReviewCategory(security.sanitized.category),
+            evidence: security.sanitized.evidence,
+            alternatives: security.sanitized.alternatives,
+            ...(security.sanitized.context ? { context: security.sanitized.context } : {}),
         };
 
         const prompt = this.buildPrompt(safeRequest);
         const response = await this.requestWithRetry(prompt);
         return this.parseReview(response, safeRequest);
+    }
+
+    private toReviewCategory(category: string): DeepSeekReviewRequest["category"] {
+        if (!this.isCategory(category)) {
+            throw new Error("external review security boundary returned an invalid governed category");
+        }
+        return category;
     }
 
     private buildPrompt(request: DeepSeekReviewRequest): string {
