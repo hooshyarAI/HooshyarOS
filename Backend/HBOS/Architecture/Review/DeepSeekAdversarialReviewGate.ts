@@ -33,8 +33,9 @@ export interface DeepSeekReviewDecision {
 }
 
 const HIGH_RISK: ReadonlySet<DeepSeekReviewRisk> = new Set(["HIGH", "CRITICAL"]);
-const MATERIAL_CATEGORIES: ReadonlySet<DeepSeekReviewInput["category"]> = new Set([
+const MANDATORY_REVIEW_CATEGORIES: ReadonlySet<DeepSeekReviewInput["category"]> = new Set([
     "ARCHITECTURE",
+    "DESIGN",
     "SECURITY",
     "RELIABILITY",
     "PRODUCTIZATION",
@@ -48,7 +49,7 @@ export class DeepSeekAdversarialReviewGate {
             input.material ||
             input.irreversible ||
             HIGH_RISK.has(input.risk) ||
-            MATERIAL_CATEGORIES.has(input.category);
+            MANDATORY_REVIEW_CATEGORIES.has(input.category);
 
         const missingEvidence: string[] = [];
         if (required && input.evidence.length === 0) missingEvidence.push("independent-review-evidence");
