@@ -20,9 +20,6 @@ ANDROID_ROOT = RELEASE_ROOT / "android"
 ANDROID_PROJECT = ROOT / "android"
 ANDROID_PROJECT_ALT = ROOT / "Android"
 
-# These strings are part of the repository productization contract. Keep them
-# stable so callers/tests can distinguish artifact and project failures without
-# coupling themselves to a particular underlying installer/toolchain.
 WINDOWS_ARTIFACT_NOT_YET_BUILT = "windows-installer-artifact-not-yet-built"
 ANDROID_PROJECT_INCOMPLETE = "android-project-incomplete"
 
@@ -35,8 +32,10 @@ def env_true(name: str) -> bool:
     return os.environ.get(name, "").strip() == "1"
 
 
-def run(command: str, args: list[str], timeout: int) -> int:
+def run(command: str, args: list[str], timeout: int, *, substage: str | None = None) -> int:
     executable = f"{command}.cmd" if os.name == "nt" and command in {"npm", "npx"} else command
+    if substage:
+        emit("AUTONOMOUS_PRODUCTIZATION_SUBSTAGE", stage="BUILD_VERIFY", substage=substage)
     result = subprocess.run(
         [executable, *args],
         cwd=ROOT,
@@ -50,53 +49,40 @@ def run(command: str, args: list[str], timeout: int) -> int:
         stderr=subprocess.STDOUT,
     )
     if result.stdout:
-        print(result.stdout, end="")
+        print(result.stdout, end="", flush=True)
+    if substage:
+        emit(
+            "AUTONOMOUS_PRODUCTIZATION_SUBSTAGE_COMPLETE",
+            stage="BUILD_VERIFY",
+            substage=substage,
+            exitCode=result.returncode,
+        )
     return result.returncode
 
 
 def verify() -> bool:
     emit("AUTONOMOUS_PRODUCTIZATION_STAGE", stage="BUILD_VERIFY")
-    return (
-        run("npm", ["run", "build"], 45 * 60) == 0
-        and run("npm", ["test", "--", "--runInBand"], 60 * 60) == 0
-    )
+    build_ok = run("npm", ["run", "build"], 45 * 60, substage="BUILD") == 0
+    if not build_ok:
+        return False
+    return run("npm", ["test", "--", "--runInBand"], 60 * 60, substage="FULL_TEST") == 0
 
 
 def build(platform: str) -> bool:
-    # Compatibility contract: this marker represents productization delegation,
-    # while BUILDER_DELEGATE names the concrete release builder implementation.
     emit("AUTONOMOUS_PRODUCTIZATION_DELEGATE", platform=platform, worker=str(PRODUCT_BUILDER))
     emit("AUTONOMOUS_PRODUCTIZATION_BUILDER_DELEGATE", platform=platform, worker=str(PRODUCT_BUILDER))
 
     if not PRODUCT_BUILDER.exists():
-        emit(
-            "AUTONOMOUS_PRODUCTIZATION_BLOCKED",
-            platform=platform,
-            reason="missing release builder",
-        )
+        emit("AUTONOMOUS_PRODUCTIZATION_BLOCKED", platform=platform, reason="missing release builder")
         return False
 
     if platform == "WINDOWS":
-        final_exe = WINDOWS_ROOT / os.environ.get(
-            "HOOSHYAR_WINDOWS_FINAL_ARTIFACT", "HooshyarOS-Setup.exe"
-        )
+        final_exe = WINDOWS_ROOT / os.environ.get("HOOSHYAR_WINDOWS_FINAL_ARTIFACT", "HooshyarOS-Setup.exe")
         if not final_exe.exists():
-            emit(
-                "AUTONOMOUS_PRODUCTIZATION_NOTE",
-                platform="WINDOWS",
-                reason=WINDOWS_ARTIFACT_NOT_YET_BUILT,
-            )
+            emit("AUTONOMOUS_PRODUCTIZATION_NOTE", platform="WINDOWS", reason=WINDOWS_ARTIFACT_NOT_YET_BUILT)
 
-    # Android project provisioning belongs to release_product_builder.py.
-    # Do not pre-block on repository-local project scaffolding here: the builder
-    # is responsible for creating/repairing the project before the APK check.
     result = subprocess.run(
-        [
-            sys.executable,
-            str(PRODUCT_BUILDER),
-            "--platform",
-            platform,
-        ],
+        [sys.executable, str(PRODUCT_BUILDER), "--platform", platform],
         cwd=ROOT,
         text=True,
         encoding="utf-8",
@@ -107,21 +93,17 @@ def build(platform: str) -> bool:
         timeout=90 * 60,
         check=False,
     )
-    print(result.stdout, end="")
+    print(result.stdout, end="", flush=True)
     return result.returncode == 0
 
 
 def verify_artifact(platform: str) -> tuple[bool, str]:
     if platform == "WINDOWS":
-        artifact = WINDOWS_ROOT / os.environ.get(
-            "HOOSHYAR_WINDOWS_FINAL_ARTIFACT", "HooshyarOS-Setup.exe"
-        )
+        artifact = WINDOWS_ROOT / os.environ.get("HOOSHYAR_WINDOWS_FINAL_ARTIFACT", "HooshyarOS-Setup.exe")
         if not artifact.exists() or artifact.stat().st_size <= 0:
             return False, WINDOWS_ARTIFACT_NOT_YET_BUILT
     else:
-        artifact = ANDROID_ROOT / os.environ.get(
-            "HOOSHYAR_ANDROID_FINAL_ARTIFACT", "HooshyarOS.apk"
-        )
+        artifact = ANDROID_ROOT / os.environ.get("HOOSHYAR_ANDROID_FINAL_ARTIFACT", "HooshyarOS.apk")
         if not artifact.exists() or artifact.stat().st_size <= 0:
             return False, "android-apk-artifact-not-produced"
 
@@ -149,12 +131,7 @@ def main() -> int:
     )
 
     if not verify():
-        emit(
-            "AUTONOMOUS_PRODUCTIZATION_BLOCKED",
-            stage="BUILD_VERIFY",
-            reason="verification failed",
-            productComplete=False,
-        )
+        emit("AUTONOMOUS_PRODUCTIZATION_BLOCKED", stage="BUILD_VERIFY", reason="verification failed", productComplete=False)
         return 21
 
     failures: list[str] = []
@@ -178,23 +155,14 @@ def main() -> int:
                 failures.append(reason)
 
     if failures:
-        emit(
-            "AUTONOMOUS_PRODUCTIZATION_BLOCKED",
-            stage="PACKAGE",
-            reasons=failures,
-            productComplete=False,
-        )
+        emit("AUTONOMOUS_PRODUCTIZATION_BLOCKED", stage="PACKAGE", reasons=failures, productComplete=False)
         return 22
 
     final_artifacts: dict[str, str] = {}
     if windows:
-        final_artifacts["windows"] = str(
-            (WINDOWS_ROOT / os.environ.get("HOOSHYAR_WINDOWS_FINAL_ARTIFACT", "HooshyarOS-Setup.exe")).relative_to(ROOT)
-        )
+        final_artifacts["windows"] = str((WINDOWS_ROOT / os.environ.get("HOOSHYAR_WINDOWS_FINAL_ARTIFACT", "HooshyarOS-Setup.exe")).relative_to(ROOT))
     if android:
-        final_artifacts["android"] = str(
-            (ANDROID_ROOT / os.environ.get("HOOSHYAR_ANDROID_FINAL_ARTIFACT", "HooshyarOS.apk")).relative_to(ROOT)
-        )
+        final_artifacts["android"] = str((ANDROID_ROOT / os.environ.get("HOOSHYAR_ANDROID_FINAL_ARTIFACT", "HooshyarOS.apk")).relative_to(ROOT))
 
     emit(
         "AUTONOMOUS_PRODUCTIZATION_COMPLETE",
