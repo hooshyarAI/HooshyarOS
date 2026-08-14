@@ -32,21 +32,85 @@ def emit(kind: str, **payload: object) -> None:
     print(json.dumps({"type": kind, **payload}, ensure_ascii=False), flush=True)
 
 
-def download(url: str, target: Path) -> None:
-    target.parent.mkdir(parents=True, exist_ok=True)
-    if target.exists() and target.stat().st_size:
-        return
-
-    emit("AUTONOMOUS_RELEASE_DOWNLOAD", url=url, target=str(target.relative_to(ROOT)))
+def _download_with_urllib(url: str, target: Path) -> None:
     request = urllib.request.Request(
         url,
         headers={
-            "User-Agent": "HooshyarOS-ReleaseBuilder/1.0",
-            "Accept": "application/octet-stream,*/*",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) HooshyarOS-ReleaseBuilder/1.0",
+            "Accept": "application/zip,application/octet-stream,*/*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Connection": "keep-alive",
         },
     )
     with urllib.request.urlopen(request, timeout=120) as response, target.open("wb") as fh:
         shutil.copyfileobj(response, fh)
+
+
+def _download_with_curl(url: str, target: Path) -> None:
+    curl = shutil.which("curl.exe") or shutil.which("curl")
+    if not curl:
+        raise RuntimeError("curl.exe is unavailable for download fallback")
+    result = subprocess.run(
+        [
+            curl,
+            "-L",
+            "--fail",
+            "--retry",
+            "3",
+            "--retry-all-errors",
+            "--connect-timeout",
+            "30",
+            "--max-time",
+            "600",
+            "-A",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) HooshyarOS-ReleaseBuilder/1.0",
+            "-o",
+            str(target),
+            url,
+        ],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        check=False,
+    )
+    if result.stdout:
+        print(result.stdout, end="")
+    if result.returncode != 0:
+        raise RuntimeError(f"curl download failed with exit code {result.returncode}")
+
+
+def _validate_zip(target: Path) -> None:
+    if not target.exists() or target.stat().st_size <= 0:
+        raise RuntimeError("download produced an empty artifact")
+    if not zipfile.is_zipfile(target):
+        raise RuntimeError("downloaded artifact is not a valid ZIP archive")
+
+
+def download(url: str, target: Path) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists() and target.stat().st_size:
+        if target.suffix.lower() != ".zip" or zipfile.is_zipfile(target):
+            return
+        target.unlink()
+
+    emit("AUTONOMOUS_RELEASE_DOWNLOAD", url=url, target=str(target.relative_to(ROOT)))
+    try:
+        _download_with_urllib(url, target)
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError) as exc:
+        emit(
+            "AUTONOMOUS_RELEASE_DOWNLOAD_FALLBACK",
+            platform="ANDROID",
+            target=str(target.relative_to(ROOT)),
+            method="curl.exe",
+            reason=str(exc),
+        )
+        if target.exists():
+            target.unlink()
+        _download_with_curl(url, target)
+
+    if target.suffix.lower() == ".zip":
+        _validate_zip(target)
 
 
 def download_any(urls: tuple[str, ...], target: Path, platform: str, artifact: str) -> str:
@@ -70,6 +134,7 @@ def download_any(urls: tuple[str, ...], target: Path, platform: str, artifact: s
 
 
 def unzip(src: Path, dest: Path) -> None:
+    _validate_zip(src)
     if dest.exists():
         shutil.rmtree(dest, ignore_errors=True)
     dest.mkdir(parents=True, exist_ok=True)
