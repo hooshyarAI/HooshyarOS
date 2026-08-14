@@ -1,12 +1,16 @@
 import { AutonomousSelfRepairRunner } from "../Autonomous/Runtime/AutonomousSelfRepairRunner";
+import { AutonomousDevelopmentResult } from "../Architecture/Autonomous/AutonomousDevelopmentLoop";
+import { AutonomousKnotRecovery } from "../Autonomous/Runtime/AutonomousKnotRecovery";
 
 describe("AutonomousSelfRepairRunner", () => {
     it("routes a real repair execution through the governed capability and records evidence", () => {
         const runner = new AutonomousSelfRepairRunner();
         const development = {
-            execute: jest.fn(() => ({ status: "completed", result: { ok: true, stage: "FINALIZE", idempotent: false, issues: [] } }))
-        } as never;
-        const recovery = { rollback: jest.fn() } as never;
+            execute: jest.fn<AutonomousDevelopmentResult, [unknown]>(() => ({ status: "completed", result: { ok: true, stage: "FINALIZE", idempotent: false, issues: [] } }))
+        } as unknown as AutonomousDevelopmentLoopLike;
+        const recovery = {
+            rollback: jest.fn()
+        } as unknown as AutonomousKnotRecoveryLike;
         let snapshotCalls = 0;
         const root = "D:/HooshyarOS";
         const result = runner.run({
@@ -17,8 +21,8 @@ describe("AutonomousSelfRepairRunner", () => {
             dependencies: [],
             repairDescription: "controlled self-repair test",
             failures: ["Gradle/JDK dependency failure"],
-            development,
-            recovery,
+            development: development as never,
+            recovery: recovery as never,
             snapshot: () => ({ commit: snapshotCalls++ === 0 ? "before" : "after", clean: true })
         });
 
@@ -29,3 +33,6 @@ describe("AutonomousSelfRepairRunner", () => {
         expect(recovery.rollback).toHaveBeenCalledWith(root, { capabilityId: "assistant.test", commit: "before" });
     });
 });
+
+type AutonomousDevelopmentLoopLike = { execute: jest.Mock };
+type AutonomousKnotRecoveryLike = { rollback: jest.Mock };
