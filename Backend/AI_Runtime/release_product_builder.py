@@ -33,10 +33,24 @@ ANDROID_REPO_URLS = (
     "https://dl.google.com/android/repository/",
     "https://redirector.gvt1.com/edgedl/android/repository/",
 )
+# Values are repository evidence from published Android package metadata.
+# platform-35_r02 uses SHA-256; the 0988... value is not a SHA-1 digest.
 ANDROID_PACKAGE_SPECS = {
-    "platform-tools": ("platform-tools_r36.0.0-win.zip", "sha256", "12c2841f354e92a0eb2fd7bf6f0f9bf8538abce7bd6b060ac8349d6f6a61107c"),
-    "platforms;android-35": ("platform-35_r02.zip", "sha1", "0988cacad01b38a18a47bac14a0695f246bc76c1b06c0eeb8eb0dc825ab0c8e0"),
-    "build-tools;34.0.0": ("build-tools_r34-windows.zip", "sha1", "62cfde1b6fcc3ad12a4d2ba1b537e752768bfd47"),
+    "platform-tools": (
+        "platform-tools_r36.0.0-win.zip",
+        "sha256",
+        "12c2841f354e92a0eb2fd7bf6f0f9bf8538abce7bd6b060ac8349d6f6a61107c",
+    ),
+    "platforms;android-35": (
+        "platform-35_r02.zip",
+        "sha256",
+        "0988cacad01b38a18a47bac14a0695f246bc76c1b06c0eeb8eb0dc825ab0c8e0",
+    ),
+    "build-tools;34.0.0": (
+        "build-tools_r34-windows.zip",
+        "sha1",
+        "62cfde1b6fcc3ad12a4d2ba1b537e752768bfd47",
+    ),
 }
 
 
@@ -45,7 +59,10 @@ def emit(kind: str, **payload: object) -> None:
 
 
 def _download_with_urllib(url: str, target: Path) -> None:
-    request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 HooshyarOS-ReleaseBuilder/2.0"})
+    request = urllib.request.Request(
+        url,
+        headers={"User-Agent": "Mozilla/5.0 HooshyarOS-ReleaseBuilder/3.0"},
+    )
     with urllib.request.urlopen(request, timeout=120) as response, target.open("wb") as fh:
         shutil.copyfileobj(response, fh)
 
@@ -55,7 +72,23 @@ def _download_with_curl(url: str, target: Path) -> None:
     if not curl:
         raise RuntimeError("curl.exe is unavailable")
     result = subprocess.run(
-        [curl, "-L", "--fail", "--retry", "3", "--retry-all-errors", "--connect-timeout", "30", "--max-time", "600", "-A", "Mozilla/5.0", "-o", str(target), url],
+        [
+            curl,
+            "-L",
+            "--fail",
+            "--retry",
+            "3",
+            "--retry-all-errors",
+            "--connect-timeout",
+            "30",
+            "--max-time",
+            "600",
+            "-A",
+            "Mozilla/5.0",
+            "-o",
+            str(target),
+            url,
+        ],
         cwd=ROOT,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -74,22 +107,31 @@ def _validate_zip(path: Path) -> None:
 
 
 def _digest(path: Path, algorithm: str) -> str:
-    h = hashlib.sha256() if algorithm == "sha256" else hashlib.sha1()
+    hash_factory = hashlib.sha256 if algorithm.lower() == "sha256" else hashlib.sha1
+    digest = hash_factory()
     with path.open("rb") as fh:
         for chunk in iter(lambda: fh.read(1024 * 1024), b""):
-            h.update(chunk)
-    return h.hexdigest()
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def download(url: str, target: Path) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
-    if target.exists() and target.stat().st_size and (target.suffix.lower() != ".zip" or zipfile.is_zipfile(target)):
+    if target.exists() and target.stat().st_size and (
+        target.suffix.lower() != ".zip" or zipfile.is_zipfile(target)
+    ):
         return
     emit("AUTONOMOUS_RELEASE_DOWNLOAD", url=url, target=str(target.relative_to(ROOT)))
     try:
         _download_with_urllib(url, target)
     except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError) as exc:
-        emit("AUTONOMOUS_RELEASE_DOWNLOAD_FALLBACK", platform="ANDROID", target=str(target.relative_to(ROOT)), method="curl.exe", reason=str(exc))
+        emit(
+            "AUTONOMOUS_RELEASE_DOWNLOAD_FALLBACK",
+            platform="ANDROID",
+            target=str(target.relative_to(ROOT)),
+            method="curl.exe",
+            reason=str(exc),
+        )
         if target.exists():
             target.unlink()
         _download_with_curl(url, target)
@@ -107,7 +149,13 @@ def download_any(urls: tuple[str, ...], target: Path, platform: str, artifact: s
             errors.append(f"{url}: {exc}")
             if target.exists():
                 target.unlink()
-            emit("AUTONOMOUS_RELEASE_DOWNLOAD_FALLBACK", platform=platform, artifact=artifact, failedUrl=url, reason=str(exc))
+            emit(
+                "AUTONOMOUS_RELEASE_DOWNLOAD_FALLBACK",
+                platform=platform,
+                artifact=artifact,
+                failedUrl=url,
+                reason=str(exc),
+            )
     raise RuntimeError("all download sources failed: " + " | ".join(errors))
 
 
@@ -133,32 +181,66 @@ def _extract_component(archive: Path, destination: Path) -> None:
 
 
 def _install_android_components_direct() -> None:
-    emit("AUTONOMOUS_RELEASE_ANDROID_FALLBACK", strategy="DIRECT_PACKAGE_DOWNLOAD", reason="sdkmanager repository manifest unavailable")
+    emit(
+        "AUTONOMOUS_RELEASE_ANDROID_FALLBACK",
+        strategy="DIRECT_PACKAGE_DOWNLOAD",
+        reason="sdkmanager repository manifest unavailable",
+    )
     for package, (filename, algorithm, expected) in ANDROID_PACKAGE_SPECS.items():
-        destination = SDK / ("platform-tools" if package == "platform-tools" else "platforms/android-35" if package == "platforms;android-35" else "build-tools/34.0.0")
-        marker = destination / ("adb.exe" if package == "platform-tools" else "android.jar" if package == "platforms;android-35" else "aapt2.exe")
+        destination = SDK / (
+            "platform-tools"
+            if package == "platform-tools"
+            else "platforms/android-35"
+            if package == "platforms;android-35"
+            else "build-tools/34.0.0"
+        )
+        marker = destination / (
+            "adb.exe"
+            if package == "platform-tools"
+            else "android.jar"
+            if package == "platforms;android-35"
+            else "aapt2.exe"
+        )
         if marker.exists():
             continue
         archive = CACHE / filename
-        selected = download_any(tuple(f"{base}{filename}" for base in ANDROID_REPO_URLS), archive, "ANDROID", package)
+        selected = download_any(
+            tuple(f"{base}{filename}" for base in ANDROID_REPO_URLS),
+            archive,
+            "ANDROID",
+            package,
+        )
         actual = _digest(archive, algorithm)
         if actual != expected:
-            raise RuntimeError(f"checksum mismatch for {package}: expected {expected}, got {actual}")
-        emit("AUTONOMOUS_RELEASE_ANDROID_COMPONENT_SOURCE_SELECTED", package=package, source=selected, checksumAlgorithm=algorithm, checksum=actual)
+            raise RuntimeError(
+                f"checksum mismatch for {package}: expected {expected}, got {actual}"
+            )
+        emit(
+            "AUTONOMOUS_RELEASE_ANDROID_COMPONENT_SOURCE_SELECTED",
+            package=package,
+            source=selected,
+            checksumAlgorithm=algorithm,
+            checksum=actual,
+        )
         _extract_component(archive, destination)
 
 
 def ensure_android_toolchain() -> tuple[Path, Path, Path]:
     for directory in (CACHE, JDK, GRADLE, SDK):
         directory.mkdir(parents=True, exist_ok=True)
+
     jzip = CACHE / "jdk17.zip"
     if not (JDK / "bin" / "java.exe").exists():
         source = download_any(JDK_URLS, jzip, "ANDROID", "jdk17")
         emit("AUTONOMOUS_RELEASE_JDK_SOURCE_SELECTED", platform="ANDROID", source=source)
         unzip(jzip, JDK)
-    java_home = next((p for p in [JDK, *JDK.iterdir()] if (p / "bin" / "java.exe").exists()), None)
+    java_home = next(
+        (p for p in [JDK, *JDK.iterdir()] if (p / "bin" / "java.exe").exists()),
+        None,
+    )
     if java_home is None:
         raise RuntimeError("JDK 17 provisioning failed")
+
     gradle_home = GRADLE / f"gradle-{GRADLE_VERSION}"
     gzip = CACHE / f"gradle-{GRADLE_VERSION}.zip"
     if not (gradle_home / "bin" / "gradle.bat").exists():
@@ -166,6 +248,7 @@ def ensure_android_toolchain() -> tuple[Path, Path, Path]:
         unzip(gzip, GRADLE)
     if not (gradle_home / "bin" / "gradle.bat").exists():
         raise RuntimeError("Gradle provisioning failed")
+
     sdkmanager = SDK / "cmdline-tools" / "latest" / "bin" / "sdkmanager.bat"
     czip = CACHE / "commandlinetools.zip"
     if not sdkmanager.exists():
@@ -178,21 +261,56 @@ def ensure_android_toolchain() -> tuple[Path, Path, Path]:
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(staging / "cmdline-tools"), str(destination))
         shutil.rmtree(staging, ignore_errors=True)
+
     env = os.environ.copy()
     env.update(JAVA_HOME=str(java_home), ANDROID_HOME=str(SDK), ANDROID_SDK_ROOT=str(SDK))
-    env["PATH"] = os.pathsep.join([str(java_home / "bin"), str(sdkmanager.parent), str(SDK / "platform-tools"), env.get("PATH", "")])
-    result = subprocess.run([str(sdkmanager), "platform-tools", "platforms;android-35", "build-tools;34.0.0"], cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=20 * 60, check=False)
+    env["PATH"] = os.pathsep.join(
+        [
+            str(java_home / "bin"),
+            str(sdkmanager.parent),
+            str(SDK / "platform-tools"),
+            env.get("PATH", ""),
+        ]
+    )
+    result = subprocess.run(
+        [str(sdkmanager), "platform-tools", "platforms;android-35", "build-tools;34.0.0"],
+        cwd=ROOT,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        timeout=20 * 60,
+        check=False,
+    )
     print(result.stdout or "", end="")
     if result.returncode:
-        emit("AUTONOMOUS_RELEASE_ANDROID_SDKMANAGER_FALLBACK", strategy="DIRECT_PACKAGE_DOWNLOAD", reason=f"sdkmanager failed with exit code {result.returncode}")
+        emit(
+            "AUTONOMOUS_RELEASE_ANDROID_SDKMANAGER_FALLBACK",
+            strategy="DIRECT_PACKAGE_DOWNLOAD",
+            reason=f"sdkmanager failed with exit code {result.returncode}",
+        )
         _install_android_components_direct()
     return java_home, gradle_home, SDK
 
 
 def _should_skip_file(path: Path, root: Path) -> bool:
+    if path.is_symlink():
+        return True
     parts = set(path.relative_to(root).parts)
     name = path.name.lower()
-    if parts & {".git", ".github", ".venv", ".toolcache", "coverage", "dist", "test", "tests", "__pycache__", ".pytest_cache", ".mypy_cache"}:
+    if parts & {
+        ".git",
+        ".github",
+        ".venv",
+        ".toolcache",
+        "coverage",
+        "dist",
+        "test",
+        "tests",
+        "__pycache__",
+        ".pytest_cache",
+        ".mypy_cache",
+    }:
         return True
     if name.endswith((".pyc", ".pyo", ".map", ".tsbuildinfo", ".backup", "~", ".log")):
         return True
@@ -206,30 +324,74 @@ def _copy_runtime_tree(source: Path, destination: Path) -> int:
     for path in source.rglob("*"):
         if _should_skip_file(path, source):
             continue
-        target = destination / path.relative_to(source)
-        if path.is_dir():
-            target.mkdir(parents=True, exist_ok=True)
-        else:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(path, target)
-            count += 1
+        try:
+            target = destination / path.relative_to(source)
+            if path.is_dir():
+                target.mkdir(parents=True, exist_ok=True)
+            else:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(path, target)
+                count += 1
+        except OSError as exc:
+            raise RuntimeError(
+                "Windows runtime tree copy failed: "
+                f"source={path} destination={destination} error={exc}"
+            ) from exc
     return count
 
 
-def _copy_node_dependency(node_modules: Path, destination: Path, package_name: str, seen: set[str]) -> None:
+def _package_supported_on_host(data: dict) -> bool:
+    allowed_os = data.get("os")
+    if allowed_os and "win32" not in allowed_os:
+        return False
+    return True
+
+
+def _copy_node_dependency(
+    node_modules: Path,
+    destination: Path,
+    package_name: str,
+    seen: set[str],
+    *,
+    optional: bool = False,
+) -> None:
     if package_name in seen:
         return
     source = node_modules / Path(*package_name.split("/"))
     manifest = source / "package.json"
     if not manifest.exists():
+        if optional:
+            emit(
+                "AUTONOMOUS_WINDOWS_OPTIONAL_DEPENDENCY_SKIPPED",
+                package=package_name,
+                reason="optional dependency is not installed for this host",
+            )
+            return
         raise RuntimeError(f"runtime dependency missing: {package_name}")
+    data = json.loads(manifest.read_text(encoding="utf-8"))
+    if not _package_supported_on_host(data):
+        if optional:
+            emit(
+                "AUTONOMOUS_WINDOWS_OPTIONAL_DEPENDENCY_SKIPPED",
+                package=package_name,
+                reason="package is not supported on Windows",
+            )
+            return
+        raise RuntimeError(f"runtime dependency unsupported on Windows: {package_name}")
     seen.add(package_name)
     target = destination / Path(*package_name.split("/"))
-    shutil.copytree(source, target, dirs_exist_ok=True, ignore=shutil.ignore_patterns("*.map", "*.tsbuildinfo", "__pycache__", "*.pyc"))
-    data = json.loads(manifest.read_text(encoding="utf-8"))
-    children = set((data.get("dependencies") or {}).keys()) | set((data.get("optionalDependencies") or {}).keys())
-    for child in children:
+    shutil.copytree(
+        source,
+        target,
+        dirs_exist_ok=True,
+        ignore=shutil.ignore_patterns("*.map", "*.tsbuildinfo", "__pycache__", "*.pyc"),
+    )
+    required_children = (data.get("dependencies") or {}).keys()
+    optional_children = (data.get("optionalDependencies") or {}).keys()
+    for child in required_children:
         _copy_node_dependency(node_modules, destination, child, seen)
+    for child in optional_children:
+        _copy_node_dependency(node_modules, destination, child, seen, optional=True)
 
 
 def _runtime_dependency_names() -> set[str]:
@@ -263,12 +425,17 @@ def _validate_windows_payload(payload: Path) -> None:
         if not path.is_file():
             continue
         relative = path.relative_to(payload).as_posix().lower()
-        if "__pycache__/" in relative or relative.endswith((".pyc", ".pyo", ".test.ts", ".spec.ts", ".map", ".tsbuildinfo")):
+        if "__pycache__/" in relative or relative.endswith(
+            (".pyc", ".pyo", ".test.ts", ".spec.ts", ".map", ".tsbuildinfo")
+        ):
             forbidden.append(relative)
         if re.search(r"(?:^|/)tests?(/|$)", relative):
             forbidden.append(relative)
     if forbidden:
-        raise RuntimeError("Windows payload contains development artifacts: " + ", ".join(forbidden[:10]))
+        raise RuntimeError(
+            "Windows payload contains development artifacts: "
+            + ", ".join(forbidden[:10])
+        )
 
 
 def _write_windows_install_script(path: Path) -> None:
@@ -294,8 +461,8 @@ $launcherCmd = Join-Path $installRoot "launch-hooshyar.cmd"
 @(
     "@echo off",
     "set HOOSHYAR_DATA_ROOT=$dataRoot",
-    "cd /d \"$installRoot\"",
-    "start \"HooshyarOS\" /b \"$installRoot\runtime\node.exe\" \"$installRoot\node_modules\tsx\dist\cli.mjs\" \"$installRoot\Backend\HBOS\Autonomous\Runtime\CommercialRuntimeServer.ts\""
+    "cd /d `"$installRoot`"",
+    "start `"HooshyarOS`" /b `"$installRoot\runtime\node.exe`" `"$installRoot\node_modules\tsx\dist\cli.mjs`" `"$installRoot\Backend\HBOS\Autonomous\Runtime\CommercialRuntimeServer.ts`""
 ) | Set-Content $launcherCmd -Encoding ASCII
 
 $launcherVbs = Join-Path $installRoot "launch-hooshyar.vbs"
@@ -355,34 +522,58 @@ def windows() -> int:
     node = shutil.which("node")
     if not node or not (ROOT / "node_modules").exists():
         raise RuntimeError("Windows product build requires Node.js and node_modules")
+
     shutil.copy2(ROOT / "package.json", payload / "package.json")
     if (ROOT / "package-lock.json").exists():
         shutil.copy2(ROOT / "package-lock.json", payload / "package-lock.json")
+    emit("AUTONOMOUS_WINDOWS_STAGE", stage="COPY_HBOS")
     _copy_runtime_tree(ROOT / "Backend" / "HBOS", payload / "Backend" / "HBOS")
-    shutil.copy2(ROOT / "Frontend" / "HooshyarWebApp" / "index.ts", payload / "Frontend" / "HooshyarWebApp" / "index.ts")
+
+    emit("AUTONOMOUS_WINDOWS_STAGE", stage="COPY_FRONTEND")
+    frontend_source = ROOT / "Frontend" / "HooshyarWebApp" / "index.ts"
+    frontend_target = payload / "Frontend" / "HooshyarWebApp" / "index.ts"
+    if not frontend_source.is_file():
+        raise RuntimeError(f"Windows frontend source missing: {frontend_source}")
+    frontend_target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(frontend_source, frontend_target)
+    emit(
+        "AUTONOMOUS_WINDOWS_STAGE",
+        stage="COPY_FRONTEND_COMPLETE",
+        artifact=str(frontend_target.relative_to(ROOT)),
+    )
+
     web_source = ROOT / "Frontend" / "HooshyarWebApp" / "web"
     if not (web_source / "index.html").exists():
         raise RuntimeError("commercial web shell is missing")
+    emit("AUTONOMOUS_WINDOWS_STAGE", stage="COPY_WEB")
     shutil.copytree(web_source, payload / "web", dirs_exist_ok=True)
+
     runtime = payload / "runtime"
     runtime.mkdir(parents=True, exist_ok=True)
     shutil.copy2(node, runtime / "node.exe")
+    emit("AUTONOMOUS_WINDOWS_STAGE", stage="COPY_RUNTIME_DEPENDENCIES")
     dependency_count = _copy_runtime_node_modules(payload / "node_modules")
+
     manifest = json.loads((payload / "package.json").read_text(encoding="utf-8"))
     (payload / "product-manifest.json").write_text(
-        json.dumps({
-            "product": "HooshyarOS",
-            "version": manifest.get("version", "0.0.0"),
-            "platform": "WINDOWS",
-            "entrypoint": "Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts",
-            "web": "web/index.html",
-            "runtimeDependencies": dependency_count,
-            "health": "http://127.0.0.1:3000/health",
-        }, ensure_ascii=False, indent=2),
+        json.dumps(
+            {
+                "product": "HooshyarOS",
+                "version": manifest.get("version", "0.0.0"),
+                "platform": "WINDOWS",
+                "entrypoint": "Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts",
+                "web": "web/index.html",
+                "runtimeDependencies": dependency_count,
+                "health": "http://127.0.0.1:3000/health",
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
         encoding="utf-8",
     )
     _validate_windows_payload(payload)
     emit("AUTONOMOUS_WINDOWS_PAYLOAD_VALIDATED", runtimeDependencies=dependency_count)
+
     install_script = source / "install.ps1"
     _write_windows_install_script(install_script)
     package = source / "HooshyarOS-Windows-Bootstrap.zip"
@@ -390,6 +581,7 @@ def windows() -> int:
         for path in source.rglob("*"):
             if path.is_file() and path != package:
                 zf.write(path, path.relative_to(source))
+
     target = WIN / "HooshyarOS-Setup.exe"
     sed = WIN / "HooshyarOS-Setup.sed"
     iexpress = Path(os.environ.get("WINDIR", r"C:\Windows")) / "System32" / "iexpress.exe"
@@ -402,11 +594,23 @@ def windows() -> int:
     target.parent.mkdir(parents=True, exist_ok=True)
     if target.exists():
         target.unlink()
-    result = subprocess.run([str(iexpress), "/N", "/Q", str(sed)], cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=False)
+    result = subprocess.run(
+        [str(iexpress), "/N", "/Q", str(sed)],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        check=False,
+    )
     print(result.stdout or "", end="")
     if result.returncode or not target.exists():
         raise RuntimeError("IExpress failed to produce installer")
-    emit("AUTONOMOUS_RELEASE_ARTIFACT", platform="WINDOWS", artifact=str(target.relative_to(ROOT)), size=target.stat().st_size)
+    emit(
+        "AUTONOMOUS_RELEASE_ARTIFACT",
+        platform="WINDOWS",
+        artifact=str(target.relative_to(ROOT)),
+        size=target.stat().st_size,
+    )
     return 0
 
 
@@ -414,8 +618,19 @@ def android() -> int:
     java_home, gradle_home, sdk = ensure_android_toolchain()
     env = os.environ.copy()
     env.update(JAVA_HOME=str(java_home), ANDROID_HOME=str(sdk), ANDROID_SDK_ROOT=str(sdk))
-    env["PATH"] = os.pathsep.join([str(java_home / "bin"), str(gradle_home / "bin"), str(sdk / "platform-tools"), env.get("PATH", "")])
-    result = subprocess.run([str(gradle_home / "bin" / "gradle.bat"), "-p", str(ANDROID), "assembleDebug", "--no-daemon"], cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=90 * 60, check=False)
+    env["PATH"] = os.pathsep.join(
+        [str(java_home / "bin"), str(gradle_home / "bin"), str(sdk / "platform-tools"), env.get("PATH", "")]
+    )
+    result = subprocess.run(
+        [str(gradle_home / "bin" / "gradle.bat"), "-p", str(ANDROID), "assembleDebug", "--no-daemon"],
+        cwd=ROOT,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        timeout=90 * 60,
+        check=False,
+    )
     print(result.stdout or "", end="")
     if result.returncode:
         return result.returncode
