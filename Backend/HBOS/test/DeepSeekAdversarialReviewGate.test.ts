@@ -22,6 +22,17 @@ describe("DeepSeekAdversarialReviewGate", () => {
         expect(result.missingEvidence).toEqual([]);
     });
 
+    it("requires independent review for design decisions even when they are not otherwise material", () => {
+        const result = new DeepSeekAdversarialReviewGate().evaluate({
+            ...base,
+            risk: "LOW",
+            material: false,
+            category: "DESIGN",
+        });
+        expect(result.required).toBe(true);
+        expect(result.allowed).toBe(true);
+    });
+
     it("blocks when an independent review identifies a high-severity finding", () => {
         const result = new DeepSeekAdversarialReviewGate().evaluate({
             ...base,
