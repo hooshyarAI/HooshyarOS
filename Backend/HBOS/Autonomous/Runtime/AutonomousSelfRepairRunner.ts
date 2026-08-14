@@ -4,6 +4,7 @@ import { FailureInput, RepairStrategy, SelfRepairCapability } from "../../Assist
 import { RepairStrategyKind } from "../../Assistant/Autonomous/SelfRepairStrategyPlanner";
 
 export interface SelfRepairRunnerContext {
+    root: string;
     checkpoint: KnotCheckpoint;
     missionCapabilityId: string;
     targetEngine: string;
@@ -47,7 +48,7 @@ export class AutonomousSelfRepairRunner {
             externalDependency: kind === "DEPENDENCY_PROVISIONING",
             strategyKind: kind,
             execute: () => {
-                context.recovery.rollback(context.checkpoint.commit ? process.cwd() : process.cwd(), context.checkpoint);
+                context.recovery.rollback(context.root, context.checkpoint);
                 const before = context.snapshot();
                 const goal = {
                     capabilityId: `repair-${context.missionCapabilityId}`,

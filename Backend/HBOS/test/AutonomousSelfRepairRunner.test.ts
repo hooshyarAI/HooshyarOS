@@ -8,8 +8,9 @@ describe("AutonomousSelfRepairRunner", () => {
         } as never;
         const recovery = { rollback: jest.fn() } as never;
         let snapshotCalls = 0;
+        const root = "D:/HooshyarOS";
         const result = runner.run({
-            root: "D:/HooshyarOS",
+            root,
             checkpoint: { capabilityId: "assistant.test", commit: "before" },
             missionCapabilityId: "assistant.test",
             targetEngine: "Autonomous Operations Engine",
@@ -25,6 +26,6 @@ describe("AutonomousSelfRepairRunner", () => {
         expect(result.repairCase.outcome).toBe("FIXED");
         expect(result.repairCase.evidence).toEqual(expect.arrayContaining(["STRATEGY=FOCUSED_CANONICAL_REPAIR", "WORKTREE_CLEAN=true"]));
         expect(development.execute).toHaveBeenCalled();
-        expect(recovery.rollback).toHaveBeenCalled();
+        expect(recovery.rollback).toHaveBeenCalledWith(root, { capabilityId: "assistant.test", commit: "before" });
     });
 });
