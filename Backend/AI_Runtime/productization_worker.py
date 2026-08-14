@@ -43,11 +43,11 @@ def run(command: str, args: list[str], timeout: int) -> int:
         text=True,
         encoding="utf-8",
         errors="replace",
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
         timeout=timeout,
         check=False,
         env={**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"},
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
     )
     if result.stdout:
         print(result.stdout, end="")
@@ -87,16 +87,9 @@ def build(platform: str) -> bool:
                 reason=WINDOWS_ARTIFACT_NOT_YET_BUILT,
             )
 
-    if platform == "ANDROID":
-        project = ANDROID_PROJECT if ANDROID_PROJECT.exists() else ANDROID_PROJECT_ALT
-        if not project.exists():
-            emit(
-                "AUTONOMOUS_PRODUCTIZATION_BLOCKED",
-                platform="ANDROID",
-                reason=ANDROID_PROJECT_INCOMPLETE,
-            )
-            return False
-
+    # Android project provisioning belongs to release_product_builder.py.
+    # Do not pre-block on repository-local project scaffolding here: the builder
+    # is responsible for creating/repairing the project before the APK check.
     result = subprocess.run(
         [
             sys.executable,
