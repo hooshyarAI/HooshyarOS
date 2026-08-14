@@ -8,18 +8,11 @@ import { CanonicalCapabilityAudit } from "./CanonicalCapabilityAudit";
 import { CommercialProductCompletionAudit } from "./CommercialProductCompletionAudit";
 import { AutonomousWeavingPlanner } from "./AutonomousWeavingPlanner";
 import { AutonomousKnotRecovery } from "./AutonomousKnotRecovery";
+import { AutonomousSelfRepairRunner } from "./AutonomousSelfRepairRunner";
 import { createLocalConstructionTools } from "./LocalConstructionToolset";
 import { AutonomousPerformanceBudget } from "./AutonomousPerformanceBudget";
 
-export interface DaemonOptions {
-    root?: string;
-    maxCycles?: number;
-    reportEvery?: number;
-    performanceBudget?: AutonomousPerformanceBudget;
-    mission?: AutonomousProjectMission;
-    continuation?: AutonomousPlatformContinuation;
-    development?: AutonomousDevelopmentLoop;
-}
+export interface DaemonOptions { root?: string; maxCycles?: number; reportEvery?: number; performanceBudget?: AutonomousPerformanceBudget; mission?: AutonomousProjectMission; continuation?: AutonomousPlatformContinuation; development?: AutonomousDevelopmentLoop; }
 
 type MissionDecision =
     | { kind: "mission"; mission: Mission; assistantGatePassed: false; continuation?: undefined }
@@ -37,6 +30,7 @@ export class AutonomousBuildDaemon {
     private readonly commercialAudit = new CommercialProductCompletionAudit();
     private readonly weavingPlanner = new AutonomousWeavingPlanner();
     private readonly knotRecovery = new AutonomousKnotRecovery();
+    private readonly selfRepairRunner = new AutonomousSelfRepairRunner();
     private readonly maxCycles: number;
     private readonly reportEvery: number;
     private readonly performanceBudget: AutonomousPerformanceBudget;
@@ -54,38 +48,11 @@ export class AutonomousBuildDaemon {
     private finalCompletionEvidence(selected: Mission): ReturnType<CapabilityEvidenceAudit["evaluate"]> {
         const root = selected.evidence?.root || this.root;
         const exists = (path: string) => existsSync(join(root, path));
-        const implementationPaths = [
-            "Backend/HBOS/Assistant/Autonomous/AutonomousAssistantRuntime.ts",
-            "Backend/HBOS/Assistant/Autonomous/AutonomousMissionController.ts",
-            "Backend/HBOS/Assistant/Autonomous/HooshyarAutonomousAssistant.ts",
-            "Backend/HBOS/Assistant/Autonomous/PythonReasoningAdapter.ts",
-            "Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts",
-            "Backend/HBOS/Architecture/Autonomous/AutonomousDevelopmentLoop.ts",
-            "Backend/HBOS/Builder/Autonomous/ArchitectureDrivenBuildController.ts",
-            "Backend/HBOS/Builder/Autonomous/AutonomousConstructionEngine.ts",
-            "Backend/AI_Runtime/autonomous_builder.py",
-            "Backend/AI_Runtime/reasoning/reasoning_engine.py"
-        ];
-        const testPaths = [
-            "Backend/HBOS/test/AutonomousMissionController.test.ts",
-            "Backend/HBOS/test/AutonomousAssistantRuntime.test.ts",
-            "Backend/HBOS/test/HooshyarAutonomousAssistant.test.ts",
-            "Backend/HBOS/test/PythonReasoningAdapter.test.ts"
-        ];
+        const implementationPaths = ["Backend/HBOS/Assistant/Autonomous/AutonomousAssistantRuntime.ts", "Backend/HBOS/Assistant/Autonomous/AutonomousMissionController.ts", "Backend/HBOS/Assistant/Autonomous/HooshyarAutonomousAssistant.ts", "Backend/HBOS/Assistant/Autonomous/PythonReasoningAdapter.ts", "Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts", "Backend/HBOS/Architecture/Autonomous/AutonomousDevelopmentLoop.ts", "Backend/HBOS/Builder/Autonomous/ArchitectureDrivenBuildController.ts", "Backend/HBOS/Builder/Autonomous/AutonomousConstructionEngine.ts", "Backend/AI_Runtime/autonomous_builder.py", "Backend/AI_Runtime/reasoning/reasoning_engine.py"];
+        const testPaths = ["Backend/HBOS/test/AutonomousMissionController.test.ts", "Backend/HBOS/test/AutonomousAssistantRuntime.test.ts", "Backend/HBOS/test/HooshyarAutonomousAssistant.test.ts", "Backend/HBOS/test/PythonReasoningAdapter.test.ts"];
         const documentationPaths = ["AGENTS.md", "Assistant/SYSTEM_PROMPT.md"];
-        const dependencyPaths = [
-            "Backend/HBOS/Engines/MemoryEngine.ts",
-            "Backend/HBOS/Engines/KnowledgeEngine.ts",
-            "Backend/HBOS/Engines/DecisionEngine.ts",
-            "Backend/HBOS/Engines/GovernanceEngine.ts"
-        ];
-        return this.evidenceAudit.evaluate({
-            implementation: implementationPaths.every(exists),
-            test: testPaths.every(exists),
-            documentation: documentationPaths.every(exists),
-            dependenciesSatisfied: dependencyPaths.every(exists),
-            verified: testPaths.every(exists) && selected.evidence.clean && selected.evidence.commit.length > 0
-        });
+        const dependencyPaths = ["Backend/HBOS/Engines/MemoryEngine.ts", "Backend/HBOS/Engines/KnowledgeEngine.ts", "Backend/HBOS/Engines/DecisionEngine.ts", "Backend/HBOS/Engines/GovernanceEngine.ts"];
+        return this.evidenceAudit.evaluate({ implementation: implementationPaths.every(exists), test: testPaths.every(exists), documentation: documentationPaths.every(exists), dependenciesSatisfied: dependencyPaths.every(exists), verified: testPaths.every(exists) && selected.evidence.clean && selected.evidence.commit.length > 0 });
     }
 
     private selectMission(): MissionDecision {
@@ -114,7 +81,6 @@ export class AutonomousBuildDaemon {
                 console.log(JSON.stringify({ type: "AUTONOMOUS_PERFORMANCE_BUDGET_EXCEEDED", cycle, ...this.performanceBudget.snapshot(), error: String(error) }));
                 return result;
             }
-
             const before = this.mission.snapshot();
             const decision = this.selectMission();
             if (decision.kind === "platform-complete") {
@@ -129,7 +95,6 @@ export class AutonomousBuildDaemon {
                 console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, performance: budgetSnapshot, result }));
                 return { status: "blocked", cycles: cycle, history: [...history, { cycle, audit: decision.details, status: "blocked", performance: budgetSnapshot }] };
             }
-
             const mission = decision.mission;
             const weavingPlan = this.weavingPlanner.plan(mission, before.clean);
             console.log(JSON.stringify({ type: "AUTONOMOUS_WEAVING_PLAN", cycle, plan: weavingPlan, performance: budgetSnapshot }));
@@ -139,7 +104,6 @@ export class AutonomousBuildDaemon {
                 console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, performance: budgetSnapshot, result: blocked }));
                 return { status: "blocked", cycles: cycle, history: [...history, { cycle, weavingPlan, status: "blocked", performance: budgetSnapshot }] };
             }
-
             if (decision.kind === "platform-continuation") console.log(JSON.stringify({ type: "AUTONOMOUS_PLATFORM_CONTINUATION", cycle, continuation: decision.continuation, mission }));
             console.log(JSON.stringify({ type: "AUTONOMOUS_MISSION", cycle, commit: before.commit, capability: mission.capability, targetEngine: mission.targetEngine }));
             const goal = { capabilityId: mission.capabilityId, capability: mission.capability, targetEngine: mission.targetEngine, dependencies: mission.dependencies };
@@ -147,39 +111,20 @@ export class AutonomousBuildDaemon {
             history.push({ cycle, commit: before.commit, mission: mission.capability, capabilityId: mission.capabilityId, targetEngine: mission.targetEngine, assistantGatePassed: decision.assistantGatePassed, handoff: decision.kind === "platform-continuation" ? decision.continuation : undefined, weavingPlan, result });
 
             if (!result.result.ok) {
-                const recovery = this.knotRecovery.observe(
-                    { capabilityId: mission.capabilityId, commit: before.commit },
-                    { capabilityId: mission.capabilityId, executionOk: false, verificationComplete: false, repositoryChanged: false, failures: result.result.issues }
-                );
+                const recovery = this.knotRecovery.observe({ capabilityId: mission.capabilityId, commit: before.commit }, { capabilityId: mission.capabilityId, executionOk: false, verificationComplete: false, repositoryChanged: false, failures: result.result.issues });
                 console.log(JSON.stringify({ type: "AUTONOMOUS_FAILURE_ANALYSIS", cycle, cluster: recovery.repairCluster, evidence: recovery.repairEvidence }));
                 console.log(JSON.stringify({ type: "AUTONOMOUS_REWEAVE", cycle, recovery }));
-                try {
-                    this.knotRecovery.rollback(this.root, recovery.checkpoint);
-                    console.log(JSON.stringify({ type: "AUTONOMOUS_ROLLBACK", cycle, checkpoint: recovery.checkpoint.commit, capabilityId: mission.capabilityId }));
-                } catch (error) {
-                    const blocked = { status: "BLOCKED", stage: "RECOVERY", issues: ["CHECKPOINT_ROLLBACK_FAILED"], checkpoint: recovery.checkpoint.commit, error: String(error) };
+                const repairDescription = recovery.repairCluster ? `${recovery.repairCluster.rationale}\nROOT CAUSE: ${recovery.repairCluster.rootCause}\nEVIDENCE:\n${recovery.repairEvidence?.join("\n") ?? "none"}` : "repair the canonical knot using the recorded verification evidence";
+                const selfRepair = this.selfRepairRunner.run({ root: this.root, checkpoint: recovery.checkpoint, missionCapabilityId: mission.capabilityId, targetEngine: mission.targetEngine, dependencies: mission.dependencies, repairDescription, failures: result.result.issues, development: this.development, recovery: this.knotRecovery, snapshot: () => this.mission.snapshot() });
+                console.log(JSON.stringify({ type: "AUTONOMOUS_SELF_REPAIR_CASE", cycle, repairCase: selfRepair.repairCase }));
+                history.push({ cycle, recovery, repairCase: selfRepair.repairCase, repairResult: selfRepair.developmentResult });
+                if (selfRepair.repairCase.outcome !== "FIXED" || !selfRepair.developmentResult) {
                     budgetSnapshot = this.performanceBudget.completeCycle(cycleStartedAt);
+                    const blocked = { status: "BLOCKED", stage: "RECOVERY", issues: ["AUTONOMOUS_SELF_REPAIR_NOT_VERIFIED"], repairCase: selfRepair.repairCase };
                     console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, performance: budgetSnapshot, result: blocked }));
-                    return { status: "blocked", cycles: cycle, history: [...history, { cycle, recovery, status: "blocked", result: blocked, performance: budgetSnapshot }] };
-                }
-                const repairDescription = recovery.repairCluster
-                    ? `${recovery.repairCluster.rationale}\nROOT CAUSE: ${recovery.repairCluster.rootCause}\nEVIDENCE:\n${recovery.repairEvidence?.join("\n") ?? "none"}`
-                    : "repair the canonical knot using the recorded verification evidence";
-                const repairGoal = {
-                    capabilityId: recovery.repairCapabilityId!,
-                    capability: `repair and re-verify knot ${mission.capabilityId} from checkpoint ${before.commit}\n\n${repairDescription}`,
-                    targetEngine: mission.targetEngine,
-                    dependencies: mission.dependencies
-                };
-                console.log(JSON.stringify({ type: "AUTONOMOUS_REPAIR_MISSION", cycle, repairGoal }));
-                const repairResult = this.development.execute(repairGoal);
-                history.push({ cycle, recovery, repairGoal, repairResult });
-                if (!repairResult.result.ok) {
-                    budgetSnapshot = this.performanceBudget.completeCycle(cycleStartedAt);
-                    console.log(JSON.stringify({ type: "AUTONOMOUS_BLOCKED", cycle, performance: budgetSnapshot, result: repairResult }));
                     return { status: "blocked", cycles: cycle, history };
                 }
-                result = repairResult;
+                result = selfRepair.developmentResult;
                 const repaired = this.mission.snapshot();
                 if (repaired.commit === before.commit && !result.result.idempotent) {
                     budgetSnapshot = this.performanceBudget.completeCycle(cycleStartedAt);
@@ -196,10 +141,7 @@ export class AutonomousBuildDaemon {
             }
 
             const after = this.mission.snapshot();
-            const knotObservation = this.knotRecovery.observe(
-                { capabilityId: mission.capabilityId, commit: before.commit },
-                { capabilityId: mission.capabilityId, executionOk: result.result.ok, verificationComplete: result.result.ok && result.result.stage === "FINALIZE", repositoryChanged: result.result.idempotent ? true : after.commit !== before.commit && after.clean, failures: result.result.issues }
-            );
+            const knotObservation = this.knotRecovery.observe({ capabilityId: mission.capabilityId, commit: before.commit }, { capabilityId: mission.capabilityId, executionOk: result.result.ok, verificationComplete: result.result.ok && result.result.stage === "FINALIZE", repositoryChanged: result.result.idempotent ? true : after.commit !== before.commit && after.clean, failures: result.result.issues });
             console.log(JSON.stringify({ type: "AUTONOMOUS_KNOT_CHECK", cycle, recovery: knotObservation }));
             if (knotObservation.recover) {
                 budgetSnapshot = this.performanceBudget.completeCycle(cycleStartedAt);

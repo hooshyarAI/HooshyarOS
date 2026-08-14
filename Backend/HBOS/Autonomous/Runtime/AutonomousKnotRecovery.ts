@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { AutonomousFailureAnalysisEngine, RepairCluster } from "./AutonomousFailureAnalysisEngine";
+import { RepairStrategyKind, SelfRepairStrategyPlanner } from "../../Assistant/Autonomous/SelfRepairStrategyPlanner";
 
 export interface KnotCheckpoint {
     capabilityId: string;
@@ -24,6 +25,9 @@ export interface KnotRecoveryDecision {
     repairCapabilityId?: string;
     repairCluster?: RepairCluster;
     repairEvidence?: string[];
+    repairStrategy?: RepairStrategyKind;
+    repairDepth?: string;
+    repairVerification?: string[];
     stopConditions: string[];
 }
 
@@ -35,9 +39,12 @@ function canonicalCapabilityId(capabilityId: string): string {
 
 export class AutonomousKnotRecovery {
     private readonly failureAnalysis = new AutonomousFailureAnalysisEngine();
+    private readonly strategyPlanner = new SelfRepairStrategyPlanner();
+    private readonly strategyHistory = new Map<string, RepairStrategyKind[]>();
 
     observe(checkpoint: KnotCheckpoint, observation: KnotExecutionObservation): KnotRecoveryDecision {
         if (observation.executionOk && observation.verificationComplete && observation.repositoryChanged) {
+            this.resetStrategyHistory(checkpoint.capabilityId);
             return {
                 recover: false,
                 action: "ADVANCE",
@@ -53,27 +60,49 @@ export class AutonomousKnotRecovery {
 
         const cluster = this.failureAnalysis.selectNext(observation.failures ?? []);
         const parentCapabilityId = canonicalCapabilityId(checkpoint.capabilityId);
+        const previousStrategies = this.strategyHistory.get(parentCapabilityId) ?? [];
+        const plan = this.strategyPlanner.plan(cluster, observation.failures ?? [], previousStrategies);
+        this.strategyHistory.set(parentCapabilityId, [...previousStrategies, plan.strategy]);
         const repairCapabilityId = `repair-${parentCapabilityId}`;
         const clusterReason = cluster
             ? `root cause selected=${cluster.rootCause}; repair evidence must address that cluster before re-verification`
             : "no known root cause was classified, so the canonical knot repair remains the safe fallback";
+        const enrichedCluster = cluster
+            ? {
+                ...cluster,
+                rationale: `${cluster.rationale}; SELF_REPAIR_DEPTH=${plan.depth}; SELF_REPAIR_STRATEGY=${plan.strategy}; CONSTRAINTS=${plan.constraints.join(" | ")}`
+            }
+            : undefined;
+        const repairEvidence = [
+            ...(cluster?.evidence ?? observation.failures ?? []),
+            `SELF_REPAIR_STRATEGY=${plan.strategy}`,
+            `SELF_REPAIR_DEPTH=${plan.depth}`,
+            ...plan.verification.map(item => `VERIFY=${item}`)
+        ];
 
         return {
             recover: true,
             action: "REPAIR",
             checkpoint,
-            rationale: `current knot is not trusted; ${clusterReason}; repair owner remains the original canonical knot`,
+            rationale: `${clusterReason}; complexity=${plan.depth}; strategy=${plan.strategy}; ${plan.rationale}`,
             repairCapabilityId,
-            repairCluster: cluster ?? undefined,
-            repairEvidence: cluster?.evidence ?? observation.failures ?? [],
+            repairCluster: enrichedCluster,
+            repairEvidence,
+            repairStrategy: plan.strategy,
+            repairDepth: plan.depth,
+            repairVerification: plan.verification,
             stopConditions: [
                 "repair verification fails",
                 "checkpoint cannot be established",
                 "repository remains inconsistent after repair",
-                "a repeated repair strategy produces the same failure set",
+                "all distinct repair strategies are exhausted",
                 "repair would cross an architecture ownership boundary"
             ]
         };
+    }
+
+    resetStrategyHistory(capabilityId: string): void {
+        this.strategyHistory.delete(canonicalCapabilityId(capabilityId));
     }
 
     rollback(root: string, checkpoint: KnotCheckpoint): void {
