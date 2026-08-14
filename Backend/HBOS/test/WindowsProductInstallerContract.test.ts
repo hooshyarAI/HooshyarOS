@@ -23,6 +23,8 @@ describe("Windows product installer contract", () => {
         expect(builder).toContain("def _copy_node_dependency");
         expect(builder).toContain("def _copy_runtime_node_modules");
         expect(builder).toContain("roots.add(\"tsx\")");
+        expect(builder).toContain("optional dependency is not installed for this host");
+        expect(builder).toContain("not supported on Windows");
     });
 
     it("makes installation observable and creates a launch surface", () => {
@@ -39,5 +41,11 @@ describe("Windows product installer contract", () => {
         expect(builder).toContain("CommercialRuntimeServer.ts");
         expect(builder).toContain("HooshyarWebApp");
         expect(builder).toContain("product-manifest.json");
+    });
+
+    it("uses verified checksum algorithms for Android release fallback", () => {
+        expect(builder).toContain('"platforms;android-35"');
+        expect(builder).toContain('"sha256"');
+        expect(builder).toContain("0988cacad01b38a18a47bac14a0695f246bc76c1b06c0eeb8eb0dc825ab0c8e0");
     });
 });
