@@ -12,6 +12,7 @@
 - `Docs/HOOSHYAROS_PRODUCT_ECOSYSTEM_CHARTER.md` — canonical organizational/ecosystem product scope, growth, success, customer, people/team and resilience model; mandatory when auditing product gaps.
 - `Docs/PRODUCT_ECOSYSTEM_GAP_REGISTER.md` — active audit checklist for missing ecosystem outcomes and application-level product evidence.
 - `Docs/Product/COMMERCIAL_PRODUCT_BUILD_ORDER.md` — governing vertical-slice productization order from runnable foundation through end-to-end commercial acceptance; mandatory when choosing the next commercial gap.
+- `Backend/HBOS/Assistant/Autonomous/AutonomousRepairLaw.ts` — permanent autonomous-first repair law; non-bypassable for construction, repair, verification and optimization.
 - Existing architecture decisions, HBOS engines, capability owners, tests and documentation — inspect before adding anything.
 
 The repository is the durable memory of the approved architecture, product principles, autonomous-construction role, decision logic and verification rules. Do not rely on conversational memory when the repository can provide the governing rule.
@@ -31,6 +32,18 @@ No routine manual file editing or command-by-command driving is required between
 The two-command construction system is subject to a **maximum seven-calendar-day target** for completing the canonical autonomous platform construction process from the approved starting state. The seven-day requirement is a performance constraint and never permits weakening architecture, security, governance, correctness, verification, recoverability or evidence integrity. The construction fabric must optimize throughput using reuse, Python-first automation, proportional verification, bounded repair, measurable telemetry and safe parallelism.
 
 The seven-day objective applies to autonomous construction work governed by the repository backlog. It must explicitly distinguish Assistant construction complete, canonical autonomous platform construction complete, and full real-world production completion; the latter may require external resources or approvals and must never be falsely claimed.
+
+## Autonomous repair law
+Every construction, build, test, runtime, productization, release or integration defect is an **autonomous problem first**. The Assistant must use the canonical mission, Architecture Freeze V4, existing engine ownership, governance, available tools and governed repair strategies to analyze, repair, verify and optimize the defect before any human intervention is considered.
+
+This law is non-bypassable:
+- Never weaken an acceptance gate, architecture boundary, security rule or verification requirement merely to make a failure disappear.
+- Prefer the smallest complete root-cause repair that preserves the frozen architecture.
+- A repair is accepted only when execution, verification, repository state and required evidence agree.
+- The Assistant must use available governed tools and may improve or re-plan its repair strategy when new evidence appears.
+- Manual intervention or external escalation is a last resort and requires persisted proof that autonomous strategies were exhausted or that a genuine external authority boundary has been demonstrated.
+- A blocked state is valid only when it contains durable evidence of the failure, attempts, verification state and the proven external boundary; otherwise autonomous repair must continue.
+- The objective is not merely to remove errors but to leave the construction fabric more robust, recoverable and self-correcting.
 
 ## Autonomous execution
 When assigned a build task, inspect the repository and existing Git history first. Derive the next genuinely missing capability from the master charter, governance charter, Architecture Freeze V4, current implementation state **and the Commercial Product Completion Contract**. Also audit the Product Ecosystem Charter and Product Ecosystem Gap Register before selecting a commercial product gap. Use the Commercial Product Build Order to prioritize the next coherent vertical slice. Do not ask the human to provide file-by-file implementation instructions when the construction fabric can perform the work safely.
@@ -118,6 +131,8 @@ This restriction is operational, not architectural: the HooshyarOS product may s
 25. Before declaring commercial product completion, pass the Commercial Product Completion Contract and keep external production dependencies distinct from repository-native completion.
 26. Before declaring a commercial capability complete, verify the applicable ecosystem outcome and user-value path, not only the underlying Engine implementation.
 27. Prefer vertical-slice commercial build order from `Docs/Product/COMMERCIAL_PRODUCT_BUILD_ORDER.md` over adding broad horizontal infrastructure that does not close a user-value path.
+28. Treat `Backend/HBOS/Assistant/Autonomous/AutonomousRepairLaw.ts` and `SelfRepairGovernance` as non-bypassable construction law for autonomous diagnosis, repair, verification and optimization.
+29. Do not request or perform routine human intervention while a governed autonomous repair, tool or re-planning path remains available within the declared architecture boundary.
 
 ## Architecture changes
 Architecture Freeze V4 is the default source of truth. Change it only when an actual contradiction or missing architectural capability is demonstrated by repository evidence. If changed, update the master charter, architecture document, governance charter and affected decisions before continuing construction.
