@@ -6,7 +6,8 @@
 - `Docs/ARCHITECTURE.md` — Architecture Freeze V4.
 - `Assistant/SYSTEM_PROMPT.md` — autonomous construction constitution.
 - `Docs/AUTONOMOUS_WEAVING_DOCTRINE.md` — expert knot-by-knot construction and recovery doctrine.
-- `Docs/AUTONOMOUS_7_DAY_BUILD_SLA.md` — permanent seven-day autonomous construction performance law.
+- `Docs/HOOSHYAROS_SELF_HEALING_CONSTRUCTION_DOCTRINE.md` — permanent self-healing, failure-learning and adversarial-review doctrine.
+- `Docs/HOOSHYAROS_7_DAY_BUILD_SLA.md` — permanent seven-day autonomous construction performance law.
 - `Docs/HOOSHYAROS_TOOLCHAIN_OPTIMIZATION_LAW.md` — permanent tool-first, Python-first construction and human-intervention law.
 - `Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md` — canonical commercial-product completion and acceptance contract; mandatory for distinguishing canonical capability completion from real commercial product completion.
 - `Docs/HOOSHYAROS_PRODUCT_ECOSYSTEM_CHARTER.md` — canonical organizational/ecosystem product scope, growth, success, customer, people/team and resilience model; mandatory when auditing product gaps.
@@ -44,6 +45,11 @@ This law is non-bypassable:
 - Manual intervention or external escalation is a last resort and requires persisted proof that autonomous strategies were exhausted or that a genuine external authority boundary has been demonstrated.
 - A blocked state is valid only when it contains durable evidence of the failure, attempts, verification state and the proven external boundary; otherwise autonomous repair must continue.
 - The objective is not merely to remove errors but to leave the construction fabric more robust, recoverable and self-correcting.
+
+## Self-healing and failure-learning law
+`Docs/HOOSHYAROS_SELF_HEALING_CONSTRUCTION_DOCTRINE.md` is non-bypassable construction law. A failure is not complete when its symptom disappears: the root cause, repair evidence, protected boundary and reusable lesson must be captured when appropriate. Learned heuristics may improve diagnosis, strategy selection, ordering and tool choice, but may never silently override Architecture Freeze V4, security, governance or approved decisions.
+
+For material decisions and repairs, the construction process must also apply an adversarial/Devil's-Advocate review: challenge root-cause validity, workaround-vs-repair confusion, security and architecture impact, neighboring regressions, evidence quality and reuse opportunities. This is a critical-review function inside the approved construction fabric, not a permission to introduce an uncontrolled external coding agent.
 
 ## Autonomous execution
 When assigned a build task, inspect the repository and existing Git history first. Derive the next genuinely missing capability from the master charter, governance charter, Architecture Freeze V4, current implementation state **and the Commercial Product Completion Contract**. Also audit the Product Ecosystem Charter and Product Ecosystem Gap Register before selecting a commercial product gap. Use the Commercial Product Build Order to prioritize the next coherent vertical slice. Do not ask the human to provide file-by-file implementation instructions when the construction fabric can perform the work safely.
@@ -133,6 +139,9 @@ This restriction is operational, not architectural: the HooshyarOS product may s
 27. Prefer vertical-slice commercial build order from `Docs/Product/COMMERCIAL_PRODUCT_BUILD_ORDER.md` over adding broad horizontal infrastructure that does not close a user-value path.
 28. Treat `Backend/HBOS/Assistant/Autonomous/AutonomousRepairLaw.ts` and `SelfRepairGovernance` as non-bypassable construction law for autonomous diagnosis, repair, verification and optimization.
 29. Do not request or perform routine human intervention while a governed autonomous repair, tool or re-planning path remains available within the declared architecture boundary.
+30. Treat `Docs/HOOSHYAROS_SELF_HEALING_CONSTRUCTION_DOCTRINE.md` as mandatory for failure learning, repair-memory capture and adversarial review.
+31. Never turn a successful workaround into a permanent repair without root-cause evidence and regression verification.
+32. Preserve sensitive customer/platform information when collecting diagnostic evidence; redact secrets and confidential payloads.
 
 ## Architecture changes
 Architecture Freeze V4 is the default source of truth. Change it only when an actual contradiction or missing architectural capability is demonstrated by repository evidence. If changed, update the master charter, architecture document, governance charter and affected decisions before continuing construction.
