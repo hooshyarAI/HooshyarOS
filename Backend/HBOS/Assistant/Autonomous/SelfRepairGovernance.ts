@@ -1,4 +1,5 @@
 import type { FailureInput, RepairStrategy } from "./SelfRepairCapability";
+import { AUTONOMOUS_REPAIR_LAW } from "./AutonomousRepairLaw";
 
 export interface GovernanceDecision {
     allowed: boolean;
@@ -8,6 +9,9 @@ export interface GovernanceDecision {
 /** Non-bypassable governance gate for autonomous repair and external escalation. */
 export class SelfRepairGovernance {
     authorizeRepair(failure: FailureInput, strategy: RepairStrategy): GovernanceDecision {
+        if (!AUTONOMOUS_REPAIR_LAW.autonomousFirst) {
+            return { allowed: false, reason: "AUTONOMOUS_REPAIR_LAW_DISABLED" };
+        }
         if (failure.architectureBoundary && strategy.architecturalFit < 5) {
             return { allowed: false, reason: "REPAIR_CROSSES_DECLARED_ARCHITECTURE_BOUNDARY" };
         }
@@ -18,6 +22,9 @@ export class SelfRepairGovernance {
     }
 
     authorizeManualIntervention(blockedProof: string[] | undefined): GovernanceDecision {
+        if (!AUTONOMOUS_REPAIR_LAW.manualInterventionLastResort || !AUTONOMOUS_REPAIR_LAW.externalEscalationRequiresProof) {
+            return { allowed: false, reason: "AUTONOMOUS_REPAIR_LAW_REQUIRES_AUTONOMOUS_FIRST" };
+        }
         const proof = blockedProof ?? [];
         const hasRootCause = proof.some(item => item.startsWith("ROOT_CAUSE_CLASS:"));
         const hasAttempts = proof.some(item => item.startsWith("ATTEMPTS:"));
