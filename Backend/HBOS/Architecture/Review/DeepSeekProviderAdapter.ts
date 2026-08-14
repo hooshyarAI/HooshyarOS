@@ -85,7 +85,7 @@ export class DeepSeekProviderAdapter {
 
         const prompt = this.buildPrompt(safeRequest);
         const response = await this.requestWithRetry(prompt);
-        return this.parseReview(response);
+        return this.parseReview(response, safeRequest);
     }
 
     private buildPrompt(request: DeepSeekReviewRequest): string {
@@ -173,7 +173,7 @@ export class DeepSeekProviderAdapter {
         throw lastError instanceof Error ? lastError : new Error("DeepSeek request failed");
     }
 
-    private parseReview(response: DeepSeekApiResponse): DeepSeekReviewInput {
+    private parseReview(response: DeepSeekApiResponse, expected: DeepSeekReviewRequest): DeepSeekReviewInput {
         const content = response.choices?.[0]?.message?.content;
         if (typeof content !== "string" || content.trim().length === 0) {
             throw new Error("DeepSeek response did not contain review JSON");
@@ -190,7 +190,39 @@ export class DeepSeekProviderAdapter {
             throw new Error("DeepSeek returned an invalid adversarial review packet");
         }
 
-        return parsed;
+        const review = parsed as DeepSeekReviewInput;
+        if (
+            review.decisionId !== expected.decisionId ||
+            review.category !== expected.category ||
+            review.risk !== expected.risk ||
+            review.material !== expected.material ||
+            review.irreversible !== expected.irreversible
+        ) {
+            throw new Error("DeepSeek returned a review packet with mismatched decision context");
+        }
+
+        const responseSecurity = this.securityBoundary.evaluate({
+            decisionId: review.decisionId,
+            category: review.category,
+            evidence: [
+                ...review.evidence,
+                review.recommendation,
+                ...review.verificationCriteria,
+                ...review.findings.flatMap((finding) => [
+                    finding.id,
+                    finding.statement,
+                    finding.rationale,
+                    ...finding.evidence,
+                ]),
+            ],
+            alternatives: review.alternatives,
+        });
+
+        if (!responseSecurity.allowed) {
+            throw new Error(`DeepSeek response blocked by security boundary: ${responseSecurity.reasons.join("; ")}`);
+        }
+
+        return review;
     }
 
     private isReviewInput(value: unknown): value is DeepSeekReviewInput {
