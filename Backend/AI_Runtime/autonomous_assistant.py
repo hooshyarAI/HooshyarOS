@@ -8,13 +8,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 BUILDER = ROOT / "Backend" / "AI_Runtime" / "hooshyar_build.py"
-WORKER = ROOT / "Backend" / "AI_Runtime" / "productization_worker.py"
+MONITOR = ROOT / "Backend" / "AI_Runtime" / "productization_monitor.py"
 
 
 def main() -> int:
     env = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
     if env.get("HOOSHYAR_PRODUCTIZATION_MODE", "").strip() == "1":
-        return subprocess.run([sys.executable, str(WORKER)], cwd=ROOT, env=env, check=False).returncode
+        return subprocess.run([sys.executable, str(MONITOR)], cwd=ROOT, env=env, check=False).returncode
     return subprocess.run([sys.executable, str(BUILDER), "assistant"], cwd=ROOT, env=env, check=False).returncode
 
 
