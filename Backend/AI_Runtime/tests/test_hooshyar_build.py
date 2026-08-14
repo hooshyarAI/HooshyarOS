@@ -3,7 +3,7 @@ from pathlib import Path
 from Backend.AI_Runtime import hooshyar_build
 
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 
 
 def test_two_command_entrypoint_exposes_both_phases():
@@ -19,7 +19,7 @@ def test_assistant_phase_is_distinct_from_platform_phase():
 
 
 def test_build_entrypoint_is_python_first_and_repository_native():
-    source = (ROOT / "hooshyar_build.py").read_text(encoding="utf-8")
+    source = (ROOT / "Backend" / "AI_Runtime" / "hooshyar_build.py").read_text(encoding="utf-8")
     assert "HOOSHYAR_AGENT" in source
     assert '"python"' in source
     assert "subprocess.Popen" in source
