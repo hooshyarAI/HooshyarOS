@@ -33,9 +33,9 @@ ANDROID_REPO_URLS = (
     "https://redirector.gvt1.com/edgedl/android/repository/",
 )
 ANDROID_PACKAGE_SPECS = {
-    "platform-tools": ("platform-tools-latest-windows.zip", None),
-    "platforms;android-35": ("platform-35_r02.zip", "0bb560a90a7a2cbd0dd8348224d518b638fe7949"),
-    "build-tools;34.0.0": ("build-tools_r34-windows.zip", "62cfde1b6fcc3ad12a4d2ba1b537e752768bfd47"),
+    "platform-tools": ("platform-tools_r36.0.0-win.zip", "sha256", "12c2841f354e92a0eb2fd7bf6f0f9bf8538abce7bd6b060ac8349d6f6a61107c"),
+    "platforms;android-35": ("platform-35_r02.zip", "sha1", "0988cacad01b38a18a47bac14a0695f246bc76c1b06c0eeb8eb0dc825ab0c8e0"),
+    "build-tools;34.0.0": ("build-tools_r34-windows.zip", "sha1", "62cfde1b6fcc3ad12a4d2ba1b537e752768bfd47"),
 }
 
 
@@ -98,8 +98,13 @@ def _validate_zip(target: Path) -> None:
         raise RuntimeError("downloaded artifact is not a valid ZIP archive")
 
 
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
+def _digest(path: Path, algorithm: str) -> str:
+    if algorithm == "sha256":
+        digest = hashlib.sha256()
+    elif algorithm == "sha1":
+        digest = hashlib.sha1()
+    else:
+        raise RuntimeError(f"unsupported checksum algorithm: {algorithm}")
     with path.open("rb") as fh:
         for chunk in iter(lambda: fh.read(1024 * 1024), b""):
             digest.update(chunk)
@@ -183,7 +188,7 @@ def _install_android_components_direct() -> None:
         reason="sdkmanager repository manifest unavailable",
     )
 
-    for package, (filename, expected_sha256) in ANDROID_PACKAGE_SPECS.items():
+    for package, (filename, checksum_algorithm, expected_checksum) in ANDROID_PACKAGE_SPECS.items():
         if package == "platform-tools":
             destination = SDK / "platform-tools"
         elif package == "platforms;android-35":
@@ -193,21 +198,30 @@ def _install_android_components_direct() -> None:
         else:
             raise RuntimeError(f"unsupported direct Android package: {package}")
 
-        marker = destination / ("adb.exe" if package == "platform-tools" else "android.jar" if package == "platforms;android-35" else "aapt2.exe")
+        marker = destination / (
+            "adb.exe"
+            if package == "platform-tools"
+            else "android.jar"
+            if package == "platforms;android-35"
+            else "aapt2.exe"
+        )
         if marker.exists():
             continue
 
         archive = CACHE / filename
         urls = tuple(f"{base}{filename}" for base in ANDROID_REPO_URLS)
         selected = download_any(urls, archive, "ANDROID", package)
-        if expected_sha256:
-            actual = _sha256(archive)
-            if actual != expected_sha256:
-                raise RuntimeError(f"checksum mismatch for {package}: expected {expected_sha256}, got {actual}")
+        actual = _digest(archive, checksum_algorithm)
+        if actual != expected_checksum:
+            raise RuntimeError(
+                f"checksum mismatch for {package}: algorithm={checksum_algorithm} expected {expected_checksum}, got {actual}"
+            )
         emit(
             "AUTONOMOUS_RELEASE_ANDROID_COMPONENT_SOURCE_SELECTED",
             package=package,
             source=selected,
+            checksumAlgorithm=checksum_algorithm,
+            checksum=actual,
         )
         _extract_component(archive, destination)
 
