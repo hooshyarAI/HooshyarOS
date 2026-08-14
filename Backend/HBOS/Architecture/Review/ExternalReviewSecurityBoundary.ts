@@ -39,6 +39,7 @@ const ALLOWED_CATEGORIES = new Set([
     "ARCHITECTURE",
     "SECURITY",
     "PERFORMANCE",
+    "RELIABILITY",
     "REPAIR",
     "PRODUCTIZATION",
     "RELEASE",
