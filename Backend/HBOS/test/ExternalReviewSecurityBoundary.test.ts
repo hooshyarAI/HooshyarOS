@@ -63,6 +63,30 @@ describe("ExternalReviewSecurityBoundary", () => {
         expect(result.reasons.join(" ")).toMatch(/category.*governed/i);
     });
 
+    it("blocks RELEASE because release review is not an approved external-review category", () => {
+        const result = boundary.evaluate({
+            decisionId: "release-1",
+            category: "RELEASE",
+            evidence: ["installer artifact verification"],
+            alternatives: ["rebuild release artifact"],
+        });
+
+        expect(result.allowed).toBe(false);
+        expect(result.reasons.join(" ")).toMatch(/category.*governed/i);
+    });
+
+    it("blocks malformed decision ids before external transmission", () => {
+        const result = boundary.evaluate({
+            decisionId: " architecture-1 ",
+            category: "ARCHITECTURE",
+            evidence: ["clean architecture failure signal"],
+            alternatives: ["option-a"],
+        });
+
+        expect(result.allowed).toBe(false);
+        expect(result.reasons.join(" ")).toMatch(/decision id.*malformed/i);
+    });
+
     it("keeps sanitized external packets free of original decision id, evidence, alternatives and context", () => {
         const result = boundary.evaluate({
             decisionId: "architecture-1",
