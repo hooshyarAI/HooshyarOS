@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -27,6 +28,15 @@ JDK_URLS = (
     "https://api.adoptium.net/v3/binary/latest/17/ga/windows/x64/jdk/hotspot/normal/eclipse",
 )
 GRADLE_URL = f"https://services.gradle.org/distributions/gradle-{GRADLE_VERSION}-bin.zip"
+ANDROID_REPO_URLS = (
+    "https://dl.google.com/android/repository/",
+    "https://redirector.gvt1.com/edgedl/android/repository/",
+)
+ANDROID_PACKAGE_SPECS = {
+    "platform-tools": ("platform-tools-latest-windows.zip", None),
+    "platforms;android-35": ("platform-35_r02.zip", "0bb560a90a7a2cbd0dd8348224d518b638fe7949"),
+    "build-tools;34.0.0": ("build-tools_r34-windows.zip", "62cfde1b6fcc3ad12a4d2ba1b537e752768bfd47"),
+}
 
 
 def emit(kind: str, **payload: object) -> None:
@@ -88,6 +98,14 @@ def _validate_zip(target: Path) -> None:
         raise RuntimeError("downloaded artifact is not a valid ZIP archive")
 
 
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def download(url: str, target: Path) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     if target.exists() and target.stat().st_size:
@@ -143,6 +161,57 @@ def unzip(src: Path, dest: Path) -> None:
         zf.extractall(dest)
 
 
+def _extract_component(archive: Path, destination: Path) -> None:
+    staging = CACHE / "android-component-stage"
+    if staging.exists():
+        shutil.rmtree(staging, ignore_errors=True)
+    unzip(archive, staging)
+    roots = [p for p in staging.iterdir() if p.is_dir()] if staging.exists() else []
+    source = roots[0] if len(roots) == 1 else staging
+    if destination.exists():
+        shutil.rmtree(destination, ignore_errors=True)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(source), str(destination))
+    if staging.exists():
+        shutil.rmtree(staging, ignore_errors=True)
+
+
+def _install_android_components_direct() -> None:
+    emit(
+        "AUTONOMOUS_RELEASE_ANDROID_FALLBACK",
+        strategy="DIRECT_PACKAGE_DOWNLOAD",
+        reason="sdkmanager repository manifest unavailable",
+    )
+
+    for package, (filename, expected_sha256) in ANDROID_PACKAGE_SPECS.items():
+        if package == "platform-tools":
+            destination = SDK / "platform-tools"
+        elif package == "platforms;android-35":
+            destination = SDK / "platforms" / "android-35"
+        elif package == "build-tools;34.0.0":
+            destination = SDK / "build-tools" / "34.0.0"
+        else:
+            raise RuntimeError(f"unsupported direct Android package: {package}")
+
+        marker = destination / ("adb.exe" if package == "platform-tools" else "android.jar" if package == "platforms;android-35" else "aapt2.exe")
+        if marker.exists():
+            continue
+
+        archive = CACHE / filename
+        urls = tuple(f"{base}{filename}" for base in ANDROID_REPO_URLS)
+        selected = download_any(urls, archive, "ANDROID", package)
+        if expected_sha256:
+            actual = _sha256(archive)
+            if actual != expected_sha256:
+                raise RuntimeError(f"checksum mismatch for {package}: expected {expected_sha256}, got {actual}")
+        emit(
+            "AUTONOMOUS_RELEASE_ANDROID_COMPONENT_SOURCE_SELECTED",
+            package=package,
+            source=selected,
+        )
+        _extract_component(archive, destination)
+
+
 def ensure_android_toolchain() -> tuple[Path, Path, Path]:
     CACHE.mkdir(parents=True, exist_ok=True)
     JDK.mkdir(parents=True, exist_ok=True)
@@ -186,12 +255,30 @@ def ensure_android_toolchain() -> tuple[Path, Path, Path]:
     env["PATH"] = os.pathsep.join(
         [str(java_home / "bin"), str(sdkmanager.parent), str(SDK / "platform-tools"), env.get("PATH", "")]
     )
-    subprocess.run(
-        [str(sdkmanager), "platform-tools", "platforms;android-35", "build-tools;34.0.0"],
-        cwd=ROOT,
-        env=env,
-        check=True,
-    )
+
+    try:
+        result = subprocess.run(
+            [str(sdkmanager), "platform-tools", "platforms;android-35", "build-tools;34.0.0"],
+            cwd=ROOT,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            check=False,
+            timeout=20 * 60,
+        )
+        if result.stdout:
+            print(result.stdout, end="")
+        if result.returncode != 0:
+            raise RuntimeError(f"sdkmanager failed with exit code {result.returncode}")
+    except Exception as exc:
+        emit(
+            "AUTONOMOUS_RELEASE_ANDROID_SDKMANAGER_FALLBACK",
+            strategy="DIRECT_PACKAGE_DOWNLOAD",
+            reason=str(exc),
+        )
+        _install_android_components_direct()
+
     subprocess.run(
         [str(sdkmanager), "--licenses"],
         cwd=ROOT,
