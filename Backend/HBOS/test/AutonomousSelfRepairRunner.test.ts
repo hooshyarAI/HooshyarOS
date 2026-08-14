@@ -1,16 +1,16 @@
 import { AutonomousSelfRepairRunner } from "../Autonomous/Runtime/AutonomousSelfRepairRunner";
 import { AutonomousDevelopmentResult } from "../Architecture/Autonomous/AutonomousDevelopmentLoop";
-import { AutonomousKnotRecovery } from "../Autonomous/Runtime/AutonomousKnotRecovery";
 
 describe("AutonomousSelfRepairRunner", () => {
     it("routes a real repair execution through the governed capability and records evidence", () => {
         const runner = new AutonomousSelfRepairRunner();
-        const development = {
-            execute: jest.fn<AutonomousDevelopmentResult, [unknown]>(() => ({ status: "completed", result: { ok: true, stage: "FINALIZE", idempotent: false, issues: [] } }))
-        } as unknown as AutonomousDevelopmentLoopLike;
-        const recovery = {
-            rollback: jest.fn()
-        } as unknown as AutonomousKnotRecoveryLike;
+        const execute = jest.fn((_: unknown): AutonomousDevelopmentResult => ({
+            status: "completed",
+            result: { ok: true, stage: "FINALIZE", idempotent: false, issues: [] }
+        }));
+        const rollback = jest.fn();
+        const development = { execute };
+        const recovery = { rollback };
         let snapshotCalls = 0;
         const root = "D:/HooshyarOS";
         const result = runner.run({
@@ -29,10 +29,7 @@ describe("AutonomousSelfRepairRunner", () => {
         expect(result.repairCase.capabilityId).toBe("assistant.autonomous.self-repair");
         expect(result.repairCase.outcome).toBe("FIXED");
         expect(result.repairCase.evidence).toEqual(expect.arrayContaining(["STRATEGY=FOCUSED_CANONICAL_REPAIR", "WORKTREE_CLEAN=true"]));
-        expect(development.execute).toHaveBeenCalled();
-        expect(recovery.rollback).toHaveBeenCalledWith(root, { capabilityId: "assistant.test", commit: "before" });
+        expect(execute).toHaveBeenCalled();
+        expect(rollback).toHaveBeenCalledWith(root, { capabilityId: "assistant.test", commit: "before" });
     });
 });
-
-type AutonomousDevelopmentLoopLike = { execute: jest.Mock };
-type AutonomousKnotRecoveryLike = { rollback: jest.Mock };
