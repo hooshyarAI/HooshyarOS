@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -43,15 +44,22 @@ def stage_from_event(event: dict[str, object]) -> tuple[int, str, str]:
         stage = str(event.get("stage", "UNKNOWN"))
         start, _, label = STAGES.get(stage, (0, 0, stage))
         return start, stage, label
+    if kind == "AUTONOMOUS_PRODUCTIZATION_SUBSTAGE":
+        substage = str(event.get("substage", "VERIFY"))
+        return (7 if substage == "BUILD" else 15), "BUILD_VERIFY", f"Running {substage}: waiting for completion"
+    if kind == "AUTONOMOUS_PRODUCTIZATION_SUBSTAGE_COMPLETE":
+        substage = str(event.get("substage", "VERIFY"))
+        code = event.get("exitCode", "unknown")
+        return (10 if substage == "BUILD" else 25), "BUILD_VERIFY", f"{substage} finished with exit code {code}"
     if kind == "AUTONOMOUS_PRODUCTIZATION_DELEGATE":
         platform = str(event.get("platform", ""))
         stage = "WINDOWS" if platform == "WINDOWS" else "ANDROID"
-        start, end, label = STAGES[stage]
+        start, end, _ = STAGES[stage]
         return start + max(1, (end - start) // 5), stage, f"Delegating {platform} release builder"
     if kind == "AUTONOMOUS_PRODUCTIZATION_BUILDER_DELEGATE":
         platform = str(event.get("platform", ""))
         stage = "WINDOWS" if platform == "WINDOWS" else "ANDROID"
-        start, end, label = STAGES[stage]
+        start, end, _ = STAGES[stage]
         return start + max(2, (end - start) // 4), stage, f"Builder executing {platform} packaging"
     if kind == "AUTONOMOUS_RELEASE_DOWNLOAD":
         return 55, "ANDROID", f"Downloading release dependency: {event.get('target', '')}"
@@ -92,6 +100,19 @@ def main() -> int:
     current_percent = 0
     current_stage = "START"
     current_detail = "Starting autonomous productization"
+    last_render = 0.0
+    stop_heartbeat = threading.Event()
+
+    def heartbeat() -> None:
+        nonlocal last_render
+        while not stop_heartbeat.wait(5):
+            current = time.monotonic()
+            if current - last_render >= 5:
+                emit_status(current_percent, current_stage, current_detail, started)
+                last_render = current
+
+    heartbeat_thread = threading.Thread(target=heartbeat, daemon=True)
+    heartbeat_thread.start()
     emit_status(current_percent, current_stage, current_detail, started)
 
     try:
@@ -110,10 +131,13 @@ def main() -> int:
                     current_detail = detail or current_detail
                     state = "BLOCKED" if event.get("type") == "AUTONOMOUS_PRODUCTIZATION_BLOCKED" else "RUNNING"
                     emit_status(current_percent, current_stage, current_detail, started, state)
+                    last_render = time.monotonic()
                 else:
                     print(raw, flush=True)
     finally:
+        stop_heartbeat.set()
         process.stdout.close()
+        heartbeat_thread.join(timeout=1)
 
     code = process.wait()
     if code == 0:
