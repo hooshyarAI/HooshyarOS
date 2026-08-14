@@ -4,8 +4,19 @@ import { AutonomousDevelopmentResult } from "../Architecture/Autonomous/Autonomo
 describe("AutonomousSelfRepairRunner", () => {
     it("routes a real repair execution through the governed capability and records evidence", () => {
         const runner = new AutonomousSelfRepairRunner();
-        const execute = jest.fn((_: unknown): AutonomousDevelopmentResult => ({
+        const execute = jest.fn((goal: any): AutonomousDevelopmentResult => ({
             status: "completed",
+            goal,
+            plan: {
+                goal,
+                requirement: {
+                    capabilityId: goal.capabilityId,
+                    capability: goal.capability,
+                    targetEngine: goal.targetEngine,
+                    dependencies: goal.dependencies
+                },
+                tasks: ["architecture", "decision", "plan", "generate", "verify", "repair", "finalize"]
+            },
             result: {
                 ok: true,
                 status: "BUILT",
