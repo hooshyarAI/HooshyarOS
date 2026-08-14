@@ -42,7 +42,6 @@ const ALLOWED_CATEGORIES = new Set([
     "RELIABILITY",
     "REPAIR",
     "PRODUCTIZATION",
-    "RELEASE",
 ]);
 
 export class ExternalReviewSecurityBoundary {
