@@ -19,3 +19,10 @@ node_modules/
 
 # Local Hooshyar runtime state
 .hooshyar/
+
+# Local autonomous construction/toolchain artifacts
+.toolcache/
+dist/
+android/
+productization-worker-local.patch
+productization_mission.txt
