@@ -11,6 +11,48 @@ describe("AutonomousRepairLaw", () => {
         expect(AUTONOMOUS_REPAIR_LAW.externalEscalationRequiresProof).toBe(true);
     });
 
+    it("makes customer runtime repair autonomous-first and safety-gated", () => {
+        expect(AUTONOMOUS_REPAIR_LAW.customerRuntimeRepairRequired).toBe(true);
+        expect(AUTONOMOUS_REPAIR_LAW.tenantIsolationNonBypassable).toBe(true);
+        expect(AUTONOMOUS_REPAIR_LAW.dataIntegrityNonBypassable).toBe(true);
+        expect(AUTONOMOUS_REPAIR_LAW.securityControlsNonBypassable).toBe(true);
+        expect(AUTONOMOUS_REPAIR_LAW.rollbackMandatory).toBe(true);
+        expect(AUTONOMOUS_REPAIR_LAW.canaryVerificationMandatory).toBe(true);
+        expect(AUTONOMOUS_REPAIR_LAW.observabilityMandatory).toBe(true);
+        expect(AUTONOMOUS_REPAIR_LAW.durableRepairAuditMandatory).toBe(true);
+        expect(AUTONOMOUS_REPAIR_LAW.automaticResumeOnlyAfterVerification).toBe(true);
+
+        const governance = new SelfRepairGovernance();
+        expect(governance.authorizeCustomerRuntimeRepair({
+            tenantId: "tenant-a",
+            failureId: "runtime-001",
+            affectsCustomerData: true,
+            securityBoundaryAtRisk: false,
+            rollbackAvailable: true,
+            canaryVerificationAvailable: true,
+            observabilityAvailable: true
+        })).toEqual({
+            allowed: true,
+            reason: "CUSTOMER_RUNTIME_REPAIR_WITHIN_GOVERNED_BOUNDARY"
+        });
+    });
+
+    it("fails closed when a customer runtime repair lacks its safety envelope", () => {
+        const governance = new SelfRepairGovernance();
+        expect(governance.authorizeCustomerRuntimeRepair({
+            tenantId: "tenant-a",
+            failureId: "runtime-002",
+            affectsCustomerData: true,
+            securityBoundaryAtRisk: false,
+            rollbackAvailable: false,
+            canaryVerificationAvailable: true,
+            observabilityAvailable: true
+        })).toEqual({
+            allowed: false,
+            reason: "CUSTOMER_RUNTIME_ROLLBACK_REQUIRED"
+        });
+    });
+
     it("forbids manual intervention without durable autonomous-boundary proof", () => {
         const governance = new SelfRepairGovernance();
         expect(governance.authorizeManualIntervention(undefined)).toEqual({
