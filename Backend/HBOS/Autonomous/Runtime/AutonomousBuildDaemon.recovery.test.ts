@@ -40,7 +40,8 @@ describe("AutonomousBuildDaemon knot recovery", () => {
                     issues: [],
                     trace: ["ARCHITECTURE", "PLAN", "GENERATE", "VERIFY", "FINALIZE"],
                     details: "knot repaired and verified",
-                    stage: "FINALIZE"
+                    stage: "FINALIZE",
+                    idempotent: true
                 }
             }));
 
