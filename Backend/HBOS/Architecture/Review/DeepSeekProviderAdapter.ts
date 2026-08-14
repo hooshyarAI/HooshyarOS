@@ -4,6 +4,7 @@ import type {
     DeepSeekReviewRisk,
     DeepSeekReviewVerdict,
 } from "./DeepSeekAdversarialReviewGate";
+import { ExternalReviewSecurityBoundary } from "./ExternalReviewSecurityBoundary";
 
 export interface DeepSeekProviderOptions {
     apiKey?: string;
@@ -45,6 +46,7 @@ export class DeepSeekProviderAdapter {
     private readonly timeoutMs: number;
     private readonly maxRetries: number;
     private readonly fetchImpl: typeof fetch;
+    private readonly securityBoundary: ExternalReviewSecurityBoundary;
 
     constructor(options: DeepSeekProviderOptions = {}) {
         this.apiKey = options.apiKey ?? process.env.DEEPSEEK_API_KEY ?? "";
@@ -53,6 +55,7 @@ export class DeepSeekProviderAdapter {
         this.timeoutMs = options.timeoutMs ?? Number(process.env.DEEPSEEK_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
         this.maxRetries = options.maxRetries ?? Number(process.env.DEEPSEEK_MAX_RETRIES ?? DEFAULT_MAX_RETRIES);
         this.fetchImpl = options.fetchImpl ?? fetch;
+        this.securityBoundary = new ExternalReviewSecurityBoundary();
     }
 
     isConfigured(): boolean {
@@ -64,7 +67,23 @@ export class DeepSeekProviderAdapter {
             throw new Error("DEEPSEEK_API_KEY is not configured");
         }
 
-        const prompt = this.buildPrompt(request);
+        const security = this.securityBoundary.evaluate({
+            decisionId: request.decisionId,
+            category: request.category,
+            evidence: request.evidence,
+            alternatives: request.alternatives,
+            context: request.context,
+        });
+        if (!security.allowed) {
+            throw new Error(`external review blocked by security boundary: ${security.reasons.join("; ")}`);
+        }
+
+        const safeRequest: DeepSeekReviewRequest = {
+            ...request,
+            ...security.sanitized,
+        };
+
+        const prompt = this.buildPrompt(safeRequest);
         const response = await this.requestWithRetry(prompt);
         return this.parseReview(response);
     }
@@ -73,6 +92,7 @@ export class DeepSeekProviderAdapter {
         return [
             "Act as the independent senior architecture, design, performance, reliability, security and repair critic for HooshyarOS.",
             "Do not implement changes. Challenge assumptions, identify root-cause risks, propose alternatives and issue a governed verdict.",
+            "Security boundary: the request is deliberately sanitized. Do not ask for customer records, personal data, financial records, credentials, tokens, secrets or raw business documents.",
             "Return ONLY valid JSON matching this shape:",
             JSON.stringify({
                 decisionId: request.decisionId,
@@ -85,7 +105,7 @@ export class DeepSeekProviderAdapter {
                 verdict: "ALLOW",
                 findings: [{ id: "finding-1", severity: "LOW", statement: "...", evidence: ["..."], rationale: "..." }],
                 recommendation: "...",
-                verificationCriteria: ["..."]
+                verificationCriteria: ["..."],
             }),
             `Decision: ${request.decisionId}`,
             `Context: ${request.context ?? "not provided"}`,
