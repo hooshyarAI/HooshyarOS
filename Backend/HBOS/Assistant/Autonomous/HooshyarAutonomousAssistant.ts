@@ -25,6 +25,14 @@ export class HooshyarAutonomousAssistant {
         const mission=this.goals.create(goal);
         const lifecycle= this.missionController.executeMission(goal);
         if (lifecycle.status !== "COMPLETED") {
+            this.memory.learnFromExecution({
+                status: lifecycle.status,
+                completed: false,
+                goal,
+                summary: "Assistant mission lifecycle did not complete.",
+                lesson: "Diagnose the lifecycle boundary before repeating the mission strategy.",
+                tags: ["mission", "failure", "repair"],
+            });
             return {
                 identity,
                 mission,
@@ -52,7 +60,15 @@ export class HooshyarAutonomousAssistant {
         const construction=this.continuePlatformConstruction();
 
         const result={identity,mission,lifecycle,runtime,evaluation,improvement,tool,construction};
-        this.memory.record(result);
+        this.memory.learnFromExecution({
+            status: lifecycle.status,
+            completed: lifecycle.status === "COMPLETED",
+            goal,
+            summary: `Assistant execution completed its governed lifecycle for: ${goal}`,
+            lesson: "Retain only verified execution patterns; treat memory as evidence, never as architectural authority.",
+            evidence: ["mission lifecycle", "self-evaluation", "improvement result", "construction handoff"],
+            tags: ["assistant", "construction", "verification"],
+        });
         return result;
     }
 
