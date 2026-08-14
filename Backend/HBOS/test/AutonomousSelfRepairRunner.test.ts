@@ -6,7 +6,17 @@ describe("AutonomousSelfRepairRunner", () => {
         const runner = new AutonomousSelfRepairRunner();
         const execute = jest.fn((_: unknown): AutonomousDevelopmentResult => ({
             status: "completed",
-            result: { ok: true, stage: "FINALIZE", idempotent: false, issues: [] }
+            result: {
+                ok: true,
+                status: "BUILT",
+                attempts: 1,
+                selectedTool: "test",
+                issues: [],
+                trace: ["ARCHITECTURE", "PLAN", "GENERATE", "VERIFY", "FINALIZE"],
+                details: "controlled self-repair test",
+                stage: "FINALIZE",
+                idempotent: false
+            }
         }));
         const rollback = jest.fn();
         const development = { execute };
