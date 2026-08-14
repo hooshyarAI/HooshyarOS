@@ -11,6 +11,8 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
+from android_toolchain_sources import CMDLINE_TOOLS_URLS
+
 ROOT = Path(__file__).resolve().parents[2]
 DIST = ROOT / "dist" / "productization"
 WIN = DIST / "windows"
@@ -20,7 +22,6 @@ JDK = CACHE / "jdk17"
 GRADLE = CACHE / "gradle"
 SDK = CACHE / "android-sdk"
 GRADLE_VERSION = "8.7"
-CMD_TOOLS_URL = "https://dl.google.com/android/repository/commandlinetools-win-15859902_latest.zip"
 JDK_URLS = (
     "https://aka.ms/download-jdk/microsoft-jdk-17-windows-x64.zip",
     "https://api.adoptium.net/v3/binary/latest/17/ga/windows/x64/jdk/hotspot/normal/eclipse",
@@ -169,7 +170,8 @@ def ensure_android_toolchain() -> tuple[Path, Path, Path]:
     czip = CACHE / "commandlinetools.zip"
     sdkmanager = SDK / "cmdline-tools" / "latest" / "bin" / "sdkmanager.bat"
     if not sdkmanager.exists():
-        download(CMD_TOOLS_URL, czip)
+        selected = download_any(CMDLINE_TOOLS_URLS, czip, "ANDROID", "command-line-tools")
+        emit("AUTONOMOUS_RELEASE_CMDLINE_TOOLS_SOURCE_SELECTED", platform="ANDROID", source=selected)
         staging = CACHE / "cmdline-tools-stage"
         unzip(czip, staging)
         source = staging / "cmdline-tools"
