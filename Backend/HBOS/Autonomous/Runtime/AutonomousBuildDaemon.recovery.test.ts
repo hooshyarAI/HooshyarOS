@@ -11,6 +11,7 @@ describe("AutonomousBuildDaemon knot recovery", () => {
     afterEach(() => {
         jest.restoreAllMocks();
     });
+
     it("repairs a failed knot from its checkpoint before allowing the run to continue", () => {
         const execute = jest.fn()
             .mockImplementationOnce((_goal: any): AutonomousDevelopmentResult => ({
@@ -45,10 +46,16 @@ describe("AutonomousBuildDaemon knot recovery", () => {
                 }
             }));
 
+        let snapshotCalls = 0;
         const mission = {
-            snapshot: jest.fn()
-                .mockReturnValueOnce({ root: process.cwd(), commit: "HEAD", clean: true })
-                .mockReturnValue({ root: process.cwd(), commit: "repaired", clean: true }),
+            snapshot: jest.fn(() => {
+                snapshotCalls += 1;
+                return {
+                    root: process.cwd(),
+                    commit: snapshotCalls <= 2 ? "HEAD" : "repaired",
+                    clean: true
+                };
+            }),
             nextMission: jest.fn(() => ({
                 capabilityId: "platform.user-management",
                 capability: "implement User Management",
