@@ -57,6 +57,25 @@ export class AutonomousSelfRepairRunner {
                     dependencies: context.dependencies
                 };
                 const result = context.development.execute(goal);
+
+                if (!result || !result.result) {
+                    const after = context.snapshot();
+                    return {
+                        ok: false,
+                        evidence: [
+                            `STRATEGY=${kind}`,
+                            "RESULT_STATUS=INVALID_EXECUTION_RESULT",
+                            "RESULT_STAGE=UNKNOWN",
+                            "REPOSITORY_CHANGED=false",
+                            `WORKTREE_CLEAN=${after.clean}`,
+                            "SELF_REPAIR_EXECUTION_RETURNED_NO_RESULT"
+                        ],
+                        verificationPassed: false,
+                        repositoryChanged: false,
+                        idempotent: false
+                    };
+                }
+
                 const after = context.snapshot();
                 recordResult(result);
                 const changed = before.commit !== after.commit || result.result.idempotent === true;
