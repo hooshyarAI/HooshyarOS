@@ -252,6 +252,7 @@ def _validate_windows_payload(payload: Path) -> None:
         "runtime/node.exe",
         "node_modules/tsx/dist/cli.mjs",
         "Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts",
+        "Frontend/HooshyarWebApp/index.ts",
         "web/index.html",
     ]
     missing = [item for item in required if not (payload / Path(item)).exists()]
@@ -285,34 +286,37 @@ Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
     Where-Object { $_.CommandLine -like '*HooshyarOS*CommercialRuntimeServer.ts*' } |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 
-New-Item -ItemType Directory -Force -Path $installRoot, $dataRoot | Out-Null
 if (Test-Path $installRoot) { Remove-Item $installRoot -Recurse -Force }
-New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
+New-Item -ItemType Directory -Force -Path $installRoot, $dataRoot | Out-Null
 Copy-Item (Join-Path $stage "payload\\*") $installRoot -Recurse -Force
 
 $launcherCmd = Join-Path $installRoot "launch-hooshyar.cmd"
-@("@echo off", "set HOOSHYAR_DATA_ROOT=$dataRoot", "cd /d \"$installRoot\"", "start \"HooshyarOS\" /b \"$installRoot\\runtime\\node.exe\" \"$installRoot\\node_modules\\tsx\\dist\\cli.mjs\" \"$installRoot\\Backend\\HBOS\\Autonomous\\Runtime\\CommercialRuntimeServer.ts\"") | Set-Content $launcherCmd -Encoding ASCII
+@(
+    "@echo off",
+    "set HOOSHYAR_DATA_ROOT=$dataRoot",
+    "cd /d \"$installRoot\"",
+    "start \"HooshyarOS\" /b \"$installRoot\runtime\node.exe\" \"$installRoot\node_modules\tsx\dist\cli.mjs\" \"$installRoot\Backend\HBOS\Autonomous\Runtime\CommercialRuntimeServer.ts\""
+) | Set-Content $launcherCmd -Encoding ASCII
 
 $launcherVbs = Join-Path $installRoot "launch-hooshyar.vbs"
-$escapedCmd = $launcherCmd.Replace("\\", "\\\\")
 @"
 Set shell = CreateObject("WScript.Shell")
-shell.Run "\"$escapedCmd\"", 0, False
+shell.Run Chr(34) & "$launcherCmd" & Chr(34), 0, False
 WScript.Sleep 1500
 shell.Run "http://127.0.0.1:3000/", 1, False
 "@ | Set-Content $launcherVbs -Encoding ASCII
 
 $ws = New-Object -ComObject WScript.Shell
 $desktop = [Environment]::GetFolderPath("Desktop")
-$start = Join-Path $env:ProgramData "Microsoft\\Windows\\Start Menu\\Programs\\HooshyarOS"
+$start = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\HooshyarOS"
 New-Item -ItemType Directory -Force -Path $start | Out-Null
 foreach ($link in @((Join-Path $desktop "HooshyarOS.lnk"), (Join-Path $start "HooshyarOS.lnk"))) {
     $s = $ws.CreateShortcut($link)
-    $s.TargetPath = "$env:SystemRoot\\System32\\wscript.exe"
+    $s.TargetPath = "$env:SystemRoot\System32\wscript.exe"
     $s.Arguments = "`"$launcherVbs`""
     $s.WorkingDirectory = $installRoot
     $s.Description = "HooshyarOS"
-    $s.IconLocation = "$env:SystemRoot\\System32\\SHELL32.dll,167"
+    $s.IconLocation = "$env:SystemRoot\System32\SHELL32.dll,167"
     $s.Save()
 }
 
@@ -320,13 +324,13 @@ $uninstall = Join-Path $installRoot "uninstall.ps1"
 @"
 `$ErrorActionPreference = "Stop"
 Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { `$_.CommandLine -like '*HooshyarOS*CommercialRuntimeServer.ts*' } | ForEach-Object { Stop-Process -Id `$_.ProcessId -Force -ErrorAction SilentlyContinue }
-Remove-Item '$desktop\\HooshyarOS.lnk' -Force -ErrorAction SilentlyContinue
+Remove-Item '$desktop\HooshyarOS.lnk' -Force -ErrorAction SilentlyContinue
 Remove-Item '$start' -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item '$installRoot' -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item '$dataRoot' -Recurse -Force -ErrorAction SilentlyContinue
 "@ | Set-Content $uninstall -Encoding UTF8
 
-$proc = Start-Process -FilePath "$env:SystemRoot\\System32\\wscript.exe" -ArgumentList "`"$launcherVbs`"" -WindowStyle Hidden -PassThru
+$proc = Start-Process -FilePath "$env:SystemRoot\System32\wscript.exe" -ArgumentList "`"$launcherVbs`"" -WindowStyle Hidden -PassThru
 $healthy = $false
 for ($i = 0; $i -lt 45; $i++) {
     Start-Sleep -Seconds 1
@@ -337,7 +341,7 @@ for ($i = 0; $i -lt 45; $i++) {
 }
 if (-not $healthy) { throw 'HooshyarOS installation health check failed.' }
 Write-Host "HooshyarOS installed and health-checked at $installRoot"
-Write-Host "Desktop shortcut created at $desktop\\HooshyarOS.lnk"
+Write-Host "Desktop shortcut created at $desktop\HooshyarOS.lnk"
 '''
     path.write_text(script, encoding="utf-8")
 
@@ -366,7 +370,15 @@ def windows() -> int:
     dependency_count = _copy_runtime_node_modules(payload / "node_modules")
     manifest = json.loads((payload / "package.json").read_text(encoding="utf-8"))
     (payload / "product-manifest.json").write_text(
-        json.dumps({"product":"HooshyarOS","version":manifest.get("version","0.0.0"),"platform":"WINDOWS","entrypoint":"Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts","web":"web/index.html","runtimeDependencies":dependency_count,"health":"http://127.0.0.1:3000/health"}, ensure_ascii=False, indent=2),
+        json.dumps({
+            "product": "HooshyarOS",
+            "version": manifest.get("version", "0.0.0"),
+            "platform": "WINDOWS",
+            "entrypoint": "Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts",
+            "web": "web/index.html",
+            "runtimeDependencies": dependency_count,
+            "health": "http://127.0.0.1:3000/health",
+        }, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
     _validate_windows_payload(payload)
@@ -380,7 +392,7 @@ def windows() -> int:
                 zf.write(path, path.relative_to(source))
     target = WIN / "HooshyarOS-Setup.exe"
     sed = WIN / "HooshyarOS-Setup.sed"
-    iexpress = Path(os.environ.get("WINDIR", r"C:\\Windows")) / "System32" / "iexpress.exe"
+    iexpress = Path(os.environ.get("WINDIR", r"C:\Windows")) / "System32" / "iexpress.exe"
     if not iexpress.exists():
         raise RuntimeError("IExpress is unavailable")
     sed.write_text(
