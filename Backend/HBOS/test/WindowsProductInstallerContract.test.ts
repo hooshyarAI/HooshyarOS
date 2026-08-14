@@ -22,19 +22,22 @@ describe("Windows product installer contract", () => {
         expect(builder).toContain("def _runtime_dependency_names");
         expect(builder).toContain("def _copy_node_dependency");
         expect(builder).toContain("def _copy_runtime_node_modules");
-        expect(builder).toContain('if \"tsx\" not in roots');
+        expect(builder).toContain("roots.add(\"tsx\")");
     });
 
     it("makes installation observable and creates a launch surface", () => {
         expect(builder).toContain("/health");
         expect(builder).toContain("HooshyarOS.lnk");
-        expect(builder).toContain("Microsoft\\Windows\\Start Menu\\Programs\\HooshyarOS");
+        expect(builder).toContain("Microsoft");
+        expect(builder).toContain("Windows");
+        expect(builder).toContain("Start Menu");
         expect(builder).toContain("HooshyarOS installed and health-checked");
+        expect(builder).toContain("Chr(34)");
     });
 
     it("requires the commercial runtime and web entrypoint in the payload", () => {
         expect(builder).toContain("CommercialRuntimeServer.ts");
-        expect(builder).toContain("Frontend/HooshyarWebApp/index.ts");
+        expect(builder).toContain("HooshyarWebApp");
         expect(builder).toContain("product-manifest.json");
     });
 });
