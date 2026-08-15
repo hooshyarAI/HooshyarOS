@@ -22,7 +22,9 @@ def _validate_windows_payload(payload: Path) -> None:
     if missing:
         raise RuntimeError(f"windows-payload-missing:{','.join(missing)}")
 def _runtime_dependency_names() -> set[str]:
-    return {"tsx"}
+    roots: set[str] = set()
+    roots.add("tsx")
+    return roots
 def _copy_node_dependency(name: str, destination: Path) -> None:
     source = ROOT / "node_modules" / name
     if source.exists(): shutil.copytree(source, destination / name, dirs_exist_ok=True)
@@ -39,7 +41,8 @@ def _copy_tree_filtered(source: Path, destination: Path) -> None:
 def _write_launch_surface(payload: Path) -> None:
     (payload / "launch-hooshyar.cmd").write_text("@echo off\r\ncd /d \"%~dp0\"\r\ncall npx.cmd tsx Backend/AI_Runtime/CommercialRuntimeServer.ts\r\n", encoding="ascii")
     (payload / "launch-hooshyar.vbs").write_text('Set shell = CreateObject("WScript.Shell")\nshell.Run Chr(34) & Replace(WScript.ScriptFullName, "launch-hooshyar.vbs", "launch-hooshyar.cmd") & Chr(34), 1, False\n', encoding="ascii")
-    shortcut_root = payload / "Microsoft\\Windows\\Start Menu\\Programs\\HooshyarOS"
+    shortcut_root_relative = r"Microsoft\Windows\Start Menu\Programs\HooshyarOS"
+    shortcut_root = payload.joinpath(*shortcut_root_relative.split("\\"))
     shortcut_root.mkdir(parents=True, exist_ok=True)
     (shortcut_root / "HooshyarOS.lnk").write_text("launch-hooshyar.vbs\n", encoding="ascii")
 def _write_installer_contract(payload: Path) -> None:
