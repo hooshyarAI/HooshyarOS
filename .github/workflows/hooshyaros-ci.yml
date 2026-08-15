@@ -2,7 +2,9 @@ name: HooshyarOS CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - agent/fix-product-repair-boundary
   pull_request:
     branches: [main]
 
