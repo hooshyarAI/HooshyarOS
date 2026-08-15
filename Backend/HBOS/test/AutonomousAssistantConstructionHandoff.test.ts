@@ -27,7 +27,7 @@ describe("Autonomous Assistant construction handoff", () => {
         assistant.evaluation = { evaluate: () => ({ healthy: true }) } as any;
         assistant.improvement = { improve: () => ({ improved: false }) } as any;
         assistant.tools = { execute: () => ({ executed: true }) } as any;
-        assistant.memory = { record: () => undefined } as any;
+        assistant.memory = { learnFromExecution: () => undefined } as any;
 
         const result = await assistant.execute("build HooshyarOS");
         const construction = result.construction;
