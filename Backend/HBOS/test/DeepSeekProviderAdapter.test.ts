@@ -42,7 +42,7 @@ describe("DeepSeekProviderAdapter", () => {
         await expect(adapter.review(request)).rejects.toThrow("DEEPSEEK_API_KEY is not configured");
     });
 
-    it("submits a useful sanitized technical review request and validates JSON response", async () => {
+    it("preserves non-sensitive technical review evidence while validating the JSON response", async () => {
         const fetchImpl = jest.fn().mockResolvedValue(new Response(JSON.stringify({
             choices: [{ message: { content: JSON.stringify(review) } }],
         }), { status: 200, headers: { "content-type": "application/json" } }));
@@ -69,6 +69,33 @@ describe("DeepSeekProviderAdapter", () => {
         expect(body.messages[1].content).toContain("failure-log");
         expect(body.messages[1].content).toContain("focused-repair");
         expect(body.messages[1].content).not.toContain("[SANITIZED_EXTERNAL_REVIEW_EVIDENCE]");
+        expect(body.messages[1].content).not.toContain("[SANITIZED_EXTERNAL_REVIEW_ALTERNATIVE]");
+    });
+
+    it("redacts secret-like technical material without discarding the rest of the evidence", async () => {
+        const safeRequest = {
+            ...request,
+            evidence: ["failure-log", "api_key: super-secret-value", "architecture owner is explicit"],
+        };
+        const fetchImpl = jest.fn().mockResolvedValue(new Response(JSON.stringify({
+            choices: [{ message: { content: JSON.stringify(review) } }],
+        }), { status: 200 }));
+
+        const adapter = new DeepSeekProviderAdapter({
+            apiKey: "test-key",
+            fetchImpl: fetchImpl as typeof fetch,
+            timeoutMs: 2_000,
+            maxRetries: 0,
+        });
+
+        const result = await adapter.review(safeRequest);
+        expect(result).toEqual(review);
+
+        const [, requestInit] = fetchImpl.mock.calls[0] as [string, RequestInit];
+        const body = JSON.parse(String(requestInit.body));
+        expect(body.messages[1].content).toContain("[REDACTED_SECRET]");
+        expect(body.messages[1].content).toContain("architecture owner is explicit");
+        expect(body.messages[1].content).not.toContain("super-secret-value");
     });
 
     it("retries transient provider failures", async () => {
