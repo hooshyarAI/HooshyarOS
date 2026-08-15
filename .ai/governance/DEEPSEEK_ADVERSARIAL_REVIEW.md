@@ -52,3 +52,24 @@ When a repair fails, DeepSeek review must challenge whether the selected repair 
 ## Evidence rule
 
 A green test alone is not completion evidence for a material decision. The evidence set must demonstrate implementation correctness, integration behavior, repository consistency, and the relevant release/acceptance artifact when applicable.
+
+## Development-stage intellectual-property boundary
+
+During construction and pre-customer audit, DeepSeek is expected to receive sufficient **non-customer technical evidence** to perform a meaningful adversarial review. This may include architecture, interfaces, component relationships, sanitized code excerpts, tests, failure evidence, performance evidence, deployment contracts, and design decisions.
+
+The primary external-review protection at this stage is **HooshyarOS intellectual-property protection**, not customer-data isolation. Review material must be limited to what is necessary for the requested critique and must not expose credentials, secrets, access tokens, private keys, or unrelated proprietary material that is not required for the review.
+
+Technical evidence must therefore follow this hierarchy:
+
+`Needed for review + non-sensitive -> preserve`
+`Secret / credential / token / private key -> redact`
+`Unrelated proprietary material -> omit`
+`Real customer data -> prohibited until the separate production customer-data boundary is active`
+
+The goal is to prevent IP leakage without reducing DeepSeek to a placeholder-only reviewer.
+
+## Production customer-data boundary
+
+When real customer information enters HooshyarOS, a separate mandatory data-protection gate applies. Customer information must not cross the external-review boundary unless an explicitly governed policy, tenant/security controls, authorization, and approved data-processing path permit it.
+
+This production boundary is intentionally independent from the development-stage intellectual-property policy so that customer-data controls do not weaken the quality of architectural and engineering review during construction.
