@@ -82,25 +82,8 @@ export class ExternalReviewSecurityBoundary {
             reasons.push("external review decision id is malformed");
         }
 
-        for (const value of fields) {
-            if (SECRET_PATTERNS.some((pattern) => pattern.test(value))) {
-                reasons.push("secret-or-credential-like material detected");
-                break;
-            }
-        }
-
-        for (const value of fields) {
-            if (CUSTOMER_DATA_MARKERS.some((pattern) => pattern.test(value))) {
-                reasons.push("customer-sensitive data marker detected");
-                break;
-            }
-        }
-
-        for (const value of fields) {
-            if (HIGH_RISK_IDENTIFIER_PATTERNS.some((pattern) => pattern.test(value))) {
-                reasons.push("high-risk identifier-like material detected");
-                break;
-            }
+        if (fields.some((value) => CUSTOMER_DATA_MARKERS.some((pattern) => pattern.test(value)))) {
+            reasons.push("customer-sensitive data marker detected");
         }
 
         return {
