@@ -42,7 +42,7 @@ export interface ConstructionTool {
     };
 }
 
-/** Architecture-driven construction control plane. */
+/** Architecture-driven construction control plane. Quality evidence is a hard finalize gate. */
 export class AutonomousConstructionEngine {
     constructor(
         private readonly tools: ConstructionTool[],
@@ -80,6 +80,7 @@ export class AutonomousConstructionEngine {
         trace.push("VERIFY");
         issues.length = 0;
         let verification = this.execute("VERIFY", plan, attempt, artifacts, issues);
+        verification = this.applyQualityGate(verification);
 
         while (!verification.ok && attempt < this.maxRepairAttempts) {
             attempt += 1;
@@ -98,7 +99,7 @@ export class AutonomousConstructionEngine {
 
             trace.push("VERIFY");
             issues.length = 0;
-            verification = this.execute("VERIFY", plan, attempt, artifacts, issues);
+            verification = this.applyQualityGate(this.execute("VERIFY", plan, attempt, artifacts, issues));
             if (verification.ok) break;
         }
 
@@ -126,6 +127,17 @@ export class AutonomousConstructionEngine {
         return this.success(attempt > 0 ? "REPAIRED" : "BUILT", attempt, trace, artifacts.GENERATE !== undefined && this.recordArtifact(artifacts.GENERATE)?.idempotentNoOp === true);
     }
 
+    private applyQualityGate(result: { ok: boolean; artifact?: unknown; issue?: string }) {
+        if (!result.ok) return result;
+        const evidence = this.recordArtifact(result.artifact);
+        if (!evidence) return { ok: false, artifact: result.artifact, issue: "QUALITY_EVIDENCE_MISSING" };
+        if (evidence.testsPassed !== true) return { ok: false, artifact: evidence, issue: "QUALITY_TESTS_UNVERIFIED" };
+        if (evidence.behavioralEvidenceVerified !== true) return { ok: false, artifact: evidence, issue: "QUALITY_BEHAVIOR_UNVERIFIED" };
+        if (evidence.integrationVerified !== true) return { ok: false, artifact: evidence, issue: "QUALITY_INTEGRATION_UNVERIFIED" };
+        if (evidence.cleanRepository !== true) return { ok: false, artifact: evidence, issue: "QUALITY_REPOSITORY_UNVERIFIED" };
+        return result;
+    }
+
     private isIdempotentGenerationNoOp(result: { ok: boolean; artifact?: unknown; issue?: string }): boolean {
         if (result.ok || result.issue !== "AUTONOMOUS_AGENT_NO_REPOSITORY_CHANGE") return false;
         const artifact = this.recordArtifact(result.artifact);
@@ -134,10 +146,7 @@ export class AutonomousConstructionEngine {
         return artifact.changed === false && artifact.exitCode === 0 && /Already implemented:/i.test(output);
     }
 
-    private isIdempotentFinalizeNoOp(
-        result: { ok: boolean; artifact?: unknown; issue?: string },
-        artifacts: Record<string, unknown>
-    ): boolean {
+    private isIdempotentFinalizeNoOp(result: { ok: boolean; artifact?: unknown; issue?: string }, artifacts: Record<string, unknown>): boolean {
         if (result.ok || result.issue !== "GIT_NO_REPOSITORY_CHANGE") return false;
         const generated = this.recordArtifact(artifacts.GENERATE);
         return generated?.idempotentNoOp === true;
@@ -166,31 +175,15 @@ export class AutonomousConstructionEngine {
 
     private success(status: "BUILT" | "REPAIRED", attempts: number, trace: ConstructionStage[], idempotent = false): ConstructionResult {
         return {
-            ok: true,
-            status,
-            stage: "FINALIZE",
-            attempts,
-            selectedTool: this.toolFor("FINALIZE").name,
-            issues: [],
-            trace,
-            details: idempotent
-                ? `Construction verified as idempotent and finalized; trace=${trace.join(" -> ")}`
-                : `Construction verified and finalized; trace=${trace.join(" -> ")}`,
+            ok: true, status, stage: "FINALIZE", attempts,
+            selectedTool: this.toolFor("FINALIZE").name, issues: [], trace,
+            details: idempotent ? `Construction verified as idempotent and finalized; trace=${trace.join(" -> ")}` : `Construction verified and finalized; trace=${trace.join(" -> ")}`,
             idempotent
         };
     }
 
     private blocked(stage: ConstructionStage, attempts: number, issues: string[], trace: ConstructionStage[]): ConstructionResult {
-        return {
-            ok: false,
-            status: "BLOCKED",
-            stage,
-            attempts,
-            selectedTool: this.toolFor(stage).name,
-            issues,
-            trace,
-            details: `Construction blocked at ${stage}; trace=${trace.join(" -> ")}`
-        };
+        return { ok: false, status: "BLOCKED", stage, attempts, selectedTool: this.toolFor(stage).name, issues, trace, details: `Construction blocked at ${stage}; trace=${trace.join(" -> ")}` };
     }
 
     static selfTest(): void {
@@ -200,7 +193,9 @@ export class AutonomousConstructionEngine {
             { name: "python", execute: stage => {
                 if (stage === "VERIFY") {
                     verificationCalls += 1;
-                    return verificationCalls === 1 ? { ok: false, issue: "INTERNAL_CONNECTION_FAILURE" } : { ok: true };
+                    return verificationCalls === 1
+                        ? { ok: false, issue: "INTERNAL_CONNECTION_FAILURE" }
+                        : { ok: true, artifact: { testsPassed: true, behavioralEvidenceVerified: true, integrationVerified: true, cleanRepository: true } };
                 }
                 return { ok: true };
             } },
@@ -211,8 +206,6 @@ export class AutonomousConstructionEngine {
             targetEngine: "Autonomous Operations Engine", dependencies: ["Architecture Brain", "Governance Engine"],
             architectureRules: ["Architecture Freeze V4", "One Capability = One Engine"]
         });
-        if (!result.ok || result.status !== "REPAIRED" || result.attempts !== 1 || !result.details || !result.trace.includes("FINALIZE")) {
-            throw new Error("AutonomousConstructionEngine self-test failed");
-        }
+        if (!result.ok || result.status !== "REPAIRED" || result.attempts !== 1 || !result.details || !result.trace.includes("FINALIZE")) throw new Error("AutonomousConstructionEngine self-test failed");
     }
 }
