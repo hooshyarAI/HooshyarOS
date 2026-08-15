@@ -10,6 +10,7 @@ class RepairRequest:
     problem: str
     evidence: dict[str, Any] = field(default_factory=dict)
     allowed_actions: tuple[str, ...] = ()
+    authorization_token: str = ""
 
 
 @dataclass(frozen=True)
@@ -18,6 +19,7 @@ class RepairEvidence:
     findings: tuple[str, ...]
     verification: tuple[str, ...]
     changed: bool
+    digest: str = ""
 
 
 @dataclass(frozen=True)
@@ -29,3 +31,7 @@ class RepairResult:
     @property
     def accepted(self) -> bool:
         return self.status == "VERIFIED" and bool(self.evidence.verification)
+
+    @property
+    def mutation_allowed(self) -> bool:
+        return bool(self.evidence.changed) and bool(self.evidence.verification)
