@@ -1,0 +1,9 @@
+{
+  "name": "Hooshyar.ai",
+  "short_name": "Hooshyar",
+  "start_url": "/",
+  "display": "standalone",
+  "description": "داشبورد هوشمند مالی و مدیریتی هوشیار.ai",
+  "lang": "fa",
+  "dir": "rtl"
+}
