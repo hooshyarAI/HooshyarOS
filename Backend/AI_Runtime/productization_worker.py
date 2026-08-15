@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -16,6 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 BUILDER = ROOT / "Backend" / "AI_Runtime" / "autonomous_builder.py"
 PRODUCT_BUILDER = ROOT / "Backend" / "AI_Runtime" / "productization_builder.py"
+WINDOWS_RELEASE_BUILDER = ROOT / "Backend" / "AI_Runtime" / "release_product_builder.py"
 RELEASE_ROOT = ROOT / "dist" / "productization"
 WINDOWS_ROOT = RELEASE_ROOT / "windows"
 ANDROID_ROOT = RELEASE_ROOT / "android"
@@ -45,12 +45,14 @@ def run(command: str, args: list[str], timeout: int = 45 * 60) -> int:
 
 
 def run_product_builder(platform: str) -> bool:
-    if not PRODUCT_BUILDER.exists():
+    builder = WINDOWS_RELEASE_BUILDER if platform == "WINDOWS" else PRODUCT_BUILDER
+    if not builder.exists():
         emit("AUTONOMOUS_PRODUCTIZATION_BLOCKED", platform=platform, reason="missing productization builder")
         return False
-    emit("AUTONOMOUS_PRODUCTIZATION_BUILDER_DELEGATE", platform=platform, worker=str(PRODUCT_BUILDER))
+    emit("AUTONOMOUS_PRODUCTIZATION_BUILDER_DELEGATE", platform=platform, worker=str(builder))
+    args = ["--windows"] if platform == "WINDOWS" else ["--platform", platform]
     result = subprocess.run(
-        [sys.executable, str(PRODUCT_BUILDER), "--platform", platform],
+        [sys.executable, str(builder), *args],
         cwd=ROOT, text=True, encoding="utf-8", errors="replace",
         env={**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"},
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=90 * 60, check=False,
