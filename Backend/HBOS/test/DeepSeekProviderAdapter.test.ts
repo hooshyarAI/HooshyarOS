@@ -2,7 +2,7 @@ import { DeepSeekProviderAdapter } from "../Architecture/Review/DeepSeekProvider
 
 describe("DeepSeekProviderAdapter", () => {
     const review = {
-        decisionId: "[OPAQUE_EXTERNAL_REVIEW_ID]",
+        decisionId: "decision-1",
         risk: "HIGH",
         material: true,
         irreversible: false,
@@ -42,7 +42,7 @@ describe("DeepSeekProviderAdapter", () => {
         await expect(adapter.review(request)).rejects.toThrow("DEEPSEEK_API_KEY is not configured");
     });
 
-    it("submits a sanitized structured review request and validates JSON response", async () => {
+    it("submits a useful sanitized technical review request and validates JSON response", async () => {
         const fetchImpl = jest.fn().mockResolvedValue(new Response(JSON.stringify({
             choices: [{ message: { content: JSON.stringify(review) } }],
         }), { status: 200, headers: { "content-type": "application/json" } }));
@@ -66,10 +66,9 @@ describe("DeepSeekProviderAdapter", () => {
         expect(body.response_format).toEqual({ type: "json_object" });
         expect(body.thinking).toEqual({ type: "enabled" });
         expect(body.reasoning_effort).toBe("high");
-        expect(body.messages[1].content).not.toContain("failure-log");
-        expect(body.messages[1].content).not.toContain("focused-repair");
-        expect(body.messages[1].content).toContain("[SANITIZED_EXTERNAL_REVIEW_EVIDENCE]");
-        expect(body.messages[1].content).toContain("[SANITIZED_EXTERNAL_REVIEW_ALTERNATIVE]");
+        expect(body.messages[1].content).toContain("failure-log");
+        expect(body.messages[1].content).toContain("focused-repair");
+        expect(body.messages[1].content).not.toContain("[SANITIZED_EXTERNAL_REVIEW_EVIDENCE]");
     });
 
     it("retries transient provider failures", async () => {
