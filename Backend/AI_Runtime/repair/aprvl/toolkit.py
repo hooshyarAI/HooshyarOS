@@ -87,6 +87,11 @@ def compare_artifacts(left: Path, right: Path) -> tuple[Finding, ...]:
         findings.append(Finding("artifact", "missing from right artifact", name, "WARN"))
     for name in sorted(right_files - left_files):
         findings.append(Finding("artifact", "missing from left artifact", name, "WARN"))
+    for name in sorted(left_files & right_files):
+        left_digest = sha256(left / name)
+        right_digest = sha256(right / name)
+        if left_digest != right_digest:
+            findings.append(Finding("artifact", "file digests differ", name, "WARN"))
     return tuple(findings)
 
 
