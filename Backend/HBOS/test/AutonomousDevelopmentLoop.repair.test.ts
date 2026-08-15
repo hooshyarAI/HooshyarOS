@@ -14,6 +14,18 @@ describe("AutonomousDevelopmentLoop repair identity", () => {
                 execute: (stage, context) => {
                     if (stage === "GENERATE") {
                         observed.push(context.plan.capabilityId);
+                        return { ok: true, artifact: { changed: true } };
+                    }
+                    if (stage === "VERIFY") {
+                        return {
+                            ok: true,
+                            artifact: {
+                                testsPassed: true,
+                                behavioralEvidenceVerified: true,
+                                integrationVerified: true,
+                                cleanRepository: true
+                            }
+                        };
                     }
                     return { ok: true };
                 }
