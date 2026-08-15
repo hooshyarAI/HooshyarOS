@@ -7,7 +7,8 @@ export interface APRVLRepairRequest {
 }
 
 export interface APRVLRepairEvidence {
-  readonly authorized: boolean;
+  /** APRVL never grants governance authorization; authorization is owned by HooshyarOS. */
+  readonly authorized: false;
   readonly verified: boolean;
   readonly summary: string;
 }
@@ -33,21 +34,21 @@ export class ProcessAPRVLRepairAdapter implements APRVLRepairAdapter {
       let stderr = "";
       child.stdout.on("data", (chunk) => { stdout += chunk.toString(); });
       child.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
-      child.on("error", (error) => resolve({ authorized: true, verified: false, summary: `APRVL process error: ${error.message}` }));
+      child.on("error", (error) => resolve({ authorized: false, verified: false, summary: `APRVL process error: ${error.message}` }));
       child.on("close", (code) => {
         if (code !== 0) {
-          resolve({ authorized: true, verified: false, summary: stdout || stderr || `APRVL exited with code ${code}` });
+          resolve({ authorized: false, verified: false, summary: stdout || stderr || `APRVL exited with code ${code}` });
           return;
         }
         try {
           const result = JSON.parse(stdout) as { status?: string; findings?: unknown[] };
           resolve({
-            authorized: true,
+            authorized: false,
             verified: result.status === "VERIFIED",
             summary: `APRVL ${result.status ?? "UNKNOWN"}; findings=${result.findings?.length ?? 0}`,
           });
         } catch {
-          resolve({ authorized: true, verified: false, summary: "APRVL returned invalid evidence" });
+          resolve({ authorized: false, verified: false, summary: "APRVL returned invalid evidence" });
         }
       });
     });
