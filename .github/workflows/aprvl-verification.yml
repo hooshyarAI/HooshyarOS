@@ -1,0 +1,37 @@
+name: HooshyarOS APRVL Verification
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aprvl-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  aprvl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify Python syntax
+        run: python -m compileall -q Backend/AI_Runtime/repair/aprvl
+
+      - name: Run APRVL contract tests
+        run: python -m pytest Backend/AI_Runtime/repair/aprvl/test_aprvl.py -q
+
+      - name: Run APRVL repository inspection
+        run: python -m Backend.AI_Runtime.repair.aprvl .
