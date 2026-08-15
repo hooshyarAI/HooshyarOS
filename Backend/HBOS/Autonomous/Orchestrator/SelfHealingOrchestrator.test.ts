@@ -28,7 +28,7 @@ describe("SelfHealingOrchestrator governance boundary", () => {
     const expectedSha256 = createHash("sha256").update("before", "utf8").digest("hex");
 
     await expect(orchestrator.executeAuthorizedRepair(
-      { authorized: true, verified: false, summary: "not verified" },
+      { authorized: false, verified: false, summary: "not verified" },
       { action: "replace-file", relativePath: "target.txt", expectedSha256, content: "after" },
       { authorized: true, authorizationToken: "governance-token" },
     )).rejects.toThrow("independent APRVL verification required before repair");
@@ -38,7 +38,7 @@ describe("SelfHealingOrchestrator governance boundary", () => {
 
   it("executes controlled repair only after governance and APRVL verification", async () => {
     const adapter: APRVLRepairAdapter = {
-      execute: jest.fn().mockResolvedValue({ authorized: true, verified: true, summary: "verified" }),
+      execute: jest.fn().mockResolvedValue({ authorized: false, verified: true, summary: "verified" }),
     };
     const root = await mkdtemp(path.join(tmpdir(), "hooshyar-aprvl-"));
     await writeFile(path.join(root, "target.txt"), "before", "utf8");
