@@ -1,13 +1,15 @@
+import { relative } from "node:path";
 import { declaredArtifactPaths, productRoadmapPaths } from "../Autonomous/Runtime/LocalConstructionToolset";
 
 describe("Autonomous repair product boundary", () => {
-    it("resolves repair-prefixed product capabilities to their durable product artifacts", () => {
+    it("resolves repair-prefixed product capabilities to their durable product artifacts across platforms", () => {
         const root = process.cwd();
-        const paths = productRoadmapPaths(root, "repair-product.financial-data-ingestion");
+        const paths = productRoadmapPaths(root, "repair-product.financial-data-ingestion")
+            .map(path => relative(root, path).replaceAll("\\", "/"));
         expect(paths).toEqual([
-            expect.stringContaining("Backend\\HBOS\\Product\\FinancialDataIngestionAdapter.ts"),
-            expect.stringContaining("Backend\\HBOS\\test\\FinancialDataIngestionAdapter.test.ts"),
-            expect.stringContaining("Docs\\Product\\FinancialDataIngestionAdapter.md")
+            expect.stringContaining("Backend/HBOS/Product/FinancialDataIngestionAdapter.ts"),
+            expect.stringContaining("Backend/HBOS/test/FinancialDataIngestionAdapter.test.ts"),
+            expect.stringContaining("Docs/Product/FinancialDataIngestionAdapter.md")
         ]);
     });
 
