@@ -1,0 +1,12 @@
+{
+  "name": "HooshyarOS",
+  "version": "1.0.0",
+  "runtime": {
+    "entrypoint": "Backend/AI_Runtime/CommercialRuntimeServer.ts",
+    "health": "/health"
+  },
+  "web": {
+    "entrypoint": "Frontend/HooshyarWebApp/index.ts",
+    "document": "Frontend/HooshyarWebApp/web/index.html"
+  }
+}
