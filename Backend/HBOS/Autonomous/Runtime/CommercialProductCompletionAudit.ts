@@ -49,8 +49,15 @@ export class CommercialProductCompletionAudit {
             const packageJson = JSON.parse(readFileSync(packagePath, "utf8")) as { scripts?: Record<string, string> };
             const scripts = packageJson.scripts ?? {};
             const hasRunnableWebScript = Boolean(scripts.start || scripts.dev || scripts.serve || scripts.preview);
-            const hasWebSource = ["frontend", "web", "app", "src/app"].some(dir => existsSync(join(root, dir)));
-            if (!hasRunnableWebScript && !hasWebSource) missingLayers.push("web-entrypoint");
+            const webArtifacts = [
+                "web/index.html",
+                "web/app.js",
+                "web/styles.css",
+                "web/manifest.webmanifest",
+                "Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts"
+            ];
+            const hasWebRuntime = webArtifacts.every(artifact => existsSync(join(root, artifact)));
+            if (!hasRunnableWebScript && !hasWebRuntime) missingLayers.push("web-entrypoint");
         }
 
         const persistenceCandidates = ["Backend/HBOS/Infrastructure", "Backend/HBOS/Persistence", "Backend/AI_Runtime/persistence", "prisma", "database"];
