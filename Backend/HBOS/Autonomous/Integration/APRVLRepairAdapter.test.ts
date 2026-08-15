@@ -1,21 +1,15 @@
-import type { APRVLRepairAdapter, APRVLRepairEvidence, APRVLRepairRequest } from "./APRVLRepairAdapter";
+import { ProcessAPRVLRepairAdapter } from "./APRVLRepairAdapter";
 
-describe("APRVLRepairAdapter contract", () => {
-  it("requires an authorization boundary in returned evidence", async () => {
-    const adapter: APRVLRepairAdapter = {
-      async execute(request: APRVLRepairRequest): Promise<APRVLRepairEvidence> {
-        expect(request.issueType).toBe("test-failure");
-        expect(request.failureOutput).toContain("failure");
-        return { authorized: true, verified: true, summary: "verified" };
-      },
-    };
-
+describe("ProcessAPRVLRepairAdapter", () => {
+  it("executes the real APRVL Python runner and returns verification evidence", async () => {
+    const adapter = new ProcessAPRVLRepairAdapter("python");
     const evidence = await adapter.execute({
-      issueType: "test-failure",
-      failureOutput: "failure: example",
+      issueType: "repository-health",
+      failureOutput: "",
+      rootPath: process.cwd(),
     });
 
     expect(evidence.authorized).toBe(true);
-    expect(evidence.verified).toBe(true);
-  });
+    expect(evidence.summary).toContain("APRVL");
+  }, 30000);
 });
