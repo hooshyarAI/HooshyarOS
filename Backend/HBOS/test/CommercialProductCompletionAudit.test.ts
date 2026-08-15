@@ -9,11 +9,15 @@ describe("CommercialProductCompletionAudit", () => {
         expect(result.missingLayers).not.toContain("commercial-completion-contract");
     });
 
-    it("does not equate engine artifacts with a missing web product entrypoint", () => {
+    it("reports the actual remaining commercial boundaries instead of a stale web-entrypoint gap", () => {
         const audit = new CommercialProductCompletionAudit();
         const result = audit.audit(process.cwd());
 
         expect(result.complete).toBe(false);
-        expect(result.missingLayers).toContain("web-entrypoint");
+        expect(result.missingLayers).not.toContain("web-entrypoint");
+        expect(result.missingLayers).toEqual(expect.arrayContaining([
+            "persistence-boundary",
+            "authentication-authorization-boundary",
+        ]));
     });
 });
