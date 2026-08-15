@@ -87,22 +87,31 @@ describe("ExternalReviewSecurityBoundary", () => {
         expect(result.reasons.join(" ")).toMatch(/decision id.*malformed/i);
     });
 
-    it("keeps sanitized external packets free of original decision id, evidence, alternatives and context", () => {
+    it("preserves safe technical evidence while redacting sensitive identifiers", () => {
         const result = boundary.evaluate({
             decisionId: "architecture-1",
             category: "ARCHITECTURE",
-            evidence: ["clean architecture failure signal"],
-            alternatives: ["option-a"],
-            context: "internal component topology only",
+            evidence: ["clean architecture failure signal with internal component topology"],
+            alternatives: ["option-a: inspect runtime dependency graph"],
+            context: "internal architecture and runtime boundary only",
         });
 
         expect(result.allowed).toBe(true);
-        expect(result.sanitized.decisionId).toBe("[OPAQUE_EXTERNAL_REVIEW_ID]");
-        expect(result.sanitized.evidence).toEqual(["[SANITIZED_EXTERNAL_REVIEW_EVIDENCE]"]);
-        expect(result.sanitized.alternatives).toEqual(["[SANITIZED_EXTERNAL_REVIEW_ALTERNATIVE]"]);
-        expect(result.sanitized.context).toBe("[SANITIZED_EXTERNAL_REVIEW_CONTEXT]");
-        expect(JSON.stringify(result.sanitized)).not.toContain("clean architecture failure signal");
-        expect(JSON.stringify(result.sanitized)).not.toContain("option-a");
-        expect(JSON.stringify(result.sanitized)).not.toContain("architecture-1");
+        expect(result.sanitized.decisionId).toBe("architecture-1");
+        expect(result.sanitized.evidence).toEqual(["clean architecture failure signal with internal component topology"]);
+        expect(result.sanitized.alternatives).toEqual(["option-a: inspect runtime dependency graph"]);
+        expect(result.sanitized.context).toBe("internal architecture and runtime boundary only");
+    });
+
+    it("redacts identifiers from otherwise safe technical evidence", () => {
+        const result = boundary.evaluate({
+            decisionId: "architecture-2",
+            category: "ARCHITECTURE",
+            evidence: ["runtime correlation 1234567890123456 was observed"],
+            alternatives: ["trace request 1234567890 through the gateway"],
+        });
+
+        expect(result.allowed).toBe(false);
+        expect(result.reasons.join(" ")).toMatch(/high-risk identifier/i);
     });
 });
