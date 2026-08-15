@@ -3,16 +3,16 @@ import { ExternalReviewSecurityBoundary } from "../Architecture/Review/ExternalR
 describe("ExternalReviewSecurityBoundary", () => {
     const boundary = new ExternalReviewSecurityBoundary();
 
-    it("blocks credentials and secrets", () => {
+    it("redacts credentials and secrets without blocking otherwise safe technical review", () => {
         const result = boundary.evaluate({
             decisionId: "repair-1",
             category: "REPAIR",
-            evidence: ["api_key: sk-secret-value"],
+            evidence: ["api_key: sk-secret-value", "repair preserves the frozen boundary"],
             alternatives: ["focused repair"],
         });
 
-        expect(result.allowed).toBe(false);
-        expect(result.reasons.join(" ")).toMatch(/secret|credential/i);
+        expect(result.allowed).toBe(true);
+        expect(result.sanitized.evidence).toEqual(["[REDACTED_SECRET]", "repair preserves the frozen boundary"]);
     });
 
     it("blocks customer-sensitive evidence before external transmission", () => {
@@ -39,16 +39,17 @@ describe("ExternalReviewSecurityBoundary", () => {
         expect(result.reasons.join(" ")).toMatch(/customer-sensitive/i);
     });
 
-    it("blocks high-risk identifiers even without explicit customer markers", () => {
+    it("redacts high-risk identifiers without blocking safe technical evidence", () => {
         const result = boundary.evaluate({
             decisionId: "security-2",
             category: "SECURITY",
-            evidence: ["identifier detected"],
-            alternatives: ["use 4111111111111111 for reproduction"],
+            evidence: ["identifier detected: 4111111111111111"],
+            alternatives: ["trace the request through the gateway"],
         });
 
-        expect(result.allowed).toBe(false);
-        expect(result.reasons.join(" ")).toMatch(/high-risk identifier/i);
+        expect(result.allowed).toBe(true);
+        expect(result.sanitized.evidence[0]).toContain("[REDACTED_IDENTIFIER]");
+        expect(result.sanitized.evidence[0]).not.toContain("4111111111111111");
     });
 
     it("blocks categories outside the governed review vocabulary", () => {
@@ -103,15 +104,16 @@ describe("ExternalReviewSecurityBoundary", () => {
         expect(result.sanitized.context).toBe("internal architecture and runtime boundary only");
     });
 
-    it("redacts identifiers from otherwise safe technical evidence", () => {
+    it("redacts secret-like material embedded in otherwise safe technical evidence", () => {
         const result = boundary.evaluate({
             decisionId: "architecture-2",
             category: "ARCHITECTURE",
-            evidence: ["runtime correlation 1234567890123456 was observed"],
-            alternatives: ["trace request 1234567890 through the gateway"],
+            evidence: ["runtime correlation uses authorization: Bearer secret-value"],
+            alternatives: ["trace the request through the gateway"],
         });
 
-        expect(result.allowed).toBe(false);
-        expect(result.reasons.join(" ")).toMatch(/high-risk identifier/i);
+        expect(result.allowed).toBe(true);
+        expect(result.sanitized.evidence[0]).toContain("[REDACTED_SECRET]");
+        expect(result.sanitized.evidence[0]).not.toContain("secret-value");
     });
 });
