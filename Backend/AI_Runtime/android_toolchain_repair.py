@@ -51,7 +51,7 @@ def discover_metadata() -> tuple[str, bytes]:
                 raise AndroidRepairError("empty metadata response")
             ET.fromstring(data)
             return endpoint, data
-        except Exception as exc:  # endpoint selection is deliberately evidence based
+        except Exception as exc:
             failures.append(f"{endpoint}: {exc}")
     raise AndroidRepairError("no official Android repository metadata endpoint succeeded: " + " | ".join(failures))
 
@@ -82,10 +82,9 @@ def resolve_package(metadata: bytes, package_path: str) -> tuple[str, str]:
 
 
 def _checksum_algorithm(expected: str) -> str:
-    length = len(expected)
-    if length == 40:
+    if len(expected) == 40:
         return "sha1"
-    if length == 64:
+    if len(expected) == 64:
         return "sha256"
     raise AndroidRepairError(f"unsupported package checksum format: {expected}")
 
@@ -115,6 +114,15 @@ def download_verified(url: str, expected_checksum: str, target: Path) -> None:
             temporary.unlink()
 
 
+def _validate_archive_members(zf: zipfile.ZipFile) -> None:
+    """Reject absolute paths and traversal before any archive extraction."""
+    for member in zf.infolist():
+        raw = member.filename.replace("\\", "/")
+        path = Path(raw)
+        if path.is_absolute() or raw.startswith("/") or raw.startswith("../") or "/../" in raw or raw == "..":
+            raise AndroidRepairError(f"unsafe archive member rejected: {member.filename}")
+
+
 def install_from_metadata(sdk_root: Path, packages: list[str]) -> None:
     """Install packages without guessing URLs when sdkmanager cannot reach metadata."""
     metadata_endpoint, metadata = discover_metadata()
@@ -134,6 +142,7 @@ def install_from_metadata(sdk_root: Path, packages: list[str]) -> None:
         verify_checksum(archive, checksum)
         with tempfile.TemporaryDirectory(prefix="hooshyar-android-repair-") as temp:
             with zipfile.ZipFile(archive) as zf:
+                _validate_archive_members(zf)
                 zf.extractall(temp)
             _install_extracted_package(Path(temp), sdk_root, package_path)
     print(f"AUTONOMOUS_ANDROID_REPAIR metadata={metadata_endpoint} packages={','.join(packages)}")
