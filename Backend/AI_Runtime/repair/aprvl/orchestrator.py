@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import replace
 from pathlib import Path
 from typing import Callable
 
@@ -12,10 +11,11 @@ Verifier = Callable[[RepairRequest, tuple[str, ...]], tuple[str, ...]]
 
 
 class APRVLOrchestrator:
-    """Governed Python execution layer for repair analysis and verification.
+    """Governed Python execution boundary under HooshyarOS policy authority.
 
-    It never chooses a repair policy, disables gates, or reports success without
-    verification evidence. Policy/engine selection remains in HooshyarOS.
+    APRVL can detect and verify, and can invoke an explicitly authorized action
+    supplied by the platform. It cannot choose policy, grant authorization,
+    disable gates, or manufacture verification evidence.
     """
 
     def __init__(self, root: Path, detector: Detector, verifier: Verifier) -> None:
@@ -34,4 +34,23 @@ class APRVLOrchestrator:
         )
         if not verification:
             return RepairResult("BLOCKED", evidence, "verification evidence is insufficient")
-        return RepairResult("VERIFIED", replace(evidence, changed=False), "analysis-only verification")
+        return RepairResult("VERIFIED", evidence, "analysis-only verification")
+
+    def execute_authorized(
+        self,
+        request: RepairRequest,
+        action: Callable[[], bool],
+        authorization_token: str,
+    ) -> RepairResult:
+        if not authorization_token or authorization_token != request.authorization_token:
+            evidence = RepairEvidence("aprvl", (), (), False)
+            return RepairResult("BLOCKED", evidence, "missing or invalid platform authorization")
+        if not request.allowed_actions:
+            evidence = RepairEvidence("aprvl", (), (), False)
+            return RepairResult("BLOCKED", evidence, "no repair action was authorized")
+        changed = bool(action())
+        verification = self.verifier(request, self.detector(request))
+        evidence = RepairEvidence("aprvl", (), verification, changed)
+        if not verification:
+            return RepairResult("BLOCKED", evidence, "post-repair verification failed")
+        return RepairResult("VERIFIED", evidence, "authorized repair verified")
