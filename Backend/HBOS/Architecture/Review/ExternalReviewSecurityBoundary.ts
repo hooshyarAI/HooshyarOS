@@ -46,19 +46,16 @@ const ALLOWED_CATEGORIES = new Set([
 
 const TECHNICAL_SAFE_REPLACEMENTS: ReadonlyArray<[RegExp, string]> = [
     [/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/gi, "[REDACTED_PRIVATE_KEY]"],
-    [/\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password|passwd|authorization)\b\s*[:=]\s*[^\s,;]+/gi, "$1: [REDACTED_SECRET]"],
+    [/\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password|passwd|authorization)\b\s*[:=]\s*[^\s,;]+/gi, "[REDACTED_SECRET]"],
     [/\bsk-[A-Za-z0-9_-]{12,}\b/gi, "[REDACTED_API_TOKEN]"],
     [/\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/gi, "[REDACTED_JWT]"],
     [/\b[A-Z]{2}\d{2}[A-Z0-9]{10,34}\b/gi, "[REDACTED_IDENTIFIER]"],
-    /(?:)/g as never,
 ];
 
 function sanitizeTechnicalText(value: string): string {
     let sanitized = value;
-    for (const entry of TECHNICAL_SAFE_REPLACEMENTS) {
-        if (Array.isArray(entry)) {
-            sanitized = sanitized.replace(entry[0], entry[1]);
-        }
+    for (const [pattern, replacement] of TECHNICAL_SAFE_REPLACEMENTS) {
+        sanitized = sanitized.replace(pattern, replacement);
     }
     sanitized = sanitized.replace(/\b\d{10,19}\b/g, "[REDACTED_IDENTIFIER]");
     sanitized = sanitized.replace(/\+?\d[\d\s()-]{8,}\d/g, "[REDACTED_PHONE]");
@@ -95,6 +92,13 @@ export class ExternalReviewSecurityBoundary {
         for (const value of fields) {
             if (CUSTOMER_DATA_MARKERS.some((pattern) => pattern.test(value))) {
                 reasons.push("customer-sensitive data marker detected");
+                break;
+            }
+        }
+
+        for (const value of fields) {
+            if (HIGH_RISK_IDENTIFIER_PATTERNS.some((pattern) => pattern.test(value))) {
+                reasons.push("high-risk identifier-like material detected");
                 break;
             }
         }
