@@ -25,10 +25,10 @@ describe("Windows product installer contract", () => {
         expect(builder).toContain('roots.add("tsx")');
     });
 
-    it("makes installation observable and creates a launch surface", () => {
+    it("makes installation observable and creates a platform-correct launch surface", () => {
         expect(builder).toContain("/health");
         expect(builder).toContain("HooshyarOS.lnk");
-        expect(builder).toContain("Microsoft\\Windows\\Start Menu\\Programs\\HooshyarOS");
+        expect(builder).toContain('payload / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "HooshyarOS"');
         expect(builder).toContain("HooshyarOS installed and health-checked");
         expect(builder).toContain("launch-hooshyar.cmd");
         expect(builder).toContain("launch-hooshyar.vbs");

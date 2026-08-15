@@ -25,8 +25,9 @@ describe("Autonomous productization routing", () => {
         expect(worker).toContain("AUTONOMOUS_PRODUCTIZATION_BUILDER_DELEGATE");
         expect(worker).toContain("AUTONOMOUS_PRODUCTIZATION_START");
         expect(worker).toContain("release_product_builder.py");
-        expect(worker).toContain("windows-exe-artifact-not-produced");
-        expect(worker).toContain("android-apk-artifact-not-produced");
+        expect(worker).toContain("windows-real-exe-not-produced");
+        expect(worker).toContain("windows-release-artifact-not-produced");
+        expect(worker).toContain("android-apk-not-produced");
         expect(worker).not.toContain("no supported Windows installer toolchain detected");
         expect(worker).not.toContain("no Android application project exists yet");
     });
