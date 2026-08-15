@@ -12,10 +12,11 @@ import json
 import os
 import shutil
 import subprocess
-import tempfile
 import urllib.request
 import zipfile
 from pathlib import Path
+
+from android_toolchain_repair import AndroidRepairError, install_from_metadata
 
 ROOT = Path(__file__).resolve().parents[2]
 RELEASE_ROOT = ROOT / "dist" / "productization"
@@ -132,7 +133,7 @@ Write-Host "Built $Package"
     if run("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(build)], timeout=45 * 60) != 0:
         return 21
 
-    iexpress = shutil.which("iexpress.exe") or shutil.which("iexpress") or (Path(os.environ.get("SystemRoot", r"C:\\Windows")) / "System32" / "iexpress.exe")
+    iexpress = shutil.which("iexpress.exe") or shutil.which("iexpress") or (Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "iexpress.exe")
     exe = WINDOWS_ROOT / "HooshyarOS-Setup.exe"
     if iexpress and Path(iexpress).exists():
         sed_root = WINDOWS_ROOT / "iexpress"
@@ -218,9 +219,14 @@ def provision_android_toolchain() -> tuple[Path, Path, Path] | None:
         "platforms;android-35",
         "build-tools;35.0.0",
     ]
-    if run(str(sdkmanager), sdkmanager_args, env=env, timeout=90 * 60, input_text=("y\n" * 30)) != 0:
-        return None
-
+    result = run(str(sdkmanager), sdkmanager_args, env=env, timeout=90 * 60, input_text=("y\n" * 30))
+    if result != 0:
+        emit("AUTONOMOUS_ANDROID_REPAIR", stage="ISOLATE", reason="sdkmanager-repository-metadata-failure", action="metadata-driven-official-fallback")
+        try:
+            install_from_metadata(sdk_root, ["platform-tools", "platforms;android-35", "build-tools;35.0.0"])
+        except AndroidRepairError as exc:
+            emit("AUTONOMOUS_ANDROID_REPAIR", stage="DIAGNOSE", status="BLOCKED", reason=str(exc))
+            return None
     return java_home, sdk_root, gradle_bin
 
 
