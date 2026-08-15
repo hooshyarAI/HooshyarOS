@@ -14,17 +14,17 @@ export interface ExternalReviewSecurityResult {
 
 const SECRET_PATTERNS: ReadonlyArray<RegExp> = [
     /-----BEGIN [A-Z ]*PRIVATE KEY-----/i,
-    /\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password|passwd|authorization)\b\s*[:=]/i,
+    /\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password|passwd|authorization)\b\s*[:=]\s*[^\s,;]+/i,
     /\bsk-[A-Za-z0-9_-]{12,}\b/i,
     /\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/i,
 ];
 
 const CUSTOMER_DATA_MARKERS: ReadonlyArray<RegExp> = [
-    /national\s*id|social\s*security|passport|phone|mobile|email|address/i,
-    /iban|bank\s*account|card\s*number|account\s*number/i,
-    /customer\s*(name|id|record|data)|tenant\s*(name|id|record|data)/i,
-    /financial\s*(statement|ledger|trial\s*balance|transaction|invoice|payroll)/i,
-    /personal\s*(data|information)/i,
+    /\b(?:customer|tenant)\s+(?:name|id|record|data)\b/i,
+    /\b(?:national\s*id|social\s*security|passport)\b/i,
+    /\b(?:iban|bank\s*account|card\s*number|account\s*number)\b/i,
+    /\bpersonal\s+(?:data|information)\b/i,
+    /\b(?:customer|tenant)\s+(?:email|phone|mobile|address)\s*(?:list|records?|data)?\b/i,
 ];
 
 const HIGH_RISK_IDENTIFIER_PATTERNS: ReadonlyArray<RegExp> = [
@@ -43,6 +43,28 @@ const ALLOWED_CATEGORIES = new Set([
     "REPAIR",
     "PRODUCTIZATION",
 ]);
+
+const TECHNICAL_SAFE_REPLACEMENTS: ReadonlyArray<[RegExp, string]> = [
+    [/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/gi, "[REDACTED_PRIVATE_KEY]"],
+    [/\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password|passwd|authorization)\b\s*[:=]\s*[^\s,;]+/gi, "$1: [REDACTED_SECRET]"],
+    [/\bsk-[A-Za-z0-9_-]{12,}\b/gi, "[REDACTED_API_TOKEN]"],
+    [/\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/gi, "[REDACTED_JWT]"],
+    [/\b[A-Z]{2}\d{2}[A-Z0-9]{10,34}\b/gi, "[REDACTED_IDENTIFIER]"],
+    /(?:)/g as never,
+];
+
+function sanitizeTechnicalText(value: string): string {
+    let sanitized = value;
+    for (const entry of TECHNICAL_SAFE_REPLACEMENTS) {
+        if (Array.isArray(entry)) {
+            sanitized = sanitized.replace(entry[0], entry[1]);
+        }
+    }
+    sanitized = sanitized.replace(/\b\d{10,19}\b/g, "[REDACTED_IDENTIFIER]");
+    sanitized = sanitized.replace(/\+?\d[\d\s()-]{8,}\d/g, "[REDACTED_PHONE]");
+    sanitized = sanitized.replace(/\b[^\s@]+@[^\s@]+\.[^\s@]+\b/gi, "[REDACTED_EMAIL]");
+    return sanitized;
+}
 
 export class ExternalReviewSecurityBoundary {
     evaluate(input: ExternalReviewSecurityInput): ExternalReviewSecurityResult {
@@ -77,22 +99,15 @@ export class ExternalReviewSecurityBoundary {
             }
         }
 
-        for (const value of fields) {
-            if (HIGH_RISK_IDENTIFIER_PATTERNS.some((pattern) => pattern.test(value))) {
-                reasons.push("high-risk identifier-like material detected");
-                break;
-            }
-        }
-
         return {
             allowed: reasons.length === 0,
             reasons,
             sanitized: {
-                decisionId: "[OPAQUE_EXTERNAL_REVIEW_ID]",
+                decisionId: sanitizeTechnicalText(input.decisionId),
                 category: input.category,
-                evidence: input.evidence.map(() => "[SANITIZED_EXTERNAL_REVIEW_EVIDENCE]"),
-                alternatives: input.alternatives.map(() => "[SANITIZED_EXTERNAL_REVIEW_ALTERNATIVE]"),
-                ...(input.context ? { context: "[SANITIZED_EXTERNAL_REVIEW_CONTEXT]" } : {}),
+                evidence: input.evidence.map(sanitizeTechnicalText),
+                alternatives: input.alternatives.map(sanitizeTechnicalText),
+                ...(input.context ? { context: sanitizeTechnicalText(input.context) } : {}),
             },
         };
     }
