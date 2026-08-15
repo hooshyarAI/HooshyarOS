@@ -1,6 +1,6 @@
 # HooshyarOS Development Constitution
 
-Version: 1.6
+Version: 1.7
 
 ---
 
@@ -186,6 +186,65 @@ Before implementation, the Assistant must choose the construction strategy expli
 - define the verification order before execution.
 
 The Assistant must prefer reasoning about root causes over blind retries.
+
+---
+
+## Platform-First Repair Doctrine — Permanent Rule
+
+Every defect, failure, inconsistency, regression, missing dependency, integration break, quality-gate failure, production-readiness blocker or required correction in HooshyarOS must be treated first as a **platform reasoning and repair problem**, not as a manual patching problem.
+
+The mandatory repair path is:
+
+```text
+DETECT
+→ CONTEXTUALIZE
+→ ISOLATE
+→ DIAGNOSE ROOT CAUSE
+→ RECOVER RELEVANT MEMORY / KNOWLEDGE
+→ SELECT OWNING ENGINE(S)
+→ SELECT APPROPRIATE REASONING / GOVERNANCE / DECISION / AUTONOMOUS CAPABILITIES
+→ FORM EVIDENCE-BACKED REPAIR PLAN
+→ APPLY MINIMAL ARCHITECTURE-COMPATIBLE REPAIR
+→ VERIFY LOCALLY
+→ VERIFY INTEGRATION
+→ VERIFY ARCHITECTURE / GOVERNANCE
+→ REGRESSION CHECK
+→ RECORD LEARNING
+→ COMMIT VERIFIED STATE
+→ RE-PLAN
+```
+
+The repair system must intelligently and proportionally compose the platform's existing engines, capabilities, memory, knowledge, decision logic, autonomous operations and construction tools. Simple failures should use a simple path; high-risk or cross-engine failures must activate the deeper reasoning, governance, expert-choice and verification chain appropriate to their risk and complexity.
+
+The following are explicitly **not** valid repair methods:
+
+- blind trial-and-error retries;
+- changing assertions merely to obtain green tests;
+- weakening or bypassing a quality gate;
+- hiding or deleting failure evidence;
+- hard-coding expected outputs solely to satisfy a test;
+- introducing duplicate capability or engine ownership for convenience;
+- bypassing an approved contract instead of repairing its implementation;
+- redesigning Architecture Freeze V4 merely because implementation is difficult;
+- declaring success from file existence or superficial command success.
+
+External coding agents are not part of the construction fabric. The authoritative construction participants remain **Python + GitHub + this Assistant**, under HooshyarOS governance. External tools may provide information only when explicitly permitted by an approved product/runtime architecture; they must not become an uncontrolled construction dependency.
+
+A repair is accepted only when the evidence demonstrates that the root cause was addressed and neighboring capabilities remain intact. If evidence is insufficient, the system must remain `BLOCKED` or escalate for additional evidence rather than guess.
+
+Every accepted repair should preserve enough provenance to answer:
+
+- what failed;
+- why it failed;
+- which evidence established the root cause;
+- which engine/capability owned the repair;
+- why the selected strategy was chosen;
+- what changed;
+- how it was verified;
+- what regression surface was checked;
+- what learning should remain in repository memory.
+
+This doctrine applies continuously across **construction, development, CI, testing, integration, commercialisation, release, deployment and customer operation**. The execution context may change, but the governing repair logic does not.
 
 ---
 
