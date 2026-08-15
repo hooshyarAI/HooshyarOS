@@ -18,7 +18,7 @@ describe("SelfHealingOrchestrator controlled repair E2E", () => {
 
     const aprvl: APRVLRepairAdapter = {
       execute: jest.fn().mockResolvedValue({
-        authorized: true,
+        authorized: false,
         verified: true,
         summary: "failure analyzed and independently verified",
       }),
@@ -39,6 +39,7 @@ describe("SelfHealingOrchestrator controlled repair E2E", () => {
       authorization,
     );
 
+    expect(aprvlEvidence.authorized).toBe(false);
     expect(aprvlEvidence.verified).toBe(true);
     expect(evidence.changed).toBe(true);
     expect(evidence.verified).toBe(true);
