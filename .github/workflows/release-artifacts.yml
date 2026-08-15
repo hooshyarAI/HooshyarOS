@@ -1,0 +1,74 @@
+name: HooshyarOS Release Artifacts
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/release-readiness
+
+permissions:
+  contents: read
+
+jobs:
+  windows-release:
+    runs-on: windows-latest
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Install Node dependencies
+        run: npm ci
+      - name: Build Windows release artifact
+        env:
+          HOOSHYAR_REQUIRE_REAL_WINDOWS_EXE: "1"
+        run: python Backend/AI_Runtime/productization_builder.py --platform WINDOWS
+      - name: Verify Windows artifact
+        shell: pwsh
+        run: |
+          $artifact = "dist/productization/windows/HooshyarOS-Setup.exe"
+          if (!(Test-Path $artifact)) { throw "Windows installer artifact missing: $artifact" }
+          if ((Get-Item $artifact).Length -lt 100KB) { throw "Windows installer artifact is unexpectedly small" }
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: HooshyarOS-Windows-Installer
+          path: dist/productization/windows/HooshyarOS-Setup.exe
+          if-no-files-found: error
+
+  android-release:
+    runs-on: windows-latest
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build Android release artifact
+        run: python Backend/AI_Runtime/productization_builder.py --platform ANDROID
+      - name: Verify Android APK
+        shell: pwsh
+        run: |
+          $artifact = "dist/productization/android/HooshyarOS.apk"
+          if (!(Test-Path $artifact)) { throw "Android APK artifact missing: $artifact" }
+          if ((Get-Item $artifact).Length -lt 100KB) { throw "Android APK artifact is unexpectedly small" }
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: HooshyarOS-Android-APK
+          path: dist/productization/android/HooshyarOS.apk
+          if-no-files-found: error
