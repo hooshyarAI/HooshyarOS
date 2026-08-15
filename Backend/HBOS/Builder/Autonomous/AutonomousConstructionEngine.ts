@@ -77,6 +77,12 @@ export class AutonomousConstructionEngine {
             if (result.artifact !== undefined) artifacts[stage] = result.artifact;
         }
 
+        const generationEvidence = this.recordArtifact(artifacts.GENERATE);
+        if (generationEvidence?.changed === false && generationEvidence.idempotentNoOp !== true) {
+            trace.push("VERIFY");
+            return this.blocked("VERIFY", attempt, ["QUALITY_IMPLEMENTATION_UNVERIFIED"], trace);
+        }
+
         trace.push("VERIFY");
         issues.length = 0;
         let verification = this.execute("VERIFY", plan, attempt, artifacts, issues);
@@ -191,6 +197,7 @@ export class AutonomousConstructionEngine {
         const tools: ConstructionTool[] = [
             { name: "architecture", execute: () => ({ ok: true }) },
             { name: "python", execute: stage => {
+                if (stage === "GENERATE") return { ok: true, artifact: { changed: true } };
                 if (stage === "VERIFY") {
                     verificationCalls += 1;
                     return verificationCalls === 1
