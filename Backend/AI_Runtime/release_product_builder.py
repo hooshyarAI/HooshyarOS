@@ -9,7 +9,6 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
-import subprocess
 import zipfile
 from pathlib import Path
 
@@ -34,23 +33,26 @@ def _should_skip_file(path: Path) -> bool:
 
 
 def _validate_windows_payload(payload: Path) -> None:
-    required = [
-        payload / "Backend" / "AI_Runtime" / "CommercialRuntimeServer.ts",
-        payload / "Frontend" / "HooshyarWebApp" / "index.ts",
-        payload / "product-manifest.json",
-        payload / "web" / "index.html",
+    required_relative = [
+        "Backend/AI_Runtime/CommercialRuntimeServer.ts",
+        "Frontend/HooshyarWebApp/index.ts",
+        "product-manifest.json",
+        "web/index.html",
     ]
-    # The web entrypoint may be packaged beneath the frontend runtime.
+    required = [payload / Path(path) for path in required_relative]
     if not required[-1].exists():
         required[-1] = payload / "Frontend" / "HooshyarWebApp" / "web" / "index.html"
-    missing = [str(p.relative_to(payload)) for p in required if not p.exists()]
+    missing = [path for path, resolved in zip(required_relative, required) if not resolved.exists()]
     if missing:
         raise RuntimeError(f"windows-payload-missing:{','.join(missing)}")
 
 
 def _runtime_dependency_names() -> set[str]:
-    # tsx is the runtime launcher used by the repository's Node entrypoints.
-    return {"tsx"}
+    # Runtime roots are explicit so the packaged dependency closure has a
+    # deterministic starting point rather than copying development dependencies.
+    roots: set[str] = set()
+    roots.add("tsx")
+    return roots
 
 
 def _copy_node_dependency(name: str, destination: Path) -> None:
@@ -61,7 +63,8 @@ def _copy_node_dependency(name: str, destination: Path) -> None:
 
 def _copy_runtime_node_modules(destination: Path) -> None:
     destination.mkdir(parents=True, exist_ok=True)
-    for name in _runtime_dependency_names():
+    roots = _runtime_dependency_names()
+    for name in roots:
         _copy_node_dependency(name, destination)
 
 
@@ -89,7 +92,6 @@ def _write_launch_surface(payload: Path) -> None:
         'Set shell = CreateObject("WScript.Shell")\nshell.Run Chr(34) & Replace(WScript.ScriptFullName, "launch-hooshyar.vbs", "launch-hooshyar.cmd") & Chr(34), 1, False\n',
         encoding="ascii",
     )
-    # Customer-visible launch surface and Start Menu contract.
     shortcut_root = payload / "Microsoft\\Windows\\Start Menu\\Programs\\HooshyarOS"
     shortcut_root.mkdir(parents=True, exist_ok=True)
     (shortcut_root / "HooshyarOS.lnk").write_text("launch-hooshyar.vbs\n", encoding="ascii")
@@ -98,7 +100,18 @@ def _write_launch_surface(payload: Path) -> None:
 def _write_installer_contract(payload: Path) -> None:
     install = DIST / "install.ps1"
     install.write_text(
-        '$ErrorActionPreference = "Stop"\n$here = Split-Path -Parent $MyInvocation.MyCommand.Path\n$zip = Join-Path $here "HooshyarOS-Windows-Bootstrap.zip"\n$stage = Join-Path $here "stage"\nif (Test-Path $stage) { Remove-Item $stage -Recurse -Force }\nExpand-Archive -Path $zip -DestinationPath $stage -Force\nWrite-Host "HooshyarOS installed and health-checked"\n',
+        '$ErrorActionPreference = "Stop"\n'
+        '$here = Split-Path -Parent $MyInvocation.MyCommand.Path\n'
+        '$zip = Join-Path $here "HooshyarOS-Windows-Bootstrap.zip"\n'
+        '$stage = Join-Path $here "stage"\n'
+        'if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }\n'
+        'Expand-Archive -Path $zip -DestinationPath $stage -Force\n'
+        '$launch = Join-Path $stage "launch-hooshyar.cmd"\n'
+        'Start-Process -FilePath $launch -WorkingDirectory $stage\n'
+        'Start-Sleep -Seconds 3\n'
+        '$health = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:3000/health" -TimeoutSec 10\n'
+        'if ($health.StatusCode -ne 200) { throw "HooshyarOS /health verification failed" }\n'
+        'Write-Host "HooshyarOS installed and health-checked"\n',
         encoding="utf-8",
     )
 
