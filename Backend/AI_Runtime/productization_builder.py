@@ -17,6 +17,8 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
+from android_toolchain_repair import AndroidRepairError, install_from_metadata
+
 ROOT = Path(__file__).resolve().parents[2]
 RELEASE_ROOT = ROOT / "dist" / "productization"
 WINDOWS_ROOT = RELEASE_ROOT / "windows"
@@ -219,6 +221,19 @@ def provision_android_toolchain() -> tuple[Path, Path, Path] | None:
         "build-tools;35.0.0",
     ]
     if run(str(sdkmanager), sdkmanager_args, env=env, timeout=90 * 60, input_text=("y\n" * 30)) != 0:
+        try:
+            install_from_metadata(sdk_root, ["platform-tools", "platforms;android-35", "build-tools;35.0.0"])
+        except AndroidRepairError as exc:
+            emit("AUTONOMOUS_ANDROID_REPAIR", status="BLOCKED", reason=str(exc))
+            return None
+
+    required = [
+        sdk_root / "platform-tools",
+        sdk_root / "platforms" / "android-35",
+        sdk_root / "build-tools" / "35.0.0",
+    ]
+    if not all(path.exists() for path in required):
+        emit("AUTONOMOUS_ANDROID_REPAIR", status="BLOCKED", reason="required-sdk-packages-not-present")
         return None
 
     return java_home, sdk_root, gradle_bin
