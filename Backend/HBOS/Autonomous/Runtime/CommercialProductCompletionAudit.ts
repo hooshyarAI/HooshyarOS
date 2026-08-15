@@ -20,10 +20,14 @@ export class CommercialProductCompletionAudit {
         else {
             const packageJson = JSON.parse(readFileSync(packagePath, "utf8")) as { scripts?: Record<string, string> };
             const scripts = packageJson.scripts ?? {};
-            const hasRunnableWebScript = Boolean(scripts.start || scripts.dev || scripts.serve || scripts.preview);
-            const webArtifacts = ["web/index.html", "web/app.js", "web/styles.css", "web/manifest.webmanifest"];
-            const hasStaticWebEntrypoint = webArtifacts.every(artifact => existsSync(join(root, artifact)));
-            if (!hasRunnableWebScript && !hasStaticWebEntrypoint) missingLayers.push("web-entrypoint");
+            const runnableWebScripts = [scripts.start, scripts.dev, scripts.serve, scripts.preview].filter(Boolean);
+            const hasWebScript = runnableWebScripts.some(script => /(?:web|frontend|vite|next|react|static)/i.test(script!));
+            const webArtifacts = [
+                "web/index.html",
+                "Frontend/HooshyarWebApp/web/index.html",
+            ];
+            const hasCanonicalStaticWebEntrypoint = webArtifacts.some(artifact => existsSync(join(root, artifact)));
+            if (!hasWebScript && !hasCanonicalStaticWebEntrypoint) missingLayers.push("web-entrypoint");
         }
 
         const persistenceCandidates = ["Backend/HBOS/Infrastructure", "Backend/HBOS/Persistence", "Backend/AI_Runtime/persistence", "prisma", "database"];
