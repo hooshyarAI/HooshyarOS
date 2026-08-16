@@ -85,6 +85,15 @@ jobs:
             }
           }
           '@ | Set-Content -Encoding UTF8 "$env:GRADLE_USER_HOME\\init.d\\hooshyaros-kotlin.gradle"
+      - name: Verify governed Kotlin policy is present
+        shell: pwsh
+        run: |
+          $policy = "$env:GRADLE_USER_HOME\\init.d\\hooshyaros-kotlin.gradle"
+          if (!(Test-Path $policy)) { throw "Governed Kotlin policy missing" }
+          $text = Get-Content $policy -Raw
+          foreach ($required in @("kotlin-stdlib-jdk7", "kotlin-stdlib-jdk8", "kotlin-stdlib:1.8.22")) {
+            if ($text -notmatch [regex]::Escape($required)) { throw "Kotlin policy missing: $required" }
+          }
       - name: Build Android test artifact
         run: python Backend/AI_Runtime/productization_builder.py --platform ANDROID
       - name: Verify Android APK
