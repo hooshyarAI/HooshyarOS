@@ -1,0 +1,27 @@
+name: HooshyarOS Release Trigger
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/release-readiness
+
+permissions:
+  contents: read
+
+jobs:
+  trigger-release-readiness:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Confirm release workflow definition
+        shell: pwsh
+        run: |
+          $workflow = '.github/workflows/release-artifacts.yml'
+          if (!(Test-Path $workflow)) { throw "Release workflow missing: $workflow" }
+          $text = Get-Content $workflow -Raw
+          foreach ($required in @('windows-install-probe','Start-Process -FilePath $installer','HooshyarOS-Android-APK-Emulator-Test')) {
+            if ($text -notmatch [regex]::Escape($required)) { throw "Release workflow missing required gate: $required" }
+          }
+          Write-Host "Release workflow trigger contract verified."
