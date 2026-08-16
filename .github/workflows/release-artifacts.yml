@@ -90,22 +90,23 @@ jobs:
           $ErrorActionPreference = "Stop"
           $installer = (Resolve-Path "dist/productization/windows/HooshyarOS-Setup.exe").Path
           $root = Join-Path $env:ProgramData "HooshyarOS"
-          $log = Join-Path $root "install.log"
-          $process = Start-Process -FilePath $installer -ArgumentList "/Q" -PassThru
-          $deadline = (Get-Date).AddMinutes(5)
-          while (!$process.HasExited -and (Get-Date) -lt $deadline) {
-            Start-Sleep -Seconds 2
-            $process.Refresh()
-          }
-          if (!$process.HasExited) {
-            try { taskkill.exe /PID $process.Id /T /F | Out-Host } catch {}
-            if (Test-Path $log) { Get-Content $log | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8 }
-            throw "Installer timed out after 5 minutes (pid=$($process.Id)); process tree terminated"
-          }
+          $marker = Join-Path $root "HooshyarOS-install-complete.marker"
+          $log = Join-Path $env:ProgramData "HooshyarOS-install.log"
+          if (Test-Path $root) { Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue }
+          $process = Start-Process -FilePath $installer -ArgumentList "/Q" -PassThru -Wait
           "InstallerExitCode=$($process.ExitCode)" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           if ($process.ExitCode -ne 0) {
             if (Test-Path $log) { Get-Content $log | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8 }
-            throw "Installer failed with exit code $($process.ExitCode)"
+            throw "Installer bootstrap failed with exit code $($process.ExitCode)"
+          }
+          $deadline = (Get-Date).AddMinutes(5)
+          do {
+            if (Test-Path $marker) { break }
+            Start-Sleep -Seconds 2
+          } while ((Get-Date) -lt $deadline)
+          if (!(Test-Path $marker)) {
+            if (Test-Path $log) { Get-Content $log | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8 }
+            throw "Installer payload did not reach completion marker within 5 minutes"
           }
       - name: Verify installation evidence
         shell: pwsh
@@ -114,8 +115,10 @@ jobs:
           $root = Join-Path $env:ProgramData "HooshyarOS"
           $runtime = Join-Path $root "runtime"
           $launcher = Join-Path $runtime "start-hooshyar.cmd"
-          $log = Join-Path $root "install.log"
+          $marker = Join-Path $root "HooshyarOS-install-complete.marker"
+          $log = Join-Path $env:ProgramData "HooshyarOS-install.log"
           if (!(Test-Path $root)) { throw "Install root missing: $root" }
+          if (!(Test-Path $marker)) { throw "Install completion evidence missing: $marker" }
           if (!(Test-Path $runtime)) { throw "Runtime directory missing: $runtime" }
           if (!(Test-Path $launcher)) { throw "Launch surface missing: $launcher" }
           if ((Get-ChildItem $runtime -File -Recurse | Measure-Object).Count -lt 1) { throw "Runtime payload is empty" }
@@ -211,6 +214,8 @@ jobs:
           $results | ConvertTo-Json | Tee-Object -FilePath release-evidence.json | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           if ($results.Values -contains 'failure') { throw "Canonical release gate failed" }
           if ($results.Values -contains 'cancelled') { throw "Canonical release gate inconclusive: a required job was cancelled" }
+          if ($results.Values -contains 'skipped') { throw "Canonical release gate inconclusive: a required job was skipped" }
+          if ($results.Values -notcontains 'success') { throw "Canonical release gate has no successful required job" }
       - name: Upload release evidence
         uses: actions/upload-artifact@v4
         with:
