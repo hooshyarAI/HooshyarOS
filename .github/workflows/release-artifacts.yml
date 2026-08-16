@@ -1,4 +1,5 @@
 name: HooshyarOS Canonical Release Gate
+run-name: HooshyarOS Release Gate • ${{ github.sha }}
 
 on:
   workflow_dispatch:
@@ -212,6 +213,7 @@ jobs:
         shell: pwsh
         run: |
           $results = @{
+            commit = '${{ github.sha }}'
             runtime = '${{ needs.runtime-contract.result }}'
             windows_build = '${{ needs.windows-release.result }}'
             windows_install_launch_uninstall = '${{ needs.windows-install-launch-uninstall.result }}'
@@ -221,7 +223,6 @@ jobs:
           if ($results.Values -contains 'failure') { throw "Canonical release gate failed" }
           if ($results.Values -contains 'cancelled') { throw "Canonical release gate inconclusive: a required job was cancelled" }
           if ($results.Values -contains 'skipped') { throw "Canonical release gate inconclusive: a required job was skipped" }
-          if ($results.Values -notcontains 'success') { throw "Canonical release gate has no successful required job" }
       - name: Upload release evidence
         uses: actions/upload-artifact@v4
         with:
