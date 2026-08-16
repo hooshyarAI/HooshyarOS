@@ -32,9 +32,17 @@ def emit(kind: str, **payload: object) -> None:
 def run(command: str, args: list[str], *, cwd: Path = ROOT, env: dict[str, str] | None = None,
         timeout: int = 60 * 60, input_text: str | None = None) -> int:
     result = subprocess.run(
-        [command, *args], cwd=cwd, env=env or os.environ.copy(), text=True,
-        encoding="utf-8", errors="replace", input=input_text,
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout, check=False,
+        [command, *args],
+        cwd=cwd,
+        env=env or os.environ.copy(),
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        input=input_text,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        timeout=timeout,
+        check=False,
     )
     if result.stdout:
         print(result.stdout, end="")
@@ -68,10 +76,35 @@ def find_file(root: Path, name: str) -> Path | None:
 
 
 def windows() -> int:
-    # Existing deterministic Windows packaging path is retained; the release gate
-    # rejects a missing real IExpress executable rather than silently accepting ZIP-only output.
     WINDOWS_INSTALLER.mkdir(parents=True, exist_ok=True)
+    install = WINDOWS_INSTALLER / "install.ps1"
+    uninstall = WINDOWS_INSTALLER / "uninstall.ps1"
     build = WINDOWS_INSTALLER / "build-installer.ps1"
+    readme = WINDOWS_INSTALLER / "README.md"
+
+    install.write_text(r'''$ErrorActionPreference = "Stop"
+$Root = Split-Path -Parent $PSScriptRoot
+$InstallRoot = Join-Path $env:ProgramData "HooshyarOS"
+$RuntimeRoot = Join-Path $InstallRoot "runtime"
+$DataRoot = Join-Path $InstallRoot "data"
+New-Item -ItemType Directory -Force -Path $RuntimeRoot, $DataRoot | Out-Null
+Copy-Item -Path (Join-Path $Root "payload\*") -Destination $RuntimeRoot -Recurse -Force
+$Launcher = Join-Path $RuntimeRoot "start-hooshyar.cmd"
+@"
+@echo off
+cd /d "$RuntimeRoot"
+call npm.cmd start
+"@ | Set-Content -Encoding ASCII $Launcher
+Write-Host "HooshyarOS installed to $InstallRoot"
+Write-Host "Start with: $Launcher"
+''', encoding="utf-8")
+
+    uninstall.write_text(r'''$ErrorActionPreference = "Stop"
+$InstallRoot = Join-Path $env:ProgramData "HooshyarOS"
+if (Test-Path $InstallRoot) { Remove-Item $InstallRoot -Recurse -Force }
+Write-Host "HooshyarOS uninstalled."
+''', encoding="utf-8")
+
     build.write_text(r'''$ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 $Payload = Join-Path $Root "payload"
@@ -84,14 +117,82 @@ Copy-Item -Path (Join-Path $Root "..\..\..\Frontend") -Destination $Payload -Rec
 Compress-Archive -Path (Join-Path $Payload "*") -DestinationPath $Package -Force
 Write-Host "Built $Package"
 ''', encoding="utf-8")
+
+    readme.write_text("""# HooshyarOS Windows Productization
+
+The Windows release contains the existing HooshyarOS runtime and a native bootstrap EXE when IExpress is available.
+
+- `install.ps1`: installs runtime files and creates the local data directory.
+- `uninstall.ps1`: removes the local installation.
+- `build-installer.ps1`: builds the deterministic bootstrap ZIP payload.
+""", encoding="utf-8")
+
+    payload_script = WINDOWS_INSTALLER / "install.cmd"
+    payload_script.write_text("@echo off\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File \"%~dp0install.ps1\"\n", encoding="ascii")
+
+    zip_result = WINDOWS_ROOT / "HooshyarOS-Windows-Bootstrap.zip"
     if run("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(build)], timeout=45 * 60) != 0:
         return 21
+
+    iexpress = shutil.which("iexpress.exe") or shutil.which("iexpress") or (Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "iexpress.exe")
+    exe = WINDOWS_ROOT / "HooshyarOS-Setup.exe"
+    if iexpress and Path(iexpress).exists():
+        sed_root = WINDOWS_ROOT / "iexpress"
+        if sed_root.exists():
+            shutil.rmtree(sed_root)
+        sed_root.mkdir(parents=True)
+        source = sed_root / "source"
+        source.mkdir()
+        shutil.copy2(payload_script, source / payload_script.name)
+        shutil.copy2(install, source / install.name)
+        shutil.copy2(uninstall, source / uninstall.name)
+        shutil.copy2(zip_result, source / zip_result.name)
+
+        sed = sed_root / "HooshyarOS.sed"
+        sed.write_text(f'''[Version]
+Class=IEXPRESS
+SEDVersion=3
+[Options]
+PackagePurpose=InstallApp
+ShowInstallProgramWindow=1
+HideExtractAnimation=1
+UseLongFileName=1
+InsideCompressed=1
+CABFileName=HooshyarOS.cab
+TargetName={exe}
+FriendlyName=HooshyarOS
+AppLaunched=install.cmd
+PostInstallCmd=<None>
+SourceFiles=SourceFiles
+[Strings]
+FILE0="install.cmd"
+FILE1="install.ps1"
+FILE2="uninstall.ps1"
+FILE3="{zip_result.name}"
+[SourceFiles]
+SourceFiles0={source}
+[SourceFiles0]
+%FILE0%=
+%FILE1%=
+%FILE2%=
+%FILE3%=
+''', encoding="utf-8")
+        if run(str(iexpress), ["/N", "/Q", str(sed)], timeout=15 * 60) != 0:
+            return 22
+
+    if not exe.exists() or exe.stat().st_size < 100 * 1024:
+        emit("AUTONOMOUS_PRODUCTIZATION_BUILDER", platform="WINDOWS", status="BLOCKED", reason="real-exe-not-produced")
+        return 23
+
+    emit("AUTONOMOUS_PRODUCTIZATION_BUILDER", platform="WINDOWS", status="COMPLETE",
+         artifact=str(exe.relative_to(ROOT)), bootstrap=str(zip_result.relative_to(ROOT)))
     return 0
 
 
 def provision_android_toolchain() -> tuple[Path, Path, Path] | None:
     local = TOOLCACHE / "android"
     local.mkdir(parents=True, exist_ok=True)
+
     java_home = Path(os.environ.get("JAVA_HOME", "")) if os.environ.get("JAVA_HOME") else None
     if not java_home or not (java_home / "bin" / "javac.exe").exists():
         jdk_zip = local / "microsoft-jdk-17-windows-x64.zip"
@@ -150,12 +251,51 @@ def android() -> int:
     src.mkdir(parents=True, exist_ok=True)
     values.mkdir(parents=True, exist_ok=True)
 
-    (ANDROID_ROOT / "settings.gradle").write_text("""pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }\ndependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }\nrootProject.name='HooshyarOS'\ninclude ':app'\n""", encoding="utf-8")
+    (ANDROID_ROOT / "settings.gradle").write_text("""pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
+rootProject.name='HooshyarOS'
+include ':app'
+""", encoding="utf-8")
     (ANDROID_ROOT / "build.gradle").write_text("plugins { id 'com.android.application' version '8.6.1' apply false }\n", encoding="utf-8")
-    (app / "build.gradle").write_text("""plugins { id 'com.android.application' }\n\nandroid {\n    namespace 'ai.hooshyar.app'\n    compileSdk 35\n    defaultConfig { applicationId 'ai.hooshyar.app'; minSdk 26; targetSdk 35; versionCode 1; versionName '1.0.0' }\n    buildTypes {\n        debug { buildConfigField 'String', 'HOOSHYAR_ENDPOINT', '\"' + (project.findProperty('HOOSHYAR_ENDPOINT') ?: 'http://10.0.2.2:3000') + '\"' }\n        release { buildConfigField 'String', 'HOOSHYAR_ENDPOINT', '\"' + (project.findProperty('HOOSHYAR_ENDPOINT') ?: '') + '\"' }\n    }\n    buildFeatures { buildConfig true }\n}\n\ndependencies { implementation 'androidx.appcompat:appcompat:1.7.0'; implementation 'androidx.webkit:webkit:1.12.1' }\n""", encoding="utf-8")
+    (app / "build.gradle").write_text("""plugins { id 'com.android.application' }
+
+android {
+    namespace 'ai.hooshyar.app'
+    compileSdk 35
+    defaultConfig { applicationId 'ai.hooshyar.app'; minSdk 26; targetSdk 35; versionCode 1; versionName '1.0.0' }
+    buildTypes {
+        debug { buildConfigField 'String', 'HOOSHYAR_ENDPOINT', '\"' + (project.findProperty('HOOSHYAR_ENDPOINT') ?: 'http://10.0.2.2:3000') + '\"' }
+        release { buildConfigField 'String', 'HOOSHYAR_ENDPOINT', '\"' + (project.findProperty('HOOSHYAR_ENDPOINT') ?: '') + '\"' }
+    }
+    buildFeatures { buildConfig true }
+}
+
+dependencies { implementation 'androidx.appcompat:appcompat:1.7.0'; implementation 'androidx.webkit:webkit:1.12.1' }
+""", encoding="utf-8")
     (app / "src" / "main" / "AndroidManifest.xml").write_text("""<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\"><uses-permission android:name=\"android.permission.INTERNET\"/><application android:theme=\"@style/Theme.AppCompat.Light.NoActionBar\" android:label=\"HooshyarOS\"><activity android:name=\".MainActivity\" android:exported=\"true\"><intent-filter><action android:name=\"android.intent.action.MAIN\"/><category android:name=\"android.intent.category.LAUNCHER\"/></intent-filter></activity></application></manifest>\n""", encoding="utf-8")
     (values / "styles.xml").write_text("<resources><style name=\"Theme.AppCompat.Light.NoActionBar\" parent=\"Theme.AppCompat.Light.NoActionBar\"/></resources>\n", encoding="utf-8")
-    (src / "MainActivity.java").write_text("""package ai.hooshyar.app;\n\nimport android.app.Activity;\nimport android.os.Bundle;\nimport android.webkit.WebView;\nimport android.webkit.WebViewClient;\n\npublic class MainActivity extends Activity {\n    @Override public void onCreate(Bundle savedInstanceState) {\n        super.onCreate(savedInstanceState);\n        WebView web = new WebView(this);\n        web.setWebViewClient(new WebViewClient());\n        web.getSettings().setJavaScriptEnabled(true);\n        String endpoint = BuildConfig.HOOSHYAR_ENDPOINT;\n        if (endpoint == null || endpoint.trim().isEmpty()) { throw new IllegalStateException(\"HOOSHYAR_ENDPOINT is required for release builds\"); }\n        web.loadUrl(endpoint);\n        setContentView(web);\n    }\n}\n""", encoding="utf-8")
+    (src / "MainActivity.java").write_text("""package ai.hooshyar.app;
+
+import android.app.Activity;
+import android.os.Bundle;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+
+public class MainActivity extends Activity {
+    @Override public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        WebView web = new WebView(this);
+        web.setWebViewClient(new WebViewClient());
+        web.getSettings().setJavaScriptEnabled(true);
+        String endpoint = BuildConfig.HOOSHYAR_ENDPOINT;
+        if (endpoint == null || endpoint.trim().isEmpty()) {
+            throw new IllegalStateException("HOOSHYAR_ENDPOINT is required for release builds");
+        }
+        web.loadUrl(endpoint);
+        setContentView(web);
+    }
+}
+""", encoding="utf-8")
 
     toolchain = provision_android_toolchain()
     if toolchain is None:
