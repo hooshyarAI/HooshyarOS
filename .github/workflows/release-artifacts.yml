@@ -77,6 +77,7 @@ jobs:
   windows-install-launch-uninstall:
     needs: windows-release
     runs-on: windows-latest
+    timeout-minutes: 15
     steps:
       - name: Download Windows installer
         uses: actions/download-artifact@v4
@@ -88,9 +89,24 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $installer = (Resolve-Path "dist/productization/windows/HooshyarOS-Setup.exe").Path
-          $process = Start-Process -FilePath $installer -ArgumentList "/Q" -Wait -PassThru
+          $root = Join-Path $env:ProgramData "HooshyarOS"
+          $log = Join-Path $root "install.log"
+          $process = Start-Process -FilePath $installer -ArgumentList "/Q" -PassThru
+          $deadline = (Get-Date).AddMinutes(5)
+          while (!$process.HasExited -and (Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 2
+            $process.Refresh()
+          }
+          if (!$process.HasExited) {
+            try { taskkill.exe /PID $process.Id /T /F | Out-Host } catch {}
+            if (Test-Path $log) { Get-Content $log | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8 }
+            throw "Installer timed out after 5 minutes (pid=$($process.Id)); process tree terminated"
+          }
           "InstallerExitCode=$($process.ExitCode)" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-          if ($process.ExitCode -ne 0) { throw "Installer failed with exit code $($process.ExitCode)" }
+          if ($process.ExitCode -ne 0) {
+            if (Test-Path $log) { Get-Content $log | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8 }
+            throw "Installer failed with exit code $($process.ExitCode)"
+          }
       - name: Verify installation evidence
         shell: pwsh
         run: |
@@ -194,6 +210,7 @@ jobs:
           }
           $results | ConvertTo-Json | Tee-Object -FilePath release-evidence.json | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           if ($results.Values -contains 'failure') { throw "Canonical release gate failed" }
+          if ($results.Values -contains 'cancelled') { throw "Canonical release gate inconclusive: a required job was cancelled" }
       - name: Upload release evidence
         uses: actions/upload-artifact@v4
         with:
