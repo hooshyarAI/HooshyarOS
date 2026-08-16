@@ -80,9 +80,13 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $installer = (Resolve-Path "dist/productization/windows/HooshyarOS-Setup.exe").Path
-          $process = Start-Process -FilePath $installer -ArgumentList "/Q" -Wait -PassThru -NoNewWindow
+          $process = Start-Process -FilePath $installer -ArgumentList "/Q" -Wait -PassThru
           "InstallerExitCode=$($process.ExitCode)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           if ($process.ExitCode -ne 0) { throw "Windows installer exited with code $($process.ExitCode)" }
+          $root = Join-Path $env:ProgramData "HooshyarOS"
+          $log = Join-Path $root "install.log"
+          if (!(Test-Path $root)) { throw "Install root missing after successful installer exit: $root" }
+          if (Test-Path $log) { Get-Content $log | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8 }
       - name: Verify installed runtime and launch surface
         shell: pwsh
         run: |
@@ -91,8 +95,18 @@ jobs:
           if (!(Test-Path $root)) { throw "Install root missing: $root" }
           $launcher = Join-Path $root "runtime\start-hooshyar.cmd"
           if (!(Test-Path $launcher)) { throw "Launch surface missing: $launcher" }
+          $runtime = Join-Path $root "runtime"
+          if ((Get-ChildItem -Path $runtime -File -Recurse | Measure-Object).Count -lt 1) { throw "Installed runtime is empty" }
           Write-Host "Windows install root verified: $root"
           Write-Host "Windows launch surface verified: $launcher"
+      - name: Launch Windows product smoke probe
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $launcher = Join-Path $env:ProgramData "HooshyarOS\runtime\start-hooshyar.cmd"
+          $probe = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", "`"$launcher`"", "--health-check" -Wait -PassThru
+          "LaunchProbeExitCode=$($probe.ExitCode)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          if ($probe.ExitCode -ne 0) { throw "Windows launch smoke probe failed with code $($probe.ExitCode)" }
       - name: Uninstall Windows product
         if: always()
         shell: pwsh
