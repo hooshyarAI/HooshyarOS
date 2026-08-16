@@ -59,6 +59,18 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Enforce Android build properties
+        shell: pwsh
+        run: |
+          @(
+            "android.useAndroidX=true",
+            "android.enableJetifier=true",
+            "org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8"
+          ) | Set-Content -Encoding UTF8 android/gradle.properties
+      - name: Setup Android test artifact endpoint
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:HOOSHYAR_ENDPOINT)) { throw "Android test endpoint is required" }
       - name: Build Android test artifact
         run: python Backend/AI_Runtime/productization_builder.py --platform ANDROID
       - name: Verify Android APK
