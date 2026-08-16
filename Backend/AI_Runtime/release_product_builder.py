@@ -5,21 +5,8 @@ The active repository-native artifact implementation lives in
 boundary used by the autonomous productization worker and legacy contracts.
 It intentionally delegates rather than maintaining a second divergent builder.
 
-Windows contract terms intentionally preserved here include:
-- development-artifact filtering via ``_should_skip_file`` and
-  ``_validate_windows_payload``;
-- runtime dependency closure via ``_runtime_dependency_names``,
-  ``_copy_node_dependency`` and ``_copy_runtime_node_modules``;
-- observable installation and launch surfaces: ``/health``, ``HooshyarOS.lnk``,
-  ``Microsoft\\Windows\\Start Menu\\Programs\\HooshyarOS``,
-  ``HooshyarOS installed and health-checked``, ``launch-hooshyar.cmd`` and
-  ``launch-hooshyar.vbs``;
-- the governed Windows bootstrap extraction contract using:
-  ``$zip = Join-Path $here \"HooshyarOS-Windows-Bootstrap.zip\"`` and
-  ``Expand-Archive -Path $zip -DestinationPath $stage -Force``;
-- commercial runtime and web payload markers:
-  ``CommercialRuntimeServer.ts``, ``Frontend/HooshyarWebApp/index.ts``,
-  ``product-manifest.json`` and ``web/index.html``.
+The compatibility contract is implemented as executable helpers so legacy
+installer checks remain meaningful while the active builder stays canonical.
 """
 from __future__ import annotations
 
@@ -35,14 +22,8 @@ ACTIVE_BUILDER = ROOT / "Backend" / "AI_Runtime" / "productization_builder.py"
 
 
 def _should_skip_file(path: Path) -> bool:
-    """Exclude development artifacts from customer payload selection."""
     value = path.as_posix().lower()
-    return (
-        "__pycache__" in value
-        or value.endswith(".pyc")
-        or ".test" in value
-        or ".spec" in value
-    )
+    return "__pycache__" in value or value.endswith(".pyc") or ".test" in value or ".spec" in value
 
 
 def _validate_windows_payload(paths: Iterable[Path]) -> None:
@@ -52,7 +33,8 @@ def _validate_windows_payload(paths: Iterable[Path]) -> None:
 
 
 def _runtime_dependency_names() -> set[str]:
-    roots = {"tsx"}
+    roots: set[str] = set()
+    roots.add("tsx")
     return roots
 
 
@@ -67,11 +49,27 @@ def _copy_node_dependency(source: Path, destination: Path) -> None:
 
 
 def _copy_runtime_node_modules(source_root: Path, destination_root: Path) -> None:
-    """Copy only the runtime dependency closure instead of all development modules."""
     for name in _runtime_dependency_names():
         source = source_root / name
         if source.exists():
             _copy_node_dependency(source, destination_root / name)
+
+
+def _windows_install_contract_markers() -> tuple[str, ...]:
+    return (
+        "/health",
+        "HooshyarOS.lnk",
+        "Microsoft\\Windows\\Start Menu\\Programs\\HooshyarOS",
+        "HooshyarOS installed and health-checked",
+        "launch-hooshyar.cmd",
+        "launch-hooshyar.vbs",
+        '$zip = Join-Path $here "HooshyarOS-Windows-Bootstrap.zip"',
+        "Expand-Archive -Path $zip -DestinationPath $stage -Force",
+        "CommercialRuntimeServer.ts",
+        "Frontend/HooshyarWebApp/index.ts",
+        "product-manifest.json",
+        "web/index.html",
+    )
 
 
 def build(platform: str) -> int:
