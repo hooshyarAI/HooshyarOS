@@ -152,7 +152,7 @@ jobs:
       - name: Govern Android Kotlin dependency resolution
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path "$env:GRADLE_USER_HOME\\init.d" | Out-Null
+          New-Item -ItemType Directory -Force -Path "$env:GRADLE_USER_HOME\init.d" | Out-Null
           @'
           allprojects {
             configurations.configureEach {
@@ -161,11 +161,11 @@ jobs:
               resolutionStrategy.force "org.jetbrains.kotlin:kotlin-stdlib:1.8.22"
             }
           }
-          '@ | Set-Content -Encoding UTF8 "$env:GRADLE_USER_HOME\\init.d\\hooshyaros-kotlin.gradle"
+          '@ | Set-Content -Encoding UTF8 "$env:GRADLE_USER_HOME\init.d\hooshyaros-kotlin.gradle"
       - name: Verify governed Kotlin policy is present
         shell: pwsh
         run: |
-          $policy = "$env:GRADLE_USER_HOME\\init.d\\hooshyaros-kotlin.gradle"
+          $policy = "$env:GRADLE_USER_HOME\init.d\hooshyaros-kotlin.gradle"
           if (!(Test-Path $policy)) { throw "Governed Kotlin policy missing" }
           $text = Get-Content $policy -Raw
           foreach ($required in @("kotlin-stdlib-jdk7", "kotlin-stdlib-jdk8", "kotlin-stdlib:1.8.22")) {
