@@ -121,12 +121,14 @@ jobs:
           $root = Join-Path $env:ProgramData "HooshyarOS"
           $runtime = Join-Path $root "runtime"
           $launcher = Join-Path $runtime "start-hooshyar.cmd"
+          $runtimeJs = Join-Path $runtime "commercial-runtime.js"
           $marker = Join-Path $root "HooshyarOS-install-complete.marker"
           $log = Join-Path $env:ProgramData "HooshyarOS-install.log"
           if (!(Test-Path $root)) { throw "Install root missing: $root" }
           if (!(Test-Path $marker)) { throw "Install completion evidence missing: $marker" }
           if (!(Test-Path $runtime)) { throw "Runtime directory missing: $runtime" }
           if (!(Test-Path $launcher)) { throw "Launch surface missing: $launcher" }
+          if (!(Test-Path $runtimeJs)) { throw "Standalone runtime missing: $runtimeJs" }
           if ((Get-ChildItem $runtime -File -Recurse | Measure-Object).Count -lt 1) { throw "Runtime payload is empty" }
           if (Test-Path $log) { Get-Content $log | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8 }
           "WINDOWS_INSTALL_ROOT=$root" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
@@ -134,8 +136,8 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $launcher = Join-Path $env:ProgramData "HooshyarOS\runtime\start-hooshyar.cmd"
-          $probe = Start-Process -FilePath "cmd.exe" -ArgumentList @("/c", "`"$launcher`"", "--health-check") -Wait -PassThru
+          $runtime = Join-Path $env:ProgramData "HooshyarOS\runtime\commercial-runtime.js"
+          $probe = Start-Process -FilePath "node.exe" -ArgumentList @($runtime, "--health-check") -Wait -PassThru
           "LaunchProbeExitCode=$($probe.ExitCode)" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           if ($probe.ExitCode -ne 0) { throw "Launch health probe failed with exit code $($probe.ExitCode)" }
       - name: Uninstall and verify cleanup
