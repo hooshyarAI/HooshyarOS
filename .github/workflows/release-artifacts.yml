@@ -72,26 +72,33 @@ jobs:
           name: HooshyarOS-Windows-Installer
           path: dist/productization/windows
       - name: Install Windows product
+        id: install
         shell: pwsh
         run: |
-          $installer = "dist/productization/windows/HooshyarOS-Setup.exe"
-          if (!(Test-Path $installer)) { throw "Installer missing: $installer" }
-          & $installer /Q
-          if ($LASTEXITCODE -ne 0) { throw "Windows installer exited with code $LASTEXITCODE" }
+          $ErrorActionPreference = "Stop"
+          $installer = (Resolve-Path "dist/productization/windows/HooshyarOS-Setup.exe").Path
+          $process = Start-Process -FilePath $installer -ArgumentList "/Q" -Wait -PassThru -NoNewWindow
+          "InstallerExitCode=$($process.ExitCode)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          if ($process.ExitCode -ne 0) { throw "Windows installer exited with code $($process.ExitCode)" }
       - name: Verify installed runtime and launch surface
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
           $root = Join-Path $env:ProgramData "HooshyarOS"
           if (!(Test-Path $root)) { throw "Install root missing: $root" }
           $launcher = Join-Path $root "runtime\start-hooshyar.cmd"
           if (!(Test-Path $launcher)) { throw "Launch surface missing: $launcher" }
           Write-Host "Windows install root verified: $root"
+          Write-Host "Windows launch surface verified: $launcher"
       - name: Uninstall Windows product
+        if: always()
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Continue"
           $uninstaller = Join-Path $env:ProgramData "HooshyarOS\runtime\uninstall.ps1"
           if (Test-Path $uninstaller) {
-            powershell.exe -NoProfile -ExecutionPolicy Bypass -File $uninstaller
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $uninstaller
+            if ($LASTEXITCODE -ne 0) { Write-Warning "Uninstaller exited with code $LASTEXITCODE" }
           }
 
   android-release:
