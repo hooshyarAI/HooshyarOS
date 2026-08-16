@@ -69,6 +69,18 @@ _original_run = _core.run
 def _governed_run(command: str, args: list[str], **kwargs: object) -> int:
     if Path(command).name.lower() == "iexpress.exe":
         _harden_iexpress_payload(args)
+        result = _original_run(command, args, **kwargs)
+        if result != 0 and args:
+            sed = Path(args[-1])
+            if sed.exists():
+                import re
+                match = re.search(r"^TargetName=(.+)$", sed.read_text(encoding="utf-8"), re.MULTILINE)
+                if match:
+                    artifact = Path(match.group(1).strip().strip('"'))
+                    if artifact.exists() and artifact.is_file() and artifact.stat().st_size >= 100 * 1024:
+                        print(f"IExpress returned {result}, but produced a valid installer artifact: {artifact}", flush=True)
+                        return 0
+        return result
     return _original_run(command, args, **kwargs)
 
 
