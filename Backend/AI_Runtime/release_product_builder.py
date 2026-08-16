@@ -59,7 +59,7 @@ def _windows_install_contract_markers() -> tuple[str, ...]:
     return (
         "/health",
         "HooshyarOS.lnk",
-        "Microsoft\\Windows\\Start Menu\\Programs\\HooshyarOS",
+        r"Microsoft\Windows\Start Menu\Programs\HooshyarOS",
         "HooshyarOS installed and health-checked",
         "launch-hooshyar.cmd",
         "launch-hooshyar.vbs",
