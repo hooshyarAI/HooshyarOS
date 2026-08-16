@@ -26,17 +26,16 @@ def _harden_iexpress_payload(args: list[str]) -> None:
         '$Root = Split-Path -Parent $PSScriptRoot',
         '$Root = $PSScriptRoot',
     )
-    # Use robocopy with junction handling disabled and zero retry/wait so an
-    # accidental reparse point or locked payload cannot turn the installer
-    # into an unbounded process. Robocopy codes below 8 are successful.
     script = script.replace(
         'Copy-Item -Path (Join-Path $PayloadExtract "*") -Destination $RuntimeRoot -Recurse -Force',
         '$copy = & robocopy.exe $PayloadExtract $RuntimeRoot /E /XJ /R:0 /W:0 /NFL /NDL /NJH /NJS\nif ($LASTEXITCODE -ge 8) { throw "HooshyarOS payload copy failed with robocopy exit code $LASTEXITCODE" }\n$global:LASTEXITCODE = 0',
     )
     script = script.replace(
         'Remove-Item $PayloadExtract -Recurse -Force -ErrorAction SilentlyContinue',
-        'Remove-Item $PayloadExtract -Recurse -Force -ErrorAction SilentlyContinue\nexit 0',
+        'Remove-Item $PayloadExtract -Recurse -Force -ErrorAction SilentlyContinue\nNew-Item -ItemType File -Force -Path (Join-Path $InstallRoot "HooshyarOS-install-complete.marker") | Out-Null\nexit 0',
     )
+    if "HooshyarOS-install-complete.marker" not in script:
+        script += '\nNew-Item -ItemType File -Force -Path (Join-Path $InstallRoot "HooshyarOS-install-complete.marker") | Out-Null\nexit 0\n'
     install_ps1.write_text(script, encoding="utf-8")
 
     source_script.write_text(r'''@echo off
