@@ -75,7 +75,6 @@ jobs:
           name: HooshyarOS-Windows-Installer
           path: dist/productization/windows
       - name: Install Windows product
-        id: install
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
