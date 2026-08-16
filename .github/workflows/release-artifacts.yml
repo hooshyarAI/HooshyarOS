@@ -2,6 +2,9 @@ name: HooshyarOS Release Artifacts
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - agent/release-readiness
   push:
     branches:
       - agent/release-readiness
