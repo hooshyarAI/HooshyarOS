@@ -23,7 +23,7 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
       - name: Verify runtime validation contract
-        run: npm test -- --runInBand Backend/HBOS/Product/RuntimeValidationContract.test.ts
+        run: npm test -- --runInBand Backend/HBOS/Product/RuntimeValidationContract.test.ts Backend/HBOS/test/AutonomousProductizationRouting.test.ts Backend/HBOS/test/WindowsProductInstallerContract.test.ts
 
   windows-release:
     needs: runtime-contract
