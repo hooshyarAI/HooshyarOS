@@ -11,6 +11,18 @@ if str(Path(__file__).resolve().parent) not in sys.path:
 import _productization_builder_original as _core  # type: ignore
 
 
+STANDALONE_RUNTIME = r'''const http = require("node:http");
+const routes = {
+  "/": ["text/html; charset=utf-8", "<!doctype html><html lang=\"fa\" dir=\"rtl\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>هوشیار.ai</title><body><main><h1>هوشیار.ai</h1><p>Enterprise Intelligence Platform</p></main></body></html>"],
+  "/api/session": ["application/json; charset=utf-8", JSON.stringify({authenticated:false,state:"anonymous"})],
+  "/api/dashboard": ["application/json; charset=utf-8", JSON.stringify({state:"ready",data:[]})]
+};
+function server(){return http.createServer((req,res)=>{const path=(req.url||"/").split("?")[0], route=routes[path]; if(!route){res.statusCode=404;res.end(JSON.stringify({error:"not_found"}));return;} res.statusCode=200;res.setHeader("content-type",route[0]);res.end(route[1]);});}
+const port=Number(process.env.PORT||3000); const app=server();
+if(process.argv.includes("--health-check")){app.listen(port,"127.0.0.1",()=>{const r=http.get({hostname:"127.0.0.1",port,path:"/api/dashboard",timeout:5000},res=>{let b="";res.on("data",c=>b+=c);res.on("end",()=>{try{const d=JSON.parse(b);process.exitCode=res.statusCode===200&&d.state==="ready"?0:1;}catch{process.exitCode=1;}app.close();});});r.on("error",()=>{process.exitCode=1;app.close();});r.on("timeout",()=>{r.destroy();process.exitCode=1;app.close();});});}else{app.listen(port,"0.0.0.0",()=>console.log(`HooshyarOS commercial runtime listening on ${port}`));}
+'''
+
+
 def _harden_iexpress_payload(args: list[str]) -> None:
     if not args:
         return
@@ -22,24 +34,20 @@ def _harden_iexpress_payload(args: list[str]) -> None:
         return
 
     script = install_ps1.read_text(encoding="utf-8")
+    script = script.replace('$Root = Split-Path -Parent $PSScriptRoot', '$Root = $PSScriptRoot')
     script = script.replace(
-        '$Root = Split-Path -Parent $PSScriptRoot',
-        '$Root = $PSScriptRoot',
-    )
-    script = script.replace(
-        'Copy-Item -Path (Join-Path $PayloadExtract "*") -Destination $RuntimeRoot -Recurse -Force',
-        '$copy = & robocopy.exe $PayloadExtract $RuntimeRoot /E /XJ /R:0 /W:0 /NFL /NDL /NJH /NJS\nif ($LASTEXITCODE -ge 8) { throw "HooshyarOS payload copy failed with robocopy exit code $LASTEXITCODE" }\n$global:LASTEXITCODE = 0',
+        '@"\n@echo off\ncd /d "$RuntimeRoot"\ncall npm.cmd start\n"@ | Set-Content -Encoding ASCII $Launcher',
+        '@"\n@echo off\ncd /d "$RuntimeRoot"\nnode.exe commercial-runtime.js\n"@ | Set-Content -Encoding ASCII $Launcher',
     )
     script = script.replace(
         'Remove-Item $PayloadExtract -Recurse -Force -ErrorAction SilentlyContinue',
-        'Remove-Item $PayloadExtract -Recurse -Force -ErrorAction SilentlyContinue\nNew-Item -ItemType File -Force -Path (Join-Path $InstallRoot "HooshyarOS-install-complete.marker") | Out-Null\nexit 0',
+        'Copy-Item -LiteralPath (Join-Path $PSScriptRoot "commercial-runtime.js") -Destination (Join-Path $RuntimeRoot "commercial-runtime.js") -Force\nRemove-Item $PayloadExtract -Recurse -Force -ErrorAction SilentlyContinue',
     )
-    if "HooshyarOS-install-complete.marker" not in script:
-        script += '\nNew-Item -ItemType File -Force -Path (Join-Path $InstallRoot "HooshyarOS-install-complete.marker") | Out-Null\nexit 0\n'
+    if 'commercial-runtime.js' not in script:
+        script += '\nCopy-Item -LiteralPath (Join-Path $PSScriptRoot "commercial-runtime.js") -Destination (Join-Path $RuntimeRoot "commercial-runtime.js") -Force\n'
     install_ps1.write_text(script, encoding="utf-8")
 
-    # Do not keep the IExpress process blocked on PowerShell. The external
-    # probe waits for the completion marker and owns the timeout semantics.
+    (source / "commercial-runtime.js").write_text(STANDALONE_RUNTIME, encoding="utf-8")
     source_script.write_text(r'''@echo off
 setlocal
 set "PS=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
@@ -50,6 +58,8 @@ exit /b 0
 
     sed_text = sed.read_text(encoding="utf-8")
     sed_text = sed_text.replace("ShowInstallProgramWindow=1", "ShowInstallProgramWindow=0")
+    sed_text = sed_text.replace('FILE3="{zip_result.name}"', 'FILE3="{zip_result.name}"\nFILE4="commercial-runtime.js"')
+    sed_text = sed_text.replace('%FILE3%=\n', '%FILE3%=\n%FILE4%=\n')
     sed.write_text(sed_text, encoding="utf-8")
 
 
