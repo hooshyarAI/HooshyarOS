@@ -38,13 +38,14 @@ def _harden_iexpress_payload(args: list[str]) -> None:
         script += '\nNew-Item -ItemType File -Force -Path (Join-Path $InstallRoot "HooshyarOS-install-complete.marker") | Out-Null\nexit 0\n'
     install_ps1.write_text(script, encoding="utf-8")
 
+    # Do not keep the IExpress process blocked on PowerShell. The external
+    # probe waits for the completion marker and owns the timeout semantics.
     source_script.write_text(r'''@echo off
 setlocal
 set "PS=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
 if not exist "%PS%" exit /b 91
-"%PS%" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%~dp0install.ps1" > "%ProgramData%\HooshyarOS-install.log" 2>&1
-set "RC=%ERRORLEVEL%"
-exit /b %RC%
+start "HooshyarOS Installer" /b "%PS%" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%~dp0install.ps1" > "%ProgramData%\HooshyarOS-install.log" 2>&1
+exit /b 0
 ''', encoding="ascii")
 
     sed_text = sed.read_text(encoding="utf-8")
