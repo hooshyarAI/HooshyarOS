@@ -1,0 +1,61 @@
+name: HooshyarOS Android Real Device Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      endpoint:
+        description: "Reachable HooshyarOS HTTP(S) endpoint from the Android device"
+        required: true
+        type: string
+
+jobs:
+  android-real-device:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate real-device endpoint
+        shell: pwsh
+        env:
+          HOOSHYAR_ENDPOINT: ${{ inputs.endpoint }}
+        run: |
+          $uri = [Uri]$env:HOOSHYAR_ENDPOINT
+          if ($uri.Scheme -notin @("http", "https")) { throw "Endpoint must use http or https" }
+          if ([string]::IsNullOrWhiteSpace($uri.Host)) { throw "Endpoint host is required" }
+          if ($env:HOOSHYAR_ENDPOINT -match "10\.0\.2\.2|localhost|127\.0\.0\.1") {
+            throw "Real-device release cannot target emulator/loopback endpoints"
+          }
+          Write-Host "Validated Android real-device endpoint: $($uri.Scheme)://$($uri.Authority)"
+
+      - name: Build Android real-device APK
+        shell: pwsh
+        env:
+          HOOSHYAR_ENDPOINT: ${{ inputs.endpoint }}
+        run: |
+          python Backend/AI_Runtime/productization_builder.py --platform ANDROID
+
+      - name: Verify Android real-device APK
+        shell: pwsh
+        env:
+          HOOSHYAR_ENDPOINT: ${{ inputs.endpoint }}
+        run: |
+          $apk = "dist/productization/android/HooshyarOS.apk"
+          if (!(Test-Path $apk)) { throw "Android APK missing: $apk" }
+          if ((Get-Item $apk).Length -lt 500000) { throw "Android APK unexpectedly small" }
+          $sha = (Get-FileHash $apk -Algorithm SHA256).Hash.ToLowerInvariant()
+          "APK_SHA256=$sha" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          "ENDPOINT=$env:HOOSHYAR_ENDPOINT" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+      - name: Upload Android real-device APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: HooshyarOS-Android-APK-Real-Device
+          path: dist/productization/android/HooshyarOS.apk
+          if-no-files-found: error
+          retention-days: 30
