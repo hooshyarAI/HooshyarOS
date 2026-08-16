@@ -4,10 +4,14 @@ on:
   workflow_dispatch:
   pull_request:
     branches:
-      - agent/release-readiness
+      - stable/aprvl-controlled-repair-2026-08-15
   push:
     branches:
       - agent/release-readiness
+
+concurrency:
+  group: hooshyaros-release-readiness-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -75,6 +79,7 @@ jobs:
           name: HooshyarOS-Windows-Installer
           path: dist/productization/windows
       - name: Install Windows product
+        id: install
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
