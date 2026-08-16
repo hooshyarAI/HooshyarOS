@@ -1,12 +1,14 @@
 """Governed release wrapper around the canonical productization builder."""
 from __future__ import annotations
 
-import os
 from pathlib import Path
-
-from . import _productization_builder_original as _core
+import sys
 
 ROOT = Path(__file__).resolve().parents[2]
+if str(Path(__file__).resolve().parent) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import _productization_builder_original as _core  # type: ignore
 
 
 def _harden_iexpress_payload(args: list[str]) -> None:
