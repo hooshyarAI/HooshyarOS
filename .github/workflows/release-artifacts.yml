@@ -51,6 +51,7 @@ jobs:
     env:
       PYTHONUTF8: "1"
       PYTHONIOENCODING: utf-8
+      HOOSHYAR_ENDPOINT: "http://10.0.2.2:3000"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -58,21 +59,17 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Build Android release artifact
-        env:
-          HOOSHYAR_ENDPOINT: ${{ vars.HOOSHYAR_RELEASE_ENDPOINT }}
-        run: |
-          if ([string]::IsNullOrWhiteSpace($env:HOOSHYAR_ENDPOINT)) { throw "Repository variable HOOSHYAR_RELEASE_ENDPOINT is required for Android release builds" }
-          python Backend/AI_Runtime/productization_builder.py --platform ANDROID
+      - name: Build Android test artifact
+        run: python Backend/AI_Runtime/productization_builder.py --platform ANDROID
       - name: Verify Android APK
         shell: pwsh
         run: |
           $artifact = "dist/productization/android/HooshyarOS.apk"
           if (!(Test-Path $artifact)) { throw "Android APK artifact missing: $artifact" }
           if ((Get-Item $artifact).Length -lt 100KB) { throw "Android APK artifact is unexpectedly small" }
-      - name: Upload Android APK
+      - name: Upload Android test APK
         uses: actions/upload-artifact@v4
         with:
-          name: HooshyarOS-Android-APK
+          name: HooshyarOS-Android-APK-Emulator-Test
           path: dist/productization/android/HooshyarOS.apk
           if-no-files-found: error
