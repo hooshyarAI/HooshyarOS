@@ -15,9 +15,22 @@ def _harden_iexpress_payload(args: list[str]) -> None:
     if not args:
         return
     sed = Path(args[-1])
-    source_script = sed.parent / "source" / "install.cmd"
-    if not source_script.exists():
+    source = sed.parent / "source"
+    source_script = source / "install.cmd"
+    install_ps1 = source / "install.ps1"
+    if not source_script.exists() or not install_ps1.exists():
         return
+
+    # IExpress extracts all payload files into one directory. The generated
+    # install.ps1 historically looked one directory above PSScriptRoot for the
+    # bootstrap archive, which made the packaged installer self-inconsistent.
+    script = install_ps1.read_text(encoding="utf-8")
+    script = script.replace(
+        '$Root = Split-Path -Parent $PSScriptRoot',
+        '$Root = $PSScriptRoot',
+    )
+    install_ps1.write_text(script, encoding="utf-8")
+
     source_script.write_text(r'''@echo off
 setlocal
 set "PS=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
@@ -26,6 +39,12 @@ if not exist "%PS%" exit /b 91
 set "RC=%ERRORLEVEL%"
 exit /b %RC%
 ''', encoding="ascii")
+
+    # The bootstrap must be silent and deterministic in CI and unattended
+    # installation. Keep the payload command itself responsible for status.
+    sed_text = sed.read_text(encoding="utf-8")
+    sed_text = sed_text.replace("ShowInstallProgramWindow=1", "ShowInstallProgramWindow=0")
+    sed.write_text(sed_text, encoding="utf-8")
 
 
 _original_run = _core.run
