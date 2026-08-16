@@ -59,7 +59,11 @@ jobs:
         with:
           python-version: "3.12"
       - name: Build Android release artifact
-        run: python Backend/AI_Runtime/productization_builder.py --platform ANDROID
+        env:
+          HOOSHYAR_ENDPOINT: ${{ vars.HOOSHYAR_RELEASE_ENDPOINT }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:HOOSHYAR_ENDPOINT)) { throw "Repository variable HOOSHYAR_RELEASE_ENDPOINT is required for Android release builds" }
+          python Backend/AI_Runtime/productization_builder.py --platform ANDROID
       - name: Verify Android APK
         shell: pwsh
         run: |
