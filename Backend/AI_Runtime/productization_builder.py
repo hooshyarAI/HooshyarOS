@@ -21,13 +21,21 @@ def _harden_iexpress_payload(args: list[str]) -> None:
     if not source_script.exists() or not install_ps1.exists():
         return
 
-    # IExpress extracts all payload files into one directory. The generated
-    # install.ps1 historically looked one directory above PSScriptRoot for the
-    # bootstrap archive, which made the packaged installer self-inconsistent.
     script = install_ps1.read_text(encoding="utf-8")
     script = script.replace(
         '$Root = Split-Path -Parent $PSScriptRoot',
         '$Root = $PSScriptRoot',
+    )
+    # Use robocopy with junction handling disabled and zero retry/wait so an
+    # accidental reparse point or locked payload cannot turn the installer
+    # into an unbounded process. Robocopy codes below 8 are successful.
+    script = script.replace(
+        'Copy-Item -Path (Join-Path $PayloadExtract "*") -Destination $RuntimeRoot -Recurse -Force',
+        '$copy = & robocopy.exe $PayloadExtract $RuntimeRoot /E /XJ /R:0 /W:0 /NFL /NDL /NJH /NJS\nif ($LASTEXITCODE -ge 8) { throw "HooshyarOS payload copy failed with robocopy exit code $LASTEXITCODE" }\n$global:LASTEXITCODE = 0',
+    )
+    script = script.replace(
+        'Remove-Item $PayloadExtract -Recurse -Force -ErrorAction SilentlyContinue',
+        'Remove-Item $PayloadExtract -Recurse -Force -ErrorAction SilentlyContinue\nexit 0',
     )
     install_ps1.write_text(script, encoding="utf-8")
 
@@ -40,8 +48,6 @@ set "RC=%ERRORLEVEL%"
 exit /b %RC%
 ''', encoding="ascii")
 
-    # The bootstrap must be silent and deterministic in CI and unattended
-    # installation. Keep the payload command itself responsible for status.
     sed_text = sed.read_text(encoding="utf-8")
     sed_text = sed_text.replace("ShowInstallProgramWindow=1", "ShowInstallProgramWindow=0")
     sed.write_text(sed_text, encoding="utf-8")
