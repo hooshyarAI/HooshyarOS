@@ -14,6 +14,7 @@ RELEASE_ROOT = ROOT / "dist" / "productization" / "windows"
 INSTALLER_ROOT = RELEASE_ROOT / "installer"
 BOOTSTRAP = RELEASE_ROOT / "HooshyarOS-Windows-Bootstrap.zip"
 EXE = RELEASE_ROOT / "HooshyarOS-Setup.exe"
+DESKTOP_SHELL = RELEASE_ROOT / "HooshyarOS.exe"
 
 STANDALONE_RUNTIME = r'''const http = require("node:http");
 const routes = {
@@ -24,12 +25,125 @@ const routes = {
 function createServer(){return http.createServer((req,res)=>{const path=(req.url||"/").split("?")[0], route=routes[path]; if(!route){res.statusCode=404;res.end(JSON.stringify({error:"not_found"}));return;} res.statusCode=200;res.setHeader("content-type",route[0]);res.end(route[1]);});}
 const port=Number(process.env.PORT||3000);
 if(process.argv.includes("--health-check")){const app=createServer();app.listen(port,"127.0.0.1",()=>{const r=http.get({hostname:"127.0.0.1",port,path:"/api/dashboard",timeout:5000},res=>{let b="";res.on("data",c=>b+=c);res.on("end",()=>{try{const d=JSON.parse(b);process.exitCode=res.statusCode===200&&d.state==="ready"?0:1;}catch{process.exitCode=1;}app.close();});});r.on("error",()=>{process.exitCode=1;app.close();});r.on("timeout",()=>{r.destroy();process.exitCode=1;app.close();});});}
-else{createServer().listen(port,"0.0.0.0",()=>console.log(`HooshyarOS commercial runtime listening on ${port}`));}
+else{createServer().listen(port,"127.0.0.1",()=>console.log(`HooshyarOS commercial runtime listening on ${port}`));}
 '''
+
+
+def build_desktop_shell() -> None:
+    dotnet = shutil.which("dotnet.exe") or shutil.which("dotnet")
+    if not dotnet:
+        raise RuntimeError("dotnet is unavailable on the Windows build runner")
+    source = r'''
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Windows.Forms;
+using Microsoft.Web.WebView2.WinForms;
+
+internal static class Program
+{
+    [STAThread]
+    private static void Main()
+    {
+        ApplicationConfiguration.Initialize();
+        Application.Run(new MainForm());
+    }
+}
+
+internal sealed class MainForm : Form
+{
+    private readonly WebView2 _web = new() { Dock = DockStyle.Fill };
+    private Process? _runtime;
+
+    public MainForm()
+    {
+        Text = "هوشیار.ai";
+        Width = 1400;
+        Height = 900;
+        MinimumSize = new System.Drawing.Size(1024, 700);
+        StartPosition = FormStartPosition.CenterScreen;
+        Controls.Add(_web);
+        Shown += async (_, _) => await StartAsync();
+        FormClosing += (_, _) => StopRuntime();
+    }
+
+    private async System.Threading.Tasks.Task StartAsync()
+    {
+        var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "HooshyarOS");
+        var runtime = Path.Combine(root, "runtime");
+        var node = Path.Combine(runtime, "node.exe");
+        var app = Path.Combine(runtime, "commercial-runtime.js");
+        if (!Ready())
+        {
+            if (!File.Exists(node) || !File.Exists(app))
+            {
+                MessageBox.Show("HooshyarOS runtime is incomplete. Please repair or reinstall the application.", "هوشیار.ai", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+            _runtime = Process.Start(new ProcessStartInfo
+            {
+                FileName = node,
+                Arguments = $"\"{app}\"",
+                WorkingDirectory = runtime,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            });
+        }
+        await _web.EnsureCoreWebView2Async();
+        _web.Source = new Uri("http://127.0.0.1:3000/");
+    }
+
+    private static bool Ready()
+    {
+        try
+        {
+            using var client = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromMilliseconds(500) };
+            var r = client.GetAsync("http://127.0.0.1:3000/api/dashboard").GetAwaiter().GetResult();
+            return r.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    private void StopRuntime()
+    {
+        try { if (_runtime is { HasExited: false }) _runtime.Kill(true); } catch { }
+    }
+}
+'''
+    csproj = r'''<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <PublishTrimmed>false</PublishTrimmed>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <AssemblyName>HooshyarOS</AssemblyName>
+  </PropertyGroup>
+</Project>
+'''
+    with tempfile.TemporaryDirectory(prefix="hooshyar-shell-") as temp:
+        root = Path(temp)
+        (root / "HooshyarOS.csproj").write_text(csproj, encoding="utf-8")
+        (root / "Program.cs").write_text(source, encoding="utf-8")
+        subprocess.run([dotnet, "add", str(root / "HooshyarOS.csproj"), "package", "Microsoft.Web.WebView2"], cwd=root, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        subprocess.run([dotnet, "publish", str(root / "HooshyarOS.csproj"), "-c", "Release", "-o", str(root / "publish"), "--nologo"], cwd=root, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=30 * 60)
+        built = root / "publish" / "HooshyarOS.exe"
+        if not built.exists():
+            raise RuntimeError("HooshyarOS desktop shell was not produced")
+        shutil.copy2(built, DESKTOP_SHELL)
 
 
 def build_bootstrap() -> None:
     RELEASE_ROOT.mkdir(parents=True, exist_ok=True)
+    node_exe = Path(shutil.which("node.exe") or "")
+    if not node_exe.exists():
+        raise RuntimeError("node.exe is required to build a self-contained Windows product")
+    if not DESKTOP_SHELL.exists():
+        raise RuntimeError("HooshyarOS desktop shell must be built before the installer")
     with tempfile.TemporaryDirectory(prefix="hooshyar-windows-") as temp:
         payload = Path(temp) / "payload"
         payload.mkdir()
@@ -38,6 +152,8 @@ def build_bootstrap() -> None:
         frontend = ROOT / "Frontend"
         if frontend.exists():
             shutil.copytree(frontend, payload / "Frontend")
+        shutil.copy2(node_exe, payload / "node.exe")
+        shutil.copy2(DESKTOP_SHELL, payload / "HooshyarOS.exe")
         with ZipFile(BOOTSTRAP, "w", ZIP_DEFLATED) as archive:
             for path in payload.rglob("*"):
                 if path.is_file():
@@ -48,23 +164,24 @@ def write_runtime_contract() -> None:
     INSTALLER_ROOT.mkdir(parents=True, exist_ok=True)
     (INSTALLER_ROOT / "commercial-runtime.js").write_text(STANDALONE_RUNTIME, encoding="utf-8")
     (INSTALLER_ROOT / "HooshyarOS-Windows-Bootstrap.zip").write_bytes(BOOTSTRAP.read_bytes())
-
     uninstall_contract = r'''$ErrorActionPreference = "Stop"
 $InstallRoot = Join-Path $env:ProgramData "HooshyarOS"
-$RuntimePattern = "commercial-runtime.js"
+$Shell = Join-Path $InstallRoot "HooshyarOS.exe"
+$Desktop = Join-Path ([Environment]::GetFolderPath('CommonDesktopDirectory')) "HooshyarOS.lnk"
+$StartMenu = Join-Path ([Environment]::GetFolderPath('CommonPrograms')) "HooshyarOS.lnk"
+$UninstallKey = "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\HooshyarOS"
 try {
-  Get-Process node -ErrorAction SilentlyContinue | ForEach-Object {
-    try {
-      if ($_.Path -and $_.Path -like "*HooshyarOS*\node.exe") { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
-    } catch { }
-  }
+  Get-Process node -ErrorAction SilentlyContinue | ForEach-Object { try { if ($_.Path -and $_.Path -like "*HooshyarOS*\node.exe") { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue } } catch {} }
+  Get-Process HooshyarOS -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+  if (Test-Path $Desktop) { Remove-Item $Desktop -Force -ErrorAction SilentlyContinue }
+  if (Test-Path $StartMenu) { Remove-Item $StartMenu -Force -ErrorAction SilentlyContinue }
+  if (Test-Path $UninstallKey) { Remove-Item $UninstallKey -Recurse -Force -ErrorAction SilentlyContinue }
   Start-Sleep -Milliseconds 500
   if (Test-Path $InstallRoot) { Remove-Item $InstallRoot -Recurse -Force -ErrorAction Stop }
   if (Test-Path $InstallRoot) { exit 1 }
+  if (Test-Path $env:ProgramData\HooshyarOS-uninstall.ps1) { Remove-Item $env:ProgramData\HooshyarOS-uninstall.ps1 -Force -ErrorAction SilentlyContinue }
   exit 0
-} catch {
-  exit 1
-}
+} catch { exit 1 }
 '''
     (INSTALLER_ROOT / "uninstall.ps1").write_text(uninstall_contract, encoding="utf-8")
 
@@ -81,7 +198,7 @@ def build_self_extracting_exe() -> None:
         project = root / "Installer.csproj"
         source = root / "Program.cs"
         project.write_text('''<Project Sdk="Microsoft.NET.Sdk">\n  <PropertyGroup>\n    <OutputType>Exe</OutputType>\n    <TargetFramework>net8.0</TargetFramework>\n    <RuntimeIdentifier>win-x64</RuntimeIdentifier>\n    <SelfContained>true</SelfContained>\n    <PublishSingleFile>true</PublishSingleFile>\n    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>\n    <PublishTrimmed>false</PublishTrimmed>\n    <InvariantGlobalization>true</InvariantGlobalization>\n    <AssemblyName>HooshyarOS-Setup</AssemblyName>\n  </PropertyGroup>\n</Project>\n''', encoding="utf-8")
-        source.write_text(f'''using System;\nusing System.IO;\nusing System.IO.Compression;\nusing System.Text;\n\ninternal static class Program\n{{\n    private const string BootstrapBase64 = "{payload_b64}";\n    private const string RuntimeBase64 = "{runtime_b64}";\n    private const string UninstallBase64 = "{uninstall_b64}";\n    private static int Main()\n    {{\n        var installRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "HooshyarOS");\n        var runtimeRoot = Path.Combine(installRoot, "runtime");\n        var dataRoot = Path.Combine(installRoot, "data");\n        var commonData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);\n        var logPath = Path.Combine(commonData, "HooshyarOS-install.log");\n        var externalUninstaller = Path.Combine(commonData, "HooshyarOS-uninstall.ps1");\n        try\n        {{\n            Directory.CreateDirectory(runtimeRoot);\n            Directory.CreateDirectory(dataRoot);\n            File.WriteAllText(logPath, "START " + DateTimeOffset.UtcNow.ToString("O") + Environment.NewLine, Encoding.UTF8);\n            var tempZip = Path.Combine(Path.GetTempPath(), "HooshyarOS-Windows-Bootstrap.zip");\n            var tempExtract = Path.Combine(Path.GetTempPath(), "HooshyarOS-bootstrap-" + Guid.NewGuid().ToString("N"));\n            File.WriteAllBytes(tempZip, Convert.FromBase64String(BootstrapBase64));\n            Directory.CreateDirectory(tempExtract);\n            ZipFile.ExtractToDirectory(tempZip, tempExtract);\n            foreach (var file in Directory.EnumerateFiles(tempExtract, "*", SearchOption.AllDirectories))\n            {{\n                var relative = Path.GetRelativePath(tempExtract, file);\n                var target = Path.Combine(runtimeRoot, relative);\n                var parent = Path.GetDirectoryName(target);\n                if (parent is not null) Directory.CreateDirectory(parent);\n                File.Copy(file, target, true);\n            }}\n            File.WriteAllBytes(Path.Combine(runtimeRoot, "commercial-runtime.js"), Convert.FromBase64String(RuntimeBase64));\n            var launcherPath = Path.Combine(runtimeRoot, "start-hooshyar.cmd");\n            var launcherContent = "@echo off" + Environment.NewLine + "cd /d " + runtimeRoot + Environment.NewLine + "node.exe commercial-runtime.js" + Environment.NewLine;\n            File.WriteAllText(launcherPath, launcherContent, Encoding.ASCII);\n            File.WriteAllBytes(externalUninstaller, Convert.FromBase64String(UninstallBase64));\n            var marker = Path.Combine(installRoot, "HooshyarOS-install-complete.marker");\n            File.WriteAllText(marker, "installed=" + DateTimeOffset.UtcNow.ToString("O"), Encoding.UTF8);\n            File.AppendAllText(logPath, "COMPLETE " + DateTimeOffset.UtcNow.ToString("O") + Environment.NewLine, Encoding.UTF8);\n            try {{ File.Delete(tempZip); Directory.Delete(tempExtract, true); }} catch {{ }}\n            return 0;\n        }}\n        catch (Exception ex)\n        {{\n            try {{ File.AppendAllText(logPath, "ERROR " + ex.Message + Environment.NewLine, Encoding.UTF8); }} catch {{ }}\n            return 1;\n        }}\n    }}\n}}\n''', encoding="utf-8")
+        source.write_text(f'''using System;\nusing System.IO;\nusing System.IO.Compression;\nusing System.Text;\nusing Microsoft.Win32;\n\ninternal static class Program\n{{\n    private const string BootstrapBase64 = "{payload_b64}";\n    private const string RuntimeBase64 = "{runtime_b64}";\n    private const string UninstallBase64 = "{uninstall_b64}";\n    private static int Main()\n    {{\n        var installRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "HooshyarOS");\n        var runtimeRoot = Path.Combine(installRoot, "runtime");\n        var dataRoot = Path.Combine(installRoot, "data");\n        var commonData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);\n        var logPath = Path.Combine(commonData, "HooshyarOS-install.log");\n        var externalUninstaller = Path.Combine(commonData, "HooshyarOS-uninstall.ps1");\n        try\n        {{\n            Directory.CreateDirectory(runtimeRoot);\n            Directory.CreateDirectory(dataRoot);\n            File.WriteAllText(logPath, "START " + DateTimeOffset.UtcNow.ToString("O") + Environment.NewLine, Encoding.UTF8);\n            var tempZip = Path.Combine(Path.GetTempPath(), "HooshyarOS-Windows-Bootstrap.zip");\n            var tempExtract = Path.Combine(Path.GetTempPath(), "HooshyarOS-bootstrap-" + Guid.NewGuid().ToString("N"));\n            File.WriteAllBytes(tempZip, Convert.FromBase64String(BootstrapBase64));\n            Directory.CreateDirectory(tempExtract);\n            ZipFile.ExtractToDirectory(tempZip, tempExtract);\n            foreach (var file in Directory.EnumerateFiles(tempExtract, "*", SearchOption.AllDirectories))\n            {{\n                var relative = Path.GetRelativePath(tempExtract, file);\n                var target = Path.Combine(runtimeRoot, relative);\n                var parent = Path.GetDirectoryName(target);\n                if (parent is not null) Directory.CreateDirectory(parent);\n                File.Copy(file, target, true);\n            }}\n            var bundledShell = Path.Combine(runtimeRoot, "HooshyarOS.exe");\n            var shellPath = Path.Combine(installRoot, "HooshyarOS.exe");\n            if (File.Exists(bundledShell)) File.Move(bundledShell, shellPath, true);\n            File.WriteAllBytes(Path.Combine(runtimeRoot, "commercial-runtime.js"), Convert.FromBase64String(RuntimeBase64));\n            File.WriteAllBytes(externalUninstaller, Convert.FromBase64String(UninstallBase64));\n            var marker = Path.Combine(installRoot, "HooshyarOS-install-complete.marker");\n            File.WriteAllText(marker, "installed=" + DateTimeOffset.UtcNow.ToString("O"), Encoding.UTF8);\n\n            var desktop = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory), "HooshyarOS.lnk");\n            var startMenu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonPrograms), "HooshyarOS.lnk");\n            var shortcutScript = Path.Combine(Path.GetTempPath(), "HooshyarOS-shortcuts.ps1");\n            var script = $"$ws=New-Object -ComObject WScript.Shell; $desktop=$ws.CreateShortcut('" + desktop.Replace("'", "''") + "'); $desktop.TargetPath='" + shellPath.Replace("'", "''") + "'; $desktop.WorkingDirectory='" + installRoot.Replace("'", "''") + "'; $desktop.Save(); $start=$ws.CreateShortcut('" + startMenu.Replace("'", "''") + "'); $start.TargetPath='" + shellPath.Replace("'", "''") + "'; $start.WorkingDirectory='" + installRoot.Replace("'", "''") + "'; $start.Save();";\n            File.WriteAllText(shortcutScript, script, Encoding.UTF8);\n            var ps = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("powershell.exe", "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"" + shortcutScript + "\") {{ UseShellExecute = false, CreateNoWindow = true }});\n            ps?.WaitForExit(15000);\n            try {{ File.Delete(shortcutScript); }} catch {{ }}\n\n            using (var key = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\HooshyarOS"))\n            {{\n                key?.SetValue("DisplayName", "Hooshyar.ai");\n                key?.SetValue("DisplayVersion", "1.0.0");\n                key?.SetValue("Publisher", "Hooshyar.ai");\n                key?.SetValue("InstallLocation", installRoot);\n                key?.SetValue("DisplayIcon", shellPath);\n                key?.SetValue("UninstallString", "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \\\"" + externalUninstaller + "\\\"");\n            }}\n\n            File.AppendAllText(logPath, "COMPLETE " + DateTimeOffset.UtcNow.ToString("O") + Environment.NewLine, Encoding.UTF8);\n            try {{ File.Delete(tempZip); Directory.Delete(tempExtract, true); }} catch {{ }}\n            return 0;\n        }}\n        catch (Exception ex)\n        {{\n            try {{ File.AppendAllText(logPath, "ERROR " + ex.Message + Environment.NewLine, Encoding.UTF8); }} catch {{ }}\n            return 1;\n        }}\n    }}\n}}\n''', encoding="utf-8")
         env = os.environ.copy()
         env["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1"
         env["DOTNET_NOLOGO"] = "1"
@@ -96,12 +213,13 @@ def build_self_extracting_exe() -> None:
 
 
 def main() -> int:
+    build_desktop_shell()
     build_bootstrap()
     write_runtime_contract()
     build_self_extracting_exe()
     print(f"WINDOWS_INSTALLER={EXE.relative_to(ROOT)}")
+    print(f"WINDOWS_DESKTOP_SHELL={DESKTOP_SHELL.relative_to(ROOT)}")
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())
