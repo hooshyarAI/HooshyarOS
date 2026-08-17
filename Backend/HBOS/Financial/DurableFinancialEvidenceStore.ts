@@ -37,17 +37,38 @@ export class DurableFinancialEvidenceStore {
     }
 
     save(record: CanonicalFinancialRecord): FinancialEvidence {
-        if (!record.tenantId || !record.sourceId) throw new Error("Tenant and source are required");
-        const payloadJson = JSON.stringify(record);
-        const payloadHash = createHash("sha256").update(payloadJson).digest("hex");
-        const id = createHash("sha256").update(`${record.tenantId}:${record.sourceId}:${record.rowNumber}`).digest("hex");
-        const createdAt = new Date().toISOString();
-        this.db.prepare(`
+        return this.saveMany([record])[0];
+    }
+
+    saveMany(records: CanonicalFinancialRecord[]): FinancialEvidence[] {
+        if (records.length === 0) return [];
+        for (const record of records) {
+            if (!record.tenantId || !record.sourceId) throw new Error("Tenant and source are required");
+        }
+
+        const insert = this.db.prepare(`
             INSERT OR IGNORE INTO financial_evidence
             (id, tenant_id, source_id, row_number, payload_json, payload_hash, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-        `).run(id, record.tenantId, record.sourceId, record.rowNumber, payloadJson, payloadHash, createdAt);
-        return this.get(record.tenantId, id)!;
+        `);
+        const ids: Array<{ tenantId: string; id: string }> = [];
+
+        this.db.exec("BEGIN IMMEDIATE");
+        try {
+            for (const record of records) {
+                const payloadJson = JSON.stringify(record);
+                const payloadHash = createHash("sha256").update(payloadJson).digest("hex");
+                const id = createHash("sha256").update(`${record.tenantId}:${record.sourceId}:${record.rowNumber}`).digest("hex");
+                insert.run(id, record.tenantId, record.sourceId, record.rowNumber, payloadJson, payloadHash, new Date().toISOString());
+                ids.push({ tenantId: record.tenantId, id });
+            }
+            this.db.exec("COMMIT");
+        } catch (error) {
+            this.db.exec("ROLLBACK");
+            throw error;
+        }
+
+        return ids.map(({ tenantId, id }) => this.get(tenantId, id)!);
     }
 
     get(tenantId: string, id: string): FinancialEvidence | null {
