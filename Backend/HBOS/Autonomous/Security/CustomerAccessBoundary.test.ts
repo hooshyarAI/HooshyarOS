@@ -1,0 +1,2 @@
+import { canAccessCustomerResource } from "./CustomerAccessBoundary";
+describe("Customer access boundary",()=>{ it("allows same-tenant explicitly authorized access",()=>expect(canAccessCustomerResource("A","A",true)).toBe(true)); it("blocks cross-tenant access",()=>expect(canAccessCustomerResource("A","B",true)).toBe(false)); it("blocks implicit owner access",()=>expect(canAccessCustomerResource("A","A",false)).toBe(false)); });
