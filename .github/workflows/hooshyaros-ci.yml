@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - agent/fix-product-repair-boundary
+      - agent/release-final
   pull_request:
     branches: [main]
 
