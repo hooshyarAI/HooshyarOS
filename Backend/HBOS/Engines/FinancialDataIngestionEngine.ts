@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { FinancialIntelligenceEngine, FinancialAnalysisResult } from "./FinancialIntelligenceEngine";
+import { FinancialEvidenceStore } from "./FinancialEvidenceStore";
 
 export interface FinancialEvidenceRecord {
     metric: string;
@@ -43,7 +44,10 @@ const REQUIRED_COLUMNS = ["metric", "period", "value", "unit"] as const;
 export class FinancialDataIngestionEngine {
     name = "FinancialDataIngestionEngine";
 
-    constructor(private readonly intelligence = new FinancialIntelligenceEngine()) {}
+    constructor(
+        private readonly intelligence = new FinancialIntelligenceEngine(),
+        private readonly evidenceStore?: FinancialEvidenceStore
+    ) {}
 
     async ingest(source: FinancialSource, evidenceRoot: string): Promise<FinancialIngestionResult> {
         const raw = await readFile(resolve(source.rawPath), "utf8");
@@ -57,6 +61,8 @@ export class FinancialDataIngestionEngine {
         await mkdir(dirname(evidencePath), { recursive: true });
         await writeFile(evidencePath, JSON.stringify({ source, evidenceHash, records }, null, 2), "utf8");
         await writeFile(canonicalPath, JSON.stringify({ model, evidenceHash }, null, 2), "utf8");
+
+        this.evidenceStore?.save({ source, evidenceHash, records, model });
 
         const intelligence = this.intelligence.analyze({
             revenue: model.revenue,
