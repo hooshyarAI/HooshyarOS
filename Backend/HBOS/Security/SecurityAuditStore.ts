@@ -53,7 +53,7 @@ export class SecurityAuditStore {
     listByUser(userId: string): SecurityAuditEvent[] {
         return this.db.prepare(`
             SELECT event_id AS eventId,event_type AS eventType,user_id AS userId,session_id_hash AS sessionIdHash,permission,role,reason,occurred_at AS occurredAt
-            FROM security_audit WHERE user_id = ? ORDER BY occurred_at ASC, event_id ASC
+            FROM security_audit WHERE user_id = ? ORDER BY rowid ASC
         `).all(userId) as unknown as SecurityAuditEvent[];
     }
 
