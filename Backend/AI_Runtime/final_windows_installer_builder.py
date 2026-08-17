@@ -1,9 +1,4 @@
-"""Canonical Windows release artifact builder.
-
-Builds a deterministic bootstrap payload and wraps it with IExpress. The
-installer script consumes the embedded bootstrap archive, writes explicit
-completion evidence, and exposes a standalone runtime health surface.
-"""
+"""Canonical Windows release artifact builder."""
 from __future__ import annotations
 
 import shutil
@@ -50,13 +45,13 @@ def build_bootstrap() -> None:
 def write_install_contract() -> None:
     INSTALLER_ROOT.mkdir(parents=True, exist_ok=True)
     (INSTALLER_ROOT / "install.ps1").write_text(r'''$ErrorActionPreference = "Stop"
+$Log = Join-Path $env:ProgramData "HooshyarOS-install.log"
 $InstallRoot = Join-Path $env:ProgramData "HooshyarOS"
 $RuntimeRoot = Join-Path $InstallRoot "runtime"
 $DataRoot = Join-Path $InstallRoot "data"
 $Stage = Join-Path $env:TEMP "HooshyarOS-payload"
 $Archive = Join-Path $PSScriptRoot "HooshyarOS-Windows-Bootstrap.zip"
 $RuntimeJs = Join-Path $PSScriptRoot "commercial-runtime.js"
-$Log = Join-Path $env:ProgramData "HooshyarOS-install.log"
 try {
   "START $(Get-Date -Format o)" | Set-Content -Encoding UTF8 $Log
   if (!(Test-Path $Archive)) { throw "Embedded bootstrap archive missing: $Archive" }
@@ -71,11 +66,7 @@ try {
   "COPY_OK" | Add-Content -Encoding UTF8 $Log
   if (Test-Path $RuntimeJs) { Copy-Item -LiteralPath $RuntimeJs -Destination (Join-Path $RuntimeRoot "commercial-runtime.js") -Force }
   $Launcher = Join-Path $RuntimeRoot "start-hooshyar.cmd"
-  @"
-@echo off
-cd /d "$RuntimeRoot"
-node.exe commercial-runtime.js
-"@ | Set-Content -Encoding ASCII $Launcher
+  "@echo off`r`ncd /d `"$RuntimeRoot`"`r`nnode.exe commercial-runtime.js`r`n" | Set-Content -Encoding ASCII $Launcher
   $Marker = Join-Path $InstallRoot "HooshyarOS-install-complete.marker"
   "installed=$(Get-Date -Format o)" | Set-Content -Encoding UTF8 $Marker
   "COMPLETE $(Get-Date -Format o)" | Add-Content -Encoding UTF8 $Log
@@ -89,19 +80,7 @@ node.exe commercial-runtime.js
     (INSTALLER_ROOT / "uninstall.ps1").write_text(r'''$ErrorActionPreference = "Stop"
 $InstallRoot = Join-Path $env:ProgramData "HooshyarOS"
 if (Test-Path $InstallRoot) { Remove-Item $InstallRoot -Recurse -Force }
-Write-Host "HooshyarOS uninstalled."
 ''', encoding="utf-8")
-    (INSTALLER_ROOT / "install.cmd").write_text(r'''@echo off
-setlocal
-set "LOG=%ProgramData%\HooshyarOS-install.log"
-echo CMD_START %DATE% %TIME%>"%LOG%"
-set "PS=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
-if not exist "%PS%" (echo POWERSHELL_MISSING>>"%LOG%" & exit /b 91)
-"%PS%" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%~dp0install.ps1" >>"%LOG%" 2>&1
-set "RC=%ERRORLEVEL%"
-echo CMD_EXIT %RC%>>"%LOG%"
-exit /b %RC%
-''', encoding="ascii")
     (INSTALLER_ROOT / "commercial-runtime.js").write_text(STANDALONE_RUNTIME, encoding="utf-8")
     (INSTALLER_ROOT / "HooshyarOS-Windows-Bootstrap.zip").write_bytes(BOOTSTRAP.read_bytes())
 
@@ -116,10 +95,10 @@ def build_iexpress() -> None:
         shutil.rmtree(sed_root)
     source = sed_root / "source"
     source.mkdir(parents=True)
-    for name in ("install.cmd", "install.ps1", "uninstall.ps1", "commercial-runtime.js", "HooshyarOS-Windows-Bootstrap.zip"):
+    for name in ("install.ps1", "uninstall.ps1", "commercial-runtime.js", "HooshyarOS-Windows-Bootstrap.zip"):
         shutil.copy2(INSTALLER_ROOT / name, source / name)
     sed = sed_root / "HooshyarOS.sed"
-    sed.write_text(f'''[Version]\nClass=IEXPRESS\nSEDVersion=3\n[Options]\nPackagePurpose=InstallApp\nShowInstallProgramWindow=0\nHideExtractAnimation=1\nUseLongFileName=1\nInsideCompressed=1\nCABFileName=HooshyarOS.cab\nTargetName={EXE}\nFriendlyName=HooshyarOS\nAppLaunched=install.cmd\nPostInstallCmd=<None>\nSourceFiles=SourceFiles\n[Strings]\nFILE0="install.cmd"\nFILE1="install.ps1"\nFILE2="uninstall.ps1"\nFILE3="commercial-runtime.js"\nFILE4="HooshyarOS-Windows-Bootstrap.zip"\n[SourceFiles]\nSourceFiles0={source}\n[SourceFiles0]\n%FILE0%=\n%FILE1%=\n%FILE2%=\n%FILE3%=\n%FILE4%=\n''', encoding="utf-8")
+    sed.write_text(f'''[Version]\nClass=IEXPRESS\nSEDVersion=3\n[Options]\nPackagePurpose=InstallApp\nShowInstallProgramWindow=0\nHideExtractAnimation=1\nUseLongFileName=1\nInsideCompressed=1\nCABFileName=HooshyarOS.cab\nTargetName={EXE}\nFriendlyName=HooshyarOS\nAppLaunched=powershell.exe\nAppLaunchedCmdLine=-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File install.ps1\nPostInstallCmd=<None>\nSourceFiles=SourceFiles\n[Strings]\nFILE0="install.ps1"\nFILE1="uninstall.ps1"\nFILE2="commercial-runtime.js"\nFILE3="HooshyarOS-Windows-Bootstrap.zip"\n[SourceFiles]\nSourceFiles0={source}\n[SourceFiles0]\n%FILE0%=\n%FILE1%=\n%FILE2%=\n%FILE3%=\n''', encoding="utf-8")
     result = subprocess.run([str(iexpress), "/N", "/Q", str(sed)], cwd=ROOT, text=True, capture_output=True)
     if result.returncode != 0:
         raise RuntimeError(f"IExpress failed: exit={result.returncode}\n{result.stdout}\n{result.stderr}")
@@ -132,7 +111,6 @@ def main() -> int:
     write_install_contract()
     build_iexpress()
     print(f"WINDOWS_INSTALLER={EXE.relative_to(ROOT)}")
-    print(f"WINDOWS_BOOTSTRAP={BOOTSTRAP.relative_to(ROOT)}")
     return 0
 
 
