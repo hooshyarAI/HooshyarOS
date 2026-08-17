@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { basename } from "node:path";
 import { SQLitePersistenceStore } from "./SQLitePersistenceStore";
 
 export interface FinancialSourceEvidence {
@@ -35,11 +37,18 @@ export interface FinancialIngestionResult {
 
 /**
  * First real financial-data vertical slice.
- * Source evidence -> CSV ingestion -> validation -> canonical normalization
+ * File source -> CSV ingestion -> validation -> canonical normalization
  * -> tenant-scoped persistence -> independently calculated financial summary.
  */
 export class FinancialDataIngestionAdapter {
   constructor(private readonly persistence: SQLitePersistenceStore) {}
+
+  async ingestFile(tenantId: string, sourcePath: string): Promise<FinancialIngestionResult> {
+    const normalizedPath = sourcePath.trim();
+    if (!normalizedPath) throw new Error("ingestion-source-path-required");
+    const csv = await readFile(normalizedPath, "utf8");
+    return this.ingestCsv(tenantId, basename(normalizedPath), csv);
+  }
 
   async ingestCsv(
     tenantId: string,

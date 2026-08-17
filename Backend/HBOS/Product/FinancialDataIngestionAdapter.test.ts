@@ -1,4 +1,5 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { SQLitePersistenceStore } from "./SQLitePersistenceStore";
@@ -12,25 +13,31 @@ describe("FinancialDataIngestionAdapter", () => {
   beforeEach(() => { directory = mkdtempSync(join(tmpdir(), "hooshyar-financial-ingestion-")); });
   afterEach(() => { rmSync(directory, { recursive: true, force: true }); });
 
-  test("ingests real CSV source evidence into canonical tenant-scoped data and persists it", async () => {
-    const database = new SQLitePersistenceStore({ databasePath: join(directory, "financial.sqlite") });
+  test("ingests an actual CSV file and survives database restart", async () => {
+    const sourcePath = join(directory, "sample-ledger.csv");
+    writeFileSync(sourcePath, SOURCE, "utf8");
+
+    const databasePath = join(directory, "financial.sqlite");
+    const database = new SQLitePersistenceStore({ databasePath });
     const adapter = new FinancialDataIngestionAdapter(database);
 
-    const result = await adapter.ingestCsv("tenant-a", "sample-ledger.csv", SOURCE);
+    const result = await adapter.ingestFile("tenant-a", sourcePath);
+    const expectedHash = createHash("sha256").update(SOURCE, "utf8").digest("hex");
 
     expect(result.persisted).toBe(true);
     expect(result.evidence.sourceName).toBe("sample-ledger.csv");
-    expect(result.evidence.sha256).toHaveLength(64);
+    expect(result.evidence.sha256).toBe(expectedHash);
     expect(result.model.tenantId).toBe("tenant-a");
     expect(result.model.transactions).toHaveLength(4);
     expect(result.model.totals).toEqual({ debit: 1250, credit: 1250, balance: 0 });
-
-    const persisted = await database.read(
-      { tenantId: "tenant-a" },
-      `financial-ingestion:${result.evidence.sha256}`,
-    );
-    expect(persisted?.value).toEqual(result.model);
     database.close();
+
+    const reopened = new SQLitePersistenceStore({ databasePath });
+    await expect(reopened.read(
+      { tenantId: "tenant-a" },
+      `financial-ingestion:${expectedHash}`,
+    )).resolves.toMatchObject({ tenantId: "tenant-a", value: result.model });
+    reopened.close();
   });
 
   test("keeps financial data tenant-scoped", async () => {
