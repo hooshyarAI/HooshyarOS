@@ -71,7 +71,7 @@ export class CommercialDecisionExecutionWorkflow {
 
     await this.persistence.write({ tenantId: authorization.session.tenantId }, `outcome:${normalizedDecisionId}`, {
       ...outcome,
-      variance: outcome.actual - outcome.target,
+      variance: Number((outcome.actual - outcome.target).toFixed(10)),
       recordedBy: authorization.session.username,
     });
   }
