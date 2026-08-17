@@ -20,7 +20,7 @@ describe("CommercialDecisionExecutionWorkflow", () => {
     const approver = identity.createSession("owner", "org-a", "OWNER");
     const databasePath = join(directory, "product.sqlite");
     const store = new SQLitePersistenceStore({ databasePath });
-    const executor = new FilesystemDecisionExecutor(join(directory, "execution");
+    const executor = new FilesystemDecisionExecutor(join(directory, "execution"));
     const workflow = new CommercialDecisionExecutionWorkflow(
       new CommercialAuthorizationBoundary(identity),
       new CommercialPersistenceBoundary(store),
