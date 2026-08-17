@@ -1,199 +1,116 @@
 name: HooshyarOS Canonical Release Gate
 run-name: HooshyarOS Release Gate • ${{ github.sha }}
-
 on:
   workflow_dispatch:
   push:
     branches: [agent/release-final]
   pull_request:
     branches: [stable/aprvl-controlled-repair-2026-08-15]
-
 concurrency:
   group: hooshyaros-canonical-release-${{ github.ref }}
   cancel-in-progress: true
-
 permissions:
   contents: read
-
 jobs:
   runtime-contract:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
+        with: {node-version: '20', cache: npm}
       - run: npm ci
-      - name: Full test suite
-        run: npm test -- --runInBand
-      - name: Release contract suite
-        run: npm test -- --runInBand Backend/HBOS/Product/RuntimeValidationContract.test.ts Backend/HBOS/Product/RuntimeValidationEvidence.test.ts Backend/HBOS/Product/WindowsRuntimeProbe.test.ts Backend/HBOS/test/AutonomousProductizationRouting.test.ts Backend/HBOS/test/WindowsProductInstallerContract.test.ts
-
+      - run: npm test -- --runInBand
+      - run: npm test -- --runInBand Backend/HBOS/Product/RuntimeValidationContract.test.ts Backend/HBOS/Product/RuntimeValidationEvidence.test.ts Backend/HBOS/Product/WindowsRuntimeProbe.test.ts Backend/HBOS/test/AutonomousProductizationRouting.test.ts Backend/HBOS/test/WindowsProductInstallerContract.test.ts
   windows-release:
     needs: runtime-contract
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+        with: {python-version: '3.12'}
       - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
+        with: {node-version: '20', cache: npm}
       - run: npm ci
-      - name: Build real Windows installer
-        run: python Backend/AI_Runtime/final_windows_installer_builder.py
-      - name: Verify Windows artifact
-        shell: pwsh
+      - run: python Backend/AI_Runtime/final_windows_installer_builder.py
+      - shell: pwsh
         run: |
-          $artifact = "dist/productization/windows/HooshyarOS-Setup.exe"
-          if (!(Test-Path $artifact)) { throw "Windows installer missing: $artifact" }
-          if ((Get-Item $artifact).Length -lt 100KB) { throw "Windows installer unexpectedly small" }
-          $sha = (Get-FileHash $artifact -Algorithm SHA256).Hash.ToLowerInvariant()
-          "WINDOWS_EXE_SHA256=$sha" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          $a='dist/productization/windows/HooshyarOS-Setup.exe'
+          if (!(Test-Path $a)) { throw "Windows installer missing: $a" }
+          if ((Get-Item $a).Length -lt 100KB) { throw 'Windows installer unexpectedly small' }
       - uses: actions/upload-artifact@v4
-        with:
-          name: HooshyarOS-Windows-Installer
-          path: dist/productization/windows/HooshyarOS-Setup.exe
-          if-no-files-found: error
-          retention-days: 30
-
+        with: {name: HooshyarOS-Windows-Installer, path: dist/productization/windows/HooshyarOS-Setup.exe, if-no-files-found: error, retention-days: 30}
   windows-install-launch-uninstall:
     needs: windows-release
     runs-on: windows-latest
     timeout-minutes: 5
     steps:
       - uses: actions/download-artifact@v4
-        with:
-          name: HooshyarOS-Windows-Installer
-          path: dist/productization/windows
-      - name: Install Windows product
-        shell: pwsh
+        with: {name: HooshyarOS-Windows-Installer, path: dist/productization/windows}
+      - shell: pwsh
         run: |
-          $ErrorActionPreference = "Stop"
-          $installer = (Resolve-Path "dist/productization/windows/HooshyarOS-Setup.exe").Path
-          $root = Join-Path $env:ProgramData "HooshyarOS"
-          $marker = Join-Path $root "HooshyarOS-install-complete.marker"
-          $log = Join-Path $env:ProgramData "HooshyarOS-install.log"
+          $ErrorActionPreference='Stop'
+          $installer=(Resolve-Path 'dist/productization/windows/HooshyarOS-Setup.exe').Path
+          $root=Join-Path $env:ProgramData 'HooshyarOS'
+          $marker=Join-Path $root 'HooshyarOS-install-complete.marker'
+          $log=Join-Path $env:ProgramData 'HooshyarOS-install.log'
           if (Test-Path $root) { Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue }
           if (Test-Path $log) { Remove-Item $log -Force -ErrorAction SilentlyContinue }
-          $process = Start-Process -FilePath $installer -ArgumentList "/Q" -PassThru
-          $deadline = (Get-Date).AddSeconds(90)
+          $p=Start-Process $installer -ArgumentList '/Q' -PassThru
+          $deadline=(Get-Date).AddSeconds(90)
           while ((Get-Date) -lt $deadline) {
             if (Test-Path $marker) { break }
-            $process.Refresh()
-            if ($process.HasExited) { break }
-            Start-Sleep -Seconds 1
+            $p.Refresh(); if ($p.HasExited) { break }; Start-Sleep 1
           }
-          $process.Refresh()
           if (!(Test-Path $marker)) {
             if (Test-Path $log) { Get-Content $log | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8 }
-            if (!$process.HasExited) { try { taskkill.exe /PID $process.Id /T /F | Out-Host } catch {} }
-            throw "Windows installer did not produce completion evidence within 90 seconds"
+            if (!$p.HasExited) { try { taskkill.exe /PID $p.Id /T /F | Out-Host } catch {} }
+            throw 'Installer did not complete within 90 seconds'
           }
-          "WINDOWS_INSTALL=PASS" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-          if (Test-Path $log) { Get-Content $log | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8 }
-      - name: Verify installation evidence
+      - shell: pwsh
+        run: |
+          $root=Join-Path $env:ProgramData 'HooshyarOS'; $runtime=Join-Path $root 'runtime'
+          foreach ($p in @($root,(Join-Path $root 'HooshyarOS-install-complete.marker'),$runtime,(Join-Path $runtime 'commercial-runtime.js'),(Join-Path $runtime 'start-hooshyar.cmd'))) { if (!(Test-Path $p)) { throw "Missing: $p" } }
+      - shell: pwsh
+        run: |
+          $runtime=Join-Path $env:ProgramData 'HooshyarOS\runtime\commercial-runtime.js'
+          $p=Start-Process node.exe -ArgumentList @($runtime,'--health-check') -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Health check failed: $($p.ExitCode)" }
+      - if: always()
         shell: pwsh
         run: |
-          $root = Join-Path $env:ProgramData "HooshyarOS"
-          $runtime = Join-Path $root "runtime"
-          foreach ($path in @(
-            $root,
-            (Join-Path $root "HooshyarOS-install-complete.marker"),
-            $runtime,
-            (Join-Path $runtime "commercial-runtime.js"),
-            (Join-Path $runtime "start-hooshyar.cmd")
-          )) { if (!(Test-Path $path)) { throw "Missing installation evidence: $path" } }
-      - name: Launch health probe
-        shell: pwsh
-        run: |
-          $runtime = Join-Path $env:ProgramData "HooshyarOS\runtime\commercial-runtime.js"
-          $probe = Start-Process -FilePath "node.exe" -ArgumentList @($runtime, "--health-check") -Wait -PassThru
-          if ($probe.ExitCode -ne 0) { throw "Launch health probe failed: $($probe.ExitCode)" }
-          "WINDOWS_HEALTH=PASS" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-      - name: Uninstall and verify cleanup
-        if: always()
-        shell: pwsh
-        run: |
-          $root = Join-Path $env:ProgramData "HooshyarOS"
-          $uninstaller = Join-Path $root "runtime\uninstall.ps1"
-          if (Test-Path $uninstaller) { & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $uninstaller }
-          Start-Sleep -Seconds 2
-          if (Test-Path $root) { throw "Install root remains after uninstall: $root" }
-          "WINDOWS_UNINSTALL=PASS" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-
+          $u=Join-Path $env:ProgramData 'HooshyarOS\runtime\uninstall.ps1'
+          if (Test-Path $u) { powershell.exe -NoProfile -ExecutionPolicy Bypass -File $u }
+          Start-Sleep 2
+          if (Test-Path (Join-Path $env:ProgramData 'HooshyarOS')) { throw 'Uninstall cleanup failed' }
   android-release:
     needs: runtime-contract
     runs-on: windows-latest
-    env:
-      HOOSHYAR_ENDPOINT: "http://10.0.2.2:3000"
-      GRADLE_USER_HOME: "${{ github.workspace }}\.gradle-governed"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Configure Android build policy
-        shell: pwsh
+        with: {python-version: '3.12'}
+      - shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path android | Out-Null
-          @(
-            "android.useAndroidX=true",
-            "android.enableJetifier=true",
-            "org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8"
-          ) | Set-Content -Encoding UTF8 android/gradle.properties
+          @('android.useAndroidX=true','android.enableJetifier=true','org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8') | Set-Content -Encoding UTF8 android/gradle.properties
           New-Item -ItemType Directory -Force -Path "$env:GRADLE_USER_HOME\init.d" | Out-Null
-          @'
-          allprojects {
-            configurations.configureEach {
-              exclude group: "org.jetbrains.kotlin", module: "kotlin-stdlib-jdk7"
-              exclude group: "org.jetbrains.kotlin", module: "kotlin-stdlib-jdk8"
-              resolutionStrategy.force "org.jetbrains.kotlin:kotlin-stdlib:1.8.22"
-            }
-          }
-          '@ | Set-Content -Encoding UTF8 "$env:GRADLE_USER_HOME\init.d\hooshyaros-kotlin.gradle"
-      - name: Build Android APK
-        run: python Backend/AI_Runtime/productization_builder.py --platform ANDROID
-      - name: Verify Android APK
-        shell: pwsh
+      - run: python Backend/AI_Runtime/productization_builder.py --platform ANDROID
+      - shell: pwsh
         run: |
-          $artifact = "dist/productization/android/HooshyarOS.apk"
-          if (!(Test-Path $artifact)) { throw "Android APK missing: $artifact" }
-          if ((Get-Item $artifact).Length -lt 100KB) { throw "Android APK unexpectedly small" }
-          $sha = (Get-FileHash $artifact -Algorithm SHA256).Hash.ToLowerInvariant()
-          "ANDROID_APK_SHA256=$sha" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          $a='dist/productization/android/HooshyarOS.apk'
+          if (!(Test-Path $a)) { throw "Android APK missing: $a" }
+          if ((Get-Item $a).Length -lt 100KB) { throw 'Android APK unexpectedly small' }
       - uses: actions/upload-artifact@v4
-        with:
-          name: HooshyarOS-Android-APK-Emulator-Test
-          path: dist/productization/android/HooshyarOS.apk
-          if-no-files-found: error
-          retention-days: 30
-
+        with: {name: HooshyarOS-Android-APK-Emulator-Test, path: dist/productization/android/HooshyarOS.apk, if-no-files-found: error, retention-days: 30}
   release-evidence:
     if: ${{ always() }}
     needs: [runtime-contract, windows-release, windows-install-launch-uninstall, android-release]
     runs-on: windows-latest
     steps:
-      - name: Publish verdict
-        shell: pwsh
+      - shell: pwsh
         run: |
-          $results = @{
-            commit = '${{ github.sha }}'
-            runtime = '${{ needs.runtime-contract.result }}'
-            windows_build = '${{ needs.windows-release.result }}'
-            windows_install_launch_uninstall = '${{ needs.windows-install-launch-uninstall.result }}'
-            android_build = '${{ needs.android-release.result }}'
-          }
-          $results | ConvertTo-Json | Tee-Object -FilePath release-evidence.json | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
-          if ($results.Values -contains 'failure') { throw "Canonical release gate failed" }
-          if ($results.Values -contains 'cancelled') { throw "Canonical release gate inconclusive: a required job was cancelled" }
-          if ($results.Values -contains 'skipped') { throw "Canonical release gate inconclusive: a required job was skipped" }
+          $r=@{runtime='${{ needs.runtime-contract.result }}';windows='${{ needs.windows-release.result }}';install='${{ needs.windows-install-launch-uninstall.result }}';android='${{ needs.android-release.result }}'}
+          $r | ConvertTo-Json | Out-File release-evidence.json -Encoding utf8
+          if ($r.Values -contains 'failure' -or $r.Values -contains 'cancelled' -or $r.Values -contains 'skipped') { throw 'Canonical release gate failed or is inconclusive' }
       - uses: actions/upload-artifact@v4
-        with:
-          name: HooshyarOS-Release-Evidence
-          path: release-evidence.json
-          if-no-files-found: error
-          retention-days: 30
+        with: {name: HooshyarOS-Release-Evidence, path: release-evidence.json, if-no-files-found: error, retention-days: 30}
