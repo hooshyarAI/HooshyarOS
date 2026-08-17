@@ -1,13 +1,9 @@
 from __future__ import annotations
 
 import json
-import re
-import subprocess
-import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-
 
 PROHIBITED_AUTO_MUTATION = (
     "automatic file replacement",
@@ -17,28 +13,26 @@ PROHIBITED_AUTO_MUTATION = (
 )
 
 
-def build_diagnostic(output: str) -> dict:
-    text = output or ""
+def build_diagnostic(output: str = "") -> dict:
+    """Build a repair proposal without mutating production source or git state."""
     return {
         "status": "BLOCKED",
         "reason": "independent-repair-verification-required",
         "capability": "product.web-application-shell",
         "prohibitedActions": list(PROHIBITED_AUTO_MUTATION),
-        "outputFingerprint": text[-4000:],
+        "outputFingerprint": (output or "")[-4000:],
         "nextAction": "produce a governed repair proposal for an independent verification gate",
     }
 
 
 def main() -> int:
-    """Fail closed instead of manufacturing code/tests or pushing autonomous repairs.
+    """Fail closed on automatic commercial repair.
 
-    This command is intentionally diagnostic-only. It may collect evidence needed
-    for a repair decision, but it must never write production source/tests or
-    create a commit/push as a consequence of a detected build failure.
+    This command is diagnostic-only. It never writes production source/tests and
+    never creates, commits, or pushes a repair as a consequence of a build failure.
     """
     print("COMMERCIAL_AUTOREPAIR_MODE=DIAGNOSTIC_ONLY", flush=True)
-    print("COMMERCIAL_AUTOREPAIR_STATUS=BLOCKED", flush=True)
-    payload = build_diagnostic(\n        \n    )
+    payload = build_diagnostic()
     print(json.dumps(payload, ensure_ascii=False, sort_keys=True), flush=True)
     return 2
 
