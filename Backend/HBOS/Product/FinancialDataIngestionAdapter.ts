@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { SQLitePersistenceStore } from "./SQLitePersistenceStore";
+import { FinancialIntelligenceEngine, FinancialAnalysisResult } from "../Engines/FinancialIntelligenceEngine";
 
 export interface FinancialSourceEvidence {
   readonly sourceName: string;
@@ -8,9 +9,12 @@ export interface FinancialSourceEvidence {
   readonly receivedAt: string;
 }
 
+export type FinancialAccountType = "ASSET" | "LIABILITY" | "REVENUE" | "EXPENSE";
+
 export interface FinancialTransaction {
   readonly date: string;
   readonly account: string;
+  readonly accountType?: FinancialAccountType;
   readonly debit: number;
   readonly credit: number;
   readonly currency: string;
@@ -30,15 +34,22 @@ export interface FinancialCanonicalModel {
 export interface FinancialIngestionResult {
   readonly evidence: FinancialSourceEvidence;
   readonly model: FinancialCanonicalModel;
+  readonly analysis: FinancialAnalysisResult | null;
   readonly persisted: boolean;
 }
 
 /**
  * First real financial-data vertical slice.
  * Source evidence -> CSV ingestion -> validation -> canonical normalization
- * -> tenant-scoped persistence -> independently calculated financial summary.
+ * -> tenant-scoped persistence -> financial intelligence.
+ *
+ * `accountType` is required for the intelligence hand-off because revenue,
+ * expense, asset and liability semantics must come from source evidence rather
+ * than from account-name heuristics.
  */
 export class FinancialDataIngestionAdapter {
+  private readonly intelligence = new FinancialIntelligenceEngine();
+
   constructor(private readonly persistence: SQLitePersistenceStore) {}
 
   async ingestCsv(
@@ -76,7 +87,39 @@ export class FinancialDataIngestionAdapter {
       model,
     );
 
-    return { evidence: source, model, persisted: true };
+    const analysis = this.analyzeIfTyped(transactions);
+
+    if (analysis) {
+      await this.persistence.write(
+        { tenantId: normalizedTenant },
+        `financial-analysis:${source.sha256}`,
+        analysis,
+      );
+    }
+
+    return { evidence: source, model, analysis, persisted: true };
+  }
+
+  private analyzeIfTyped(transactions: FinancialTransaction[]): FinancialAnalysisResult | null {
+    if (transactions.some((row) => !row.accountType)) return null;
+
+    const totals = { revenue: 0, expenses: 0, assets: 0, liabilities: 0 };
+    for (const row of transactions) {
+      const amount = row.credit > 0 ? row.credit : row.debit;
+      switch (row.accountType) {
+        case "REVENUE": totals.revenue += amount; break;
+        case "EXPENSE": totals.expenses += amount; break;
+        case "ASSET": totals.assets += amount; break;
+        case "LIABILITY": totals.liabilities += amount; break;
+      }
+    }
+
+    return this.intelligence.analyze({
+      revenue: this.round(totals.revenue),
+      expenses: this.round(totals.expenses),
+      assets: this.round(totals.assets),
+      liabilities: this.round(totals.liabilities),
+    });
   }
 
   private parseAndValidate(csv: string): FinancialTransaction[] {
@@ -84,15 +127,17 @@ export class FinancialDataIngestionAdapter {
     if (lines.length < 2) throw new Error("ingestion-header-and-data-required");
 
     const header = this.parseLine(lines[0]).map((value) => value.toLowerCase());
-    const expected = ["date", "account", "debit", "credit", "currency"];
-    if (header.length !== expected.length || header.some((value, index) => value !== expected[index])) {
-      throw new Error("ingestion-schema-invalid");
-    }
+    const base = ["date", "account", "debit", "credit", "currency"];
+    const typed = [...base, "accounttype"];
+    const isTyped = header.length === typed.length && header.every((value, index) => value === typed[index]);
+    const isBasic = header.length === base.length && header.every((value, index) => value === base[index]);
+    if (!isTyped && !isBasic) throw new Error("ingestion-schema-invalid");
 
     return lines.slice(1).map((line, index) => {
       const row = this.parseLine(line);
-      if (row.length !== expected.length) throw new Error(`ingestion-row-invalid:${index + 2}`);
-      const [date, account, debitText, creditText, currency] = row.map((value) => value.trim());
+      if (row.length !== header.length) throw new Error(`ingestion-row-invalid:${index + 2}`);
+      const values = row.map((value) => value.trim());
+      const [date, account, debitText, creditText, currency, accountTypeText] = values;
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error(`ingestion-date-invalid:${index + 2}`);
       if (!account) throw new Error(`ingestion-account-invalid:${index + 2}`);
       if (!currency) throw new Error(`ingestion-currency-invalid:${index + 2}`);
@@ -102,7 +147,15 @@ export class FinancialDataIngestionAdapter {
       if (debit === 0 && credit === 0) throw new Error(`ingestion-zero-row:${index + 2}`);
       if (debit > 0 && credit > 0) throw new Error(`ingestion-double-sided-row:${index + 2}`);
 
-      return { date, account, debit, credit, currency };
+      let accountType: FinancialAccountType | undefined;
+      if (isTyped) {
+        if (!["ASSET", "LIABILITY", "REVENUE", "EXPENSE"].includes(accountTypeText)) {
+          throw new Error(`ingestion-account-type-invalid:${index + 2}`);
+        }
+        accountType = accountTypeText as FinancialAccountType;
+      }
+
+      return { date, account, accountType, debit, credit, currency };
     });
   }
 
