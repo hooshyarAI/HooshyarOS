@@ -119,7 +119,7 @@ def build_iexpress() -> None:
     for name in ("install.cmd", "install.ps1", "uninstall.ps1", "commercial-runtime.js", "HooshyarOS-Windows-Bootstrap.zip"):
         shutil.copy2(INSTALLER_ROOT / name, source / name)
     sed = sed_root / "HooshyarOS.sed"
-    sed.write_text(f'''[Version]\nClass=IEXPRESS\nSEDVersion=3\n[Options]\nPackagePurpose=InstallApp\nShowInstallProgramWindow=0\nHideExtractAnimation=1\nUseLongFileName=1\nInsideCompressed=1\nCABFileName=HooshyarOS.cab\nTargetName={EXE}\nFriendlyName=HooshyarOS\nAppLaunched=cmd.exe\nAppLaunchedCmdLine=/c install.cmd\nPostInstallCmd=<None>\nSourceFiles=SourceFiles\n[Strings]\nFILE0="install.cmd"\nFILE1="install.ps1"\nFILE2="uninstall.ps1"\nFILE3="commercial-runtime.js"\nFILE4="HooshyarOS-Windows-Bootstrap.zip"\n[SourceFiles]\nSourceFiles0={source}\n[SourceFiles0]\n%FILE0%=\n%FILE1%=\n%FILE2%=\n%FILE3%=\n%FILE4%=\n''', encoding="utf-8")
+    sed.write_text(f'''[Version]\nClass=IEXPRESS\nSEDVersion=3\n[Options]\nPackagePurpose=InstallApp\nShowInstallProgramWindow=0\nHideExtractAnimation=1\nUseLongFileName=1\nInsideCompressed=1\nCABFileName=HooshyarOS.cab\nTargetName={EXE}\nFriendlyName=HooshyarOS\nAppLaunched=install.cmd\nPostInstallCmd=<None>\nSourceFiles=SourceFiles\n[Strings]\nFILE0="install.cmd"\nFILE1="install.ps1"\nFILE2="uninstall.ps1"\nFILE3="commercial-runtime.js"\nFILE4="HooshyarOS-Windows-Bootstrap.zip"\n[SourceFiles]\nSourceFiles0={source}\n[SourceFiles0]\n%FILE0%=\n%FILE1%=\n%FILE2%=\n%FILE3%=\n%FILE4%=\n''', encoding="utf-8")
     result = subprocess.run([str(iexpress), "/N", "/Q", str(sed)], cwd=ROOT, text=True, capture_output=True)
     if result.returncode != 0:
         raise RuntimeError(f"IExpress failed: exit={result.returncode}\n{result.stdout}\n{result.stderr}")
