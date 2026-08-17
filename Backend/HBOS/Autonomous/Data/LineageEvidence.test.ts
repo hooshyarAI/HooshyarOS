@@ -1,0 +1,2 @@
+import { isLineageComplete } from "./LineageEvidence";
+describe("Lineage evidence",()=>{ it("accepts complete provenance",()=>expect(isLineageComplete({sourceId:"pdf-1",transformationIds:["ocr-1"],actor:"ingestion",timestamp:"2026-08-18T00:00:00Z"})).toBe(true)); it("rejects missing transformation history",()=>expect(isLineageComplete({sourceId:"pdf-1",transformationIds:[],actor:"ingestion",timestamp:"2026-08-18T00:00:00Z"})).toBe(false)); });
