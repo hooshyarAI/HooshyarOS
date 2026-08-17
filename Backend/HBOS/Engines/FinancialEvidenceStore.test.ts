@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { FinancialEvidenceStore } from "./FinancialEvidenceStore";
 
 describe("FinancialEvidenceStore", () => {
-    it("survives process-level restart and preserves financial evidence", async () => {
+    it("survives process-level restart and rejects evidence mutation", async () => {
         const root = await mkdtemp(join(tmpdir(), "hooshyar-evidence-"));
         const databasePath = join(root, "financial.sqlite");
         const payload = {
@@ -31,7 +31,9 @@ describe("FinancialEvidenceStore", () => {
         try {
             const firstProcess = new FinancialEvidenceStore(databasePath);
             firstProcess.save(payload);
+            firstProcess.save(payload);
             expect(firstProcess.count()).toBe(1);
+            expect(() => firstProcess.save({ ...payload, evidenceHash: "b".repeat(64) })).toThrow("Financial evidence conflict");
             firstProcess.close();
 
             const secondProcess = new FinancialEvidenceStore(databasePath);
