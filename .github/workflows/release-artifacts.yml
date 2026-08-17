@@ -1,5 +1,6 @@
 name: HooshyarOS Canonical Release Gate
 run-name: HooshyarOS Release Gate • ${{ github.sha }}
+# Canonical release gate rebuilt on current stable after commercial vertical slice integration.
 
 on:
   workflow_dispatch:
