@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { CommercialAuthorizationBoundary } from "./CommercialAuthorizationBoundary";
 import { CommercialPersistenceBoundary } from "./CommercialPersistenceBoundary";
+import { FilesystemDecisionExecutor } from "./FilesystemDecisionExecutor";
 
 export interface CommercialDecisionExecutionInput {
   readonly token: string;
@@ -19,19 +20,20 @@ export interface CommercialDecisionExecutionResult {
   readonly approvedBy: string;
   readonly assignee: string;
   readonly evidenceSha256: string;
+  readonly executionReceiptPath: string;
 }
 
 /**
  * Governed decision-to-execution vertical slice.
  *
- * Authorization -> approval -> durable decision/assignment persistence ->
- * execution evidence. Outcome feedback is persisted separately through the
- * same tenant-scoped boundary so it cannot escape the authorized tenant.
+ * Authorization -> approval -> observable operational execution -> independent
+ * evidence hash -> durable decision/assignment/evidence persistence.
  */
 export class CommercialDecisionExecutionWorkflow {
   constructor(
     private readonly authorization: CommercialAuthorizationBoundary,
     private readonly persistence: CommercialPersistenceBoundary,
+    private readonly executor: FilesystemDecisionExecutor,
   ) {}
 
   async approveAndExecute(input: CommercialDecisionExecutionInput): Promise<CommercialDecisionExecutionResult> {
@@ -53,10 +55,19 @@ export class CommercialDecisionExecutionWorkflow {
     if (!input.decisionId.trim()) throw new Error("decision-id-required");
     if (!input.assignee.trim()) throw new Error("decision-assignee-required");
 
-    const evidenceSha256 = createHash("sha256")
-      .update(JSON.stringify({ decisionId: input.decisionId, decision: input.decision, assignee: input.assignee, approvedBy: approver.session.username }))
-      .digest("hex");
+    const scope = { tenantId: actor.session.tenantId };
+    const execution = await this.executor.execute({
+      tenantId: actor.session.tenantId,
+      decisionId: input.decisionId.trim(),
+      assignee: input.assignee.trim(),
+      approvedBy: approver.session.username,
+      action: input.decision,
+    });
+    if (!execution.executed || execution.receiptBytes.length === 0) {
+      throw new Error("EXECUTION_SIDE_EFFECT_UNVERIFIED");
+    }
 
+    const evidenceSha256 = createHash("sha256").update(execution.receiptBytes).digest("hex");
     const result: CommercialDecisionExecutionResult = {
       tenantId: actor.session.tenantId,
       decisionId: input.decisionId.trim(),
@@ -64,11 +75,18 @@ export class CommercialDecisionExecutionWorkflow {
       approvedBy: approver.session.username,
       assignee: input.assignee.trim(),
       evidenceSha256,
+      executionReceiptPath: execution.receiptPath,
     };
 
-    const scope = { tenantId: actor.session.tenantId };
-    await this.persistence.write(scope, `decision:${result.decisionId}`, { decision: input.decision, approvedBy: result.approvedBy, status: result.status });
-    await this.persistence.write(scope, `assignment:${result.decisionId}`, { assignee: result.assignee, status: "ASSIGNED" });
+    await this.persistence.write(scope, `decision:${result.decisionId}`, {
+      decision: input.decision,
+      approvedBy: result.approvedBy,
+      status: result.status,
+    });
+    await this.persistence.write(scope, `assignment:${result.decisionId}`, {
+      assignee: result.assignee,
+      status: "ASSIGNED",
+    });
     await this.persistence.write(scope, `evidence:${result.decisionId}`, result);
     return result;
   }
