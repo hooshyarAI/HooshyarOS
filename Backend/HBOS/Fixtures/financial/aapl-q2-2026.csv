@@ -1,0 +1,9 @@
+# source_uri=https://www.sec.gov/Archives/edgar/data/320193/000032019326000013/aapl-20260328.htm
+# filing=Apple Inc. Form 10-Q, quarter ended 2026-03-28
+# units=USD millions
+metric,period,value,unit
+total_net_sales,2026-03-28,111184,USD_MILLIONS
+total_cost_of_sales,2026-03-28,56403,USD_MILLIONS
+total_operating_expenses,2026-03-28,18896,USD_MILLIONS
+total_assets,2026-03-28,371082,USD_MILLIONS
+total_liabilities,2026-03-28,264591,USD_MILLIONS
