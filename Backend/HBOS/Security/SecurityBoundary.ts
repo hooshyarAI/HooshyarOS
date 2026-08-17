@@ -14,10 +14,10 @@ export class SecurityBoundary {
     login(username: string, password: string): { userId: string; token: string; expiresAt: string } | null {
         const result = this.authentication.login(username, password);
         if (!result) {
-            this.audit.record({ type: "LOGIN_FAILURE", subject: username });
+            this.audit.record({ eventType: "LOGIN_FAILURE", reason: "invalid_credentials", userId: username });
             return null;
         }
-        this.audit.record({ type: "LOGIN_SUCCESS", subject: result.userId, sessionHash: result.tokenHash });
+        this.audit.recordSessionEvent("LOGIN_SUCCESS", result.userId, result.token);
         return result;
     }
 
@@ -27,7 +27,7 @@ export class SecurityBoundary {
         const assignment = this.assignments.getAssignment(session.userId);
         const allowed = this.authorization.isAllowed({ userId: session.userId, roles: assignment.roles }, permission);
         if (!allowed) {
-            this.audit.record({ type: "AUTHORIZATION_DENIED", subject: session.userId, permission });
+            this.audit.record({ eventType: "AUTHORIZATION_DENIED", userId: session.userId, permission, reason: "permission_denied" });
         }
         return allowed;
     }
@@ -35,6 +35,6 @@ export class SecurityBoundary {
     logout(token: string): void {
         const session = this.authentication.authenticate(token);
         this.authentication.logout(token);
-        this.audit.record({ type: "LOGOUT", subject: session?.userId ?? "unknown" });
+        this.audit.recordSessionEvent("LOGOUT", session?.userId ?? "unknown", token);
     }
 }
