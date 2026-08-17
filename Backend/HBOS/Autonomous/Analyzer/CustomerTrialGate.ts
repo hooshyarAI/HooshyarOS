@@ -1,0 +1,1 @@
+export function customerTrialAllowed(isolationVerified: boolean, securityVerified: boolean, dataIngressVerified: boolean): boolean { return isolationVerified && securityVerified && dataIngressVerified; }
