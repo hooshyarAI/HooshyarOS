@@ -48,8 +48,6 @@ def _validate_windows_payload(payload: Path) -> None:
 
 
 def _runtime_dependency_names() -> set[str]:
-    # Runtime roots are explicit so the packaged dependency closure has a
-    # deterministic starting point rather than copying development dependencies.
     roots: set[str] = set()
     roots.add("tsx")
     return roots
@@ -63,8 +61,7 @@ def _copy_node_dependency(name: str, destination: Path) -> None:
 
 def _copy_runtime_node_modules(destination: Path) -> None:
     destination.mkdir(parents=True, exist_ok=True)
-    roots = _runtime_dependency_names()
-    for name in roots:
+    for name in _runtime_dependency_names():
         _copy_node_dependency(name, destination)
 
 
@@ -92,7 +89,10 @@ def _write_launch_surface(payload: Path) -> None:
         'Set shell = CreateObject("WScript.Shell")\nshell.Run Chr(34) & Replace(WScript.ScriptFullName, "launch-hooshyar.vbs", "launch-hooshyar.cmd") & Chr(34), 1, False\n',
         encoding="ascii",
     )
-    shortcut_root = payload / "Microsoft\\Windows\\Start Menu\\Programs\\HooshyarOS"
+    # Use forward slashes in the logical payload path. pathlib converts these
+    # to native separators on Windows while keeping the artifact deterministic
+    # and testable on Linux CI.
+    shortcut_root = payload / "Microsoft/Windows/Start Menu/Programs/HooshyarOS"
     shortcut_root.mkdir(parents=True, exist_ok=True)
     (shortcut_root / "HooshyarOS.lnk").write_text("launch-hooshyar.vbs\n", encoding="ascii")
 
