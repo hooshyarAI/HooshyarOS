@@ -1,6 +1,8 @@
-"""Canonical Windows release artifact builder."""
+"""Canonical Windows installer builder for HooshyarOS."""
 from __future__ import annotations
 
+import base64
+import os
 import shutil
 import subprocess
 import tempfile
@@ -42,41 +44,8 @@ def build_bootstrap() -> None:
                     archive.write(path, path.relative_to(payload).as_posix())
 
 
-def write_install_contract() -> None:
+def write_runtime_contract() -> None:
     INSTALLER_ROOT.mkdir(parents=True, exist_ok=True)
-    (INSTALLER_ROOT / "install.ps1").write_text(r'''$ErrorActionPreference = "Stop"
-$Log = Join-Path $env:ProgramData "HooshyarOS-install.log"
-$InstallRoot = Join-Path $env:ProgramData "HooshyarOS"
-$RuntimeRoot = Join-Path $InstallRoot "runtime"
-$DataRoot = Join-Path $InstallRoot "data"
-$Stage = Join-Path $env:TEMP "HooshyarOS-payload"
-$Archive = Join-Path $PSScriptRoot "HooshyarOS-Windows-Bootstrap.zip"
-$RuntimeJs = Join-Path $PSScriptRoot "commercial-runtime.js"
-try {
-  "START $(Get-Date -Format o)" | Set-Content -Encoding UTF8 $Log
-  if (!(Test-Path $Archive)) { throw "Embedded bootstrap archive missing: $Archive" }
-  "ARCHIVE_OK" | Add-Content -Encoding UTF8 $Log
-  if (Test-Path $InstallRoot) { Remove-Item $InstallRoot -Recurse -Force -ErrorAction SilentlyContinue }
-  if (Test-Path $Stage) { Remove-Item $Stage -Recurse -Force -ErrorAction SilentlyContinue }
-  New-Item -ItemType Directory -Force -Path $RuntimeRoot, $DataRoot, $Stage | Out-Null
-  "DIRS_OK" | Add-Content -Encoding UTF8 $Log
-  Expand-Archive -LiteralPath $Archive -DestinationPath $Stage -Force
-  "EXPAND_OK" | Add-Content -Encoding UTF8 $Log
-  Copy-Item -Path (Join-Path $Stage "*") -Destination $RuntimeRoot -Recurse -Force
-  "COPY_OK" | Add-Content -Encoding UTF8 $Log
-  if (Test-Path $RuntimeJs) { Copy-Item -LiteralPath $RuntimeJs -Destination (Join-Path $RuntimeRoot "commercial-runtime.js") -Force }
-  $Launcher = Join-Path $RuntimeRoot "start-hooshyar.cmd"
-  "@echo off`r`ncd /d `"$RuntimeRoot`"`r`nnode.exe commercial-runtime.js`r`n" | Set-Content -Encoding ASCII $Launcher
-  $Marker = Join-Path $InstallRoot "HooshyarOS-install-complete.marker"
-  "installed=$(Get-Date -Format o)" | Set-Content -Encoding UTF8 $Marker
-  "COMPLETE $(Get-Date -Format o)" | Add-Content -Encoding UTF8 $Log
-  Remove-Item $Stage -Recurse -Force -ErrorAction SilentlyContinue
-  exit 0
-} catch {
-  ("ERROR " + $_.Exception.Message) | Add-Content -Encoding UTF8 $Log
-  exit 1
-}
-''', encoding="utf-8")
     (INSTALLER_ROOT / "uninstall.ps1").write_text(r'''$ErrorActionPreference = "Stop"
 $InstallRoot = Join-Path $env:ProgramData "HooshyarOS"
 if (Test-Path $InstallRoot) { Remove-Item $InstallRoot -Recurse -Force }
@@ -85,31 +54,35 @@ if (Test-Path $InstallRoot) { Remove-Item $InstallRoot -Recurse -Force }
     (INSTALLER_ROOT / "HooshyarOS-Windows-Bootstrap.zip").write_bytes(BOOTSTRAP.read_bytes())
 
 
-def build_iexpress() -> None:
-    iexpress_path = shutil.which("iexpress.exe")
-    if not iexpress_path:
-        raise RuntimeError("IExpress is unavailable on the Windows build runner")
-    iexpress = Path(iexpress_path)
-    sed_root = INSTALLER_ROOT / "iexpress"
-    if sed_root.exists():
-        shutil.rmtree(sed_root)
-    source = sed_root / "source"
-    source.mkdir(parents=True)
-    for name in ("install.ps1", "uninstall.ps1", "commercial-runtime.js", "HooshyarOS-Windows-Bootstrap.zip"):
-        shutil.copy2(INSTALLER_ROOT / name, source / name)
-    sed = sed_root / "HooshyarOS.sed"
-    sed.write_text(f'''[Version]\nClass=IEXPRESS\nSEDVersion=3\n[Options]\nPackagePurpose=InstallApp\nShowInstallProgramWindow=0\nHideExtractAnimation=1\nUseLongFileName=1\nInsideCompressed=1\nCABFileName=HooshyarOS.cab\nTargetName={EXE}\nFriendlyName=HooshyarOS\nAppLaunched=powershell.exe\nAppLaunchedCmdLine=-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File install.ps1\nPostInstallCmd=<None>\nSourceFiles=SourceFiles\n[Strings]\nFILE0="install.ps1"\nFILE1="uninstall.ps1"\nFILE2="commercial-runtime.js"\nFILE3="HooshyarOS-Windows-Bootstrap.zip"\n[SourceFiles]\nSourceFiles0={source}\n[SourceFiles0]\n%FILE0%=\n%FILE1%=\n%FILE2%=\n%FILE3%=\n''', encoding="utf-8")
-    result = subprocess.run([str(iexpress), "/N", "/Q", str(sed)], cwd=ROOT, text=True, capture_output=True)
-    if result.returncode != 0:
-        raise RuntimeError(f"IExpress failed: exit={result.returncode}\n{result.stdout}\n{result.stderr}")
-    if not EXE.exists() or EXE.stat().st_size < 100 * 1024:
-        raise RuntimeError("IExpress did not produce a valid Windows installer artifact")
+def build_self_extracting_exe() -> None:
+    dotnet = shutil.which("dotnet.exe") or shutil.which("dotnet")
+    if not dotnet:
+        raise RuntimeError("dotnet is unavailable on the Windows build runner")
+    payload_b64 = base64.b64encode(BOOTSTRAP.read_bytes()).decode("ascii")
+    runtime_b64 = base64.b64encode(STANDALONE_RUNTIME.encode("utf-8")).decode("ascii")
+    with tempfile.TemporaryDirectory(prefix="hooshyar-dotnet-installer-") as temp:
+        root = Path(temp)
+        project = root / "Installer.csproj"
+        source = root / "Program.cs"
+        project.write_text('''<Project Sdk="Microsoft.NET.Sdk">\n  <PropertyGroup>\n    <OutputType>Exe</OutputType>\n    <TargetFramework>net8.0</TargetFramework>\n    <RuntimeIdentifier>win-x64</RuntimeIdentifier>\n    <SelfContained>true</SelfContained>\n    <PublishSingleFile>true</PublishSingleFile>\n    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>\n    <PublishTrimmed>false</PublishTrimmed>\n    <InvariantGlobalization>true</InvariantGlobalization>\n    <AssemblyName>HooshyarOS-Setup</AssemblyName>\n  </PropertyGroup>\n</Project>\n''', encoding="utf-8")
+        source.write_text(f'''using System;\nusing System.IO;\nusing System.IO.Compression;\nusing System.Text;\n\ninternal static class Program\n{{\n    private const string BootstrapBase64 = "{payload_b64}";\n    private const string RuntimeBase64 = "{runtime_b64}";\n    private static int Main()\n    {{\n        var installRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "HooshyarOS");\n        var runtimeRoot = Path.Combine(installRoot, "runtime");\n        var dataRoot = Path.Combine(installRoot, "data");\n        var logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "HooshyarOS-install.log");\n        try\n        {{\n            Directory.CreateDirectory(runtimeRoot);\n            Directory.CreateDirectory(dataRoot);\n            File.WriteAllText(logPath, "START " + DateTimeOffset.UtcNow.ToString("O") + Environment.NewLine, Encoding.UTF8);\n            var tempZip = Path.Combine(Path.GetTempPath(), "HooshyarOS-Windows-Bootstrap.zip");\n            var tempExtract = Path.Combine(Path.GetTempPath(), "HooshyarOS-bootstrap-" + Guid.NewGuid().ToString("N"));\n            File.WriteAllBytes(tempZip, Convert.FromBase64String(BootstrapBase64));\n            Directory.CreateDirectory(tempExtract);\n            ZipFile.ExtractToDirectory(tempZip, tempExtract);\n            foreach (var file in Directory.EnumerateFiles(tempExtract, "*", SearchOption.AllDirectories))\n            {{\n                var relative = Path.GetRelativePath(tempExtract, file);\n                var target = Path.Combine(runtimeRoot, relative);\n                Directory.CreateDirectory(Path.GetDirectoryName(target)!);\n                File.Copy(file, target, true);\n            }}\n            File.WriteAllBytes(Path.Combine(runtimeRoot, "commercial-runtime.js"), Convert.FromBase64String(RuntimeBase64));\n            var launcher = Path.Combine(runtimeRoot, "start-hooshyar.cmd");\n            File.WriteAllText(launcher, "@echo off" + Environment.NewLine + "cd /d \"" + runtimeRoot + "\"" + Environment.NewLine + "node.exe commercial-runtime.js" + Environment.NewLine, Encoding.ASCII);\n            var marker = Path.Combine(installRoot, "HooshyarOS-install-complete.marker");\n            File.WriteAllText(marker, "installed=" + DateTimeOffset.UtcNow.ToString("O"), Encoding.UTF8);\n            File.AppendAllText(logPath, "COMPLETE " + DateTimeOffset.UtcNow.ToString("O") + Environment.NewLine, Encoding.UTF8);\n            try {{ File.Delete(tempZip); Directory.Delete(tempExtract, true); }} catch {{ }}\n            return 0;\n        }}\n        catch (Exception ex)\n        {{\n            try {{ File.AppendAllText(logPath, "ERROR " + ex.Message + Environment.NewLine, Encoding.UTF8); }} catch {{ }}\n            return 1;\n        }}\n    }}\n}}\n''', encoding="utf-8")
+        env = os.environ.copy()
+        env["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1"
+        env["DOTNET_NOLOGO"] = "1"
+        result = subprocess.run([dotnet, "publish", str(project), "-c", "Release", "-o", str(root / "publish"), "--nologo"], cwd=root, env=env, text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30*60, check=False)
+        print(result.stdout, end="")
+        if result.returncode != 0:
+            raise RuntimeError(f"dotnet publish failed with exit code {result.returncode}")
+        built = root / "publish" / "HooshyarOS-Setup.exe"
+        if not built.exists() or built.stat().st_size < 1 * 1024 * 1024:
+            raise RuntimeError("Self-contained Windows installer was not produced or is unexpectedly small")
+        shutil.copy2(built, EXE)
 
 
 def main() -> int:
     build_bootstrap()
-    write_install_contract()
-    build_iexpress()
+    write_runtime_contract()
+    build_self_extracting_exe()
     print(f"WINDOWS_INSTALLER={EXE.relative_to(ROOT)}")
     return 0
 
