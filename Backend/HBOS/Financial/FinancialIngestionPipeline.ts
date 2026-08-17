@@ -14,7 +14,7 @@ export class FinancialIngestionPipeline {
 
     ingest(csv: string, tenantId: string, sourceId: string): FinancialIngestionResult {
         const records = this.ingestion.ingest(csv, tenantId, sourceId);
-        const evidence = records.map((record) => this.evidenceStore.save(record));
+        const evidence = this.evidenceStore.saveMany(records);
         return { records, evidence };
     }
 }
