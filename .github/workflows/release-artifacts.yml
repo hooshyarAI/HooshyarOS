@@ -35,8 +35,11 @@ jobs:
       - shell: pwsh
         run: |
           $a='dist/productization/windows/HooshyarOS-Setup.exe'
+          $shell='dist/productization/windows/HooshyarOS.exe'
           if (!(Test-Path $a)) { throw "Windows installer missing: $a" }
+          if (!(Test-Path $shell)) { throw "Windows desktop shell missing: $shell" }
           if ((Get-Item $a).Length -lt 100KB) { throw 'Windows installer unexpectedly small' }
+          if ((Get-Item $shell).Length -lt 100KB) { throw 'Windows desktop shell unexpectedly small' }
       - uses: actions/upload-artifact@v4
         with: {name: HooshyarOS-Windows-Installer, path: dist/productization/windows/HooshyarOS-Setup.exe, if-no-files-found: error, retention-days: 30}
   windows-install-launch-uninstall:
@@ -70,13 +73,30 @@ jobs:
           }
       - shell: pwsh
         run: |
-          $root=Join-Path $env:ProgramData 'HooshyarOS'; $runtime=Join-Path $root 'runtime'
-          foreach ($p in @($root,(Join-Path $root 'HooshyarOS-install-complete.marker'),$runtime,(Join-Path $runtime 'commercial-runtime.js'),(Join-Path $runtime 'start-hooshyar.cmd'))) { if (!(Test-Path $p)) { throw "Missing: $p" } }
-          if (!(Test-Path (Join-Path $env:ProgramData 'HooshyarOS-uninstall.ps1'))) { throw 'External uninstaller missing' }
+          $root=Join-Path $env:ProgramData 'HooshyarOS'; $runtime=Join-Path $root 'runtime'; $shell=Join-Path $root 'HooshyarOS.exe'
+          $desktop=Join-Path ([Environment]::GetFolderPath('CommonDesktopDirectory')) 'HooshyarOS.lnk'
+          $startMenu=Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'HooshyarOS.lnk'
+          foreach ($p in @($root,(Join-Path $root 'HooshyarOS-install-complete.marker'),$runtime,(Join-Path $runtime 'commercial-runtime.js'),(Join-Path $runtime 'node.exe'),$shell,(Join-Path $runtime 'start-hooshyar.cmd'))) { if (!(Test-Path $p)) { throw "Missing: $p" } }
+          foreach ($p in @($desktop,$startMenu)) { if (!(Test-Path $p)) { throw "Shortcut missing: $p" } }
+          $key=Get-ItemProperty 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\HooshyarOS' -ErrorAction Stop
+          if ($key.DisplayName -ne 'Hooshyar.ai') { throw 'Installed-app registry metadata missing' }
+          if ($key.UninstallString -notmatch 'HooshyarOS-uninstall.ps1') { throw 'Uninstall registration missing' }
+      - shell: pwsh
+        run: |
+          $shell=Join-Path $env:ProgramData 'HooshyarOS\HooshyarOS.exe'
+          $p=Start-Process $shell -PassThru
+          $deadline=(Get-Date).AddSeconds(30)
+          $ready=$false
+          while ((Get-Date) -lt $deadline) {
+            try { $r=Invoke-WebRequest 'http://127.0.0.1:3000/api/dashboard' -TimeoutSec 2; if ($r.StatusCode -eq 200) { $ready=$true; break } } catch {}
+            Start-Sleep 1
+          }
+          if (!$ready) { if (!$p.HasExited) { try { taskkill.exe /PID $p.Id /T /F | Out-Null } catch {} }; throw 'HooshyarOS desktop shell did not bring the product runtime online' }
+          try { taskkill.exe /PID $p.Id /T /F | Out-Null } catch {}
       - shell: pwsh
         run: |
           $runtime=Join-Path $env:ProgramData 'HooshyarOS\runtime\commercial-runtime.js'
-          $p=Start-Process node.exe -ArgumentList @($runtime,'--health-check') -Wait -PassThru
+          $p=Start-Process (Join-Path $env:ProgramData 'HooshyarOS\runtime\node.exe') -ArgumentList @($runtime,'--health-check') -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "Health check failed: $($p.ExitCode)" }
       - if: always()
         shell: pwsh
@@ -86,6 +106,8 @@ jobs:
           Start-Sleep 2
           if (Test-Path (Join-Path $env:ProgramData 'HooshyarOS')) { throw 'Uninstall cleanup failed' }
           if (Test-Path $u) { Remove-Item $u -Force -ErrorAction SilentlyContinue }
+          foreach ($p in @((Join-Path ([Environment]::GetFolderPath('CommonDesktopDirectory')) 'HooshyarOS.lnk'),(Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'HooshyarOS.lnk'))) { if (Test-Path $p) { throw "Shortcut cleanup failed: $p" } }
+          if (Test-Path 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\HooshyarOS') { throw 'Uninstall registry cleanup failed' }
   android-release:
     needs: runtime-contract
     runs-on: windows-latest
