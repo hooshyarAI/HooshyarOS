@@ -8,12 +8,13 @@ export interface CommercialAuthorizationRequest {
     token?: string;
     organization: string;
     permission: CommercialPermission;
+    tenantId?: string;
 }
 
 export interface CommercialAuthorizationResult {
     allowed: boolean;
     session: CommercialSession | null;
-    reason?: "AUTHENTICATION_REQUIRED" | "AUTHORIZATION_DENIED";
+    reason?: "AUTHENTICATION_REQUIRED" | "TENANT_SCOPE_MISMATCH" | "AUTHORIZATION_DENIED";
 }
 
 /**
@@ -28,13 +29,21 @@ export class CommercialAuthorizationBoundary {
             return { allowed: false, session: null, reason: "AUTHENTICATION_REQUIRED" };
         }
 
+        const session = this.identity.getSession(request.token);
+        if (!session) {
+            return { allowed: false, session: null, reason: "AUTHORIZATION_DENIED" };
+        }
+        if (request.tenantId?.trim() && request.tenantId.trim() !== session.tenantId) {
+            return { allowed: false, session: null, reason: "TENANT_SCOPE_MISMATCH" };
+        }
+
         try {
-            const session = this.identity.authorize(
+            const authorized = this.identity.authorize(
                 request.token,
                 request.organization,
                 request.permission
             );
-            return { allowed: true, session };
+            return { allowed: true, session: authorized };
         } catch {
             return { allowed: false, session: null, reason: "AUTHORIZATION_DENIED" };
         }
