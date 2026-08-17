@@ -56,7 +56,7 @@ jobs:
           if (Test-Path $root) { Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue }
           if (Test-Path $log) { Remove-Item $log -Force -ErrorAction SilentlyContinue }
           $p=Start-Process $installer -ArgumentList '/Q' -PassThru
-          $deadline=(Get-Date).AddSeconds(90)
+          $deadline=(Get-Date).AddSeconds(180)
           while ((Get-Date) -lt $deadline) {
             if (Test-Path $marker) { break }
             $p.Refresh(); if ($p.HasExited) { break }; Start-Sleep 1
@@ -64,7 +64,7 @@ jobs:
           if (!(Test-Path $marker)) {
             if (Test-Path $log) { Get-Content $log | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8 }
             if (!$p.HasExited) { try { taskkill.exe /PID $p.Id /T /F | Out-Host } catch {} }
-            throw 'Installer did not complete within 90 seconds'
+            throw 'Installer did not complete within 180 seconds'
           }
       - shell: pwsh
         run: |
@@ -94,6 +94,17 @@ jobs:
           New-Item -ItemType Directory -Force -Path android | Out-Null
           @('android.useAndroidX=true','android.enableJetifier=true','org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8') | Set-Content -Encoding UTF8 android/gradle.properties
           New-Item -ItemType Directory -Force -Path "$env:GRADLE_USER_HOME\init.d" | Out-Null
+          @'
+          allprojects {
+            configurations.configureEach {
+              resolutionStrategy.dependencySubstitution {
+                substitute module('org.jetbrains.kotlin:kotlin-stdlib-jdk7') using module('org.jetbrains.kotlin:kotlin-stdlib:1.8.22')
+                substitute module('org.jetbrains.kotlin:kotlin-stdlib-jdk8') using module('org.jetbrains.kotlin:kotlin-stdlib:1.8.22')
+              }
+              resolutionStrategy.force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+            }
+          }
+          '@ | Set-Content -Encoding UTF8 "$env:GRADLE_USER_HOME\init.d\hooshyaros-kotlin.gradle"
       - run: python Backend/AI_Runtime/productization_builder.py --platform ANDROID
       - shell: pwsh
         run: |
