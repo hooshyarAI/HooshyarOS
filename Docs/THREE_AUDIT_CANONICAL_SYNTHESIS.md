@@ -14,17 +14,7 @@ The three main review phases converge on the following canonical judgement:
 
 ## Audit reconciliation
 
-### Claude
-The initial adversarial review was document/evidence-bundle constrained and therefore low confidence about implementation presence. Later source evidence invalidated several “missing subsystem” claims.
-
-### DeepSeek
-The source-backed re-audit corrected those stale absence claims and confirmed substantial implementation. Remaining risks were durability, real ingestion, deployment, performance, observability, product acceptance and security hardening.
-
-### Python architecture/governance audit
-The Python audit strengthened completion semantics and highlighted false-green risk: source existence, packaging, unit tests or health endpoints cannot by themselves establish commercial completion.
-
-### Direct source verification
-Direct source inspection is the adjudication layer used to settle conflicts; it is not counted as a fourth independent audit.
+Claude's initial review was document/evidence-bundle constrained and low confidence about implementation presence. DeepSeek's source-backed re-audit invalidated stale absence claims and confirmed substantial implementation. The Python architecture/governance/commercial audit strengthened completion semantics and highlighted false-green risk. Direct source verification is the adjudication layer, not a fourth independent audit.
 
 ## Canonical surviving findings
 
@@ -41,9 +31,8 @@ Direct source inspection is the adjudication layer used to settle conflicts; it 
 - Durable SQLite persistence boundary: implemented.
 - Durable identity/session/audit storage: implemented.
 - Real filesystem CSV ingestion: implemented and merged into `agent/release-final`.
-- Governed decision-to-execution: implementation is being hardened on `agent/commercial-decision-execution`.
-- Current hardening adds a filesystem-backed observable execution adapter, independently reads the resulting receipt, fingerprints the observed receipt bytes, verifies decision/assignment/outcome after restart, and rejects cross-tenant approval.
-- Placeholder ingestion marker files were removed from the decision-execution branch.
+- Governed decision-to-execution: hardened on `agent/commercial-decision-execution` with an observable filesystem execution adapter, independent receipt observation, receipt-byte evidence hashing, restart verification and cross-tenant approval rejection.
+- The three placeholder ingestion marker files were removed from the decision-execution branch.
 
 ## Completion model
 
