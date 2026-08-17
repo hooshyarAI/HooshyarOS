@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { CommercialAuthorizationBoundary } from "./CommercialAuthorizationBoundary";
 import { CommercialPersistenceBoundary } from "./CommercialPersistenceBoundary";
+import { FilesystemDecisionExecutor } from "./FilesystemDecisionExecutor";
 
 export interface CommercialDecisionExecutionInput {
   readonly token: string;
@@ -19,12 +20,14 @@ export interface CommercialDecisionExecutionResult {
   readonly approvedBy: string;
   readonly assignee: string;
   readonly evidenceSha256: string;
+  readonly executionReceiptPath: string;
 }
 
 export class CommercialDecisionExecutionWorkflow {
   constructor(
     private readonly authorization: CommercialAuthorizationBoundary,
     private readonly persistence: CommercialPersistenceBoundary,
+    private readonly executor: FilesystemDecisionExecutor,
   ) {}
 
   async approveAndExecute(input: CommercialDecisionExecutionInput): Promise<CommercialDecisionExecutionResult> {
@@ -41,10 +44,16 @@ export class CommercialDecisionExecutionWorkflow {
 
     const decisionId = input.decisionId.trim();
     const assignee = input.assignee.trim();
-    const evidenceSha256 = createHash("sha256")
-      .update(JSON.stringify({ decisionId, decision: input.decision, assignee, approvedBy: approver.session.username }))
-      .digest("hex");
+    const execution = await this.executor.execute({
+      tenantId: actor.session.tenantId,
+      decisionId,
+      assignee,
+      approvedBy: approver.session.username,
+      action: input.decision,
+    });
+    if (!execution.executed || execution.receiptBytes.length === 0) throw new Error("EXECUTION_SIDE_EFFECT_UNVERIFIED");
 
+    const evidenceSha256 = createHash("sha256").update(execution.receiptBytes).digest("hex");
     const result: CommercialDecisionExecutionResult = {
       tenantId: actor.session.tenantId,
       decisionId,
@@ -52,6 +61,7 @@ export class CommercialDecisionExecutionWorkflow {
       approvedBy: approver.session.username,
       assignee,
       evidenceSha256,
+      executionReceiptPath: execution.receiptPath,
     };
 
     const scope = { tenantId: actor.session.tenantId };
