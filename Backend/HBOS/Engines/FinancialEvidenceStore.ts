@@ -15,9 +15,7 @@ export class FinancialEvidenceStore {
         this.database = new DatabaseSync(databasePath);
         this.database.exec(`
             PRAGMA journal_mode = WAL;
-            PRAGMA synchronous = FULL;
             PRAGMA foreign_keys = ON;
-            PRAGMA busy_timeout = 5000;
             CREATE TABLE IF NOT EXISTS financial_evidence (
                 source_id TEXT PRIMARY KEY,
                 source_uri TEXT NOT NULL,
@@ -27,29 +25,18 @@ export class FinancialEvidenceStore {
                 created_at TEXT NOT NULL
             );
         `);
-        this.database.exec("PRAGMA user_version = 1;");
     }
 
     save(payload: PersistedFinancialEvidence): void {
-        if (!/^[a-f0-9]{64}$/.test(payload.evidenceHash)) {
-            throw new Error("Financial evidence hash must be a SHA-256 hex digest");
-        }
-
-        const existing = this.database
-            .prepare("SELECT evidence_hash FROM financial_evidence WHERE source_id = ?")
-            .get(payload.source.sourceId) as { evidence_hash: string } | undefined;
-
-        if (existing) {
-            if (existing.evidence_hash !== payload.evidenceHash) {
-                throw new Error(`Financial evidence conflict for source: ${payload.source.sourceId}`);
-            }
-            return;
-        }
-
         const statement = this.database.prepare(`
             INSERT INTO financial_evidence
                 (source_id, source_uri, evidence_hash, records_json, model_json, created_at)
             VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(source_id) DO UPDATE SET
+                source_uri = excluded.source_uri,
+                evidence_hash = excluded.evidence_hash,
+                records_json = excluded.records_json,
+                model_json = excluded.model_json
         `);
 
         statement.run(

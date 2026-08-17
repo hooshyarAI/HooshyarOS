@@ -10,7 +10,8 @@ describe("FinancialDataIngestionEngine real-data vertical slice", () => {
         const source = {
             sourceId: "aapl-q2-2026",
             sourceUri: "https://www.sec.gov/Archives/edgar/data/320193/000032019326000013/aapl-20260328.htm",
-            rawPath: join(process.cwd(), "Backend/HBOS/Fixtures/financial/aapl-q2-2026.csv")
+            rawPath: join(process.cwd(), "Backend/HBOS/Fixtures/financial/aapl-q2-2026.csv"),
+            entity: "Apple Inc."
         };
 
         try {
@@ -22,6 +23,8 @@ describe("FinancialDataIngestionEngine real-data vertical slice", () => {
             expect(result.model).toMatchObject({
                 entity: "Apple Inc.",
                 period: "2026-03-28",
+                currency: "USD",
+                scale: 1_000_000,
                 revenue: 111184,
                 expenses: 75299,
                 assets: 371082,

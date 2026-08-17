@@ -15,6 +15,7 @@ export interface FinancialSource {
     sourceId: string;
     sourceUri: string;
     rawPath: string;
+    entity: string;
 }
 
 export interface CanonicalFinancialModel {
@@ -50,10 +51,11 @@ export class FinancialDataIngestionEngine {
     ) {}
 
     async ingest(source: FinancialSource, evidenceRoot: string): Promise<FinancialIngestionResult> {
+        if (!source.entity.trim()) throw new Error("Financial source entity is required");
         const raw = await readFile(resolve(source.rawPath), "utf8");
         const records = this.parseCsv(raw);
         this.validate(records);
-        const model = this.normalize(source.sourceId, records);
+        const model = this.normalize(source, records);
         const evidenceHash = createHash("sha256").update(raw, "utf8").digest("hex");
 
         const evidencePath = resolve(evidenceRoot, `${source.sourceId}.raw.json`);
@@ -112,20 +114,22 @@ export class FinancialDataIngestionEngine {
         for (const metric of required) {
             if (!records.some((record) => record.metric === metric)) throw new Error(`Missing required financial metric: ${metric}`);
         }
+        if (new Set(records.map((record) => record.period)).size !== 1) throw new Error("Financial source contains mixed periods");
+        if (new Set(records.map((record) => record.unit)).size !== 1) throw new Error("Financial source uses mixed units");
     }
 
-    private normalize(sourceId: string, records: FinancialEvidenceRecord[]): CanonicalFinancialModel {
+    private normalize(source: FinancialSource, records: FinancialEvidenceRecord[]): CanonicalFinancialModel {
         const value = (metric: string): number => records.find((record) => record.metric === metric)!.value;
-        const firstPeriod = records[0].period;
-        const units = new Set(records.map((record) => record.unit));
-        if (units.size !== 1) throw new Error("Financial source uses mixed units");
+        const unit = records[0].unit;
+        const [currency, scaleName] = unit.split("_");
+        const scale = scaleName === "MILLIONS" ? 1_000_000 : scaleName === "THOUSANDS" ? 1_000 : 1;
 
         return {
-            sourceId,
-            entity: "Apple Inc.",
-            period: firstPeriod,
-            currency: records[0].unit.replace(/^[A-Z]+\//, ""),
-            scale: 1_000_000,
+            sourceId: source.sourceId,
+            entity: source.entity,
+            period: records[0].period,
+            currency,
+            scale,
             revenue: value("total_net_sales"),
             expenses: value("total_cost_of_sales") + value("total_operating_expenses"),
             assets: value("total_assets"),
