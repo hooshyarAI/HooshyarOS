@@ -1,14 +1,14 @@
-# HooshyarOS — Canonical Synthesis of the Three Independent Audits
+# HooshyarOS — Canonical Synthesis of the Three Main Audits / Reviews
 
 **Date:** 2026-08-17  
 **Repository:** `hooshyarAI/HooshyarOS`  
-**Purpose:** canonical, evidence-based reconciliation of the three architecture / adversarial audit phases and the resulting refinement priorities.
+**Purpose:** canonical, evidence-based reconciliation of the three main audit/review phases — Claude independent adversarial audit, DeepSeek independent adversarial re-audit, and the Python architecture/governance/commercial audit — plus direct source verification used to settle conflicts.
 
 ---
 
-## 1. Audits reconciled
+## 1. Audit/review phases reconciled
 
-### Audit A — Initial Independent Senior Adversarial Audit
+### Audit A — Claude Independent Senior Adversarial Audit
 **Basis:** 27 architecture/governance documents; source access was not available.  
 **Verdict:** `BLOCKED` / low confidence.
 
@@ -32,8 +32,8 @@ The remaining material risks identified by this review were:
 - operational observability;
 - documentation-to-code drift.
 
-### Audit C — Deep Architecture / Governance / Commercial Audit (Python phase)
-**Basis:** consolidated architectural contracts plus source-level findings and commercial completion semantics.  
+### Audit C — Python Architecture / Governance / Commercial Audit
+**Basis:** consolidated architectural contracts, source-level findings, and commercial completion semantics.  
 **Verdict:** `BLOCKED_PENDING_DEEPSEEK_LIVE_REVIEW` at the time of that phase.
 
 Main contribution: it tightened the *completion semantics* and exposed false-green risk even when code, packaging, or CI are healthy.
@@ -45,6 +45,9 @@ Its highest-value findings were:
 - a healthy server or package is not evidence that the enterprise product exists end-to-end;
 - independent adversarial review must remain advisory, mutation-free, fail-closed, and explicitly separated from the construction toolchain;
 - commercial completion requires identity/tenancy, real data ingestion, decision-to-execution flows, provenance, and application-level acceptance evidence.
+
+### Direct source verification layer
+The three reviews were reconciled against current repository source wherever available. This layer is not counted as a fourth independent audit; it is the evidence adjudication layer that reclassifies stale or low-confidence findings.
 
 ---
 
@@ -59,7 +62,7 @@ Its highest-value findings were:
 `ENGINEERING_BASELINE: STRONG`  
 `ARCHITECTURE: IMPLEMENTED WITH REFINEMENT REQUIRED`  
 `AUTONOMOUS_TOOLCHAIN: IMPLEMENTED`  
-`IDENTITY/TENANCY: IMPLEMENTED BUT DURABILITY/HARDENING MUST BE VERIFIED`  
+`IDENTITY/TENANCY: IMPROVED — DURABILITY BOUNDARY IMPLEMENTED; HARDENING/ACCEPTANCE STILL REQUIRED`  
 `COMMERCIAL_RUNTIME: PARTIAL`  
 `COMMERCIAL_PRODUCT_COMPLETE: FALSE`  
 `PRODUCTION_READY: FALSE`
@@ -73,7 +76,7 @@ The following early claims must **not** remain active as current facts when they
 | Early claim | Canonical status |
 |---|---|
 | Four of five primary intelligence engines are missing | **INVALIDATED** |
-| User/Organization/Security engines are absent | **INVALIDATED / PARTIALLY CONFIRMED only where durability is concerned** |
+| User/Organization/Security engines are absent | **INVALIDATED / PARTIALLY CONFIRMED only where durability and hardening were concerned** |
 | Web/API runtime is completely absent | **INVALIDATED** |
 | Autonomous Python construction is absent | **INVALIDATED** |
 | Expert Weaving / self-healing is purely textual | **INVALIDATED** |
@@ -83,12 +86,14 @@ The correct lesson is not that the first audit was useless; it was a **low-confi
 
 ---
 
-## 4. Findings that survive all meaningful reconciliations
+## 4. Findings that survive the reconciliation
 
 These are the issues that remain high-confidence because they recur across the later evidence and are consistent with the commercial completion contract:
 
 ### P0 — Durable persistence and tenant-scoped identity
 The system must retain users, organizations, sessions, revocations, audit records, and product state across restart. Tenant isolation must exist at the persistence boundary, not only as an in-memory scope.
+
+**Current refinement status:** a durable SQLite persistence boundary and durable Identity/Session/Audit storage have been introduced and wired into `CommercialIdentityService`; restart, revocation, and cross-tenant checks have been added. This moves the finding from “missing implementation” to **“implemented boundary requiring full acceptance and hardening evidence.”** fileciteturn102file0L2-L2
 
 ### P0 — Real financial data ingestion
 A normalization adapter alone is not enough. At least one real connector path must be demonstrated end-to-end: source evidence → ingestion → validation → normalization → canonical model → evidence/persistence → intelligence.
@@ -144,6 +149,8 @@ Independent reviewers (including DeepSeek when available) are:
 - prohibited from overriding governance or source-of-truth rules;
 - treated as a fail-closed verification boundary when their required evidence is unavailable.
 
+This aligns with the project’s canonical refinement plan, which separates documented → implemented → behaviorally verified → integration verified → production verified → commercial ready. fileciteturn101file0L2-L2
+
 ---
 
 ## 6. False-green register — canonical interpretation
@@ -166,16 +173,17 @@ The release gate must prove the *behavioral contract* at the same layer as the c
 
 ## 7. Work already completed after the audits
 
-The post-audit refinement work has already addressed the first durability boundary:
+The post-audit refinement tranche has already addressed the first safety and durability boundaries:
 
 - autonomous commercial repair was moved toward fail-closed behavior;
 - a durable SQLite persistence boundary was introduced;
 - Identity/Session/Audit Trail was connected to durable storage;
 - tenant-scoped persistence was made explicit;
 - restart/revocation/cross-tenant verification was added;
-- the canonical refinement plan was committed as a project artifact.
+- the canonical refinement plan was committed as a project artifact;
+- this canonical three-audit synthesis has now been committed to GitHub.
 
-These changes address the P0 findings but do **not** by themselves establish full commercial completion.
+These changes address the first P0 findings but do **not** by themselves establish full commercial completion.
 
 ---
 
@@ -184,7 +192,7 @@ These changes address the P0 findings but do **not** by themselves establish ful
 ```text
 Audit Reconciliation
   → Contract Freeze
-  → P0 Durable Persistence / Identity Verification
+  → P0 Durable Persistence / Identity Acceptance
   → P0 Real Data Ingestion Vertical Slice
   → P1 Decision-to-Execution Vertical Slice
   → P1 Security + Observability Hardening
@@ -226,9 +234,11 @@ DETECT
 
 ## 9. Final decision
 
-**The three audits converge on one strategic conclusion:**
+**The three main audits/reviews converge on one strategic conclusion:**
 
-> **Do not restart or redesign HooshyarOS. Preserve the implemented architecture and autonomous toolchain, but enforce stricter commercial completion semantics and close the durable persistence, real-data, security, observability, deployment, and end-to-end value-flow gaps in risk order.**
+> **Do not restart or redesign HooshyarOS. Preserve the implemented architecture and autonomous toolchain, but enforce stricter commercial completion semantics and close the real-data, security, observability, deployment, and end-to-end value-flow gaps in risk order.**
+
+Persistence/identity should now be treated as an **active acceptance/hardening workstream**, not as a reason to revert to the old “no persistence exists” conclusion.
 
 The project should therefore continue from the current branch/baseline rather than returning to the assumptions of the first low-confidence audit.
 
@@ -239,6 +249,7 @@ The project should therefore continue from the current branch/baseline rather th
 This synthesis intentionally distinguishes:
 - **source-backed invalidations** from the first audit;
 - **later source-backed surviving risks**;
+- **implemented refinements** already applied after the audits;
 - **architectural inference/refinement** derived by cross-audit reconciliation.
 
 Where a later audit depended on an evidence bundle rather than live runtime observation, its conclusions are treated as evidence-scoped rather than absolute runtime proof.
