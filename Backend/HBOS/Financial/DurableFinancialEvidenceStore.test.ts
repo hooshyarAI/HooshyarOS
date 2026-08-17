@@ -29,4 +29,21 @@ describe("DurableFinancialEvidenceStore", () => {
         store.close();
         await rm(root, { recursive: true, force: true });
     });
+
+    it("rolls back the whole batch when a later record cannot be serialized", async () => {
+        const root = await mkdtemp(join(tmpdir(), "hooshyar-financial-evidence-rollback-"));
+        const store = new DurableFinancialEvidenceStore(join(root, "financial.sqlite"));
+        const valid = new CsvFinancialIngestion().ingest(
+            "accountCode,accountName,transactionDate,debit,credit,description\n1000,Cash,2026-08-17,100,0,Opening",
+            "tenant-a",
+            "source-rollback"
+        )[0];
+        const circular = { ...valid, rowNumber: 2 } as Record<string, unknown>;
+        circular.self = circular;
+
+        expect(() => store.saveMany([valid, circular as never])).toThrow();
+        expect(store.listByTenant("tenant-a")).toEqual([]);
+        store.close();
+        await rm(root, { recursive: true, force: true });
+    });
 });
