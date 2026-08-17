@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { CapabilityEvidence } from "./CapabilityGateEvaluator";
+import { CapabilityStage } from "./CapabilityGateEvaluator";
 
 export interface CapabilityDefinition {
     name: string;
@@ -7,9 +7,14 @@ export interface CapabilityDefinition {
     documented?: boolean;
 }
 
+export interface RepositoryCapabilityEvidence {
+    stage: CapabilityStage;
+    verified: boolean;
+}
+
 export interface DiscoveredCapability {
     name: string;
-    evidence: CapabilityEvidence[];
+    evidence: RepositoryCapabilityEvidence[];
     missingPaths: string[];
 }
 
