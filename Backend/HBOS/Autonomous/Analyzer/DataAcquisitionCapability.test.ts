@@ -24,6 +24,17 @@ describe("Unified organizational data acquisition capability", () => {
         );
     });
 
+    it("defines an evidence-first acquisition pipeline", () => {
+        expect(UNIFIED_ORGANIZATIONAL_DATA_ACQUISITION.pipeline).toEqual([
+            "ACQUIRE",
+            "EXTRACT",
+            "NORMALIZE",
+            "VALIDATE",
+            "RECONCILE",
+            "EVIDENCE",
+        ]);
+    });
+
     it("requires validation, evidence and human review for low-confidence extraction", () => {
         expect(UNIFIED_ORGANIZATIONAL_DATA_ACQUISITION.requiresValidation).toBe(true);
         expect(UNIFIED_ORGANIZATIONAL_DATA_ACQUISITION.requiresEvidenceBeforeUse).toBe(true);
