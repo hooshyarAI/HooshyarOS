@@ -9,11 +9,7 @@ export class CapabilityEvidenceAdapter {
                 capability: discovered.name,
                 stage: evidence.stage,
                 evidence: evidence.stage === "IMPLEMENTED"
-                    ? discovered.missingPaths.length === 0
-                        ? discovered.missingPaths.length === 0
-                            ? ["required-artifacts-present"]
-                            : []
-                        : []
+                    ? ["required-artifacts-present"]
                     : ["repository-discovery"],
             }));
     }
