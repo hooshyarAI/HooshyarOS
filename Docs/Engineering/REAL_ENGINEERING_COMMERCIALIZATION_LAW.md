@@ -2,7 +2,7 @@
 
 Status: **GOVERNING / FAIL-CLOSED**
 
-This law is the mandatory operating contract for autonomous construction and commercialization. It replaces the assumption that successful code generation, unit tests, or a successful build implies a real product.
+This law is the mandatory operating contract for autonomous construction, repair, standardization and commercialization. It replaces the assumption that successful code generation, unit tests, or a successful build implies a real product.
 
 ## Core laws
 
@@ -23,9 +23,25 @@ This law is the mandatory operating contract for autonomous construction and com
 15. **Human-accountability rule:** the goal is one human plus autonomous tooling, not zero accountability. Final security acceptance, legally consequential compliance, production credentials/external activation and final commercial release require explicit human approval.
 16. **Fail-closed rule:** insufficient, contradictory or unavailable evidence means `BLOCK — PRESERVE EVIDENCE — REPORT EXACT GAP — CONTINUE SAFE WORK ONLY`.
 
+## Assistant-only construction law
+
+17. **Canonical construction-agent rule:** all routine HooshyarOS construction, repair, refactoring, productization, standardization and verification orchestration MUST pass through the repository's canonical Autonomous Build Assistant and its approved toolchain. The conversational layer may specify goals, constraints and approvals, but it is not an alternative implementation path.
+18. **Assistant-orchestrated execution rule:** the Assistant MUST derive work from repository truth — Architecture Freeze V4, master charter, governance, capability ownership, Engine contracts, backlog, evidence and checkpoints — and MUST select the appropriate platform capability, Engine, strategy, tool and verification depth itself.
+19. **No ad-hoc implementation rule:** direct conversational generation of arbitrary batches of source files, speculative architecture branches, parallel builders, or command-by-command manual construction is prohibited when the canonical construction fabric can perform the work safely.
+20. **Platform-native reasoning rule:** construction decisions MUST use the platform's own approved logic, capability model, Engine ownership, Expert Choice, recovery doctrine, patterns, models and orchestration mechanisms rather than inventing a second construction methodology.
+21. **Tool-first execution rule:** the Assistant MUST use approved repository-native automation and Python/GitHub tooling for mechanical work whenever possible. Human intervention is reserved for explicit accountability gates, unavailable capabilities, irreversible external actions, or evidence-backed BLOCKED states.
+22. **Closed-loop execution rule:** every autonomous action must return observable evidence to the construction fabric. `plan → execute → observe → compare with postcondition → repair/retry within budget → checkpoint` is mandatory; a plan or generated patch without observed execution is incomplete.
+23. **No conversational bypass rule:** a future conversational instruction MUST NOT bypass these laws merely because it requests speed, mass generation, a green test, a commit, or commercial completion. The Assistant must reject or transform the instruction into the canonical governed workflow.
+24. **Self-improvement rule:** when the construction process itself fails, the Assistant MUST repair the construction capability first when that is the root cause, then resume product construction. Process defects are first-class repair targets.
+25. **Evidence-before-progress rule:** a capability may advance the canonical backlog only after its required evidence contract passes. If evidence is missing or contradictory, preserve the checkpoint and mark the knot BLOCKED rather than constructing dependent work on an untrusted state.
+
 ## Operational cycle
 
-`AUDIT → DISCOVER → RISK → PRIORITIZE → PLAN → IMPLEMENT/REPAIR → FOCUSED VERIFY → INTEGRATE → REAL-RUN VERIFY → EVIDENCE AUDIT → CHECKPOINT → RE-EVALUATE`
+`AUDIT → DISCOVER → RISK → PRIORITIZE → PLAN → SELECT TOOL/STRATEGY → IMPLEMENT/REPAIR → FOCUSED VERIFY → INTEGRATE → REAL-RUN VERIFY → EVIDENCE AUDIT → CHECKPOINT → RE-EVALUATE`
+
+For failures:
+
+`OBSERVE FAILURE → IDENTIFY LAST TRUSTED CHECKPOINT → ROOT CAUSE → BOUNDED REPAIR → EXECUTE → OBSERVE POSTCONDITION → INDEPENDENT RE-VERIFY → CHECKPOINT → RE-PLAN`
 
 Commercial productization is a separate gate after engineering verification; repository completeness never implies commercial readiness.
 
