@@ -11,7 +11,8 @@ describe("FinancialEvidenceStore", () => {
             source: {
                 sourceId: "aapl-q2-2026",
                 sourceUri: "https://www.sec.gov/Archives/edgar/data/320193/000032019326000013/aapl-20260328.htm",
-                rawPath: "fixture.csv"
+                rawPath: "fixture.csv",
+                entity: "Apple Inc."
             },
             evidenceHash: "a".repeat(64),
             records: [{ metric: "total_net_sales", period: "2026-03-28", value: 111184, unit: "USD_MILLIONS" }],
