@@ -51,10 +51,12 @@ describe("Windows product installer contract", () => {
         expect(builder).toContain("web/index.html");
     });
 
-    it("waits for the installed runtime readiness handshake before opening the desktop UI", () => {
-        expect(finalInstallerBuilder).toContain("WaitUntilReadyAsync");
+    it("waits for runtime readiness before opening the desktop browser surface", () => {
+        expect(finalInstallerBuilder).toContain("WaitUntilReady");
         expect(finalInstallerBuilder).toContain("/api/dashboard");
         expect(finalInstallerBuilder).toContain('"state":"ready"');
-        expect(finalInstallerBuilder).toContain("runtime could not be started");
+        expect(finalInstallerBuilder).toContain("runtime");
+        expect(finalInstallerBuilder).toContain("msedge.exe");
+        expect(finalInstallerBuilder).not.toContain("Microsoft.Web.WebView2");
     });
 });
