@@ -9,6 +9,7 @@
 - `Docs/AUTONOMOUS_7_DAY_BUILD_SLA.md` — permanent seven-day autonomous construction performance law.
 - `Docs/HOOSHYAROS_TOOLCHAIN_OPTIMIZATION_LAW.md` — permanent tool-first, Python-first construction and human-intervention law.
 - `Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md` — canonical commercial-product completion and acceptance contract; mandatory for distinguishing canonical capability completion from real commercial product completion.
+- `Docs/Engineering/REAL_ENGINEERING_COMMERCIALIZATION_LAW.md` — mandatory real-engineering, independent-verification and commercialization law.
 - Existing architecture decisions, HBOS engines, capability owners, tests and documentation — inspect before adding anything.
 
 The repository is the durable memory of the approved architecture, product principles, autonomous-construction role, decision logic and verification rules. Do not rely on conversational memory when the repository can provide the governing rule.
@@ -62,7 +63,7 @@ READ → UNDERSTAND → AUDIT → SELECT ONE KNOT → PLAN → CHECK DEPENDENCIE
 → SELECT STRATEGY → IMPLEMENT → TEST → VERIFY → CHECKPOINT → ADVANCE
 ```
 
-A knot is one canonical capability with one owner, one intent, one implementation contract and one verification contract. Generation success alone is never sufficient evidence of acceptance.
+A knot is one canonical capability with one owner, one intent, one implementation contract and one verification contract. Generation success alone is never sufficient evidence for acceptance.
 
 ### Capability evidence rule
 Behavioral evidence is authoritative when it reflects the **actual owning Engine contract and the focused test contract**. Hard-coded method markers are hints only and must never be the sole source of truth for capability completion. The mission/audit layer must tolerate legitimate contract names such as `audit`, `analyze`, `validate`, `deploy`, `route`, or other repository-defined behavior without forcing a generic naming convention.
@@ -113,6 +114,21 @@ This restriction is operational, not architectural: the HooshyarOS product may s
 23. Preserve repair intent end-to-end; `repair-<capabilityId>` must reach the repair worker unchanged.
 24. Use the best approved tool for each stage before considering additional human intervention.
 25. Before declaring commercial product completion, pass the Commercial Product Completion Contract and keep external production dependencies distinct from repository-native completion.
+26. **Reality Gate Law:** `productComplete=true` requires machine-generated application/acceptance evidence from `Docs/Evidence/commercial-product-reality.json`; source presence, unit tests, mocks, screenshots or narrative claims can never substitute for executed product evidence.
+27. The commercial reality manifest must bind to the exact Git commit under test and must fail closed on missing, malformed, stale or unsuccessful command/runtime/application/persistence/security/acceptance evidence.
+28. A repair or builder step is successful only when its claimed postcondition is observed after execution. A script that fails to mutate its target, skips its postcondition, or merely prints a success message MUST be treated as failed.
+29. Never maintain two competing canonical productization paths without an explicit routing/deprecation contract. Tests must target the same builder/artifact path that the release gate actually executes.
+30. Any stale contract test that contradicts the active implementation is a release blocker until the owner contract is reconciled; never "fix" the implementation solely to satisfy stale assertions.
+31. **Independent-verification law:** the implementation author/generator MUST NOT be the sole authority that declares its own change verified. Acceptance must use an independent deterministic oracle or black-box runtime observation.
+32. **Truth-hierarchy law:** runtime/black-box evidence outranks integration evidence, which outranks unit evidence, which outranks source/documentation evidence. A weaker layer can never promote a stronger completion state.
+33. **Fresh-environment law:** installation, deployment, runtime lifecycle, persistence/restart, security isolation and user-facing acceptance MUST be verified from the produced artifact in a fresh or isolated environment whenever practical.
+34. **Artifact-provenance law:** commercial artifacts require exact commit, actual SHA-256, actual non-zero size, build command/exit code, verification environment and observed acceptance result. Merely populating these fields is not evidence.
+35. **No-self-certification law:** a generated manifest, screenshot, mocked process, source marker or success message is invalid unless the underlying postcondition was independently observed by the verification workflow.
+36. **Repair-postcondition law:** automatic repair is successful only after the intended postcondition is observed and re-verified. Failure to mutate, wrong-target mutation, contradictory tests or skipped postconditions are BLOCKED outcomes.
+37. **Canonical-boundary law:** duplicate capability roots, competing productization builders/installers or parallel ownership paths are release blockers until one canonical path is explicitly selected and the alternative deprecated.
+38. **Standard-tool law:** prefer mature standard infrastructure over hand-written substitutes; invent a replacement only with a recorded architecture/security reason.
+39. **Domain-authority law:** legally consequential Iranian tax/accounting/privacy/compliance claims require authoritative current sources and appropriate human approval; AI output is not the final legal authority.
+40. **Human-accountability law:** the objective is one human plus autonomous tooling, not zero accountability. Final security acceptance, legally consequential compliance, production credentials/external activation and final commercial release require explicit human approval.
 
 ## Architecture changes
 Architecture Freeze V4 is the default source of truth. Change it only when an actual contradiction or missing architectural capability is demonstrated by repository evidence. If changed, update the master charter, architecture document, governance charter and affected decisions before continuing construction.
