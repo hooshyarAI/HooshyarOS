@@ -1,11 +1,14 @@
 import { CommercialReadinessAuditEngine } from "./CommercialReadinessAuditEngine";
 
 describe("CommercialReadinessAuditEngine", () => {
-    it("never reports commercial readiness without product runtime and UI evidence", () => {
+    it("never reports commercial readiness while evidence blockers remain", () => {
         const result = new CommercialReadinessAuditEngine().audit(process.cwd());
         expect(result.commercialReady).toBe(false);
-        expect(result.blockers).toContain("web-ui");
-        expect(result.blockers).toContain("deployment-verification");
+        expect(result.blockers).toEqual(expect.arrayContaining([
+            "deployment-verification",
+            "operational-observability-verification",
+            "commercial-controls",
+        ]));
         expect(result.externalDependencies).toContain("production infrastructure");
     });
 });
