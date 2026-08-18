@@ -91,8 +91,6 @@ internal static class Program
             if (browser is null)
                 return 13;
 
-            // Keep this shell alive for the whole desktop session. The Node runtime
-            // is intentionally owned by this process while the browser is open.
             browser.WaitForExit();
             Log("browser-exited");
             return 0;
@@ -151,22 +149,34 @@ internal static class Program
 }
 '''
 
-s = BUILDER.read_text(encoding="utf-8")
-pattern = r"DESKTOP_CS = r''' .*? '''\n\nDESKTOP_CSPROJ ="
-replacement = "DESKTOP_CS = r'''" + DESKTOP_CS + "'''\n\nDESKTOP_CSPROJ ="
-new_s, count = re.subn(pattern, replacement, s, count=1, flags=re.S)
-if count != 1:
-    raise SystemExit("DESKTOP_CS block not found")
-BUILDER.write_text(new_s, encoding="utf-8")
 
-# Keep the test aligned with the real desktop-session contract.
-t = TEST.read_text(encoding="utf-8")
-t = t.replace('    it("detaches the installed Node runtime from the desktop shell lifecycle", () => {\n        expect(finalInstallerBuilder).toContain(\'FileName = "cmd.exe"\');\n        expect(finalInstallerBuilder).toContain(\'Arguments = "/d /c start \\\\\"HooshyarOS Runtime\\\\\" /b\');\n        expect(finalInstallerBuilder).not.toContain("runtime.Kill(true)");\n    });', '''    it("keeps the runtime alive for the desktop session", () => {
-        expect(finalInstallerBuilder).toContain("browser.WaitForExit();");
-        expect(finalInstallerBuilder).toContain("runtimeProcess.Kill(true)");
-        expect(finalInstallerBuilder).toContain("runtime-started pid=");
-        expect(finalInstallerBuilder).toContain("browser-exited");
-        expect(finalInstallerBuilder).not.toContain('FileName = "cmd.exe"');
-    });''')
-TEST.write_text(t, encoding="utf-8")
-print("PATCHED Windows desktop runtime lifecycle")
+def replace_block(text: str, start_marker: str, end_marker: str, replacement: str) -> str:
+    start = text.find(start_marker)
+    if start < 0:
+        raise RuntimeError(f"start marker not found: {start_marker}")
+    end = text.find(end_marker, start)
+    if end < 0:
+        raise RuntimeError(f"end marker not found: {end_marker}")
+    return text[:start] + replacement + text[end:]
+
+
+def patch_builder() -> None:
+    s = BUILDER.read_text(encoding="utf-8")
+    s = replace_block(s, "DESKTOP_CS = r'''", "DESKTOP_CSPROJ =", "DESKTOP_CS = r'''" + DESKTOP_CS + "'''\n\n")
+    BUILDER.write_text(s, encoding="utf-8")
+
+
+def patch_test() -> None:
+    t = TEST.read_text(encoding="utf-8")
+    pattern = r'\n\s*it\("detaches the installed Node runtime from the desktop shell lifecycle", \(\) => \{.*?\n\s*\}\);'
+    replacement = '''\n    it("keeps the runtime alive for the desktop session", () => {\n        expect(finalInstallerBuilder).toContain("browser.WaitForExit();");\n        expect(finalInstallerBuilder).toContain("runtimeProcess.Kill(true)");\n        expect(finalInstallerBuilder).toContain("runtime-started pid=");\n        expect(finalInstallerBuilder).toContain("browser-exited");\n        expect(finalInstallerBuilder).not.toContain('FileName = "cmd.exe"');\n    });'''
+    new_t, count = re.subn(pattern, replacement, t, count=1, flags=re.S)
+    if count != 1:
+        raise RuntimeError("old runtime lifecycle test block not found")
+    TEST.write_text(new_t, encoding="utf-8")
+
+
+if __name__ == "__main__":
+    patch_builder()
+    patch_test()
+    print("PATCHED Windows desktop runtime lifecycle")
