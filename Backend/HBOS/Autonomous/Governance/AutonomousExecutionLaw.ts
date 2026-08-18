@@ -1,4 +1,4 @@
-import { ConstructionStage } from "../../Builder/Autonomous/AutonomousConstructionEngine";
+import type { ConstructionStage } from "../../Builder/Autonomous/AutonomousConstructionEngine";
 
 export type AutonomousExecutionOperation = "BUILD" | "REPAIR" | "REBUILD" | "STANDARDIZE" | "COMMERCIALIZE" | "ASSISTANT_SELF_REPAIR";
 
