@@ -1,7 +1,6 @@
 """Canonical Windows installer builder for HooshyarOS."""
 from __future__ import annotations
 
-import base64
 import os
 import shutil
 import subprocess
@@ -67,7 +66,6 @@ internal sealed class MainForm : Form
         var runtimeRoot = Path.Combine(root, "runtime");
         var node = Path.Combine(runtimeRoot, "node.exe");
         var app = Path.Combine(runtimeRoot, "commercial-runtime.js");
-
         if (!Ready())
         {
             if (!File.Exists(node) || !File.Exists(app))
@@ -84,7 +82,6 @@ internal sealed class MainForm : Form
                 CreateNoWindow = true
             });
         }
-
         await web.EnsureCoreWebView2Async();
         web.Source = new Uri("http://127.0.0.1:3000/");
     }
@@ -147,33 +144,44 @@ try {
 INSTALLER_CS = r'''using System;
 using System.Diagnostics;
 using System.IO;
-using System.IO.Compression;
+using System.Reflection;
 using System.Text;
 using Microsoft.Win32;
 
 internal static class Program
 {
-    private const string BootstrapBase64 = "__BOOTSTRAP__";
-    private const string RuntimeBase64 = "__RUNTIME__";
-    private const string UninstallBase64 = "__UNINSTALL__";
+    private static Stream OpenResource(string name)
+    {
+        return Assembly.GetExecutingAssembly().GetManifestResourceStream(name)
+            ?? throw new InvalidOperationException("Missing embedded installer resource: " + name);
+    }
+
+    private static void CopyResource(string name, string destination)
+    {
+        var parent = Path.GetDirectoryName(destination);
+        if (parent is not null) Directory.CreateDirectory(parent);
+        using var input = OpenResource(name);
+        using var output = File.Create(destination);
+        input.CopyTo(output);
+    }
 
     private static int Main()
     {
         var installRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "HooshyarOS");
         var runtimeRoot = Path.Combine(installRoot, "runtime");
-        var logPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "HooshyarOS-install.log");
-        var externalUninstaller = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "HooshyarOS-uninstall.ps1");
+        var commonData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+        var logPath = Path.Combine(commonData, "HooshyarOS-install.log");
+        var externalUninstaller = Path.Combine(commonData, "HooshyarOS-uninstall.ps1");
 
         try
         {
             Directory.CreateDirectory(runtimeRoot);
             File.WriteAllText(logPath, "START " + DateTimeOffset.UtcNow.ToString("O") + Environment.NewLine, Encoding.UTF8);
 
-            var tempZip = Path.Combine(Path.GetTempPath(), "HooshyarOS-bootstrap.zip");
             var tempExtract = Path.Combine(Path.GetTempPath(), "HooshyarOS-bootstrap-" + Guid.NewGuid().ToString("N"));
-            File.WriteAllBytes(tempZip, Convert.FromBase64String(BootstrapBase64));
-            Directory.CreateDirectory(tempExtract);
-            ZipFile.ExtractToDirectory(tempZip, tempExtract);
+            var tempZip = Path.Combine(Path.GetTempPath(), "HooshyarOS-bootstrap.zip");
+            CopyResource("HooshyarOS.Bootstrap", tempZip);
+            System.IO.Compression.ZipFile.ExtractToDirectory(tempZip, tempExtract);
 
             foreach (var file in Directory.EnumerateFiles(tempExtract, "*", SearchOption.AllDirectories))
             {
@@ -187,8 +195,8 @@ internal static class Program
             var bundledShell = Path.Combine(runtimeRoot, "HooshyarOS.exe");
             var shellPath = Path.Combine(installRoot, "HooshyarOS.exe");
             if (File.Exists(bundledShell)) File.Move(bundledShell, shellPath, true);
-            File.WriteAllText(Path.Combine(runtimeRoot, "commercial-runtime.js"), Encoding.UTF8.GetString(Convert.FromBase64String(RuntimeBase64)), Encoding.UTF8);
-            File.WriteAllBytes(externalUninstaller, Convert.FromBase64String(UninstallBase64));
+            CopyResource("HooshyarOS.Runtime", Path.Combine(runtimeRoot, "commercial-runtime.js"));
+            CopyResource("HooshyarOS.Uninstall", externalUninstaller);
             File.WriteAllText(Path.Combine(installRoot, "HooshyarOS-install-complete.marker"), "installed=" + DateTimeOffset.UtcNow.ToString("O"), Encoding.UTF8);
 
             var desktop = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory), "HooshyarOS.lnk");
@@ -206,7 +214,7 @@ internal static class Program
             var shortcutInfo = new ProcessStartInfo
             {
                 FileName = "powershell.exe",
-                Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File " + shortcutScript,
+                Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"" + shortcutScript + "\"",
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
@@ -223,7 +231,7 @@ internal static class Program
                 key?.SetValue("Publisher", "Hooshyar.ai");
                 key?.SetValue("InstallLocation", installRoot);
                 key?.SetValue("DisplayIcon", shellPath);
-                key?.SetValue("UninstallString", "powershell.exe -NoProfile -ExecutionPolicy Bypass -File " + externalUninstaller);
+                key?.SetValue("UninstallString", "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"" + externalUninstaller + "\"");
             }
 
             File.AppendAllText(logPath, "COMPLETE " + DateTimeOffset.UtcNow.ToString("O") + Environment.NewLine, Encoding.UTF8);
@@ -240,7 +248,7 @@ internal static class Program
 '''
 
 
-def publish(dotnet: str, project_text: str, source_text: str, assembly_name: str, temp_prefix: str) -> Path:
+def publish(dotnet: str, project_text: str, source_text: str, assembly_name: str, temp_prefix: str, extra_files: dict[str, bytes] | None = None) -> Path:
     with tempfile.TemporaryDirectory(prefix=temp_prefix) as temp:
         root = Path(temp)
         project = root / f"{assembly_name}.csproj"
@@ -248,6 +256,11 @@ def publish(dotnet: str, project_text: str, source_text: str, assembly_name: str
         output = root / "publish"
         project.write_text(project_text, encoding="utf-8")
         source.write_text(source_text, encoding="utf-8")
+        if extra_files:
+            for name, data in extra_files.items():
+                target = root / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(data)
         env = os.environ.copy()
         env["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1"
         env["DOTNET_NOLOGO"] = "1"
@@ -324,25 +337,32 @@ def build_installer(dotnet: str) -> None:
     RELEASE_ROOT.mkdir(parents=True, exist_ok=True)
     INSTALLER_ROOT.mkdir(parents=True, exist_ok=True)
     (INSTALLER_ROOT / "uninstall.ps1").write_text(UNINSTALL_PS, encoding="utf-8")
-    payload = base64.b64encode(BOOTSTRAP.read_bytes()).decode("ascii")
-    runtime = base64.b64encode(STANDALONE_RUNTIME.encode("utf-8")).decode("ascii")
-    uninstall = base64.b64encode(UNINSTALL_PS.encode("utf-8")).decode("ascii")
-    source = INSTALLER_CS.replace("__BOOTSTRAP__", payload).replace("__RUNTIME__", runtime).replace("__UNINSTALL__", uninstall)
     project = r'''<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net8.0-windows</TargetFramework>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
     <PublishTrimmed>false</PublishTrimmed>
     <InvariantGlobalization>true</InvariantGlobalization>
     <AssemblyName>HooshyarOS-Setup</AssemblyName>
   </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="bootstrap.bin"><LogicalName>HooshyarOS.Bootstrap</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="runtime.bin"><LogicalName>HooshyarOS.Runtime</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="uninstall.bin"><LogicalName>HooshyarOS.Uninstall</LogicalName></EmbeddedResource>
+  </ItemGroup>
 </Project>
 '''
-    built = publish(dotnet, project, source, "HooshyarOS-Setup", "hooshyar-installer-")
+    extra = {
+        "bootstrap.bin": BOOTSTRAP.read_bytes(),
+        "runtime.bin": STANDALONE_RUNTIME.encode("utf-8"),
+        "uninstall.bin": UNINSTALL_PS.encode("utf-8"),
+    }
+    built = publish(dotnet, project, INSTALLER_CS, "HooshyarOS-Setup", "hooshyar-installer-", extra_files=extra)
     if built.stat().st_size < 1 * 1024 * 1024:
         raise RuntimeError("Installer is unexpectedly small")
     shutil.copy2(built, EXE)
@@ -350,7 +370,8 @@ def build_installer(dotnet: str) -> None:
 
 def main() -> int:
     dotnet = shutil.which("dotnet.exe") or shutil.which("dotnet")
-    if not dotnet: raise RuntimeError("dotnet is unavailable")
+    if not dotnet:
+        raise RuntimeError("dotnet is unavailable")
     build_desktop_shell(dotnet)
     build_bootstrap()
     build_installer(dotnet)
