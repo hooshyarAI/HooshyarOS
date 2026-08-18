@@ -62,7 +62,7 @@ READ → UNDERSTAND → AUDIT → SELECT ONE KNOT → PLAN → CHECK DEPENDENCIE
 → SELECT STRATEGY → IMPLEMENT → TEST → VERIFY → CHECKPOINT → ADVANCE
 ```
 
-A knot is one canonical capability with one owner, one intent, one implementation contract and one verification contract. Generation success alone is never sufficient evidence of acceptance.
+A knot is one canonical capability with one owner, one intent, one implementation contract and one verification contract. Generation success alone is never sufficient evidence for acceptance.
 
 ### Capability evidence rule
 Behavioral evidence is authoritative when it reflects the **actual owning Engine contract and the focused test contract**. Hard-coded method markers are hints only and must never be the sole source of truth for capability completion. The mission/audit layer must tolerate legitimate contract names such as `audit`, `analyze`, `validate`, `deploy`, `route`, or other repository-defined behavior without forcing a generic naming convention.
@@ -113,6 +113,11 @@ This restriction is operational, not architectural: the HooshyarOS product may s
 23. Preserve repair intent end-to-end; `repair-<capabilityId>` must reach the repair worker unchanged.
 24. Use the best approved tool for each stage before considering additional human intervention.
 25. Before declaring commercial product completion, pass the Commercial Product Completion Contract and keep external production dependencies distinct from repository-native completion.
+26. **Reality Gate Law:** `productComplete=true` requires machine-generated application/acceptance evidence from `Docs/Evidence/commercial-product-reality.json`; source presence, unit tests, mocks, screenshots or narrative claims can never substitute for executed product evidence.
+27. The commercial reality manifest must bind to the exact Git commit under test and must fail closed on missing, malformed, stale or unsuccessful command/runtime/application/persistence/security/acceptance evidence.
+28. A repair or builder step is successful only when its claimed postcondition is observed after execution. A script that fails to mutate its target, skips its postcondition, or merely prints a success message MUST be treated as failed.
+29. Never maintain two competing canonical productization paths without an explicit routing/deprecation contract. Tests must target the same builder/artifact path that the release gate actually executes.
+30. Any stale contract test that contradicts the active implementation is a release blocker until the owner contract is reconciled; never "fix" the implementation solely to satisfy stale assertions.
 
 ## Architecture changes
 Architecture Freeze V4 is the default source of truth. Change it only when an actual contradiction or missing architectural capability is demonstrated by repository evidence. If changed, update the master charter, architecture document, governance charter and affected decisions before continuing construction.
