@@ -60,11 +60,11 @@ describe("Windows product installer contract", () => {
         expect(finalInstallerBuilder).not.toContain("Microsoft.Web.WebView2");
     });
 
-    it("keeps the runtime alive for the desktop session", () => {
-        expect(finalInstallerBuilder).toContain("browser.WaitForExit();");
-        expect(finalInstallerBuilder).toContain("runtimeProcess.Kill(true)");
+    it("detaches the installed Node runtime from the desktop shell lifecycle", () => {
+        expect(finalInstallerBuilder).toContain('FileName = "cmd.exe"');
+        expect(finalInstallerBuilder).toContain('Arguments = "/d /c start \\\"HooshyarOS Runtime\\\" /b');
         expect(finalInstallerBuilder).toContain("runtime-started pid=");
-        expect(finalInstallerBuilder).toContain("browser-exited");
-        expect(finalInstallerBuilder).not.toContain('FileName = "cmd.exe"');
+        expect(finalInstallerBuilder).not.toContain("runtimeProcess.Kill(true)");
+        expect(finalInstallerBuilder).not.toContain("browser.WaitForExit();");
     });
 });
