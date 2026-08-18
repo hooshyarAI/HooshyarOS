@@ -150,6 +150,18 @@ export function declaredArtifactPaths(root: string, capabilityId: string, target
     ];
 }
 
+export function missingDeclaredArtifactPaths(requiredPaths: string[], changedPaths: string[], root: string): string[] {
+    const changed = new Set(changedPaths.map(path => normalize(path)));
+    return requiredPaths
+        .map(path => normalize(path))
+        .filter(path => !changed.has(path) && !existsSync(path.replace(normalize(root) + normalize("/"), "")));
+}
+
+function allDeclaredArtifactsPresentOrChanged(requiredPaths: string[], changedPaths: string[], root: string): boolean {
+    const changed = new Set(changedPaths.map(path => normalize(path)));
+    return requiredPaths.map(path => normalize(path)).every(path => changed.has(path) || existsSync(path));
+}
+
 function relativeStatusPaths(statusOutput: string, root: string): string[] {
     return statusOutput.split(/\r?\n/)
         .map(line => line.slice(3).trim())
@@ -213,6 +225,10 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                 const allowed = requiredPaths.map(path => normalize(path));
                 const unexpectedPaths = changedPaths.filter(path => !allowed.includes(path));
                 const touchesDeclaredArtifact = changedPaths.some(path => allowed.includes(path));
+                const allDeclaredArtifactsReady = allDeclaredArtifactsPresentOrChanged(requiredPaths, changedPaths, root);
+                const missingRequiredArtifacts = requiredPaths
+                    .map(path => normalize(path))
+                    .filter(path => !changedPaths.includes(path) && !existsSync(path));
                 const artifact = {
                     type: "AUTONOMOUS_AGENT_GENERATION_RESULT",
                     provider: agent,
@@ -222,6 +238,8 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                     requiredPaths,
                     changedPaths,
                     unexpectedPaths,
+                    missingRequiredArtifacts,
+                    allDeclaredArtifactsReady,
                     exitCode: result.code,
                     changed,
                     elapsedMs: result.elapsedMs,
@@ -235,6 +253,9 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                 if (!changed) return { ok: false, issue: "AUTONOMOUS_AGENT_NO_REPOSITORY_CHANGE", artifact };
                 if (!touchesDeclaredArtifact || unexpectedPaths.length > 0) {
                     return { ok: false, issue: "AUTONOMOUS_ARTIFACT_BOUNDARY_VIOLATION", artifact };
+                }
+                if (!allDeclaredArtifactsReady) {
+                    return { ok: false, issue: "AUTONOMOUS_REQUIRED_ARTIFACT_MISSING", artifact };
                 }
                 return { ok: true, artifact };
             }
