@@ -59,4 +59,10 @@ describe("Windows product installer contract", () => {
         expect(finalInstallerBuilder).toContain("msedge.exe");
         expect(finalInstallerBuilder).not.toContain("Microsoft.Web.WebView2");
     });
+
+    it("detaches the installed Node runtime from the desktop shell lifecycle", () => {
+        expect(finalInstallerBuilder).toContain('FileName = "cmd.exe"');
+        expect(finalInstallerBuilder).toContain('Arguments = "/d /c start \\\"HooshyarOS Runtime\\\" /b');
+        expect(finalInstallerBuilder).not.toContain("runtime.Kill(true)");
+    });
 });
