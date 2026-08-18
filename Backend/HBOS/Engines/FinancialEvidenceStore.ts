@@ -20,6 +20,7 @@ export class FinancialEvidenceStore {
                 source_id TEXT PRIMARY KEY,
                 source_uri TEXT NOT NULL,
                 source_entity TEXT NOT NULL DEFAULT '',
+                raw_path TEXT NOT NULL DEFAULT '',
                 evidence_hash TEXT NOT NULL UNIQUE,
                 records_json TEXT NOT NULL,
                 model_json TEXT NOT NULL,
@@ -31,16 +32,20 @@ export class FinancialEvidenceStore {
         if (!columns.some((column) => column.name === "source_entity")) {
             this.database.exec("ALTER TABLE financial_evidence ADD COLUMN source_entity TEXT NOT NULL DEFAULT ''");
         }
+        if (!columns.some((column) => column.name === "raw_path")) {
+            this.database.exec("ALTER TABLE financial_evidence ADD COLUMN raw_path TEXT NOT NULL DEFAULT ''");
+        }
     }
 
     save(payload: PersistedFinancialEvidence): void {
         const statement = this.database.prepare(`
             INSERT INTO financial_evidence
-                (source_id, source_uri, source_entity, evidence_hash, records_json, model_json, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+                (source_id, source_uri, source_entity, raw_path, evidence_hash, records_json, model_json, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(source_id) DO UPDATE SET
                 source_uri = excluded.source_uri,
                 source_entity = excluded.source_entity,
+                raw_path = excluded.raw_path,
                 evidence_hash = excluded.evidence_hash,
                 records_json = excluded.records_json,
                 model_json = excluded.model_json
@@ -50,6 +55,7 @@ export class FinancialEvidenceStore {
             payload.source.sourceId,
             payload.source.sourceUri,
             payload.source.entity,
+            payload.source.rawPath,
             payload.evidenceHash,
             JSON.stringify(payload.records),
             JSON.stringify(payload.model),
@@ -59,12 +65,12 @@ export class FinancialEvidenceStore {
 
     get(sourceId: string): PersistedFinancialEvidence | null {
         const row = this.database
-            .prepare("SELECT source_uri, source_entity, evidence_hash, records_json, model_json FROM financial_evidence WHERE source_id = ?")
-            .get(sourceId) as { source_uri: string; source_entity: string; evidence_hash: string; records_json: string; model_json: string } | undefined;
+            .prepare("SELECT source_uri, source_entity, raw_path, evidence_hash, records_json, model_json FROM financial_evidence WHERE source_id = ?")
+            .get(sourceId) as { source_uri: string; source_entity: string; raw_path: string; evidence_hash: string; records_json: string; model_json: string } | undefined;
 
         if (!row) return null;
         return {
-            source: { sourceId, sourceUri: row.source_uri, rawPath: "", entity: row.source_entity },
+            source: { sourceId, sourceUri: row.source_uri, rawPath: row.raw_path, entity: row.source_entity },
             evidenceHash: row.evidence_hash,
             records: JSON.parse(row.records_json),
             model: JSON.parse(row.model_json)
