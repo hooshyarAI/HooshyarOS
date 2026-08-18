@@ -67,13 +67,15 @@ internal sealed class MainForm : Form
         var runtimeRoot = Path.Combine(root, "runtime");
         var node = Path.Combine(runtimeRoot, "node.exe");
         var app = Path.Combine(runtimeRoot, "commercial-runtime.js");
-        if (!Ready())
+
+        if (!await WaitUntilReadyAsync())
         {
             if (!File.Exists(node) || !File.Exists(app))
             {
                 MessageBox.Show("HooshyarOS runtime is incomplete. Please repair or reinstall the application.", "Hooshyar.ai", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
+
             runtime = Process.Start(new ProcessStartInfo
             {
                 FileName = node,
@@ -82,20 +84,32 @@ internal sealed class MainForm : Form
                 UseShellExecute = false,
                 CreateNoWindow = true
             });
+
+            if (runtime is null || !await WaitUntilReadyAsync())
+            {
+                MessageBox.Show("HooshyarOS runtime could not be started. Please repair or reinstall the application.", "Hooshyar.ai", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
         }
+
         await web.EnsureCoreWebView2Async();
         web.Source = new Uri("http://127.0.0.1:3000/");
     }
 
-    private static bool Ready()
+    private static async System.Threading.Tasks.Task<bool> WaitUntilReadyAsync()
     {
-        try
+        using var client = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromMilliseconds(700) };
+        for (var attempt = 0; attempt < 40; attempt++)
         {
-            using var client = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromMilliseconds(700) };
-            var response = client.GetAsync("http://127.0.0.1:3000/api/dashboard").GetAwaiter().GetResult();
-            return response.IsSuccessStatusCode;
+            try
+            {
+                var body = await client.GetStringAsync("http://127.0.0.1:3000/api/dashboard");
+                if (body.Contains("\"state\":\"ready\"", StringComparison.Ordinal)) return true;
+            }
+            catch { }
+            await System.Threading.Tasks.Task.Delay(250);
         }
-        catch { return false; }
+        return false;
     }
 
     private void StopRuntime()
