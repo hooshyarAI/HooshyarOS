@@ -9,7 +9,7 @@
 - `Docs/AUTONOMOUS_7_DAY_BUILD_SLA.md` — permanent seven-day autonomous construction performance law.
 - `Docs/HOOSHYAROS_TOOLCHAIN_OPTIMIZATION_LAW.md` — permanent tool-first, Python-first construction and human-intervention law.
 - `Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md` — canonical commercial-product completion and acceptance contract; mandatory for distinguishing canonical capability completion from real commercial product completion.
-- `Docs/Engineering/REAL_ENGINEERING_COMMERCIALIZATION_LAW.md` — mandatory real-engineering, independent-verification and commercialization law.
+- `Docs/Engineering/REAL_ENGINEERING_COMMERCIALIZATION_LAW.md` — mandatory real-engineering, independent-verification, Assistant-only construction and commercialization law.
 - Existing architecture decisions, HBOS engines, capability owners, tests and documentation — inspect before adding anything.
 
 The repository is the durable memory of the approved architecture, product principles, autonomous-construction role, decision logic and verification rules. Do not rely on conversational memory when the repository can provide the governing rule.
@@ -24,6 +24,13 @@ The complete autonomous construction experience must be operable from Visual Stu
 2. **Platform Build Command** — starts/resumes the canonical autonomous construction of the full HooshyarOS platform only after the Assistant completion gate and final Assistant verification have passed. It must continue automatically through the canonical backlog, preserving Architecture Freeze V4, governance, security, evidence and expert-weaving rules, until the canonical platform construction backlog is exhausted or a bounded evidence-backed BLOCKED state is reached.
 
 No routine manual file editing or command-by-command driving is required between these two commands. Mechanical work that Python, Git/GitHub or the Assistant can safely perform remains autonomous.
+
+## Assistant-only construction law
+All routine HooshyarOS construction, repair, refactoring, productization, standardization and verification orchestration MUST pass through the canonical Autonomous Build Assistant and its approved toolchain. The conversational layer may specify goals, constraints and explicit approvals, but it is not an alternative implementation path. Direct ad-hoc generation of arbitrary batches, speculative parallel builders, or command-by-command construction is prohibited when the canonical construction fabric can safely perform the work.
+
+The Assistant MUST derive work from repository truth and use the platform's own approved capability model, Engine ownership, Expert Choice, patterns, models, recovery doctrine, toolchain and evidence contracts. Every action follows `PLAN → EXECUTE → OBSERVE → COMPARE POSTCONDITION → REPAIR/RETRY WITHIN BUDGET → CHECKPOINT`. A generated patch, printed success message, passing self-authored test or source marker without observed postcondition is incomplete.
+
+If the construction process itself is defective, the Assistant treats that defect as a first-class repair target before continuing product construction. If evidence is missing or contradictory, the Assistant preserves the last trusted checkpoint and enters an evidence-backed BLOCKED state rather than bypassing the gate.
 
 ## Permanent seven-day completion law
 The two-command construction system is subject to a **maximum seven-calendar-day target** for completing the canonical autonomous platform construction process from the approved starting state. The seven-day requirement is a performance constraint and never permits weakening architecture, security, governance, correctness, verification, recoverability or evidence integrity. The construction fabric must optimize throughput using reuse, Python-first automation, proportional verification, bounded repair, measurable telemetry and safe parallelism.
@@ -129,6 +136,10 @@ This restriction is operational, not architectural: the HooshyarOS product may s
 38. **Standard-tool law:** prefer mature standard infrastructure over hand-written substitutes; invent a replacement only with a recorded architecture/security reason.
 39. **Domain-authority law:** legally consequential Iranian tax/accounting/privacy/compliance claims require authoritative current sources and appropriate human approval; AI output is not the final legal authority.
 40. **Human-accountability law:** the objective is one human plus autonomous tooling, not zero accountability. Final security acceptance, legally consequential compliance, production credentials/external activation and final commercial release require explicit human approval.
+41. **Assistant-only execution law:** all routine construction and repair MUST originate from and be orchestrated by the canonical Autonomous Build Assistant. A conversational response, manually supplied patch, ad-hoc shell sequence or external coding agent cannot become an accepted construction checkpoint outside that workflow.
+42. **Platform-native strategy law:** the Assistant MUST use the existing Engine/capability/pattern/model/tooling hierarchy before introducing new mechanisms, and must record a concrete repository-backed reason whenever the existing hierarchy is insufficient.
+43. **Observed-loop law:** no autonomous stage is complete until its expected postcondition is observed in the execution environment and attached to the checkpoint evidence.
+44. **Process-repair law:** failures in the build/repair/verification fabric are themselves capabilities to diagnose and repair; product work must not paper over a broken construction process.
 
 ## Architecture changes
 Architecture Freeze V4 is the default source of truth. Change it only when an actual contradiction or missing architectural capability is demonstrated by repository evidence. If changed, update the master charter, architecture document, governance charter and affected decisions before continuing construction.
