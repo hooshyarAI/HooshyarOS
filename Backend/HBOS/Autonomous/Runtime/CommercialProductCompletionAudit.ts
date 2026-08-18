@@ -1,6 +1,7 @@
+import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
 
 export interface CommercialProductCompletionAuditResult {
     complete: boolean;
@@ -12,8 +13,12 @@ export interface CommercialProductCompletionAuditResult {
 interface CommercialRealityEvidence {
     schemaVersion?: number;
     status?: string;
+    generatorId?: string;
+    verificationMode?: string;
+    generatedAt?: string;
     commit?: string;
-    commands?: Array<{ name?: string; exitCode?: number }>;
+    environmentId?: string;
+    commands?: Array<{ name?: string; exitCode?: number; observedPostcondition?: boolean }>;
     artifacts?: {
         installer?: { path?: string; sha256?: string; sizeBytes?: number };
     };
@@ -55,13 +60,14 @@ interface CommercialRealityEvidence {
  *
  * Source artifacts and unit/integration tests establish implementation
  * confidence; they do not establish that the packaged product actually ran.
- * `complete=true` therefore requires a machine-generated, commit-bound
- * commercial reality evidence manifest in addition to the repository-native
- * commercial layers.
+ * `complete=true` therefore requires machine-generated, commit-bound evidence
+ * plus deterministic checks against the actual produced artifact.
  */
 export class CommercialProductCompletionAudit {
     private readonly contractPath = "Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md";
     private readonly realityEvidencePath = "Docs/Evidence/commercial-product-reality.json";
+    private readonly expectedGeneratorId = "HooshyarOS.RealityVerifier.v1";
+    private readonly expectedVerificationMode = "BLACK_BOX_RUNTIME";
 
     audit(root: string): CommercialProductCompletionAuditResult {
         const contractFile = join(root, this.contractPath);
@@ -122,12 +128,12 @@ export class CommercialProductCompletionAudit {
         if (contract.includes("Payment-provider activation is an external dependency")) blockedExternalDependencies.push("payment-provider-activation");
         if (contract.includes("Cloud deployment may remain externally blocked")) blockedExternalDependencies.push("production-cloud-resources");
 
-        const reality = this.readRealityEvidence(root, missingLayers, blockedExternalDependencies);
+        this.readRealityEvidence(root, missingLayers, blockedExternalDependencies);
         return {
             complete: missingLayers.length === 0,
             contractPresent: true,
-            missingLayers,
-            blockedExternalDependencies: reality.blockedExternalDependencies,
+            missingLayers: [...new Set(missingLayers)],
+            blockedExternalDependencies: [...new Set(blockedExternalDependencies)],
         };
     }
 
@@ -135,7 +141,7 @@ export class CommercialProductCompletionAudit {
         const path = join(root, this.realityEvidencePath);
         if (!existsSync(path)) {
             missingLayers.push("commercial-reality-evidence");
-            return { blockedExternalDependencies };
+            return;
         }
 
         let evidence: CommercialRealityEvidence;
@@ -143,29 +149,33 @@ export class CommercialProductCompletionAudit {
             evidence = JSON.parse(readFileSync(path, "utf8")) as CommercialRealityEvidence;
         } catch {
             missingLayers.push("commercial-reality-evidence-invalid-json");
-            return { blockedExternalDependencies };
+            return;
         }
 
         if (evidence.schemaVersion !== 1) missingLayers.push("commercial-reality-evidence-schema");
         if (evidence.status !== "VERIFIED") missingLayers.push("commercial-reality-evidence-status");
+        if (evidence.generatorId !== this.expectedGeneratorId) missingLayers.push("commercial-reality-evidence-generator");
+        if (evidence.verificationMode !== this.expectedVerificationMode) missingLayers.push("commercial-reality-evidence-verification-mode");
+        if (!evidence.generatedAt || Number.isNaN(Date.parse(evidence.generatedAt))) missingLayers.push("commercial-reality-evidence-timestamp");
+        if (!evidence.environmentId) missingLayers.push("commercial-reality-evidence-environment");
         if (!evidence.commit) missingLayers.push("commercial-reality-evidence-commit");
 
-        if (existsSync(join(root, ".git")) && evidence.commit) {
-            try {
-                const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
-                if (head !== evidence.commit) missingLayers.push("commercial-reality-evidence-commit-mismatch");
-            } catch {
-                missingLayers.push("commercial-reality-evidence-git-binding");
-            }
+        try {
+            const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+            if (!evidence.commit || head !== evidence.commit) missingLayers.push("commercial-reality-evidence-commit-mismatch");
+        } catch {
+            missingLayers.push("commercial-reality-evidence-git-binding");
         }
 
-        if (!evidence.commands?.length || evidence.commands.some(command => command.exitCode !== 0)) {
+        if (!evidence.commands?.length || evidence.commands.some(command => !command.name || command.exitCode !== 0 || command.observedPostcondition !== true)) {
             missingLayers.push("commercial-command-evidence");
         }
 
         const installer = evidence.artifacts?.installer;
         if (!installer?.path || !installer.sha256 || !installer.sizeBytes || installer.sizeBytes <= 0) {
             missingLayers.push("commercial-artifact-evidence");
+        } else {
+            this.verifyArtifact(root, installer.path, installer.sha256, installer.sizeBytes, missingLayers);
         }
 
         const runtime = evidence.runtime;
@@ -190,11 +200,36 @@ export class CommercialProductCompletionAudit {
         if (!evidence.acceptance?.userValuePath) missingLayers.push("acceptance-evidence");
 
         for (const dependency of evidence.externalDependencies ?? []) {
-            if (dependency.required && dependency.status === "BLOCKED" && dependency.name) {
-                if (!blockedExternalDependencies.includes(dependency.name)) blockedExternalDependencies.push(dependency.name);
+            if (dependency.required && dependency.name) {
+                if (dependency.status === "BLOCKED") {
+                    if (!blockedExternalDependencies.includes(dependency.name)) blockedExternalDependencies.push(dependency.name);
+                    missingLayers.push(`external-dependency:${dependency.name}`);
+                } else if (dependency.status !== "VERIFIED") {
+                    missingLayers.push(`external-dependency-unverified:${dependency.name}`);
+                }
             }
         }
+    }
 
-        return { blockedExternalDependencies };
+    private verifyArtifact(root: string, artifactPath: string, expectedSha256: string, expectedSize: number, missingLayers: string[]) {
+        const rootPath = resolve(root);
+        const target = resolve(root, artifactPath);
+        const rel = relative(rootPath, target);
+        if (rel.startsWith("..") || rel.includes(`..${relative(rootPath, join(rootPath, "x")).slice(1)}`)) {
+            missingLayers.push("commercial-artifact-path-escape");
+            return;
+        }
+        if (!existsSync(target)) {
+            missingLayers.push("commercial-artifact-missing");
+            return;
+        }
+        try {
+            const stat = statSync(target);
+            if (stat.size !== expectedSize || stat.size <= 0) missingLayers.push("commercial-artifact-size-mismatch");
+            const actualSha256 = createHash("sha256").update(readFileSync(target)).digest("hex");
+            if (actualSha256.toLowerCase() !== expectedSha256.toLowerCase()) missingLayers.push("commercial-artifact-sha256-mismatch");
+        } catch {
+            missingLayers.push("commercial-artifact-verification-failed");
+        }
     }
 }
