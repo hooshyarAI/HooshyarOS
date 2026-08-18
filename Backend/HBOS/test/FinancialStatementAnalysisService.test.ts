@@ -11,8 +11,8 @@ describe("FinancialStatementAnalysisService", () => {
   };
 
   const reasoning = {
-    reason: jest.fn(() => ({
-      problem: "financial analysis",
+    reason: jest.fn((prompt: string) => ({
+      problem: prompt,
       status: "reasoned",
       success: true,
     })),
@@ -72,7 +72,11 @@ describe("FinancialStatementAnalysisService", () => {
 
   it("fails closed when the reasoning boundary cannot produce evidence", () => {
     const blockedReasoning = {
-      reason: jest.fn(() => ({ problem: "x", status: "reasoning_failed", success: false })),
+      reason: jest.fn((_prompt: string) => ({
+        problem: "x",
+        status: "reasoning_failed",
+        success: false,
+      })),
     };
 
     const blocked = new FinancialStatementAnalysisService(
