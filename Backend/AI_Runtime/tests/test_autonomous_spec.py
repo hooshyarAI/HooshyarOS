@@ -68,7 +68,7 @@ def test_product_artifacts_remain_product_scoped_for_windows_absolute_paths():
     assert "class FinancialDataIngestionAdapter" in artifacts[spec.engine_path]
     assert "../Product/FinancialDataIngestionAdapter" in artifacts[spec.test_path]
     assert "../Engines/FinancialDataIngestionAdapter" not in artifacts[spec.test_path]
-    assert "/Product/" in artifacts[spec.docs_path] or "\\Product\\" in artifacts[spec.docs_path]
+    assert "\\Product\\" in spec.docs_path or "/Product/" in spec.docs_path
 
 
 def test_generic_artifacts_preserve_architecture_contract():
