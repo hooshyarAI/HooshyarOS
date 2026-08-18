@@ -112,6 +112,7 @@ DESKTOP_CSPROJ = r'''<Project Sdk="Microsoft.NET.Sdk">
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
+    <UseAppHost>true</UseAppHost>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <PublishTrimmed>false</PublishTrimmed>
     <InvariantGlobalization>true</InvariantGlobalization>
@@ -248,6 +249,17 @@ internal static class Program
 '''
 
 
+def _find_published_exe(output: Path, assembly_name: str) -> Path:
+    exact = output / f"{assembly_name}.exe"
+    if exact.is_file():
+        return exact
+    candidates = sorted(output.glob("*.exe"), key=lambda p: p.stat().st_size, reverse=True)
+    if len(candidates) == 1:
+        return candidates[0]
+    names = ", ".join(p.name for p in candidates) or "<none>"
+    raise RuntimeError(f"No unambiguous Windows executable produced for {assembly_name}; publish output EXEs: {names}")
+
+
 def publish(dotnet: str, project_text: str, source_text: str, assembly_name: str, temp_prefix: str, extra_files: dict[str, bytes] | None = None) -> Path:
     with tempfile.TemporaryDirectory(prefix=temp_prefix) as temp:
         root = Path(temp)
@@ -265,16 +277,14 @@ def publish(dotnet: str, project_text: str, source_text: str, assembly_name: str
         env["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1"
         env["DOTNET_NOLOGO"] = "1"
         result = subprocess.run(
-            [dotnet, "publish", str(project), "-c", "Release", "-o", str(output), "--nologo"],
-            cwd=root, env=env, text=True, encoding="utf-8", errors="replace",
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30 * 60, check=False,
+            [dotnet, "publish", str(project), "-c", "Release", "-r", "win-x64", "--self-contained", "true", "-p:UseAppHost=true", "-p:PublishSingleFile=true", "-o", str(output), "--nologo"],
+            cwd=root, env=env, text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30 * 60, check=False,
         )
         print(result.stdout, end="")
         if result.returncode != 0:
             raise RuntimeError(f"dotnet publish failed for {assembly_name} with exit code {result.returncode}")
-        built = output / f"{assembly_name}.exe"
-        if not built.exists():
-            raise RuntimeError(f"Missing published {assembly_name}.exe")
+        built = _find_published_exe(output, assembly_name)
+        print(f"PUBLISHED_EXE={built.name} SIZE={built.stat().st_size}")
         return built
 
 
@@ -283,11 +293,7 @@ def build_desktop_shell(dotnet: str) -> None:
         root = Path(temp)
         project = root / "HooshyarOS.csproj"
         project.write_text(DESKTOP_CSPROJ, encoding="utf-8")
-        result = subprocess.run(
-            [dotnet, "add", str(project), "package", "Microsoft.Web.WebView2"],
-            cwd=root, text=True, encoding="utf-8", errors="replace",
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=10 * 60, check=False,
-        )
+        result = subprocess.run([dotnet, "add", str(project), "package", "Microsoft.Web.WebView2"], cwd=root, text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=10 * 60, check=False)
         print(result.stdout, end="")
         if result.returncode != 0:
             raise RuntimeError("Unable to restore Microsoft.Web.WebView2")
@@ -296,19 +302,15 @@ def build_desktop_shell(dotnet: str) -> None:
         env["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1"
         env["DOTNET_NOLOGO"] = "1"
         out = root / "publish"
-        result = subprocess.run(
-            [dotnet, "publish", str(project), "-c", "Release", "-o", str(out), "--nologo"],
-            cwd=root, env=env, text=True, encoding="utf-8", errors="replace",
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30 * 60, check=False,
-        )
+        result = subprocess.run([dotnet, "publish", str(project), "-c", "Release", "-r", "win-x64", "--self-contained", "true", "-p:UseAppHost=true", "-p:PublishSingleFile=true", "-o", str(out), "--nologo"], cwd=root, env=env, text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30 * 60, check=False)
         print(result.stdout, end="")
         if result.returncode != 0:
             raise RuntimeError("HooshyarOS desktop shell publish failed")
-        built = out / "HooshyarOS.exe"
-        if not built.exists():
-            raise RuntimeError("HooshyarOS.exe was not produced")
+        built = _find_published_exe(out, "HooshyarOS")
         RELEASE_ROOT.mkdir(parents=True, exist_ok=True)
         shutil.copy2(built, DESKTOP_SHELL)
+        if DESKTOP_SHELL.stat().st_size < 1 * 1024 * 1024:
+            raise RuntimeError("HooshyarOS desktop shell is unexpectedly small")
 
 
 def build_bootstrap() -> None:
@@ -344,6 +346,7 @@ def build_installer(dotnet: str) -> None:
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
+    <UseAppHost>true</UseAppHost>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
     <PublishTrimmed>false</PublishTrimmed>
@@ -366,6 +369,7 @@ def build_installer(dotnet: str) -> None:
     if built.stat().st_size < 1 * 1024 * 1024:
         raise RuntimeError("Installer is unexpectedly small")
     shutil.copy2(built, EXE)
+    print(f"INSTALLER_EXE_SIZE={EXE.stat().st_size}")
 
 
 def main() -> int:
@@ -378,7 +382,6 @@ def main() -> int:
     print(f"WINDOWS_INSTALLER={EXE.relative_to(ROOT)}")
     print(f"WINDOWS_DESKTOP_SHELL={DESKTOP_SHELL.relative_to(ROOT)}")
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())
