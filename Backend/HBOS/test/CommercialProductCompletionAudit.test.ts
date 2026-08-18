@@ -9,12 +9,12 @@ describe("CommercialProductCompletionAudit", () => {
         expect(result.missingLayers).not.toContain("commercial-completion-contract");
     });
 
-    it("reports the actual remaining commercial boundaries instead of a stale web-entrypoint gap", () => {
+    it("fails closed when real application evidence has not been produced", () => {
         const audit = new CommercialProductCompletionAudit();
         const result = audit.audit(process.cwd());
 
         expect(result.complete).toBe(false);
+        expect(result.missingLayers).toContain("commercial-reality-evidence");
         expect(result.missingLayers).not.toContain("web-entrypoint");
-        expect(result.missingLayers).toContain("persistence-boundary");
     });
 });
