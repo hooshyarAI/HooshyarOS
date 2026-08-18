@@ -15,6 +15,7 @@ BOOTSTRAP = RELEASE_ROOT / "HooshyarOS-Windows-Bootstrap.zip"
 EXE = RELEASE_ROOT / "HooshyarOS-Setup.exe"
 DESKTOP_SHELL = RELEASE_ROOT / "HooshyarOS.exe"
 
+# Existing file body up to the publish helper is intentionally retained.
 STANDALONE_RUNTIME = r'''const http = require("node:http");
 const routes = {
   "/": ["text/html; charset=utf-8", "<!doctype html><html lang=\"fa\" dir=\"rtl\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Hooshyar.ai</title><body><main><h1>Hooshyar.ai</h1><p>Enterprise Intelligence Platform</p></main></body></html>"],
@@ -211,7 +212,6 @@ internal static class Program
                          + "$s.TargetPath='" + shellPath.Replace("'", "''") + "'; "
                          + "$s.WorkingDirectory='" + installRoot.Replace("'", "''") + "'; $s.Save();";
             File.WriteAllText(shortcutScript, psScript, Encoding.UTF8);
-
             var shortcutInfo = new ProcessStartInfo
             {
                 FileName = "powershell.exe",
@@ -219,10 +219,7 @@ internal static class Program
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
-            using (var process = Process.Start(shortcutInfo))
-            {
-                process?.WaitForExit(15000);
-            }
+            using (var process = Process.Start(shortcutInfo)) { process?.WaitForExit(15000); }
             try { File.Delete(shortcutScript); } catch { }
 
             using (var key = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\HooshyarOS"))
@@ -284,8 +281,11 @@ def publish(dotnet: str, project_text: str, source_text: str, assembly_name: str
         if result.returncode != 0:
             raise RuntimeError(f"dotnet publish failed for {assembly_name} with exit code {result.returncode}")
         built = _find_published_exe(output, assembly_name)
-        print(f"PUBLISHED_EXE={built.name} SIZE={built.stat().st_size}")
-        return built
+        RELEASE_ROOT.mkdir(parents=True, exist_ok=True)
+        persisted = RELEASE_ROOT / f".{assembly_name}.build.exe"
+        shutil.copy2(built, persisted)
+        print(f"PUBLISHED_EXE={built.name} SIZE={persisted.stat().st_size}")
+        return persisted
 
 
 def build_desktop_shell(dotnet: str) -> None:
