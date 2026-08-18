@@ -17,14 +17,14 @@ describe("Risk sensitivity analysis", () => {
 
     it("marks a decision stable when the risk level does not change", () => {
         expect(analyzeRiskSensitivity({
-            probability: 2,
-            impact: 2,
+            probability: 1,
+            impact: 1,
             probabilityDelta: 1,
             impactDelta: 1,
         })).toEqual({
-            baselineScore: 4,
-            minScore: 1,
-            maxScore: 9,
+            baselineScore: 1,
+            minScore: 0,
+            maxScore: 4,
             decisionStable: true,
         });
     });
