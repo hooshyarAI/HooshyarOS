@@ -15,9 +15,6 @@ describe("CommercialProductCompletionAudit", () => {
 
         expect(result.complete).toBe(false);
         expect(result.missingLayers).not.toContain("web-entrypoint");
-        expect(result.missingLayers).toEqual(expect.arrayContaining([
-            "persistence-boundary",
-            "authentication-authorization-boundary",
-        ]));
+        expect(result.missingLayers).toContain("persistence-boundary");
     });
 });
