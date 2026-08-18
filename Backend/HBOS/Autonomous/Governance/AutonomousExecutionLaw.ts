@@ -10,6 +10,7 @@ export interface AutonomousExecutionLawInput {
     tool: string;
     assistantMediated?: boolean;
     platformNative?: boolean;
+    verificationPassed?: boolean;
     architectureRules?: string[];
 }
 
@@ -49,7 +50,6 @@ export class AutonomousExecutionLaw {
         const assistantMediated = input.assistantMediated !== false;
         const platformNative = input.platformNative !== false;
         const staged = this.stageAllowed(input.stage, input.tool);
-        const finalizeRequiresVerification = input.stage !== "FINALIZE";
         const externalCodingAgent = process.env.HOOSHYAR_EXTERNAL_CODING_AGENT?.trim();
 
         if (!platformNative) return this.block("PLATFORM_NATIVE_ONLY", invariants);
@@ -57,7 +57,7 @@ export class AutonomousExecutionLaw {
         if (!architectureBound) return this.block("ARCHITECTURE_BOUNDARY_REQUIRED", invariants);
         if (!input.capabilityId.trim()) return this.block("CAPABILITY_ID_REQUIRED", invariants);
         if (!staged.allowed) return this.block(staged.reason, invariants);
-        if (input.stage === "FINALIZE" && finalizeRequiresVerification) return this.block("FINALIZE_REQUIRES_PRIOR_VERIFICATION", invariants);
+        if (input.stage === "FINALIZE" && input.verificationPassed !== true) return this.block("FINALIZE_REQUIRES_PRIOR_VERIFICATION", invariants);
         if (externalCodingAgent) return this.block("EXTERNAL_CODING_AGENT_FORBIDDEN", invariants);
 
         return { allowed: true, reason: "AUTONOMOUS_EXECUTION_LAW_AUTHORIZED", invariants };
