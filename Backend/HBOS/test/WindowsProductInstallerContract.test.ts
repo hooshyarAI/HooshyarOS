@@ -7,6 +7,10 @@ describe("Windows product installer contract", () => {
         path.join(root, "Backend", "AI_Runtime", "release_product_builder.py"),
         "utf8",
     );
+    const finalInstallerBuilder = fs.readFileSync(
+        path.join(root, "Backend", "AI_Runtime", "final_windows_installer_builder.py"),
+        "utf8",
+    );
 
     it("filters development artifacts from the customer payload", () => {
         expect(builder).toContain("def _should_skip_file");
@@ -45,5 +49,12 @@ describe("Windows product installer contract", () => {
         expect(builder).toContain("Frontend/HooshyarWebApp/index.ts");
         expect(builder).toContain("product-manifest.json");
         expect(builder).toContain("web/index.html");
+    });
+
+    it("waits for the installed runtime readiness handshake before opening the desktop UI", () => {
+        expect(finalInstallerBuilder).toContain("WaitUntilReadyAsync");
+        expect(finalInstallerBuilder).toContain("/api/dashboard");
+        expect(finalInstallerBuilder).toContain('"state":"ready"');
+        expect(finalInstallerBuilder).toContain("runtime could not be started");
     });
 });
