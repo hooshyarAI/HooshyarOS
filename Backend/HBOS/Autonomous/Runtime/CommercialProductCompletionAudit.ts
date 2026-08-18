@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 
 export interface CommercialProductCompletionAuditResult {
     complete: boolean;
@@ -55,14 +55,7 @@ interface CommercialRealityEvidence {
     }>;
 }
 
-/**
- * Fail-closed commercial product gate.
- *
- * Source artifacts and unit/integration tests establish implementation
- * confidence; they do not establish that the packaged product actually ran.
- * `complete=true` therefore requires machine-generated, commit-bound evidence
- * plus deterministic checks against the actual produced artifact.
- */
+/** Fail-closed commercial product gate. */
 export class CommercialProductCompletionAudit {
     private readonly contractPath = "Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md";
     private readonly realityEvidencePath = "Docs/Evidence/commercial-product-reality.json";
@@ -215,7 +208,8 @@ export class CommercialProductCompletionAudit {
         const rootPath = resolve(root);
         const target = resolve(root, artifactPath);
         const rel = relative(rootPath, target);
-        if (rel.startsWith("..") || rel.includes(`..${relative(rootPath, join(rootPath, "x")).slice(1)}`)) {
+        const escapesRoot = rel === ".." || rel.startsWith(`..${sep}`) || resolve(rootPath, rel) !== target && rel.startsWith("..");
+        if (escapesRoot) {
             missingLayers.push("commercial-artifact-path-escape");
             return;
         }
