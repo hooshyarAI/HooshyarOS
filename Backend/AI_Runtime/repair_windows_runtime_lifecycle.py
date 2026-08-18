@@ -46,7 +46,7 @@ internal static class Program
                     WindowStyle = ProcessWindowStyle.Hidden,
                 };
 
-                var launcher = Process.Start(launch);
+                using var launcher = Process.Start(launch);
                 if (launcher is null)
                 {
                     Log("runtime-launcher-start-failed");
@@ -156,6 +156,24 @@ def patch_builder() -> None:
     BUILDER.write_text(updated, encoding="utf-8")
 
 
+def verify_builder() -> None:
+    text = BUILDER.read_text(encoding="utf-8")
+    required = (
+        'FileName = "cmd.exe"',
+        'Arguments = "/d /c start \\"HooshyarOS Runtime\\" /b',
+        "runtime-launch-requested node=",
+        "runtime-ready",
+    )
+    missing = [item for item in required if item not in text]
+    if missing:
+        raise RuntimeError("runtime detachment contract incomplete: " + ", ".join(missing))
+    forbidden = ("runtimeProcess.Kill(true)", "browser.WaitForExit();")
+    present = [item for item in forbidden if item in text]
+    if present:
+        raise RuntimeError("runtime detachment contract still contains: " + ", ".join(present))
+
+
 if __name__ == "__main__":
     patch_builder()
+    verify_builder()
     print("PATCHED Windows runtime detachment contract")
