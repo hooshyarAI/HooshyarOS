@@ -1,16 +1,19 @@
 ﻿import { ArchitectureDrivenBuildController } from "../../Builder/Autonomous/ArchitectureDrivenBuildController";
 import { ConstructionResult, ConstructionTool } from "../../Builder/Autonomous/AutonomousConstructionEngine";
 import { GoalPlanner, GoalPlan } from "../Planner/GoalPlanner";
+import { AutonomousEngineeringControlPlane, EngineeringCycleResult } from "../../Autonomous/Runtime/AutonomousEngineeringControlPlane";
 
 export interface AutonomousDevelopmentResult {
     goal: any;
     plan: GoalPlan;
     result: ConstructionResult;
     status: "completed" | "blocked";
+    engineeringControl?: EngineeringCycleResult;
 }
 
 export class AutonomousDevelopmentLoop {
     private readonly planner = new GoalPlanner();
+    private readonly engineeringControl = new AutonomousEngineeringControlPlane();
 
     constructor(private readonly tools: ConstructionTool[]) {}
 
@@ -35,8 +38,33 @@ export class AutonomousDevelopmentLoop {
         };
         if (outcome.status === "completed") {
             AutonomousDevelopmentLoop.verifyCompletionEvidence(outcome);
+        } else {
+            outcome.engineeringControl = this.engineeringControl.plan([{
+                id: canonicalGoal.capabilityId,
+                kind: this.failureKind(result),
+                severity: 5,
+                businessImpact: 5,
+                recurrence: 1,
+                recoverability: 3,
+                observed: true,
+                postconditionMissing: result.stage !== "FINALIZE",
+                evidenceContradictory: !result.details || !result.details.trim(),
+                canonicalPathBroken: this.failureKind(result) === "PROCESS"
+            }]);
         }
         return outcome;
+    }
+
+    private failureKind(result: ConstructionResult): "BUILD" | "TEST" | "RUNTIME" | "INTEGRATION" | "SECURITY" | "PERSISTENCE" | "EVIDENCE" | "PROCESS" {
+        const details = String(result.details || "").toLowerCase();
+        if (details.includes("evidence") || details.includes("verification")) return "EVIDENCE";
+        if (details.includes("security") || details.includes("authorization")) return "SECURITY";
+        if (details.includes("persist") || details.includes("database") || details.includes("storage")) return "PERSISTENCE";
+        if (details.includes("runtime") || details.includes("launch")) return "RUNTIME";
+        if (details.includes("integration") || details.includes("contract")) return "INTEGRATION";
+        if (details.includes("test")) return "TEST";
+        if (details.includes("process") || details.includes("tool") || details.includes("planner")) return "PROCESS";
+        return "BUILD";
     }
 
     static selfTest(): void {
