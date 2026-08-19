@@ -22,6 +22,5 @@ export function createFailureMode(
             throw new Error("FailureMode scores must be integers from 1 to 10");
         }
     }
-
     return { id, description, severity, occurrence, detectability, critical };
 }
