@@ -78,4 +78,40 @@ describe("FailureTheoryEngine", () => {
         const result = engine.assess({ ...base, hardConstraintViolation: true });
         expect(result.status).toBe("REJECTED");
     });
+
+    it("propagates bounded uncertainty through a linear computation", () => {
+        expect(engine.propagateLinear([
+            { coefficient: 2, value: { min: 10, max: 12 } },
+            { coefficient: -1, value: { min: 3, max: 5 } },
+        ])).toEqual({ min: 15, max: 21 });
+    });
+
+    it("fails closed on an analysis with no declared material failure modes", () => {
+        expect(engine.assessAnalysis({
+            id: "analysis-1",
+            confidence: 0.95,
+            conclusionStable: true,
+            evidenceObserved: true,
+            materialFailureModes: 0,
+        })).toBe("BLOCKED");
+    });
+
+    it("marks low-confidence analysis for mitigation and contradictory analysis as blocked", () => {
+        expect(engine.assessAnalysis({
+            id: "analysis-2",
+            confidence: 0.7,
+            conclusionStable: true,
+            evidenceObserved: true,
+            materialFailureModes: 2,
+        })).toBe("MITIGATE");
+
+        expect(engine.assessAnalysis({
+            id: "analysis-3",
+            confidence: 0.95,
+            conclusionStable: true,
+            evidenceObserved: true,
+            evidenceContradictory: true,
+            materialFailureModes: 2,
+        })).toBe("BLOCKED");
+    });
 });
