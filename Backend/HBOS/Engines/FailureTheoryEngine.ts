@@ -32,6 +32,25 @@ export interface FailureTheoryInput {
     readonly hardConstraintViolation?: boolean;
 }
 
+export interface FailureTheoryInterval {
+    readonly min: number;
+    readonly max: number;
+}
+
+export interface FailureTheoryLinearTerm {
+    readonly coefficient: number;
+    readonly value: FailureTheoryInterval;
+}
+
+export interface FailureTheoryAnalysisInput {
+    readonly id: string;
+    readonly confidence: number;
+    readonly conclusionStable: boolean;
+    readonly evidenceObserved: boolean;
+    readonly evidenceContradictory?: boolean;
+    readonly materialFailureModes: number;
+}
+
 /**
  * Canonical failure-theory control layer for material computation, analysis and decisions.
  * It does not invent business thresholds; the owning capability supplies its risk budget.
@@ -78,6 +97,36 @@ export class FailureTheoryEngine {
         }
 
         return this.assessment("SAFE", input, expectedLoss, worstCaseLoss, true, dominantFactors, "Observed evidence and declared bounds remain within the owning risk budget.");
+    }
+
+    /** Propagates bounded uncertainty through a linear computation without inventing precision. */
+    propagateLinear(terms: readonly FailureTheoryLinearTerm[]): FailureTheoryInterval {
+        if (!terms.length) throw new Error("failure-theory-computation-terms-required");
+        let min = 0;
+        let max = 0;
+        for (const term of terms) {
+            if (!Number.isFinite(term.coefficient) || !Number.isFinite(term.value?.min) || !Number.isFinite(term.value?.max) || term.value.min > term.value.max) {
+                throw new Error("failure-theory-computation-interval-invalid");
+            }
+            const a = term.coefficient * term.value.min;
+            const b = term.coefficient * term.value.max;
+            min += Math.min(a, b);
+            max += Math.max(a, b);
+        }
+        return { min, max };
+    }
+
+    /** Converts analytical uncertainty and failure-mode coverage into a fail-closed status. */
+    assessAnalysis(input: FailureTheoryAnalysisInput): FailureTheoryStatus {
+        if (!input?.id?.trim() || !Number.isFinite(input.confidence) || !Number.isInteger(input.materialFailureModes) || input.materialFailureModes < 0) {
+            throw new Error("failure-theory-analysis-input-invalid");
+        }
+        if (input.confidence < 0 || input.confidence > 1) throw new Error("failure-theory-analysis-confidence-invalid");
+        if (!input.evidenceObserved || input.evidenceContradictory) return "BLOCKED";
+        if (input.materialFailureModes === 0) return "BLOCKED";
+        if (!input.conclusionStable) return "UNSTABLE";
+        if (input.confidence < 0.8) return "MITIGATE";
+        return "SAFE";
     }
 
     private isStable(input: FailureTheoryInput, expectedLoss: number, worstCaseLoss: number): boolean {
