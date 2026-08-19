@@ -9,6 +9,7 @@
 - `Docs/AUTONOMOUS_7_DAY_BUILD_SLA.md` — permanent seven-day autonomous construction performance law.
 - `Docs/HOOSHYAROS_TOOLCHAIN_OPTIMIZATION_LAW.md` — permanent tool-first, Python-first construction and human-intervention law.
 - `Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md` — canonical commercial-product completion and acceptance contract; mandatory for distinguishing canonical capability completion from real commercial product completion.
+- `Docs/Engineering/FAILURE_THEORY_GOVERNANCE_LAW.md` — mandatory failure-first law for material computations, analyses, decisions and repair prioritization.
 - Existing architecture decisions, HBOS engines, capability owners, tests and documentation — inspect before adding anything.
 
 The repository is the durable memory of the approved architecture, product principles, autonomous-construction role, decision logic and verification rules. Do not rely on conversational memory when the repository can provide the governing rule.
@@ -34,7 +35,7 @@ When assigned a build task, inspect the repository and existing Git history firs
 
 Use this loop:
 
-Architecture → Decision → Capability → Tool Selection → Generate → Static Validation → Test → Integration Verification → Architecture Compliance → Repair → Re-test → Finalize → Commit → Push → Re-plan
+Architecture → Decision → Capability → Tool Selection → Generate → Static Validation → Test → Integration Verification → Architecture Compliance → Failure-Theory Assessment → Repair → Re-test → Finalize → Commit → Push → Re-plan
 
 When the Assistant completion gate is verified, immediately hand off to the canonical platform continuation flow:
 
@@ -53,6 +54,15 @@ This is a performance constraint, not permission to weaken correctness. All cons
 Therefore the Assistant must actively remove unnecessary serialization, repeated full-suite verification, duplicate generation, false-negative capability detection, blind retry loops and avoidable human intervention. Independent work should be batched or parallelized when dependencies and repository isolation permit it. Verification should be proportional to risk: focused verification for local confidence, periodic integration checkpoints for system confidence, and deep audits when risk or evidence requires them.
 
 The construction fabric must continuously measure generation, verification, repair and cycle time; completed capabilities per hour; retries; queue depth; blocking reasons; and cumulative backlog progress. The seven-day objective must be treated as an engineering constraint and optimized from measured evidence.
+
+## Failure-theory execution law
+`Docs/Engineering/FAILURE_THEORY_GOVERNANCE_LAW.md` is mandatory for every material computation, analysis and decision. The platform MUST evaluate failure modes, uncertainty, expected loss, worst-case loss, sensitivity, detectability, reversibility, confidence and the owning capability's explicit risk budget before accepting a material result.
+
+The canonical execution sequence is:
+
+`IDENTIFY FAILURE MODES → BOUND UNCERTAINTY → COMPUTE EXPECTED/WORST CASE → SENSITIVITY → ASSESS DETECTABILITY/REVERSIBILITY → COMPARE RISK BUDGET → MITIGATE/REJECT/BLOCK → INDEPENDENTLY VERIFY → TRACE DECISION`
+
+A favorable point estimate, passing calculation, successful analysis or positive expected value MUST NOT override an unacceptable plausible downside. Missing or contradictory evidence MUST be `BLOCKED`; unstable conclusions MUST be marked `UNSTABLE`; material but reducible risk MUST enter mitigation and re-analysis. The platform MUST NOT invent a universal business risk threshold; the owning capability supplies its risk budget and constraints.
 
 ## Expert weaving contract
 Every construction cycle follows the expert weaving doctrine:
@@ -113,6 +123,12 @@ This restriction is operational, not architectural: the HooshyarOS product may s
 23. Preserve repair intent end-to-end; `repair-<capabilityId>` must reach the repair worker unchanged.
 24. Use the best approved tool for each stage before considering additional human intervention.
 25. Before declaring commercial product completion, pass the Commercial Product Completion Contract and keep external production dependencies distinct from repository-native completion.
+26. Every material computation, analysis and decision MUST pass the FailureTheoryEngine or an explicitly equivalent canonical owner implementing the same failure-theory contract.
+27. Risk budgets are owner-supplied contracts; the construction fabric MUST NOT silently substitute universal thresholds.
+28. Expected loss MUST be kept separate from worst-case loss and uncertainty premium.
+29. Missing/contradictory evidence, invalid bounds or unverifiable provenance MUST fail closed.
+30. Unstable conclusions MUST NOT be presented as stable decisions without mitigation, additional evidence or an explicit owner-approved exception.
+31. Repeated observed failures MUST feed recurrence/exposure prioritization and the autonomous repair loop.
 
 ## Architecture changes
 Architecture Freeze V4 is the default source of truth. Change it only when an actual contradiction or missing architectural capability is demonstrated by repository evidence. If changed, update the master charter, architecture document, governance charter and affected decisions before continuing construction.

@@ -63,6 +63,9 @@ describe("Windows product installer contract", () => {
     it("detaches the installed Node runtime from the desktop shell lifecycle", () => {
         expect(finalInstallerBuilder).toContain('FileName = "cmd.exe"');
         expect(finalInstallerBuilder).toContain('Arguments = "/d /c start \\\"HooshyarOS Runtime\\\" /b');
-        expect(finalInstallerBuilder).not.toContain("runtime.Kill(true)");
+        expect(finalInstallerBuilder).toContain("runtime-launch-requested node=");
+        expect(finalInstallerBuilder).toContain("runtime-ready");
+        expect(finalInstallerBuilder).not.toContain("runtimeProcess.Kill(true)");
+        expect(finalInstallerBuilder).not.toContain("browser.WaitForExit();");
     });
 });

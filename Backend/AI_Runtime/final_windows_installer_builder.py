@@ -28,10 +28,9 @@ if(process.argv.includes("--health-check")){const app=createServer();app.listen(
 else{createServer().listen(port,"127.0.0.1",()=>console.log(`HooshyarOS commercial runtime listening on ${port}`));}
 '''
 
-# Deliberately avoid WebView2. The shell starts the packaged runtime, verifies the
-# readiness handshake, and opens the already-installed Microsoft Edge in app mode.
-# The shell does NOT kill the runtime when the browser exits; the runtime is owned by
-# the installation and is cleaned by the uninstaller.
+# Deliberately avoid WebView2. The shell starts the packaged runtime through a detached
+# cmd launcher, verifies the readiness handshake, and opens the already-installed
+# Microsoft Edge in app mode. The shell does NOT kill the runtime when the browser exits.
 DESKTOP_CS = r'''using System;
 using System.Diagnostics;
 using System.IO;
@@ -65,22 +64,26 @@ internal static class Program
                     return 10;
                 }
 
-                var runtimeProcess = Process.Start(new ProcessStartInfo
+                var runtimeLauncher = new ProcessStartInfo
                 {
-                    FileName = Node,
-                    Arguments = "\"" + Runtime + "\"",
+                    FileName = "cmd.exe",
+                    Arguments = "/d /c start \"HooshyarOS Runtime\" /b \"" + Node + "\" \"" + Runtime + "\"",
                     WorkingDirectory = RuntimeRoot,
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     WindowStyle = ProcessWindowStyle.Hidden,
-                });
-                if (runtimeProcess is null)
+                };
+                Log("runtime-launch-requested node=" + Node);
+                using (var launcherProcess = Process.Start(runtimeLauncher))
                 {
-                    Log("runtime Process.Start returned null");
-                    MessageBox.Show("HooshyarOS runtime could not be started. Please repair or reinstall the application.", "Hooshyar.ai", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return 11;
+                    if (launcherProcess is null)
+                    {
+                        Log("runtime launcher Process.Start returned null");
+                        MessageBox.Show("HooshyarOS runtime could not be started. Please repair or reinstall the application.", "Hooshyar.ai", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return 11;
+                    }
+                    launcherProcess.WaitForExit(5000);
                 }
-                Log("runtime started pid=" + runtimeProcess.Id);
 
                 if (!WaitUntilReadyAsync())
                 {
@@ -88,6 +91,11 @@ internal static class Program
                     MessageBox.Show("HooshyarOS runtime could not be started. Please repair or reinstall the application.", "Hooshyar.ai", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return 12;
                 }
+                Log("runtime-ready");
+            }
+            else
+            {
+                Log("runtime-ready");
             }
 
             var url = "http://127.0.0.1:3000/";

@@ -1,9 +1,7 @@
 from pathlib import Path
-import re
 
 ROOT = Path(__file__).resolve().parents[2]
 BUILDER = ROOT / "Backend" / "AI_Runtime" / "final_windows_installer_builder.py"
-TEST = ROOT / "Backend" / "HBOS" / "test" / "WindowsProductInstallerContract.test.ts"
 
 DESKTOP_CS = r'''using System;
 using System.Diagnostics;
@@ -22,10 +20,8 @@ internal static class Program
     private static readonly string LogPath = Path.Combine(Root, "desktop-shell.log");
 
     [STAThread]
-    private static int Main()
+    private static int Main(string[] args)
     {
-        Process? runtimeProcess = null;
-        Process? browser = null;
         try
         {
             Directory.CreateDirectory(Root);
@@ -40,25 +36,31 @@ internal static class Program
                     return 10;
                 }
 
-                runtimeProcess = Process.Start(new ProcessStartInfo
+                var launch = new ProcessStartInfo
                 {
-                    FileName = Node,
-                    Arguments = "\"" + Runtime + "\"",
+                    FileName = "cmd.exe",
+                    Arguments = "/d /c start \"HooshyarOS Runtime\" /b \"" + Node + "\" \"" + Runtime + "\"",
                     WorkingDirectory = RuntimeRoot,
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     WindowStyle = ProcessWindowStyle.Hidden,
-                });
-                if (runtimeProcess is null)
+                };
+
+                using var launcher = Process.Start(launch);
+                if (launcher is null)
                 {
-                    Log("runtime-start-failed");
+                    Log("runtime-launcher-start-failed");
+                    MessageBox.Show("HooshyarOS runtime could not be started. Please repair or reinstall the application.", "Hooshyar.ai", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return 11;
                 }
-                Log("runtime-started pid=" + runtimeProcess.Id);
+
+                launcher.WaitForExit(5000);
+                Log("runtime-launch-requested node=" + Node);
 
                 if (!WaitUntilReady())
                 {
                     Log("runtime-readiness-timeout");
+                    MessageBox.Show("HooshyarOS runtime could not be started. Please repair or reinstall the application.", "Hooshyar.ai", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return 12;
                 }
                 Log("runtime-ready");
@@ -70,6 +72,7 @@ internal static class Program
 
             var url = "http://127.0.0.1:3000/";
             var edge = FindEdge();
+            Process? browser = null;
             if (edge is not null)
             {
                 var profile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HooshyarOS", "EdgeProfile");
@@ -88,30 +91,13 @@ internal static class Program
                 Log("default-browser-launched=" + (browser is not null));
             }
 
-            if (browser is null)
-                return 13;
-
-            // Keep this shell alive for the whole desktop session. The Node runtime
-            // is intentionally owned by this process while the browser is open.
-            browser.WaitForExit();
-            Log("browser-exited");
-            return 0;
+            return browser is null ? 13 : 0;
         }
         catch (Exception ex)
         {
             Log("ERROR " + ex);
             MessageBox.Show("HooshyarOS could not be started. Please repair or reinstall the application.", "Hooshyar.ai", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return 14;
-        }
-        finally
-        {
-            try
-            {
-                if (runtimeProcess is { HasExited: false })
-                    runtimeProcess.Kill(true);
-            }
-            catch { }
-            Log("STOP");
         }
     }
 
@@ -151,22 +137,43 @@ internal static class Program
 }
 '''
 
-s = BUILDER.read_text(encoding="utf-8")
-pattern = r"DESKTOP_CS = r''' .*? '''\n\nDESKTOP_CSPROJ ="
-replacement = "DESKTOP_CS = r'''" + DESKTOP_CS + "'''\n\nDESKTOP_CSPROJ ="
-new_s, count = re.subn(pattern, replacement, s, count=1, flags=re.S)
-if count != 1:
-    raise SystemExit("DESKTOP_CS block not found")
-BUILDER.write_text(new_s, encoding="utf-8")
 
-# Keep the test aligned with the real desktop-session contract.
-t = TEST.read_text(encoding="utf-8")
-t = t.replace('    it("detaches the installed Node runtime from the desktop shell lifecycle", () => {\n        expect(finalInstallerBuilder).toContain(\'FileName = "cmd.exe"\');\n        expect(finalInstallerBuilder).toContain(\'Arguments = "/d /c start \\\\\"HooshyarOS Runtime\\\\\" /b\');\n        expect(finalInstallerBuilder).not.toContain("runtime.Kill(true)");\n    });', '''    it("keeps the runtime alive for the desktop session", () => {
-        expect(finalInstallerBuilder).toContain("browser.WaitForExit();");
-        expect(finalInstallerBuilder).toContain("runtimeProcess.Kill(true)");
-        expect(finalInstallerBuilder).toContain("runtime-started pid=");
-        expect(finalInstallerBuilder).toContain("browser-exited");
-        expect(finalInstallerBuilder).not.toContain('FileName = "cmd.exe"');
-    });''')
-TEST.write_text(t, encoding="utf-8")
-print("PATCHED Windows desktop runtime lifecycle")
+def replace_desktop_block(text: str) -> str:
+    start = text.find("DESKTOP_CS = r'''")
+    if start < 0:
+        raise RuntimeError("DESKTOP_CS start marker not found")
+    end = text.find("DESKTOP_CSPROJ =", start)
+    if end < 0:
+        raise RuntimeError("DESKTOP_CSPROJ marker not found")
+    return text[:start] + "DESKTOP_CS = r'''" + DESKTOP_CS + "'''\n\n" + text[end:]
+
+
+def patch_builder() -> None:
+    current = BUILDER.read_text(encoding="utf-8")
+    updated = replace_desktop_block(current)
+    if updated == current:
+        raise RuntimeError("desktop shell contract was not changed")
+    BUILDER.write_text(updated, encoding="utf-8")
+
+
+def verify_builder() -> None:
+    text = BUILDER.read_text(encoding="utf-8")
+    required = (
+        'FileName = "cmd.exe"',
+        'Arguments = "/d /c start \\"HooshyarOS Runtime\\" /b',
+        "runtime-launch-requested node=",
+        "runtime-ready",
+    )
+    missing = [item for item in required if item not in text]
+    if missing:
+        raise RuntimeError("runtime detachment contract incomplete: " + ", ".join(missing))
+    forbidden = ("runtimeProcess.Kill(true)", "browser.WaitForExit();")
+    present = [item for item in forbidden if item in text]
+    if present:
+        raise RuntimeError("runtime detachment contract still contains: " + ", ".join(present))
+
+
+if __name__ == "__main__":
+    patch_builder()
+    verify_builder()
+    print("PATCHED Windows runtime detachment contract")

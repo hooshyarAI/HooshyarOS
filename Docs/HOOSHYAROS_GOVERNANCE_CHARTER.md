@@ -88,7 +88,7 @@ Construction decisions must optimize the whole system rather than a single metri
 
 The engineering loop is:
 
-**Architecture → Decision → Capability → Tool Selection → Generation → Static Validation → Test → Integration Verification → Architecture Compliance → Repair → Re-test → Finalize → Commit → Push → Re-plan**
+**Architecture → Decision → Capability → Tool Selection → Generation → Static Validation → Test → Integration Verification → Architecture Compliance → Failure-Theory Assessment → Repair → Re-test → Finalize → Commit → Push → Re-plan**
 
 A passing placeholder test, a large file count, or a superficially complete tree is not completion.
 
@@ -283,7 +283,61 @@ For the autonomous Assistant itself, DONE additionally means the verified comple
 
 ---
 
-## 13. Status
+## 13. Failure-Theory Governance — Mandatory
+
+`Docs/Engineering/FAILURE_THEORY_GOVERNANCE_LAW.md` is a permanent, fail-closed governance rule for every material computation, analysis, decision, repair prioritization and commercial acceptance judgment.
+
+The platform MUST NOT treat a technically successful calculation, analysis or decision as trustworthy merely because it returned a result. Before accepting a material result, the system must model:
+
+- material failure modes;
+- probability/likelihood bounds;
+- consequence/impact bounds;
+- exposure;
+- uncertainty and confidence;
+- detectability;
+- reversibility;
+- expected loss;
+- plausible worst-case loss;
+- sensitivity/instability;
+- the explicit risk budget of the owning capability.
+
+The canonical quantitative model is:
+
+```text
+EXPECTED_LOSS = P(failure) × IMPACT × EXPOSURE
+WORST_CASE_LOSS = P_upper × IMPACT_upper × EXPOSURE_upper
+UNCERTAINTY_PREMIUM = WORST_CASE_LOSS − EXPECTED_LOSS
+```
+
+Expected loss and worst-case loss MUST remain separate. A favorable expected value MUST NOT override an unacceptable plausible downside.
+
+For computations:
+
+`INPUT BOUNDS → COMPUTATION → OUTPUT BOUNDS → SENSITIVITY → ACCEPT / FLAG / BLOCK`
+
+For analyses:
+
+`OBSERVATIONS → FAILURE MODES → CONFIDENCE → COUNTERFACTUAL/WORST CASE → SENSITIVITY → CONCLUSION + LIMITATIONS`
+
+For decisions:
+
+`OPTIONS → EXPECTED LOSS → WORST CASE → REVERSIBILITY → DETECTABILITY → RISK BUDGET → MITIGATION → DECISION → TRACEABLE EVIDENCE`
+
+Mandatory status semantics are:
+
+- `SAFE` — evidence and bounds support the result inside the owner's risk budget;
+- `MITIGATE` — material but reducible risk remains;
+- `UNSTABLE` — plausible uncertainty can change the conclusion;
+- `REJECTED` — a non-negotiable constraint or explicit hard boundary is violated;
+- `BLOCKED` — evidence, bounds, provenance or independent verification are missing/contradictory.
+
+The construction fabric MUST use the canonical `FailureTheoryEngine` or an explicitly equivalent owning capability. It MUST NOT invent universal business-risk thresholds; risk budgets belong to the owning domain contract.
+
+Repeated observed failures MUST feed recurrence/exposure prioritization and the self-healing loop. Failure is therefore both a verification object and a construction-planning signal.
+
+---
+
+## 14. Status
 
 **GOVERNANCE CHARTER: ACTIVE**
 
@@ -292,6 +346,8 @@ For the autonomous Assistant itself, DONE additionally means the verified comple
 **EXPERT WEAVING GOVERNANCE: ACTIVE**
 
 **CHECKPOINT / ROLLBACK / REPAIR: REQUIRED**
+
+**FAILURE-THEORY GOVERNANCE: ACTIVE / FAIL-CLOSED**
 
 **PYTHON-FIRST CONSTRUCTION: APPROVED**
 
