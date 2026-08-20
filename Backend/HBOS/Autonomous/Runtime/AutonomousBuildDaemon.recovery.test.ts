@@ -125,13 +125,27 @@ describe("AutonomousBuildDaemon knot recovery", () => {
         }
     });
 
-    it("does not recurse when a repair knot fails verification", () => {
-        const observe = new AutonomousKnotRecovery().observe(
-            { capabilityId: "repair-product.financial-data-ingestion", commit: "checkpoint" },
-            { capabilityId: "repair-product.financial-data-ingestion", executionOk: false, verificationComplete: false, repositoryChanged: false }
-        );
+    it("preserves a dirty repair checkpoint instead of destructive rollback", () => {
+        const recovery = new AutonomousKnotRecovery();
+        const execSpy = jest.spyOn(require("node:child_process"), "execFileSync");
+        const original = execSpy.getMockImplementation();
+        let call = 0;
+        execSpy.mockImplementation(((command: string, args: string[]) => {
+            call += 1;
+            if (args[0] === "rev-parse") return "17cac376\n";
+            if (args[0] === "status") return "?? Docs/Engines/AutonomousOperationsEngine.md\n";
+            throw new Error(`unexpected git call: ${command} ${args.join(" ")}`);
+        }) as any);
 
-        expect(observe.recover).toBe(true);
-        expect(observe.repairCapabilityId).toBe("repair-product.financial-data-ingestion");
+        try {
+            expect(() => recovery.rollback(process.cwd(), {
+                capabilityId: "repair-product.financial-data-ingestion",
+                commit: "17cac376"
+            })).not.toThrow();
+            expect(call).toBe(2);
+        } finally {
+            execSpy.mockRestore();
+            if (original) execSpy.mockImplementation(original);
+        }
     });
 });
