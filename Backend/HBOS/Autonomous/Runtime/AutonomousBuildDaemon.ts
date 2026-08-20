@@ -92,6 +92,31 @@ export class AutonomousBuildDaemon {
 
     private selectMission(): MissionDecision {
         const selected = this.mission.nextMission();
+
+        if (!selected.evidence.clean) {
+            const configuredRepair = process.env.HOOSHYAR_AUTONOMOUS_REPAIR_TARGET?.trim();
+            const repairCapabilityId = configuredRepair?.startsWith("repair-")
+                ? configuredRepair
+                : "repair-workspace";
+            console.log(JSON.stringify({
+                type: "AUTONOMOUS_REPAIR_SELECTION",
+                reason: "working tree is dirty before mission continuation",
+                repairCapabilityId,
+                checkpoint: selected.evidence.commit
+            }));
+            return {
+                kind: "mission",
+                mission: {
+                    ...selected,
+                    capabilityId: repairCapabilityId,
+                    capability: `repair and re-verify the dirty workspace from checkpoint ${selected.evidence.commit}`,
+                    targetEngine: "Autonomous Operations Engine",
+                    dependencies: []
+                },
+                assistantGatePassed: false
+            };
+        }
+
         if (selected.capabilityId !== "assistant.completion.gate") return { kind: "mission", mission: selected, assistantGatePassed: false };
 
         const continuation = this.continuation.createMission();

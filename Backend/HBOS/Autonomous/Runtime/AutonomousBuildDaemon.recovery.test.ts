@@ -62,4 +62,56 @@ describe("AutonomousBuildDaemon knot recovery", () => {
             capabilityId: "repair-platform.user-management"
         }));
     });
+
+    it("prioritizes an explicit repair target when the working tree is dirty", () => {
+        const previousTarget = process.env.HOOSHYAR_AUTONOMOUS_REPAIR_TARGET;
+        process.env.HOOSHYAR_AUTONOMOUS_REPAIR_TARGET = "repair-product.financial-data-ingestion";
+
+        const execute = jest.fn((_goal: any): AutonomousDevelopmentResult => ({
+            status: "completed",
+            goal: _goal,
+            plan: { requirement: {} } as any,
+            result: {
+                ok: true,
+                status: "BUILT",
+                attempts: 1,
+                selectedTool: "python",
+                issues: [],
+                trace: ["ARCHITECTURE", "PLAN", "GENERATE", "VERIFY", "FINALIZE"],
+                details: "dirty workspace repair verified",
+                stage: "FINALIZE"
+            }
+        }));
+
+        const mission = {
+            snapshot: jest.fn()
+                .mockReturnValueOnce({ root: process.cwd(), commit: "1802b05e", clean: false })
+                .mockReturnValue({ root: process.cwd(), commit: "repaired", clean: true }),
+            nextMission: jest.fn(() => ({
+                capabilityId: "assistant.completion.gate",
+                capability: "completion gate",
+                targetEngine: "Autonomous Operations Engine",
+                dependencies: [],
+                evidence: { root: process.cwd(), commit: "1802b05e", clean: false, architectureFiles: [], engineCount: 1, runtimeFileCount: 1, latestCommits: [] },
+                directives: [],
+                architectureRules: []
+            }))
+        } as unknown as AutonomousProjectMission;
+
+        try {
+            const development = { execute } as unknown as AutonomousDevelopmentLoop;
+            const daemon = new AutonomousBuildDaemon({ maxCycles: 1, mission, development });
+            const result = daemon.run();
+
+            expect(result.status).toBe("cycle_limit");
+            expect(execute).toHaveBeenCalledTimes(1);
+            expect(execute.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
+                capabilityId: "repair-product.financial-data-ingestion",
+                targetEngine: "Autonomous Operations Engine"
+            }));
+        } finally {
+            if (previousTarget === undefined) delete process.env.HOOSHYAR_AUTONOMOUS_REPAIR_TARGET;
+            else process.env.HOOSHYAR_AUTONOMOUS_REPAIR_TARGET = previousTarget;
+        }
+    });
 });
