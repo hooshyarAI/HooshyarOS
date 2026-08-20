@@ -46,12 +46,16 @@ export class AutonomousKnotRecovery {
             };
         }
 
+        const canonicalCapabilityId = checkpoint.capabilityId.startsWith("repair-")
+            ? checkpoint.capabilityId.slice("repair-".length)
+            : checkpoint.capabilityId;
+
         return {
             recover: true,
             action: "REPAIR",
             checkpoint,
             rationale: "current knot is not trusted; return to the last verified checkpoint and re-weave this knot before continuing",
-            repairCapabilityId: `repair-${checkpoint.capabilityId}`,
+            repairCapabilityId: `repair-${canonicalCapabilityId}`,
             stopConditions: [
                 "repair verification fails",
                 "checkpoint cannot be established",
