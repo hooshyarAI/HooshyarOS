@@ -80,6 +80,7 @@ export class AutonomousConstructionEngine {
         trace.push("VERIFY");
         issues.length = 0;
         let verification = this.execute("VERIFY", plan, attempt, artifacts, issues);
+        verification = this.applyQualityGate(verification, artifacts);
 
         while (!verification.ok && attempt < this.maxRepairAttempts) {
             attempt += 1;
@@ -99,6 +100,7 @@ export class AutonomousConstructionEngine {
             trace.push("VERIFY");
             issues.length = 0;
             verification = this.execute("VERIFY", plan, attempt, artifacts, issues);
+            verification = this.applyQualityGate(verification, artifacts);
             if (verification.ok) break;
         }
 
@@ -124,6 +126,40 @@ export class AutonomousConstructionEngine {
         }
 
         return this.success(attempt > 0 ? "REPAIRED" : "BUILT", attempt, trace, artifacts.GENERATE !== undefined && this.recordArtifact(artifacts.GENERATE)?.idempotentNoOp === true);
+    }
+
+    private applyQualityGate(
+        result: { ok: boolean; artifact?: unknown; issue?: string },
+        artifacts: Record<string, unknown>
+    ): { ok: boolean; artifact?: unknown; issue?: string } {
+        if (!result.ok) return result;
+
+        const generated = this.recordArtifact(artifacts.GENERATE);
+        if (generated?.changed === false && generated?.idempotentNoOp !== true) {
+            return {
+                ok: false,
+                issue: "QUALITY_IMPLEMENTATION_UNVERIFIED",
+                artifact: generated
+            };
+        }
+
+        const evidence = this.recordArtifact(result.artifact);
+        if (!evidence) return result;
+
+        if (evidence.behavioralEvidenceVerified === false) {
+            return { ok: false, issue: "QUALITY_BEHAVIOR_UNVERIFIED", artifact: evidence };
+        }
+        if (evidence.integrationVerified === false) {
+            return { ok: false, issue: "QUALITY_INTEGRATION_UNVERIFIED", artifact: evidence };
+        }
+        if (evidence.cleanRepository === false) {
+            return { ok: false, issue: "QUALITY_REPOSITORY_UNVERIFIED", artifact: evidence };
+        }
+        if (evidence.testsPassed === false || evidence.jestVerified === false || evidence.verified === false) {
+            return { ok: false, issue: "QUALITY_TESTS_UNVERIFIED", artifact: evidence };
+        }
+
+        return result;
     }
 
     private isIdempotentGenerationNoOp(result: { ok: boolean; artifact?: unknown; issue?: string }): boolean {
@@ -200,7 +236,9 @@ export class AutonomousConstructionEngine {
             { name: "python", execute: stage => {
                 if (stage === "VERIFY") {
                     verificationCalls += 1;
-                    return verificationCalls === 1 ? { ok: false, issue: "INTERNAL_CONNECTION_FAILURE" } : { ok: true };
+                    return verificationCalls === 1
+                        ? { ok: false, issue: "INTERNAL_CONNECTION_FAILURE" }
+                        : { ok: true, artifact: { verified: true } };
                 }
                 return { ok: true };
             } },
