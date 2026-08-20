@@ -46,7 +46,7 @@ export class AutonomousKnotRecovery {
             };
         }
 
-        const canonicalCapabilityId = checkpoint.capabilityId.startsWith("repair-")
+        const canonicalId = checkpoint.capabilityId.startsWith("repair-")
             ? checkpoint.capabilityId.slice("repair-".length)
             : checkpoint.capabilityId;
 
@@ -55,7 +55,7 @@ export class AutonomousKnotRecovery {
             action: "REPAIR",
             checkpoint,
             rationale: "current knot is not trusted; return to the last verified checkpoint and re-weave this knot before continuing",
-            repairCapabilityId: `repair-${canonicalCapabilityId}`,
+            repairCapabilityId: `repair-${canonicalId}`,
             stopConditions: [
                 "repair verification fails",
                 "checkpoint cannot be established",
@@ -85,6 +85,13 @@ export class AutonomousKnotRecovery {
         ).trim();
 
         if (head === checkpoint.commit && !beforeStatus) {
+            return;
+        }
+
+        // A failed repair is itself operating on an already-dirty repair checkpoint.
+        // Do not destroy unrelated or previously generated evidence merely to make
+        // the worktree look clean. Preserve it and let the daemon fail closed at VERIFY.
+        if (head === checkpoint.commit && checkpoint.capabilityId.startsWith("repair-") && beforeStatus) {
             return;
         }
 
