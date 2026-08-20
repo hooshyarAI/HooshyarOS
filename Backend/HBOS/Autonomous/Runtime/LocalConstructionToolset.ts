@@ -1,4 +1,5 @@
 /// <reference types="node" />
+import { createHash } from "node:crypto";
 import { execFileSync } from "child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join, normalize } from "node:path";
@@ -157,6 +158,27 @@ function relativeStatusPaths(statusOutput: string, root: string): string[] {
         .map(path => normalize(join(root, path)));
 }
 
+function repositoryPathSet(statusOutput: string, root: string): Set<string> {
+    return new Set(relativeStatusPaths(statusOutput, root));
+}
+
+function fileFingerprint(path: string): string | null {
+    if (!existsSync(path)) return null;
+    try {
+        return createHash("sha256").update(readFileSync(path)).digest("hex");
+    } catch {
+        return null;
+    }
+}
+
+function artifactFingerprints(paths: string[]): Map<string, string | null> {
+    return new Map(paths.map(path => [normalize(path), fileFingerprint(path)]));
+}
+
+function isRepairCapability(capabilityId: string): boolean {
+    return capabilityId.startsWith("repair-");
+}
+
 function buildAgentPrompt(context: ConstructionContext): string {
     const requiredPaths = declaredArtifactPaths(process.cwd(), context.plan.capabilityId, context.plan.targetEngine);
     return [
@@ -202,25 +224,39 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                 if (stage !== "GENERATE") return { ok: true };
                 const before = run("git", REPOSITORY_STATUS_ARGS, root);
                 if (!before.ok) return { ok: false, issue: "AUTONOMOUS_REPOSITORY_STATE_UNAVAILABLE", artifact: before };
-                if (before.output.trim()) return { ok: false, issue: "AUTONOMOUS_WORKTREE_DIRTY", artifact: { clean: false, output: before.output } };
+
+                const repairMission = isRepairCapability(context.plan.capabilityId);
+                const beforePaths = repositoryPathSet(before.output, root);
+                const requiredPaths = declaredArtifactPaths(root, context.plan.capabilityId, context.plan.targetEngine);
+                const beforeFingerprints = artifactFingerprints(requiredPaths);
+                if (before.output.trim() && !repairMission) {
+                    return { ok: false, issue: "AUTONOMOUS_WORKTREE_DIRTY", artifact: { clean: false, output: before.output } };
+                }
+
                 const agent = resolveImplementationAgent(root);
                 if (!agent) return { ok: false, issue: "AUTONOMOUS_AGENT_UNAVAILABLE", artifact: { provider: null, changed: false } };
-                const requiredPaths = declaredArtifactPaths(root, context.plan.capabilityId, context.plan.targetEngine);
                 const result = run(agent, buildAgentArgs(agent, buildAgentPrompt(context)), root, 30 * 60 * 1000);
                 const after = run("git", REPOSITORY_STATUS_ARGS, root);
-                const changed = after.ok && repositoryStateChanged(before.output, after.output);
-                const changedPaths = after.ok ? relativeStatusPaths(after.output, root) : [];
+                const afterPaths = after.ok ? repositoryPathSet(after.output, root) : new Set<string>();
+                const changedPaths = after.ok
+                    ? relativeStatusPaths(after.output, root).filter(path => !beforePaths.has(path))
+                    : [];
+                const changedDeclaredPaths = requiredPaths.filter(path => fileFingerprint(path) !== beforeFingerprints.get(normalize(path)));
+                const changed = changedPaths.length > 0 || changedDeclaredPaths.length > 0;
+                const allNewOrChangedPaths = Array.from(new Set([...changedPaths, ...changedDeclaredPaths.map(normalize)]));
                 const allowed = requiredPaths.map(path => normalize(path));
-                const unexpectedPaths = changedPaths.filter(path => !allowed.includes(path));
-                const touchesDeclaredArtifact = changedPaths.some(path => allowed.includes(path));
+                const unexpectedPaths = allNewOrChangedPaths.filter(path => !allowed.includes(path));
+                const touchesDeclaredArtifact = changedDeclaredPaths.length > 0 || changedPaths.some(path => allowed.includes(path));
                 const artifact = {
                     type: "AUTONOMOUS_AGENT_GENERATION_RESULT",
                     provider: agent,
                     capabilityId: context.plan.capabilityId,
                     capability: context.plan.capability,
                     targetEngine: context.plan.targetEngine,
+                    repairMission,
                     requiredPaths,
-                    changedPaths,
+                    preexistingPaths: Array.from(beforePaths),
+                    changedPaths: allNewOrChangedPaths,
                     unexpectedPaths,
                     exitCode: result.code,
                     changed,
@@ -289,40 +325,21 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
         },
         {
             name: "git",
-            execute: (stage) => {
+            execute: (stage, context) => {
                 if (stage !== "FINALIZE") return { ok: true };
+                const requiredPaths = declaredArtifactPaths(root, context.plan.capabilityId, context.plan.targetEngine).map(path => normalize(path.replace(/\\/g, "/")));
+                const existing = requiredPaths.filter(path => existsSync(path));
+                if (existing.length === 0) return { ok: false, issue: "AUTONOMOUS_ARTIFACT_MISSING", artifact: { requiredPaths } };
+                const add = run("git", ["add", "--", ...existing.map(path => path.replace(`${normalize(root)}/`, ""))], root);
+                if (!add.ok) return { ok: false, issue: "GIT_STAGE_FAILED", artifact: add };
+                const cached = run("git", ["diff", "--cached", "--name-only"], root);
+                if (!cached.ok || !cached.output.trim()) return { ok: false, issue: "GIT_NO_REPOSITORY_CHANGE", artifact: cached };
+                const commit = run("git", ["commit", "-m", `feat(autonomous): finalize ${context.plan.capabilityId}`], root);
+                if (!commit.ok) return { ok: false, issue: "GIT_COMMIT_FAILED", artifact: commit };
                 const status = run("git", REPOSITORY_STATUS_ARGS, root);
-                if (!status.ok) return { ok: false, issue: "GIT_STATUS_FAILED", artifact: { output: status.output, error: status.error } };
-                if (!status.output.trim()) return { ok: false, issue: "GIT_NO_REPOSITORY_CHANGE", artifact: { clean: true, committed: false, pushed: false, changeDetected: false } };
-                const add = run("git", ["add", "-A"], root);
-                if (!add.ok) return { ok: false, issue: "GIT_ADD_FAILED", artifact: { output: add.output, error: add.error } };
-                const staged = run("git", ["diff", "--cached", "--quiet"], root);
-                if (!staged.ok && staged.code !== 1) return { ok: false, issue: "GIT_STAGED_DIFF_CHECK_FAILED", artifact: { output: staged.output, error: staged.error } };
-                if (staged.code === 0) return { ok: false, issue: "GIT_NO_STAGED_CHANGE", artifact: { clean: true, committed: false, pushed: false, changeDetected: false } };
-                const commit = run("git", ["commit", "-m", "feat(hbos): autonomous construction progress"], root);
-                if (!commit.ok) return { ok: false, issue: "GIT_COMMIT_FAILED", artifact: { output: commit.output, error: commit.error } };
-                const branchResult = run("git", ["branch", "--show-current"], root);
-                if (!branchResult.ok) return { ok: false, issue: "GIT_BRANCH_DETECTION_FAILED", artifact: { output: branchResult.output, error: branchResult.error } };
-                const branch = branchResult.output.trim();
-                if (!branch) return { ok: false, issue: "GIT_DETACHED_HEAD", artifact: { committed: true, pushed: false, changeDetected: true } };
-                const fetch = run("git", ["fetch", "origin", branch], root);
-                if (!fetch.ok) return { ok: false, issue: "GIT_FETCH_FAILED", artifact: { branch, output: fetch.output, error: fetch.error } };
-                const remoteRef = `origin/${branch}`;
-                const remoteExists = run("git", ["rev-parse", "--verify", remoteRef], root);
-                if (remoteExists.ok) {
-                    const remoteAncestor = run("git", ["merge-base", "--is-ancestor", remoteRef, "HEAD"], root);
-                    if (!remoteAncestor.ok && remoteAncestor.code !== 1) return { ok: false, issue: "GIT_DIVERGENCE_CHECK_FAILED", artifact: { branch, output: remoteAncestor.output, error: remoteAncestor.error } };
-                    if (remoteAncestor.code === 1) {
-                        const rebase = run("git", ["rebase", remoteRef], root);
-                        if (!rebase.ok) {
-                            run("git", ["rebase", "--abort"], root);
-                            return { ok: false, issue: "GIT_REBASE_CONFLICT", artifact: { branch, output: rebase.output, error: rebase.error } };
-                        }
-                    }
-                }
-                const push = run("git", ["push", "origin", branch], root);
-                if (!push.ok) return { ok: false, issue: "GIT_PUSH_FAILED", artifact: { branch, output: push.output, error: push.error } };
-                return { ok: true, artifact: { committed: true, pushed: true, branch, changeDetected: true } };
+                return status.ok
+                    ? { ok: true, artifact: { committed: true, pushed: false, clean: status.output.trim() === "", changedPaths: cached.output.trim().split(/\r?\n/).filter(Boolean) } }
+                    : { ok: false, issue: "AUTONOMOUS_REPOSITORY_STATE_UNAVAILABLE", artifact: status };
             }
         }
     ];
