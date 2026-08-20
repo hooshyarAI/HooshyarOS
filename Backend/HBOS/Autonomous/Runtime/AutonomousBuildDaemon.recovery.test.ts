@@ -1,6 +1,7 @@
 import { AutonomousBuildDaemon } from "./AutonomousBuildDaemon";
 import { AutonomousDevelopmentLoop, AutonomousDevelopmentResult } from "../../Architecture/Autonomous/AutonomousDevelopmentLoop";
 import { AutonomousProjectMission } from "./AutonomousProjectMission";
+import { AutonomousKnotRecovery } from "./AutonomousKnotRecovery";
 
 describe("AutonomousBuildDaemon knot recovery", () => {
     it("repairs a failed knot from its checkpoint before allowing the run to continue", () => {
@@ -52,15 +53,24 @@ describe("AutonomousBuildDaemon knot recovery", () => {
         } as unknown as AutonomousProjectMission;
 
         const development = { execute } as unknown as AutonomousDevelopmentLoop;
-        const daemon = new AutonomousBuildDaemon({ maxCycles: 1, mission, development });
+        const rollback = jest.spyOn(AutonomousKnotRecovery.prototype, "rollback").mockImplementation(() => undefined);
 
-        const result = daemon.run();
+        try {
+            const daemon = new AutonomousBuildDaemon({ maxCycles: 1, mission, development });
+            const result = daemon.run();
 
-        expect(result.status).toBe("cycle_limit");
-        expect(execute).toHaveBeenCalledTimes(2);
-        expect(execute.mock.calls[1]?.[0]).toEqual(expect.objectContaining({
-            capabilityId: "repair-platform.user-management"
-        }));
+            expect(result.status).toBe("cycle_limit");
+            expect(execute).toHaveBeenCalledTimes(2);
+            expect(execute.mock.calls[1]?.[0]).toEqual(expect.objectContaining({
+                capabilityId: "repair-platform.user-management"
+            }));
+            expect(rollback).toHaveBeenCalledWith(process.cwd(), expect.objectContaining({
+                capabilityId: "platform.user-management",
+                commit: "HEAD"
+            }));
+        } finally {
+            rollback.mockRestore();
+        }
     });
 
     it("prioritizes an explicit repair target when the working tree is dirty", () => {
