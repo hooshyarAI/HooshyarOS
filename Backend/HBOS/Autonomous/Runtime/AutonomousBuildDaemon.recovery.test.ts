@@ -148,4 +148,28 @@ describe("AutonomousBuildDaemon knot recovery", () => {
             if (original) execSpy.mockImplementation(original);
         }
     });
+
+    it("preserves dirty repair evidence even when HEAD advanced beyond the checkpoint", () => {
+        const recovery = new AutonomousKnotRecovery();
+        const execSpy = jest.spyOn(require("node:child_process"), "execFileSync");
+        const original = execSpy.getMockImplementation();
+        let call = 0;
+        execSpy.mockImplementation(((command: string, args: string[]) => {
+            call += 1;
+            if (args[0] === "rev-parse") return "advanced-head\n";
+            if (args[0] === "status") return "?? Docs/Engines/AutonomousOperationsEngine.md\n";
+            throw new Error(`unexpected git call: ${command} ${args.join(" ")}`);
+        }) as any);
+
+        try {
+            expect(() => recovery.rollback(process.cwd(), {
+                capabilityId: "repair-product.financial-data-ingestion",
+                commit: "837b8458"
+            })).not.toThrow();
+            expect(call).toBe(2);
+        } finally {
+            execSpy.mockRestore();
+            if (original) execSpy.mockImplementation(original);
+        }
+    });
 });
