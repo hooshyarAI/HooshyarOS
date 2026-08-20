@@ -124,4 +124,14 @@ describe("AutonomousBuildDaemon knot recovery", () => {
             else process.env.HOOSHYAR_AUTONOMOUS_REPAIR_TARGET = previousTarget;
         }
     });
+
+    it("does not recurse when a repair knot fails verification", () => {
+        const observe = new AutonomousKnotRecovery().observe(
+            { capabilityId: "repair-product.financial-data-ingestion", commit: "checkpoint" },
+            { capabilityId: "repair-product.financial-data-ingestion", executionOk: false, verificationComplete: false, repositoryChanged: false }
+        );
+
+        expect(observe.recover).toBe(true);
+        expect(observe.repairCapabilityId).toBe("repair-product.financial-data-ingestion");
+    });
 });
