@@ -88,10 +88,11 @@ export class AutonomousKnotRecovery {
             return;
         }
 
-        // A failed repair is itself operating on an already-dirty repair checkpoint.
-        // Do not destroy unrelated or previously generated evidence merely to make
-        // the worktree look clean. Preserve it and let the daemon fail closed at VERIFY.
-        if (head === checkpoint.commit && checkpoint.capabilityId.startsWith("repair-") && beforeStatus) {
+        // A dirty repair checkpoint is non-destructive by policy. Preserve every
+        // existing artifact/evidence and let the daemon fail closed at VERIFY.
+        // This deliberately does not depend on HEAD equality because repair work
+        // may have advanced the repository before recovery observes the failure.
+        if (checkpoint.capabilityId.startsWith("repair-") && beforeStatus) {
             return;
         }
 
