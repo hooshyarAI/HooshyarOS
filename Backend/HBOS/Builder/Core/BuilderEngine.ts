@@ -1,32 +1,22 @@
-export class BuilderEngine {
+﻿import { Engine } from "../../Core/Engine";
 
-    initialize() {
+export class BuilderEngine implements Engine {
+    readonly name = "BuilderEngine";
 
+    initialize(): void {
         console.log("BuilderEngine Started");
-
-        return {
-            name: "BuilderEngine",
-            status: "READY"
-        };
-
     }
 
+    health(): boolean {
+        return true;
+    }
 
     build(projectName: string) {
-
-        console.log(
-            `Building ${projectName}`
-        );
-
+        console.log(`Building ${projectName}`);
 
         return {
-
             name: projectName,
-
             status: "READY"
-
         };
-
     }
-
 }

@@ -1,16 +1,17 @@
-﻿import { EngineRegistry } from "../Registry/EngineRegistry";
+﻿import { EngineRegistry } from "../Core/EngineRegistry";
+import { BuilderEngine } from "../Builder/Core/BuilderEngine";
 
-test("BuilderEngine should register in HBOS Registry",()=>{
-
+test("BuilderEngine should register in canonical HBOS Core Registry", () => {
     const registry = new EngineRegistry();
 
-    const engines = registry.initialize();
+    registry.register(new BuilderEngine());
 
-    const builder =
-        engines.find(
-            (e:any)=>e.constructor.name==="BuilderEngine"
-        );
+    registry.initializeAll();
+
+    const builder = registry
+        .healthReport()
+        .find(engine => engine.name === "BuilderEngine");
 
     expect(builder).toBeDefined();
-
+    expect(builder?.healthy).toBe(true);
 });
