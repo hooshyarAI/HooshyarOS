@@ -7,25 +7,39 @@ export interface RepairPlan {
     requiredEvidence: string[];
 }
 
+export interface RepairExecutionEvidence {
+    repaired: boolean;
+    verificationPassed: boolean;
+    integrationVerified: boolean;
+    architectureVerified: boolean;
+    failureTheoryAssessed: boolean;
+    artifact?: unknown;
+    reason?: string;
+}
+
 export interface RepairExecutionResult {
     repaired: boolean;
     plan: RepairPlan;
+    evidence: RepairExecutionEvidence;
+}
+
+export interface RepairExecutionPort {
+    execute(plan: RepairPlan): RepairExecutionResult;
 }
 
 /**
- * Governed repair planning boundary.
- * The engine records why a repair is allowed and what evidence must prove it;
- * mutation itself remains delegated to the platform's repair/tooling layer.
+ * Governed repair planning boundary. Mutation is delegated to a platform-native
+ * construction executor; this class never claims repair without verification evidence.
  */
 export class AutonomousRepairEngine {
+    constructor(private readonly executor?: RepairExecutionPort) {}
+
     createPlan(issue: string, output?: string, capabilityId?: string): RepairPlan {
         let targetFile = "unknown";
-
         if (output) {
             const match = output.match(/([A-Za-z0-9_\/\\.-]+\.ts)/);
             if (match) targetFile = match[1];
         }
-
         return {
             issue,
             targetFile,
@@ -43,17 +57,32 @@ export class AutonomousRepairEngine {
                 "IMPLEMENTATION_CHANGED_OR_IDEMPOTENTLY_VERIFIED",
                 "BEHAVIOR_VERIFIED",
                 "INTEGRATION_VERIFIED",
+                "ARCHITECTURE_VERIFIED",
+                "FAILURE_THEORY_ASSESSED",
                 "REGRESSION_VERIFIED"
             ]
         };
     }
 
     execute(plan: RepairPlan): RepairExecutionResult {
-        // Planning is not repair. The mutation-capable platform tool must execute
-        // the plan and return evidence before this boundary can report repaired=true.
-        return {
-            repaired: false,
-            plan
-        };
+        if (!this.executor) {
+            return {
+                repaired: false,
+                plan,
+                evidence: {
+                    repaired: false,
+                    verificationPassed: false,
+                    integrationVerified: false,
+                    architectureVerified: false,
+                    failureTheoryAssessed: false,
+                    reason: "REPAIR_EXECUTOR_UNWIRED"
+                }
+            };
+        }
+        const result = this.executor.execute(plan);
+        if (!result.repaired || !result.evidence.verificationPassed || !result.evidence.integrationVerified || !result.evidence.architectureVerified || !result.evidence.failureTheoryAssessed) {
+            return { ...result, repaired: false };
+        }
+        return result;
     }
 }
