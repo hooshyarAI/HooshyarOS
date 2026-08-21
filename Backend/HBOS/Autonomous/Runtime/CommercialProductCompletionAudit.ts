@@ -54,7 +54,7 @@ export class CommercialProductCompletionAudit {
                 "web/app.js",
                 "web/styles.css",
                 "web/manifest.webmanifest",
-                "Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts"
+                "Backend/AI_Runtime/CommercialRuntimeServer.ts"
             ];
             const hasWebRuntime = webArtifacts.every(artifact => existsSync(join(root, artifact)));
             if (!hasRunnableWebScript && !hasWebRuntime) missingLayers.push("web-entrypoint");
