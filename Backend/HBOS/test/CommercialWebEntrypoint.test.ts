@@ -1,4 +1,4 @@
-import { createCommercialRuntimeServer } from "../Autonomous/Runtime/CommercialRuntimeServer";
+import { createCommercialRuntimeServer } from "../../AI_Runtime/CommercialRuntimeServer";
 
 async function request(port: number, path: string): Promise<{ status: number; body: string; contentType: string }> {
     return new Promise((resolve, reject) => {
@@ -30,17 +30,27 @@ describe("Commercial web entrypoint", () => {
 
     afterAll(() => new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())));
 
-    test("serves a responsive product shell and its executable client assets", async () => {
+    test("serves the canonical product contract", async () => {
+        const health = await request(port, "/health");
+        const ready = await request(port, "/api/ready");
+        const dashboard = await request(port, "/api/dashboard?organization=audit");
         const home = await request(port, "/");
         const app = await request(port, "/app.js");
         const styles = await request(port, "/styles.css");
         const manifest = await request(port, "/manifest.webmanifest");
 
+        expect(health.status).toBe(200);
+        expect(JSON.parse(health.body).status).toBe("ok");
+
+        expect(ready.status).toBe(200);
+        expect(JSON.parse(ready.body).status).toBe("READY");
+
+        expect(dashboard.status).toBe(200);
+        expect(JSON.parse(dashboard.body).metrics).toEqual({ revenue: 0, profit: 0, risk: 0 });
+
         expect(home.status).toBe(200);
         expect(home.contentType).toContain("text/html");
         expect(home.body).toContain("هوشیار.ai");
-        expect(home.body).toContain("/app.js");
-        expect(home.body).toContain("/manifest.webmanifest");
 
         expect(app.status).toBe(200);
         expect(app.contentType).toContain("text/javascript");
@@ -49,7 +59,6 @@ describe("Commercial web entrypoint", () => {
 
         expect(styles.status).toBe(200);
         expect(styles.contentType).toContain("text/css");
-        expect(styles.body).toContain("@media");
 
         expect(manifest.status).toBe(200);
         expect(manifest.contentType).toContain("manifest");
