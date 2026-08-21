@@ -1,15 +1,19 @@
 import { createCommercialRuntimeServer } from "../../AI_Runtime/CommercialRuntimeServer";
 
-async function request(port: number, path: string): Promise<{ status: number; body: string; contentType: string }> {
+async function request(port: number, path: string, method = "GET", body?: string): Promise<{ status: number; body: string; contentType: string }> {
     return new Promise((resolve, reject) => {
         const http = require("node:http") as typeof import("node:http");
-        const request = http.request(`http://127.0.0.1:${port}${path}`, { method: "GET" }, response => {
-            let body = "";
+        const request = http.request(`http://127.0.0.1:${port}${path}`, {
+            method,
+            headers: body ? { "content-type": "application/json" } : undefined,
+        }, response => {
+            let responseBody = "";
             response.setEncoding("utf8");
-            response.on("data", chunk => { body += chunk; });
-            response.on("end", () => resolve({ status: response.statusCode ?? 0, body, contentType: String(response.headers["content-type"] ?? "") }));
+            response.on("data", chunk => { responseBody += chunk; });
+            response.on("end", () => resolve({ status: response.statusCode ?? 0, body: responseBody, contentType: String(response.headers["content-type"] ?? "") }));
         });
         request.on("error", reject);
+        if (body) request.write(body);
         request.end();
     });
 }
@@ -34,6 +38,7 @@ describe("Commercial web entrypoint", () => {
         const health = await request(port, "/health");
         const ready = await request(port, "/api/ready");
         const dashboard = await request(port, "/api/dashboard?organization=audit");
+        const session = await request(port, "/api/session", "POST", JSON.stringify({ organization: "AuditCo" }));
         const home = await request(port, "/");
         const app = await request(port, "/app.js");
         const styles = await request(port, "/styles.css");
@@ -47,6 +52,9 @@ describe("Commercial web entrypoint", () => {
 
         expect(dashboard.status).toBe(200);
         expect(JSON.parse(dashboard.body).metrics).toEqual({ revenue: 0, profit: 0, risk: 0 });
+
+        expect(session.status).toBe(200);
+        expect(JSON.parse(session.body).organization.name).toBe("AuditCo");
 
         expect(home.status).toBe(200);
         expect(home.contentType).toContain("text/html");
