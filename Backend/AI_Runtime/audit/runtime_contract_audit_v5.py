@@ -7,7 +7,19 @@ from pathlib import Path
 from Backend.AI_Runtime.audit.evidence_audit_v4 import EvidenceArchitectureAuditV4
 
 
-ROUTE_RE = re.compile(r'url\.pathname\s*===\s*["\']([^"\']+)["\']')
+PATHNAME_ROUTE_RE = re.compile(r'url\.pathname\s*===\s*["\']([^"\']+)["\']')
+REQUEST_URL_ROUTE_RE = re.compile(r'(?:req\.url|request\.url|url)\s*===\s*["\']([^"\']+)["\']')
+
+
+def extract_routes(text: str, health: str | None = None) -> list[str]:
+    routes = set(PATHNAME_ROUTE_RE.findall(text))
+    routes.update(REQUEST_URL_ROUTE_RE.findall(text))
+    if health:
+        # A manifest health path is authoritative even when the implementation
+        # uses an equivalent request property without a literal route equality.
+        if health in text:
+            routes.add(health)
+    return sorted(routes)
 
 
 class RuntimeContractAuditV5(EvidenceArchitectureAuditV4):
@@ -71,7 +83,7 @@ class RuntimeContractAuditV5(EvidenceArchitectureAuditV4):
             }
 
         canonical_text = canonical.read_text(encoding="utf-8-sig", errors="replace")
-        canonical_routes = sorted(set(ROUTE_RE.findall(canonical_text)))
+        canonical_routes = extract_routes(canonical_text, health)
 
         servers = []
         for path in self.root.rglob("*CommercialRuntimeServer.ts"):
@@ -80,7 +92,7 @@ class RuntimeContractAuditV5(EvidenceArchitectureAuditV4):
             text = path.read_text(encoding="utf-8-sig", errors="replace")
             servers.append({
                 "path": self._rel(path),
-                "routes": sorted(set(ROUTE_RE.findall(text))),
+                "routes": extract_routes(text),
             })
 
         parallel = [s for s in servers if s["path"] != entrypoint]
@@ -105,8 +117,6 @@ class RuntimeContractAuditV5(EvidenceArchitectureAuditV4):
                         f"route divergence: {entrypoint} adds {only_canonical}"
                     )
 
-        # Do not infer an advertised API surface from implementation details.
-        # The manifest currently declares only the runtime entrypoint + health route.
         authoritative_surface = sorted({health} if health else set())
         contract_surface_ok = bool(health and health in canonical_routes)
 
