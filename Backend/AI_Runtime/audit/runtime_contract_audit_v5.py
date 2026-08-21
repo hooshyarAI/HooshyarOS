@@ -11,7 +11,7 @@ ROUTE_RE = re.compile(r'url\.pathname\s*===\s*["\']([^"\']+)["\']')
 
 
 class RuntimeContractAuditV5(EvidenceArchitectureAuditV4):
-    """V5 validates the manifest-selected runtime against its actual HTTP surface."""
+    """V5 validates the manifest-selected runtime against evidenced contracts."""
 
     def audit(self) -> dict:
         result = super().audit()
@@ -42,60 +42,92 @@ class RuntimeContractAuditV5(EvidenceArchitectureAuditV4):
     def _runtime_contract(self) -> dict:
         manifest_path = self.root / "product-manifest.json"
         if not manifest_path.exists():
-            return {"status": "FAIL", "reason": "MANIFEST_MISSING", "mismatches": ["product-manifest.json"], "parallel_runtime_servers": []}
+            return {
+                "status": "FAIL",
+                "reason": "MANIFEST_MISSING",
+                "mismatches": ["product-manifest.json"],
+                "parallel_runtime_servers": [],
+            }
+
         manifest = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
         entrypoint = manifest.get("runtime", {}).get("entrypoint")
         health = manifest.get("runtime", {}).get("health")
+
         if not entrypoint:
-            return {"status": "FAIL", "reason": "RUNTIME_ENTRYPOINT_MISSING", "mismatches": ["runtime.entrypoint"], "parallel_runtime_servers": []}
+            return {
+                "status": "FAIL",
+                "reason": "RUNTIME_ENTRYPOINT_MISSING",
+                "mismatches": ["runtime.entrypoint"],
+                "parallel_runtime_servers": [],
+            }
 
         canonical = self.root / entrypoint
         if not canonical.exists():
-            return {"status": "FAIL", "reason": "CANONICAL_ENTRYPOINT_MISSING", "mismatches": [entrypoint], "parallel_runtime_servers": []}
+            return {
+                "status": "FAIL",
+                "reason": "CANONICAL_ENTRYPOINT_MISSING",
+                "mismatches": [entrypoint],
+                "parallel_runtime_servers": [],
+            }
 
         canonical_text = canonical.read_text(encoding="utf-8-sig", errors="replace")
         canonical_routes = sorted(set(ROUTE_RE.findall(canonical_text)))
-        if health and health not in canonical_routes and health == "/health" and "/health" not in canonical_text:
-            canonical_routes.append(health)
 
         servers = []
         for path in self.root.rglob("*CommercialRuntimeServer.ts"):
             if ".git" in path.parts:
                 continue
             text = path.read_text(encoding="utf-8-sig", errors="replace")
-            servers.append({"path": self._rel(path), "routes": sorted(set(ROUTE_RE.findall(text)))})
+            servers.append({
+                "path": self._rel(path),
+                "routes": sorted(set(ROUTE_RE.findall(text))),
+            })
 
         parallel = [s for s in servers if s["path"] != entrypoint]
-        expected_routes = sorted(set(canonical_routes + ([health] if health else [])))
-
-        advertised = {"/health", "/api/ready", "/api/dashboard", "/api/session"}
-        present_expected = sorted(advertised.intersection(set(canonical_routes)))
-        missing_advertised = sorted(advertised - set(canonical_routes))
 
         mismatches = []
-        if health and health not in canonical_text:
-            mismatches.append(f"canonical health {health} not evidenced in entrypoint")
-        if missing_advertised:
-            mismatches.extend(f"canonical missing {route}" for route in missing_advertised)
+        if health and health not in canonical_routes:
+            mismatches.append(f"manifest health {health} not found in canonical route comparisons")
+
         if parallel:
             mismatches.append("parallel CommercialRuntimeServer implementations exist")
+            canonical_set = set(canonical_routes)
+            for server in parallel:
+                parallel_set = set(server["routes"])
+                only_parallel = sorted(parallel_set - canonical_set)
+                only_canonical = sorted(canonical_set - parallel_set)
+                if only_parallel:
+                    mismatches.append(
+                        f"route divergence: {server['path']} adds {only_parallel}"
+                    )
+                if only_canonical:
+                    mismatches.append(
+                        f"route divergence: {entrypoint} adds {only_canonical}"
+                    )
+
+        # Do not infer an advertised API surface from implementation details.
+        # The manifest currently declares only the runtime entrypoint + health route.
+        authoritative_surface = sorted({health} if health else set())
+        contract_surface_ok = bool(health and health in canonical_routes)
 
         return {
             "status": "PASS" if not mismatches else "FAIL",
             "manifest_entrypoint": entrypoint,
             "manifest_health": health,
-            "canonical_routes": expected_routes,
-            "advertised_surface": sorted(advertised),
-            "missing_advertised_routes": missing_advertised,
+            "canonical_routes": canonical_routes,
+            "authoritative_surface": authoritative_surface,
             "parallel_runtime_servers": parallel,
             "mismatches": mismatches,
+            "surface_contract_ok": contract_surface_ok,
         }
 
     def write_evidence(self, output: str | Path) -> dict:
         out = Path(output).resolve()
         out.mkdir(parents=True, exist_ok=True)
         result = self.audit()
-        (out / "audit_v5.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+        (out / "audit_v5.json").write_text(
+            json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         (out / "audit_v5_report.md").write_text(self._report(result), encoding="utf-8")
         return result
 
@@ -112,8 +144,9 @@ class RuntimeContractAuditV5(EvidenceArchitectureAuditV4):
             f"- Manifest entrypoint: `{result['runtime_contract']['manifest_entrypoint']}`",
             f"- Manifest health: `{result['runtime_contract']['manifest_health']}`",
             f"- Canonical routes: `{result['runtime_contract']['canonical_routes']}`",
-            f"- Missing advertised routes: `{result['runtime_contract']['missing_advertised_routes']}`",
+            f"- Authoritative surface: `{result['runtime_contract']['authoritative_surface']}`",
             f"- Parallel runtime servers: `{[x['path'] for x in result['runtime_contract']['parallel_runtime_servers']]}`",
+            f"- Surface contract OK: `{result['runtime_contract']['surface_contract_ok']}`",
             "",
             "## New Root Finding",
             "",
@@ -130,6 +163,7 @@ class RuntimeContractAuditV5(EvidenceArchitectureAuditV4):
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument("repository")
     parser.add_argument("--out", required=True)
