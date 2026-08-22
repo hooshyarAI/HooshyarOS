@@ -1,7 +1,8 @@
 import { AutonomousRepairEngine } from "../../Autonomous/RepairEngine/AutonomousRepairEngine";
 import { AutonomousExecutionLaw, AutonomousExecutionOperation } from "../../Autonomous/Governance/AutonomousExecutionLaw";
+import type { ConstructionStage } from "../../Autonomous/Contracts/ConstructionContract";
 
-export type ConstructionStage = "ARCHITECTURE" | "PLAN" | "GENERATE" | "VERIFY" | "REPAIR" | "FINALIZE";
+
 
 export interface ArchitecturePlan {
     capabilityId: string;
