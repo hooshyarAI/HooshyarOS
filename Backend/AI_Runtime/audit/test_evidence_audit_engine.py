@@ -37,6 +37,24 @@ def test_core_upper_layer_dependency_is_aggregated(tmp_path):
     assert finding["confidence"] == 0.85
 
 
+def test_nested_core_directory_uses_hbso_top_level_layer(tmp_path):
+    assistant = tmp_path / "Backend/HBOS/Assistant/Core"
+    builder = tmp_path / "Backend/HBOS/Builder/Core"
+    assistant.mkdir(parents=True)
+    builder.mkdir(parents=True)
+    (builder / "BuilderEngine.ts").write_text("export class BuilderEngine {}\n", encoding="utf-8")
+    source = assistant / "AutonomousAssistant.ts"
+    source.write_text('import { BuilderEngine } from "../../Builder/Core/BuilderEngine";\n', encoding="utf-8")
+
+    audit = EvidenceArchitectureAudit(tmp_path)
+
+    assert audit._layer("Backend/HBOS/Assistant/Core/AutonomousAssistant.ts") == "Assistant"
+    assert audit._layer("Backend/HBOS/Builder/Core/BuilderEngine.ts") == "Builder"
+
+    result = audit.audit()
+    assert not any(f["id"] == "ARCH-BOUND-001" for f in result["findings"])
+
+
 def test_security_read_signal_is_not_declared_vulnerability(tmp_path):
     runtime = tmp_path / "Backend/HBOS/Product"
     runtime.mkdir(parents=True)

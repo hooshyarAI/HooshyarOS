@@ -77,9 +77,15 @@ class EvidenceArchitectureAudit:
         return path.relative_to(self.root).as_posix()
 
     def _layer(self, path: str) -> str:
-        for part in Path(path).parts:
-            if part in LAYER_NAMES:
-                return part
+        parts = Path(path).parts
+        try:
+            hbso_index = parts.index("HBOS")
+        except ValueError:
+            return "Other"
+        if hbso_index + 1 < len(parts):
+            top_level = parts[hbso_index + 1]
+            if top_level in LAYER_NAMES:
+                return top_level
         return "Other"
 
     def _metrics(self, path: Path, text: str):
@@ -213,17 +219,12 @@ class EvidenceArchitectureAudit:
                 if line and not re.fullmatch(r"[0-9a-f]{40}",line): churn[line]+=1
         incoming=Counter(t for _,t in g.edges()); rows=[]
         for f in files: rows.append({"path":f["path"],"risk_score":max(1,f["complexity"])*max(1,incoming[f["path"]]+1)*max(1,churn[f["path"]]+1),"complexity":f["complexity"],"dependents":incoming[f["path"]],"churn":churn[f["path"]]})
-        return sorted(rows,key=lambda x:x["risk_score"],reverse=True)[:100]
+        return sorted(rows,key=lambda x:x["risk_score"],reverse=True)[:50]
 
-    def _markdown(self,r):
-        lines=["# HooshyarOS Evidence-Based Architecture Audit V2","",f"- HEAD: `{r['baseline']['head']}`",f"- Clean: `{r['baseline']['clean']}`",f"- Code files: **{r['inventory']['code_files']}**",f"- Lines: **{r['inventory']['lines']:,}**",f"- Test-like files: **{r['inventory']['test_like_files']}**",f"- Graph nodes: **{r['dependency_graph']['nodes']}**",f"- Graph edges: **{r['dependency_graph']['edges']}**",f"- Cycles/SCC: **{len(r['dependency_graph']['cycles'])}**",f"- Raw findings: **{len(r['findings_raw'])}**",f"- Root findings: **{len(r['findings'])}**","","## Root Findings",""]
-        lines += [f"- **{x['severity']}** `{x['id']}` — {x['title']} (confidence={x['confidence']:.2f}, evidence={x['evidence_count']}, disposition={x['disposition']})" for x in r["findings"]] or ["- None"]
-        lines += ["","## Unknowns",""]+[f"- {x}" for x in r["unknowns"]]
-        return "\n".join(lines)+"\n"
-
-if __name__ == "__main__":
-    import argparse
-    parser=argparse.ArgumentParser(description="HooshyarOS evidence-based architecture audit")
-    parser.add_argument("repository",nargs="?",default=os.environ.get("HOOSHYAR_AUDIT_REPO",".")); parser.add_argument("--out",default=os.environ.get("HOOSHYAR_AUDIT_OUT","AuditOutput")); args=parser.parse_args()
-    result=EvidenceArchitectureAudit(args.repository).write_evidence(args.out)
-    print(json.dumps({"status":"PASS","audit_version":result["audit_version"],"head":result["baseline"]["head"],"files":result["inventory"]["code_files"],"cycles":len(result["dependency_graph"]["cycles"]),"raw_findings":len(result["findings_raw"]),"root_findings":len(result["findings"]),"output":str(Path(args.out).resolve())},ensure_ascii=False,indent=2))
+    def _markdown(self, result: dict) -> str:
+        lines=["# HooshyarOS Evidence-Based Architecture Audit","",f"- Audit mode: `{result['audit_mode']}`",f"- HEAD: `{result['baseline']['head']}`",f"- Branch: `{result['baseline']['branch']}`",f"- Clean: `{result['baseline']['clean']}`",f"- Code files: **{result['inventory']['code_files']}**",f"- Lines: **{result['inventory']['lines']}**",f"- Classes: **{result['inventory']['classes']}**",f"- Functions: **{result['inventory']['functions']}**",f"- Test-like files: **{result['inventory']['test_like_files']}**",f"- Cycles: **{len(result['dependency_graph']['cycles'])}**","","## Findings"]
+        for f in result["findings"]: lines += [f"- **{f['severity']}** `{f['id']}` — {f['title']} (confidence={f['confidence']:.2f}, disposition={f['disposition']}, evidence_count={f['evidence_count']})"]
+        lines += ["","## Root Cause Types"]
+        counts=Counter(f["class"] for f in result["findings"])
+        lines += [f"- {k}: **{v}**" for k,v in sorted(counts.items())]
+        return "\n".join(lines) + "\n"
