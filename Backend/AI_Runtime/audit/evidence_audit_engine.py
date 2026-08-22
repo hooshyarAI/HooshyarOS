@@ -16,7 +16,7 @@ except ImportError:
 CODE_EXTENSIONS = {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".py"}
 DOC_EXTENSIONS = {".md", ".txt"}
 SKIP_DIRECTORIES = {".git", "node_modules", "dist", "build", "coverage", ".next", ".venv", "venv", "__pycache__", ".pytest_cache", ".mypy_cache", ".idea", ".vscode"}
-LAYER_NAMES = {"Core", "Autonomous", "Product", "Commercial", "Security", "Financial", "Engines", "Builder", "Runtime", "Architecture", "Communication", "Persistence", "Factory", "Services"}
+LAYER_NAMES = {"Core", "Assistant", "Autonomous", "Product", "Commercial", "Security", "Financial", "Engines", "Builder", "Runtime", "Architecture", "Communication", "Persistence", "Factory", "Services"}
 SECURITY_PATTERNS = {
     "SEC-PATH-001": ("HIGH", re.compile(r"\breadFile(?:Sync)?\s*\(")),
     "SEC-SUBPROC-001": ("HIGH", re.compile(r"\b(?:spawn|exec|execFile|spawnSync)\s*\(")),
