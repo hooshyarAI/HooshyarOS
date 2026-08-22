@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { FinancialDataIngestionAdapter } from "../Product/FinancialDataIngestionAdapter";
@@ -6,10 +6,13 @@ import { SQLitePersistenceStore } from "../Product/SQLitePersistenceStore";
 
 describe("FinancialDataIngestionAdapter", () => {
     let tempDir: string;
+    let allowedRoot: string;
     let persistence: SQLitePersistenceStore;
 
     beforeEach(async () => {
         tempDir = await mkdtemp(join(tmpdir(), "hooshyar-financial-ingestion-"));
+        allowedRoot = join(tempDir, "allowed");
+        await mkdir(allowedRoot, { recursive: true });
         persistence = new SQLitePersistenceStore({ databasePath: join(tempDir, "financial.sqlite") });
     });
 
@@ -45,6 +48,22 @@ describe("FinancialDataIngestionAdapter", () => {
         expect(persisted?.value).toEqual(result.model);
     });
 
+    it("ingests an actual CSV file within the configured allowed root", async () => {
+        const sourcePath = join(allowedRoot, "sample.csv");
+        await writeFile(sourcePath, [
+            "date,account,debit,credit,currency",
+            "2026-01-01,1000,100.00,0,IRR",
+            "2026-01-02,2000,0,30.50,IRR"
+        ].join("\n"));
+
+        const adapter = new FinancialDataIngestionAdapter(persistence, undefined, allowedRoot);
+        const result = await adapter.ingestFile("tenant-a", sourcePath);
+
+        expect(result.evidence.sourceName).toBe("sample.csv");
+        expect(result.model.transactions).toHaveLength(2);
+        expect(result.persisted).toBe(true);
+    });
+
     it("rejects an invalid financial CSV schema before persistence", async () => {
         await expect(
             new FinancialDataIngestionAdapter(persistence).ingestCsv(
@@ -53,5 +72,20 @@ describe("FinancialDataIngestionAdapter", () => {
                 "date,account\n2026-01-01,1000",
             ),
         ).rejects.toThrow("ingestion-schema-invalid");
+    });
+
+    it("rejects file ingestion outside the configured allowed root", async () => {
+        const outside = join(tempDir, "outside.csv");
+        await writeFile(outside, [
+            "date,account,debit,credit,currency",
+            "2026-01-01,1000,1,0,IRR",
+        ].join("\n"));
+
+        await expect(
+            new FinancialDataIngestionAdapter(persistence, undefined, allowedRoot).ingestFile(
+                "tenant-a",
+                outside,
+            ),
+        ).rejects.toThrow("ingestion-source-path-outside-allowed-root");
     });
 });

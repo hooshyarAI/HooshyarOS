@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import { basename } from "node:path";
+import { readFile, realpath } from "node:fs/promises";
+import { basename, isAbsolute, relative, resolve, sep } from "node:path";
 import { SQLitePersistenceStore } from "./SQLitePersistenceStore";
 import { FinancialIntelligenceEngine, FinancialAnalysisResult } from "../Engines/FinancialIntelligenceEngine";
 
@@ -46,13 +46,15 @@ export class FinancialDataIngestionAdapter {
   constructor(
     private readonly persistence: SQLitePersistenceStore,
     private readonly intelligence: FinancialIntelligenceEngine = new FinancialIntelligenceEngine(),
+    private readonly allowedRoot = process.env.HOOSHYAR_FINANCIAL_INGESTION_ROOT ?? process.cwd(),
   ) {}
 
   async ingestFile(tenantId: string, sourcePath: string): Promise<FinancialIngestionResult> {
     const normalizedPath = sourcePath.trim();
     if (!normalizedPath) throw new Error("ingestion-source-path-required");
-    const csv = await readFile(normalizedPath, "utf8");
-    return this.ingestCsv(tenantId, basename(normalizedPath), csv);
+    const safePath = await this.assertAllowedPath(normalizedPath);
+    const csv = await readFile(safePath, "utf8");
+    return this.ingestCsv(tenantId, basename(safePath), csv);
   }
 
   async ingestCsv(
@@ -98,6 +100,17 @@ export class FinancialDataIngestionAdapter {
     });
 
     return { evidence: source, model, intelligence, persisted: true };
+  }
+
+  private async assertAllowedPath(sourcePath: string): Promise<string> {
+    const root = await realpath(resolve(this.allowedRoot));
+    const candidate = await realpath(resolve(sourcePath));
+    const containment = relative(root, candidate);
+    const escaped = containment === ".."
+      || containment.startsWith(`..${sep}`)
+      || isAbsolute(containment);
+    if (escaped || containment === "") throw new Error("ingestion-source-path-outside-allowed-root");
+    return candidate;
   }
 
   private parseAndValidate(csv: string): FinancialTransaction[] {
