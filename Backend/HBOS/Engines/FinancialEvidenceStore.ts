@@ -1,5 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
-import type { CanonicalFinancialModel, FinancialEvidenceRecord, FinancialSource } from "./FinancialDataIngestionEngine";
+import type { CanonicalFinancialModel, FinancialEvidenceRecord, FinancialSource } from "../Financial/Contracts/FinancialEvidenceContract";
 
 export interface PersistedFinancialEvidence {
     source: FinancialSource;
