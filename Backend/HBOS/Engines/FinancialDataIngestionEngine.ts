@@ -3,32 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { FinancialIntelligenceEngine, FinancialAnalysisResult } from "./FinancialIntelligenceEngine";
 import { FinancialEvidenceStore } from "./FinancialEvidenceStore";
-
-export interface FinancialEvidenceRecord {
-    metric: string;
-    period: string;
-    value: number;
-    unit: string;
-}
-
-export interface FinancialSource {
-    sourceId: string;
-    sourceUri: string;
-    rawPath: string;
-    entity: string;
-}
-
-export interface CanonicalFinancialModel {
-    sourceId: string;
-    entity: string;
-    period: string;
-    currency: string;
-    scale: number;
-    revenue: number;
-    expenses: number;
-    assets: number;
-    liabilities: number;
-}
+import type { CanonicalFinancialModel, FinancialEvidenceRecord, FinancialSource } from "../Financial/Contracts/FinancialEvidenceContract";
 
 export interface FinancialIngestionResult {
     source: FinancialSource;
