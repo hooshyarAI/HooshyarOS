@@ -1,0 +1,228 @@
+name: HooshyarOS Engineering Audit
+
+on:
+  push:
+    branches: ["agent/release-final"]
+  pull_request:
+    branches: ["agent/release-final"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  python-quality-security:
+    name: Python quality + security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install runtime and audit tools
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install pytest pytest-cov fastapi httpx ruff mypy bandit pip-audit pydeps
+
+      - name: Ruff
+        run: ruff check Backend/AI_Runtime
+
+      - name: Mypy
+        run: mypy Backend/AI_Runtime --ignore-missing-imports
+
+      - name: Bandit
+        run: bandit -r Backend/AI_Runtime -ll -ii
+
+      - name: Dependency audit
+        shell: bash
+        run: |
+          if [ -f requirements.txt ]; then
+            pip-audit -r requirements.txt
+          else
+            echo "No requirements.txt: auditing the CI-installed Python environment instead."
+            pip-audit
+          fi
+
+      - name: Python tests + coverage
+        run: |
+          python -m pytest Backend/AI_Runtime/tests -q \
+            --cov=Backend/AI_Runtime \
+            --cov-report=term-missing \
+            --cov-report=xml
+
+      - name: Upload Python coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-coverage
+          path: coverage.xml
+          if-no-files-found: error
+
+      - name: Generate Python dependency graph
+        shell: bash
+        run: |
+          mkdir -p audit-artifacts
+          pydeps Backend/AI_Runtime --noshow --max-bacon=2 --output audit-artifacts/python-dependencies.svg || true
+          find audit-artifacts -maxdepth 1 -type f -print
+
+      - name: Upload architecture evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-architecture-evidence
+          path: audit-artifacts/
+          if-no-files-found: warn
+
+  node-quality-tests:
+    name: Node/TypeScript quality + tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Jest
+        run: npm test -- --runInBand
+
+  api-contract:
+    name: FastAPI contract smoke test
+    runs-on: ubuntu-latest
+    needs: python-quality-security
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install runtime dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install fastapi httpx pytest
+
+      - name: Verify OpenAPI contract through real app
+        run: |
+          python - <<'PY'
+          from fastapi.testclient import TestClient
+          from Backend.AI_Runtime.main import app
+
+          client = TestClient(app)
+          health = client.get('/')
+          assert health.status_code == 200, health.text
+          assert health.json().get('status') == 'online', health.text
+
+          spec = client.get('/openapi.json')
+          assert spec.status_code == 200, spec.text
+          paths = spec.json().get('paths', {})
+          assert '/' in paths
+          assert '/execute' in paths
+          print('OpenAPI contract: PASS')
+          print('Routes:', sorted(paths))
+          PY
+
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  semgrep:
+    name: Semgrep security scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Semgrep
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/python
+            p/security-audit
+
+  docker-scan:
+    name: Docker image security scan
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('Dockerfile') != '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t hooshyaros:audit .
+
+      - name: Trivy
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: hooshyaros:audit
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+
+  architecture-contract:
+    name: Architecture contract evidence
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check architecture policy presence
+        shell: bash
+        run: |
+          if [ -f .importlinter ]; then
+            echo "import-linter configuration found"
+            python -m pip install import-linter
+            lint-imports
+          else
+            echo "ARCHITECTURE POLICY NOT YET CODIFIED: .importlinter is absent"
+            echo "This job remains non-blocking evidence until canonical boundaries are explicitly encoded."
+          fi
+
+  performance:
+    name: Performance audit (manual)
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install profiling/load tools
+        run: pip install locust py-spy scalene
+
+      - name: Record performance-tool readiness
+        run: |
+          locust --version
+          py-spy --version
+          scalene --version
+          echo "Performance harness is ready; no synthetic workload is invented here."
