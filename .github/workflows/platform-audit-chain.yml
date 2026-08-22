@@ -1,0 +1,177 @@
+name: HooshyarOS Platform Audit Chain
+
+on:
+  pull_request:
+    branches: [agent/release-final]
+  push:
+    branches: [agent/release-final]
+  workflow_dispatch:
+
+concurrency:
+  group: platform-audit-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  node-runtime:
+    name: Node / TypeScript / Jest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: TypeScript compile
+        run: node ./node_modules/typescript/bin/tsc --noEmit --pretty false
+      - name: Jest with coverage
+        run: node ./node_modules/jest/bin/jest.js --runInBand --coverage
+      - name: npm dependency audit
+        run: npm audit --audit-level=high
+
+  python-runtime:
+    name: Python runtime / quality / dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install audit tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest pytest-cov ruff bandit pip-audit pydeps
+          if [ -f requirements.txt ]; then python -m pip install -r requirements.txt; fi
+          if [ -f requirements-dev.txt ]; then python -m pip install -r requirements-dev.txt; fi
+      - name: Python tests with coverage
+        run: python -m pytest Backend/AI_Runtime/tests -q --cov=Backend/AI_Runtime --cov-report=term-missing --cov-report=xml
+      - name: Ruff
+        run: ruff check Backend/AI_Runtime --output-format=github
+      - name: Bandit
+        run: bandit -r Backend/AI_Runtime -ll -ii -f screen
+      - name: Python dependency audit
+        shell: bash
+        run: |
+          if [ -f requirements.txt ]; then
+            python -m pip_audit -r requirements.txt
+          elif [ -f pyproject.toml ]; then
+            python -m pip_audit
+          else
+            echo 'SKIPPED: no Python dependency manifest'
+          fi
+      - name: Dependency graph evidence
+        shell: bash
+        run: |
+          mkdir -p audit-evidence
+          pydeps Backend/AI_Runtime --noshow --max-bacon 2 > audit-evidence/python-dependencies.txt || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-audit-evidence
+          path: |
+            coverage.xml
+            audit-evidence/python-dependencies.txt
+          if-no-files-found: ignore
+
+  semgrep:
+    name: Semgrep SAST
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Semgrep
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/python
+            p/typescript
+            p/secrets
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+  secrets:
+    name: Full-history secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  optional-surfaces:
+    name: Optional Docker / API surfaces
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect surfaces
+        id: detect
+        shell: bash
+        run: |
+          if [ -f Dockerfile ]; then echo 'docker=true' >> "$GITHUB_OUTPUT"; else echo 'docker=false' >> "$GITHUB_OUTPUT"; fi
+          if find . -maxdepth 5 -type f \( -name 'openapi.json' -o -name 'openapi.yaml' -o -name 'openapi.yml' \) | grep -q .; then echo 'openapi=true' >> "$GITHUB_OUTPUT"; else echo 'openapi=false' >> "$GITHUB_OUTPUT"; fi
+      - name: Build Docker image
+        if: steps.detect.outputs.docker == 'true'
+        run: docker build -t hooshyaros:audit .
+      - name: Trivy
+        if: steps.detect.outputs.docker == 'true'
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: hooshyaros:audit
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+      - name: API contract decision
+        shell: bash
+        run: |
+          if [ '${{ steps.detect.outputs.openapi }}' = 'true' ]; then
+            echo 'OpenAPI detected: enable Schemathesis as a dedicated API gate.'
+          else
+            echo 'SKIPPED: no OpenAPI contract detected; no API assumptions are made.'
+          fi
+
+  architecture:
+    name: Architecture evidence
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install architecture tools when applicable
+        run: python -m pip install pydeps import-linter
+      - name: Produce dependency evidence
+        shell: bash
+        run: |
+          mkdir -p audit-evidence
+          pydeps Backend/AI_Runtime --noshow --max-bacon 3 > audit-evidence/python-dependency-graph.txt || true
+          if [ -f .importlinter.toml ] || [ -f pyproject.toml ]; then
+            lint-imports || true
+          else
+            echo 'SKIPPED: architecture contracts are not yet declared.'
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: architecture-evidence
+          path: audit-evidence/python-dependency-graph.txt
+          if-no-files-found: ignore
+
+  workflow-contract:
+    name: Hooshyar workflow contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify canonical workflow surfaces
+        shell: bash
+        run: |
+          test -f .github/workflows/platform-audit-chain.yml
+          test -f .github/workflows/autonomous-platform-construction.yml
+          test -f .github/workflows/hooshyaros-ci.yml
+          grep -R -q 'AUTONOMOUS' .github/workflows/autonomous-platform-construction.yml
+          grep -R -q 'jest' .github/workflows/hooshyaros-ci.yml
+          echo 'Canonical workflow contract present.'
