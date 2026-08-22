@@ -1,0 +1,1 @@
+export function commercialReady(evidenceComplete: boolean, securityVerified: boolean, customerIsolationVerified: boolean, recoveryVerified: boolean): boolean { return evidenceComplete && securityVerified && customerIsolationVerified && recoveryVerified; }

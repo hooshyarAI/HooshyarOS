@@ -1,28 +1,11 @@
 import { randomUUID } from "node:crypto";
+import { resolve } from "node:path";
 import { SecurityLayerEngine } from "../Engines/SecurityLayerEngine";
 import { UserManagementEngine } from "../Engines/UserManagementEngine";
 import { OrganizationModelEngine } from "../Engines/OrganizationModelEngine";
-
-export type CommercialRole = "OWNER" | "ADMIN" | "MANAGER" | "VIEWER";
-export type CommercialPermission = "READ_DASHBOARD" | "INGEST_DATA" | "CREATE_DECISION" | "MANAGE_USERS";
-
-export interface CommercialSession {
-    token: string;
-    username: string;
-    organization: string;
-    tenantId: string;
-    role: CommercialRole;
-    createdAt: string;
-    active: boolean;
-}
-
-export interface IdentityAuditEvent {
-    type: "SESSION_CREATED" | "SESSION_REVOKED" | "AUTHORIZATION_ALLOWED" | "AUTHORIZATION_DENIED";
-    username: string;
-    organization: string;
-    permission?: CommercialPermission;
-    createdAt: string;
-}
+import { SQLiteIdentityStore } from "./SQLiteIdentityStore";
+import type { CommercialPermission, CommercialRole, CommercialSession, IdentityAuditEvent } from "./Contracts/CommercialIdentityContract";
+export type { CommercialPermission, CommercialRole, CommercialSession, IdentityAuditEvent } from "./Contracts/CommercialIdentityContract";
 
 const permissions: Record<CommercialRole, ReadonlySet<CommercialPermission>> = {
     OWNER: new Set(["READ_DASHBOARD", "INGEST_DATA", "CREATE_DECISION", "MANAGE_USERS"]),
@@ -31,12 +14,22 @@ const permissions: Record<CommercialRole, ReadonlySet<CommercialPermission>> = {
     VIEWER: new Set(["READ_DASHBOARD"])
 };
 
+function defaultDatabasePath(): string {
+    const configured = process.env.HOOSHYAR_DB_PATH?.trim();
+    if (configured) return configured;
+    const dataDirectory = process.env.HOOSHYAR_DATA_DIR?.trim() || resolve(".hooshyar", "data");
+    return resolve(dataDirectory, "hooshyar.sqlite");
+}
+
 export class CommercialIdentityService {
     private readonly security = new SecurityLayerEngine();
     private readonly users = new UserManagementEngine();
     private readonly organizations = new OrganizationModelEngine();
-    private readonly sessions = new Map<string, CommercialSession>();
-    private readonly auditEvents: IdentityAuditEvent[] = [];
+    private readonly identityStore: SQLiteIdentityStore;
+
+    constructor(databasePath = defaultDatabasePath()) {
+        this.identityStore = new SQLiteIdentityStore({ databasePath });
+    }
 
     initialize(): void {
         this.security.initialize();
@@ -61,14 +54,20 @@ export class CommercialIdentityService {
             createdAt: new Date().toISOString(),
             active: true
         };
-        this.sessions.set(session.token, session);
-        this.auditEvents.push({ type: "SESSION_CREATED", username: session.username, organization: session.organization, createdAt: session.createdAt });
+
+        this.identityStore.saveSession(session);
+        this.identityStore.appendAuditEvent({
+            type: "SESSION_CREATED",
+            username: session.username,
+            organization: session.organization,
+            createdAt: session.createdAt
+        });
         return { ...session };
     }
 
     getSession(token: string | undefined): CommercialSession | null {
         if (!token) return null;
-        const session = this.sessions.get(token.trim());
+        const session = this.identityStore.getSession(token.trim());
         return session?.active ? { ...session } : null;
     }
 
@@ -76,23 +75,49 @@ export class CommercialIdentityService {
         const session = this.getSession(token);
         const normalizedOrganization = organization?.trim() ?? "";
         if (!session || session.organization !== normalizedOrganization || !permissions[session.role].has(permission)) {
-            if (session) this.auditEvents.push({ type: "AUTHORIZATION_DENIED", username: session.username, organization: normalizedOrganization, permission, createdAt: new Date().toISOString() });
+            if (session) {
+                this.identityStore.appendAuditEvent({
+                    type: "AUTHORIZATION_DENIED",
+                    username: session.username,
+                    organization: normalizedOrganization,
+                    permission,
+                    createdAt: new Date().toISOString()
+                });
+            }
             throw new Error("AUTHORIZATION_DENIED");
         }
-        this.auditEvents.push({ type: "AUTHORIZATION_ALLOWED", username: session.username, organization: session.organization, permission, createdAt: new Date().toISOString() });
+
+        this.identityStore.appendAuditEvent({
+            type: "AUTHORIZATION_ALLOWED",
+            username: session.username,
+            organization: session.organization,
+            permission,
+            createdAt: new Date().toISOString()
+        });
         return session;
     }
 
     logout(token: string | undefined): boolean {
         if (!token) return false;
-        const session = this.sessions.get(token.trim());
-        if (!session || !session.active) return false;
-        session.active = false;
-        this.auditEvents.push({ type: "SESSION_REVOKED", username: session.username, organization: session.organization, createdAt: new Date().toISOString() });
-        return true;
+        const session = this.identityStore.getSession(token.trim());
+        if (!session?.active) return false;
+        const revoked = this.identityStore.revokeSession(token.trim());
+        if (revoked) {
+            this.identityStore.appendAuditEvent({
+                type: "SESSION_REVOKED",
+                username: session.username,
+                organization: session.organization,
+                createdAt: new Date().toISOString()
+            });
+        }
+        return revoked;
     }
 
     auditTrail(): IdentityAuditEvent[] {
-        return this.auditEvents.map(event => ({ ...event }));
+        return this.identityStore.auditTrail().map(event => ({ ...event }));
+    }
+
+    close(): void {
+        this.identityStore.close();
     }
 }

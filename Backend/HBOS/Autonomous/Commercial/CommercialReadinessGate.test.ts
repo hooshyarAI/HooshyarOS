@@ -1,0 +1,2 @@
+import { evaluateCommercialReadiness } from "./CommercialReadinessGate";
+describe("Commercial readiness",()=>{ it("blocks incomplete product",()=>expect(evaluateCommercialReadiness({security:true,tenantIsolation:false,persistence:true,ingestion:true,behavioralVerification:true,recovery:true}).ready).toBe(false)); it("passes only when all evidence is verified",()=>expect(evaluateCommercialReadiness({security:true,tenantIsolation:true,persistence:true,ingestion:true,behavioralVerification:true,recovery:true})).toEqual({ready:true,blockers:[]})); });

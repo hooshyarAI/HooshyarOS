@@ -1,0 +1,2 @@
+import { createVerificationPlan } from "./VerificationPlan";
+describe("Verification plan",()=>{ it("requires behavioral, integration and adversarial layers",()=>{const p=createVerificationPlan("Ingestion",["behavior"],["integration"],["malformed-input"]); expect(p).toEqual({capability:"Ingestion",behavioralTests:["behavior"],integrationTests:["integration"],adversarialTests:["malformed-input"]});});});

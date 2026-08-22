@@ -7,6 +7,10 @@ describe("Windows product installer contract", () => {
         path.join(root, "Backend", "AI_Runtime", "release_product_builder.py"),
         "utf8",
     );
+    const finalInstallerBuilder = fs.readFileSync(
+        path.join(root, "Backend", "AI_Runtime", "final_windows_installer_builder.py"),
+        "utf8",
+    );
 
     it("filters development artifacts from the customer payload", () => {
         expect(builder).toContain("def _should_skip_file");
@@ -45,5 +49,23 @@ describe("Windows product installer contract", () => {
         expect(builder).toContain("Frontend/HooshyarWebApp/index.ts");
         expect(builder).toContain("product-manifest.json");
         expect(builder).toContain("web/index.html");
+    });
+
+    it("waits for runtime readiness before opening the desktop browser surface", () => {
+        expect(finalInstallerBuilder).toContain("WaitUntilReady");
+        expect(finalInstallerBuilder).toContain("/api/dashboard");
+        expect(finalInstallerBuilder).toContain('"state":"ready"');
+        expect(finalInstallerBuilder).toContain("runtime");
+        expect(finalInstallerBuilder).toContain("msedge.exe");
+        expect(finalInstallerBuilder).not.toContain("Microsoft.Web.WebView2");
+    });
+
+    it("detaches the installed Node runtime from the desktop shell lifecycle", () => {
+        expect(finalInstallerBuilder).toContain('FileName = "cmd.exe"');
+        expect(finalInstallerBuilder).toContain('Arguments = "/d /c start \\\"HooshyarOS Runtime\\\" /b');
+        expect(finalInstallerBuilder).toContain("runtime-launch-requested node=");
+        expect(finalInstallerBuilder).toContain("runtime-ready");
+        expect(finalInstallerBuilder).not.toContain("runtimeProcess.Kill(true)");
+        expect(finalInstallerBuilder).not.toContain("browser.WaitForExit();");
     });
 });

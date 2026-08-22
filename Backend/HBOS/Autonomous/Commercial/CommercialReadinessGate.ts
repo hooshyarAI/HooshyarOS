@@ -1,0 +1,2 @@
+export interface CommercialEvidence { security:boolean; tenantIsolation:boolean; persistence:boolean; ingestion:boolean; behavioralVerification:boolean; recovery:boolean; }
+export function evaluateCommercialReadiness(x:CommercialEvidence):{ready:boolean;blockers:string[]} { const blockers=Object.entries(x).filter(([,v])=>!v).map(([k])=>k.toUpperCase()+"_NOT_VERIFIED"); return {ready:blockers.length===0,blockers}; }

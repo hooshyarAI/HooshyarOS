@@ -31,8 +31,12 @@ def _class_name(target_engine: str) -> str:
     return "".join(word[:1].upper() + word[1:] for word in words) or "AutonomousCapabilityEngine"
 
 
+def _normalized_path(path: str) -> str:
+    return path.replace("\\", "/")
+
+
 def _path_class_name(path: str, fallback: str) -> str:
-    name = Path(path).stem
+    name = Path(_normalized_path(path)).stem
     return name or fallback
 
 
@@ -109,7 +113,8 @@ def validate_spec(spec: CapabilitySpec) -> list[str]:
 
 
 def _artifact_dir(path: str) -> str:
-    parent = Path(path).parent.as_posix()
+    parent = _normalized_path(path)
+    parent = Path(parent).parent.as_posix()
     return f"../{parent.split('/')[-1]}" if parent else ".."
 
 
@@ -119,7 +124,8 @@ def product_artifacts(spec: CapabilitySpec) -> list[tuple[str, str]]:
         raise ValueError("Invalid capability specification: " + "; ".join(errors))
 
     class_name = spec.class_name
-    product_dir = Path(spec.engine_path).parent.as_posix()
+    normalized_engine_path = _normalized_path(spec.engine_path)
+    product_dir = Path(normalized_engine_path).parent.as_posix()
     relative_product_import = "../" + product_dir.split("/")[-1]
     test_import = f"{relative_product_import}/{class_name}"
 
@@ -149,7 +155,8 @@ def product_artifacts(spec: CapabilitySpec) -> list[tuple[str, str]]:
 
 
 def generic_artifacts(spec: CapabilitySpec) -> list[tuple[str, str]]:
-    if spec.capability_id.startswith("product.") or "/Product/" in spec.engine_path:
+    normalized_engine_path = _normalized_path(spec.engine_path)
+    if spec.capability_id.startswith("product.") or "/product/" in f"/{normalized_engine_path.lower().lstrip('/')}".replace("//", "/"):
         return product_artifacts(spec)
 
     errors = validate_spec(spec)

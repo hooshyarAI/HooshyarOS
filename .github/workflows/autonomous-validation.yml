@@ -2,7 +2,9 @@ name: Autonomous Builder Validation
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - agent/release-final
   pull_request:
 
 jobs:

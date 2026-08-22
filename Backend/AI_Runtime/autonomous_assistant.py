@@ -1,12 +1,12 @@
-"""Explicit autonomous assistant/productization entrypoint.
+"""Canonical autonomous master-cycle entrypoint.
 
-This is a stable product-facing boundary. The HBOS TypeScript architecture remains
-authoritative; this Python entrypoint delegates to the governed productization worker
-rather than maintaining a second business implementation.
+The assistant is the orchestration boundary for construction, verification and
+commercialization readiness. Domain implementation remains delegated to the
+existing governed HBOS/AI workers; this file must not duplicate business logic.
 """
 from __future__ import annotations
 
-from productization_worker import main
+from autonomous_master_orchestrator import main
 
 
 if __name__ == "__main__":

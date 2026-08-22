@@ -57,6 +57,20 @@ def test_product_spec_honors_declared_artifact_paths():
     assert "product.financial-data-ingestion" in artifacts[spec.docs_path]
 
 
+def test_product_artifacts_remain_product_scoped_for_windows_absolute_paths():
+    windows_prompt = PRODUCT_PROMPT.replace(
+        "Required artifact paths: Backend/HBOS/Product/FinancialDataIngestionAdapter.ts ; Backend/HBOS/test/FinancialDataIngestionAdapter.test.ts ; Docs/Product/FinancialDataIngestionAdapter.md",
+        r"Required artifact paths: D:\HooshyarOS\Backend\HBOS\Product\FinancialDataIngestionAdapter.ts ; D:\HooshyarOS\Backend\HBOS\test\FinancialDataIngestionAdapter.test.ts ; D:\HooshyarOS\Docs\Product\FinancialDataIngestionAdapter.md",
+    )
+    spec = spec_from_prompt(windows_prompt)
+    assert spec is not None
+    artifacts = dict(generic_artifacts(spec))
+    assert "class FinancialDataIngestionAdapter" in artifacts[spec.engine_path]
+    assert "../Product/FinancialDataIngestionAdapter" in artifacts[spec.test_path]
+    assert "../Engines/FinancialDataIngestionAdapter" not in artifacts[spec.test_path]
+    assert "\\Product\\" in spec.docs_path or "/Product/" in spec.docs_path
+
+
 def test_generic_artifacts_preserve_architecture_contract():
     spec = spec_from_prompt(PROMPT)
     artifacts = dict(generic_artifacts(spec))

@@ -1,0 +1,153 @@
+name: HooshyarOS Windows Desktop Product Gate
+run-name: HooshyarOS Desktop Product Gate • ${{ github.sha }}
+on:
+  workflow_dispatch:
+  push:
+    branches: [agent/release-final]
+permissions:
+  contents: read
+concurrency:
+  group: hooshyaros-windows-desktop-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  runtime:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20', cache: npm }
+      - run: npm ci
+      - run: npm test -- --runInBand
+
+  windows-build:
+    needs: runtime
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: python Backend/AI_Runtime/final_windows_desktop_installer_builder_v2.py
+      - shell: pwsh
+        run: |
+          $installer='dist/productization/windows/HooshyarOS-Setup.exe'
+          $shell='dist/productization/windows/HooshyarOS.exe'
+          if (!(Test-Path $installer)) { throw 'Installer missing' }
+          if (!(Test-Path $shell)) { throw 'Desktop shell missing' }
+          if ((Get-Item $installer).Length -lt 1MB) { throw 'Installer unexpectedly small' }
+          if ((Get-Item $shell).Length -lt 100KB) { throw 'Shell unexpectedly small' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HooshyarOS-Windows-Desktop-Installer
+          path: dist/productization/windows/HooshyarOS-Setup.exe
+          if-no-files-found: error
+          retention-days: 30
+
+  windows-install-run-uninstall:
+    needs: windows-build
+    runs-on: windows-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: HooshyarOS-Windows-Desktop-Installer
+          path: dist/productization/windows
+      - shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $installer=(Resolve-Path 'dist/productization/windows/HooshyarOS-Setup.exe').Path
+          $root=Join-Path $env:ProgramData 'HooshyarOS'
+          $marker=Join-Path $root 'HooshyarOS-install-complete.marker'
+          $log=Join-Path $env:ProgramData 'HooshyarOS-install.log'
+          if (Test-Path $root) { Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue }
+          if (Test-Path (Join-Path $env:ProgramData 'HooshyarOS-uninstall.ps1')) { Remove-Item (Join-Path $env:ProgramData 'HooshyarOS-uninstall.ps1') -Force -ErrorAction SilentlyContinue }
+          $p=Start-Process $installer -ArgumentList '/Q' -PassThru
+          $deadline=(Get-Date).AddSeconds(180)
+          while ((Get-Date) -lt $deadline) {
+            if (Test-Path $marker) { break }
+            $p.Refresh(); if ($p.HasExited) { break }
+            Start-Sleep 1
+          }
+          if (!(Test-Path $marker)) {
+            if (Test-Path $log) { Get-Content $log | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8 }
+            throw 'Installer did not complete'
+          }
+      - shell: pwsh
+        run: |
+          $root=Join-Path $env:ProgramData 'HooshyarOS'
+          $shell=Join-Path $root 'HooshyarOS.exe'
+          $node=Join-Path $root 'runtime\node.exe'
+          $runtime=Join-Path $root 'runtime\commercial-runtime.js'
+          $desktop=Join-Path ([Environment]::GetFolderPath('CommonDesktopDirectory')) 'HooshyarOS.lnk'
+          $start=Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'HooshyarOS.lnk'
+          $uninstall=Join-Path $env:ProgramData 'HooshyarOS-uninstall.ps1'
+          foreach ($p in @($shell,$node,$runtime,$desktop,$start,$uninstall)) { if (!(Test-Path $p)) { throw "Missing installed component: $p" } }
+          $key=Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\HooshyarOS' -ErrorAction Stop
+          if ($key.DisplayName -ne 'HooshyarOS') { throw 'Installed app metadata mismatch' }
+          if ($key.Publisher -ne 'Hooshyar.ai') { throw 'Publisher metadata missing' }
+          if ($key.DisplayVersion -ne '1.0.0') { throw 'Version metadata missing' }
+          if ($key.UninstallString -notmatch 'HooshyarOS-uninstall.ps1') { throw 'Uninstall registration missing' }
+      - shell: pwsh
+        run: |
+          $shell=Join-Path $env:ProgramData 'HooshyarOS\HooshyarOS.exe'
+          $p=Start-Process $shell -PassThru
+          $deadline=(Get-Date).AddSeconds(45)
+          $ready=$false
+          while ((Get-Date) -lt $deadline) {
+            try { $r=Invoke-WebRequest 'http://127.0.0.1:3000/api/dashboard' -TimeoutSec 2; if ($r.StatusCode -eq 200) { $ready=$true; break } } catch {}
+            Start-Sleep 1
+          }
+          if (!$ready) { throw 'HooshyarOS desktop shell failed to start product runtime' }
+          try { if (!$p.HasExited) { taskkill.exe /PID $p.Id /T /F | Out-Null } } catch {}
+      - shell: pwsh
+        run: |
+          $node=Join-Path $env:ProgramData 'HooshyarOS\runtime\node.exe'
+          $runtime=Join-Path $env:ProgramData 'HooshyarOS\runtime\commercial-runtime.js'
+          $p=Start-Process $node -ArgumentList @($runtime,'--health-check') -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Runtime health failed: $($p.ExitCode)" }
+      - if: always()
+        shell: pwsh
+        run: |
+          $u=Join-Path $env:ProgramData 'HooshyarOS-uninstall.ps1'
+          if (Test-Path $u) { powershell.exe -NoProfile -ExecutionPolicy Bypass -File $u }
+          Start-Sleep 2
+          if (Test-Path (Join-Path $env:ProgramData 'HooshyarOS')) { throw 'Install root cleanup failed' }
+          foreach ($p in @((Join-Path ([Environment]::GetFolderPath('CommonDesktopDirectory')) 'HooshyarOS.lnk'),(Join-Path ([Environment]::GetFolderPath('CommonPrograms')) 'HooshyarOS.lnk'))) { if (Test-Path $p) { throw "Shortcut cleanup failed: $p" } }
+          if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\HooshyarOS') { throw 'Registry cleanup failed' }
+
+  android-build:
+    needs: runtime
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path android | Out-Null
+          @('android.useAndroidX=true','android.enableJetifier=true','org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8') | Set-Content -Encoding UTF8 android/gradle.properties
+          New-Item -ItemType Directory -Force -Path "$env:GRADLE_USER_HOME\init.d" | Out-Null
+          @'
+          allprojects {
+            configurations.configureEach {
+              resolutionStrategy.dependencySubstitution {
+                substitute module('org.jetbrains.kotlin:kotlin-stdlib-jdk7') using module('org.jetbrains.kotlin:kotlin-stdlib:1.8.22')
+                substitute module('org.jetbrains.kotlin:kotlin-stdlib-jdk8') using module('org.jetbrains.kotlin:kotlin-stdlib:1.8.22')
+              }
+              resolutionStrategy.force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+            }
+          }
+          '@ | Set-Content -Encoding UTF8 "$env:GRADLE_USER_HOME\init.d\hooshyaros-kotlin.gradle"
+      - run: python Backend/AI_Runtime/productization_builder.py --platform ANDROID
+      - shell: pwsh
+        run: |
+          $apk='dist/productization/android/HooshyarOS.apk'
+          if (!(Test-Path $apk)) { throw 'Android APK missing' }
+          if ((Get-Item $apk).Length -lt 100KB) { throw 'Android APK unexpectedly small' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HooshyarOS-Android-APK
+          path: dist/productization/android/HooshyarOS.apk
+          if-no-files-found: error
+          retention-days: 30

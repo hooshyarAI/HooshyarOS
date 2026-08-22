@@ -1,0 +1,2 @@
+export interface RiskFactor { name:string; probability:number; impact:number; }
+export function aggregateRisk(factors:RiskFactor[]):{score:number;level:"LOW"|"MEDIUM"|"HIGH"|"CRITICAL"} { const score=Math.max(0,Math.min(100,factors.reduce((s,f)=>s+Math.max(0,Math.min(100,f.probability))*Math.max(0,Math.min(100,f.impact))/100,0))); const level=score>=80?"CRITICAL":score>=60?"HIGH":score>=30?"MEDIUM":"LOW"; return {score,level}; }

@@ -2,7 +2,7 @@
   "name": "HooshyarOS",
   "version": "1.0.0",
   "runtime": {
-    "entrypoint": "Backend/AI_Runtime/CommercialRuntimeServer.ts",
+    "entrypoint": "Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts",
     "health": "/health"
   },
   "web": {
