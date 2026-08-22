@@ -1,0 +1,168 @@
+name: HooshyarOS Platform Audit Chain
+
+on:
+  pull_request:
+    branches: [agent/release-final]
+  push:
+    branches: [agent/release-final]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  node-runtime:
+    name: Node runtime verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install locked Node dependencies
+        run: npm ci
+
+      - name: TypeScript compile gate
+        run: npx tsc --noEmit --pretty false
+
+      - name: Full Jest verification
+        run: node ./node_modules/jest/bin/jest.js --runInBand --coverage
+
+      - name: Node dependency audit
+        run: npm audit --audit-level=high
+
+  python-runtime:
+    name: Python runtime verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install runtime audit tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest pytest-cov ruff bandit pip-audit
+          if [ -f requirements.txt ]; then python -m pip install -r requirements.txt; fi
+
+      - name: Python runtime tests with coverage
+        run: python -m pytest Backend/AI_Runtime/tests -q --cov=Backend/AI_Runtime --cov-report=term-missing --cov-report=xml
+
+      - name: Ruff static analysis
+        run: ruff check Backend/AI_Runtime --output-format=github
+        continue-on-error: true
+
+      - name: Bandit security analysis
+        run: bandit -r Backend/AI_Runtime -ll -ii -f screen
+        continue-on-error: true
+
+      - name: Dependency vulnerability audit
+        shell: bash
+        run: |
+          if [ -f requirements.txt ]; then
+            python -m pip_audit -r requirements.txt
+          elif [ -f pyproject.toml ]; then
+            python -m pip_audit
+          else
+            echo 'No Python dependency manifest found; dependency audit skipped.'
+          fi
+
+      - name: Upload Python coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-coverage
+          path: coverage.xml
+          if-no-files-found: ignore
+
+  secret-scan:
+    name: Secret exposure audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  conditional-security:
+    name: Conditional container and API security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect optional surfaces
+        id: detect
+        shell: bash
+        run: |
+          if [ -f Dockerfile ]; then echo 'docker=true' >> "$GITHUB_OUTPUT"; else echo 'docker=false' >> "$GITHUB_OUTPUT"; fi
+          if find . -maxdepth 4 -type f \( -name 'openapi.json' -o -name 'openapi.yaml' -o -name 'openapi.yml' \) | grep -q .; then echo 'openapi=true' >> "$GITHUB_OUTPUT"; else echo 'openapi=false' >> "$GITHUB_OUTPUT"; fi
+
+      - name: Build Docker image
+        if: steps.detect.outputs.docker == 'true'
+        run: docker build -t hooshyaros:audit .
+
+      - name: Trivy image scan
+        if: steps.detect.outputs.docker == 'true'
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: hooshyaros:audit
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+
+      - name: Report API surface decision
+        run: |
+          if [ '${{ steps.detect.outputs.openapi }}' = 'true' ]; then
+            echo 'OpenAPI specification detected; Schemathesis should be enabled as the next API-specific gate.'
+          else
+            echo 'No OpenAPI specification detected; Schemathesis is intentionally skipped.'
+          fi
+
+  architecture-observability:
+    name: Architecture and audit observability
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Inventory architecture surfaces
+        shell: bash
+        run: |
+          echo '=== Python surfaces ==='
+          find Backend/AI_Runtime -type f -name '*.py' | sort
+          echo '=== TypeScript engine/product surfaces ==='
+          find Backend/HBOS -type f \( -name '*.ts' -o -name '*.tsx' \) | sort | sed -n '1,400p'
+          echo '=== Workflow surfaces ==='
+          find .github/workflows -maxdepth 1 -type f -name '*.yml' -o -name '*.yaml' | sort
+
+      - name: Detect architecture tooling configuration
+        shell: bash
+        run: |
+          for f in pyproject.toml ruff.toml .ruff.toml .importlinter.toml setup.cfg tox.ini; do
+            if [ -f "$f" ]; then echo "FOUND $f"; else echo "ABSENT $f"; fi
+          done
+
+      - name: Audit workflow contract
+        shell: bash
+        run: |
+          test -f .github/workflows/platform-audit-chain.yml
+          grep -q 'AUTONOMOUS' .github/workflows/autonomous-platform-construction.yml
+          grep -q 'jest' .github/workflows/hooshyaros-ci.yml
+          echo 'Canonical workflow surfaces are present.'
