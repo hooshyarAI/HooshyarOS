@@ -19,7 +19,7 @@ describe("FinancialDataIngestionAdapter", () => {
 
     const databasePath = join(directory, "financial.sqlite");
     const database = new SQLitePersistenceStore({ databasePath });
-    const adapter = new FinancialDataIngestionAdapter(database);
+    const adapter = new FinancialDataIngestionAdapter(database, undefined, directory);
 
     const result = await adapter.ingestFile("tenant-a", sourcePath);
     const expectedHash = createHash("sha256").update(SOURCE, "utf8").digest("hex");
