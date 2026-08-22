@@ -1,0 +1,12 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "charliermarsh.ruff",
+    "github.vscode-github-actions",
+    "github.vscode-codeql",
+    "SonarSource.sonarlint-vscode",
+    "eamodio.gitlens"
+  ],
+  "unwantedRecommendations": []
+}

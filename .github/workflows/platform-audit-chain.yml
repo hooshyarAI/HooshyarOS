@@ -1,0 +1,197 @@
+name: HooshyarOS Platform Audit Fabric
+
+on:
+  pull_request:
+    branches: [agent/release-final]
+  push:
+    branches: [agent/release-final]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: platform-audit-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '24'
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  node-runtime:
+    name: Node / TypeScript / Jest / npm audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: TypeScript compile
+        run: npx tsc --noEmit --pretty false
+      - name: Jest verification
+        run: node ./node_modules/jest/bin/jest.js --runInBand --coverage
+      - name: npm dependency audit
+        run: npm audit --audit-level=high
+      - name: Upload Node evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-audit-evidence
+          path: coverage/
+          if-no-files-found: ignore
+
+  python-runtime:
+    name: Python runtime / quality / dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install Python audit toolchain
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest pytest-cov ruff bandit pip-audit pydeps import-linter
+          if [ -f requirements.txt ]; then python -m pip install -r requirements.txt; fi
+      - name: Python tests and coverage
+        run: python -m pytest Backend/AI_Runtime -q --cov=Backend/AI_Runtime --cov-report=term-missing --cov-report=xml
+      - name: Ruff
+        run: ruff check Backend/AI_Runtime --output-format=github
+      - name: Bandit
+        run: bandit -r Backend/AI_Runtime -ll -ii -f screen
+      - name: Python dependency audit
+        shell: bash
+        run: |
+          if [ -f requirements.txt ]; then
+            python -m pip_audit -r requirements.txt
+          else
+            echo 'No repository Python dependency manifest; pip-audit skipped by evidence-based policy.'
+          fi
+      - name: Import architecture contract
+        shell: bash
+        run: |
+          if [ -f .importlinter.toml ]; then
+            lint-imports --config .importlinter.toml
+          else
+            echo 'No Import Linter contract exists yet; architecture enforcement is intentionally deferred.'
+          fi
+      - name: Dependency graph evidence
+        shell: bash
+        run: |
+          mkdir -p audit-artifacts
+          pydeps Backend/AI_Runtime --max-bacon 2 --show-deps --no-show > audit-artifacts/python-dependency-graph.txt 2>&1 || true
+          find Backend/AI_Runtime -type f -name '*.py' | sort > audit-artifacts/python-surface.txt
+      - name: Upload Python evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-audit-evidence
+          path: |
+            coverage.xml
+            audit-artifacts/
+          if-no-files-found: ignore
+
+  codeql:
+    name: CodeQL SAST
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript,python
+      - uses: github/codeql-action/autobuild@v3
+      - uses: github/codeql-action/analyze@v3
+
+  secrets:
+    name: Full-history secret audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  optional-surfaces:
+    name: Conditional Docker / API audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: detect
+        shell: bash
+        run: |
+          if [ -f Dockerfile ]; then echo 'docker=true' >> "$GITHUB_OUTPUT"; else echo 'docker=false' >> "$GITHUB_OUTPUT"; fi
+          if find . -maxdepth 5 -type f \( -name 'openapi.json' -o -name 'openapi.yaml' -o -name 'openapi.yml' \) -print -quit | grep -q .; then echo 'openapi=true' >> "$GITHUB_OUTPUT"; else echo 'openapi=false' >> "$GITHUB_OUTPUT"; fi
+      - name: Build Docker image
+        if: steps.detect.outputs.docker == 'true'
+        run: docker build -t hooshyaros:audit .
+      - name: Trivy
+        if: steps.detect.outputs.docker == 'true'
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: hooshyaros:audit
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+      - name: API contract decision
+        shell: bash
+        run: |
+          if [ '${{ steps.detect.outputs.openapi }}' = 'true' ]; then
+            echo 'OpenAPI detected: Schemathesis is an eligible next API-gate capability.'
+          else
+            echo 'No OpenAPI contract detected: Schemathesis intentionally skipped.'
+          fi
+
+  architecture-observability:
+    name: Architecture evidence
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build architecture inventory
+        shell: bash
+        run: |
+          mkdir -p audit-artifacts
+          find Backend/HBOS -type f \( -name '*.ts' -o -name '*.tsx' \) | sort > audit-artifacts/hbos-surface.txt
+          find Backend/AI_Runtime -type f -name '*.py' | sort > audit-artifacts/python-surface.txt
+          find .github/workflows -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) | sort > audit-artifacts/workflow-surface.txt
+          find Backend -type f \( -name '*.ts' -o -name '*.py' \) | wc -l > audit-artifacts/source-file-count.txt
+      - name: Architecture configuration inventory
+        shell: bash
+        run: |
+          {
+            for f in pyproject.toml ruff.toml .ruff.toml .importlinter.toml setup.cfg; do
+              test -f "$f" && echo "FOUND $f" || echo "ABSENT $f"
+            done
+          } | tee audit-artifacts/architecture-config.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: architecture-evidence
+          path: audit-artifacts/
+
+  audit-summary:
+    name: Audit evidence gate
+    if: always()
+    needs: [node-runtime, python-runtime, codeql, secrets, optional-surfaces, architecture-observability]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summarize required gates
+        shell: bash
+        run: |
+          echo "Node=${{ needs.node-runtime.result }}"
+          echo "Python=${{ needs.python-runtime.result }}"
+          echo "CodeQL=${{ needs.codeql.result }}"
+          echo "Secrets=${{ needs.secrets.result }}"
+          echo "Optional=${{ needs.optional-surfaces.result }}"
+          echo "Architecture=${{ needs.architecture-observability.result }}"
+          test '${{ needs.node-runtime.result }}' = success
+          test '${{ needs.python-runtime.result }}' = success
+          test '${{ needs.codeql.result }}' = success
+          test '${{ needs.secrets.result }}' = success
+          test '${{ needs.optional-surfaces.result }}' = success
+          test '${{ needs.architecture-observability.result }}' = success
