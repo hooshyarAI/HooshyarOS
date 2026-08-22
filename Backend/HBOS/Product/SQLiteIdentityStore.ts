@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { CommercialPermission, CommercialRole, CommercialSession, IdentityAuditEvent } from "./CommercialIdentityService";
+import type { CommercialPermission, CommercialRole, CommercialSession, IdentityAuditEvent } from "./Contracts/CommercialIdentityContract";
 
 export interface SQLiteIdentityStoreOptions {
   readonly databasePath: string;

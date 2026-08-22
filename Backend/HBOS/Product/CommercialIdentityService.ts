@@ -4,27 +4,8 @@ import { SecurityLayerEngine } from "../Engines/SecurityLayerEngine";
 import { UserManagementEngine } from "../Engines/UserManagementEngine";
 import { OrganizationModelEngine } from "../Engines/OrganizationModelEngine";
 import { SQLiteIdentityStore } from "./SQLiteIdentityStore";
-
-export type CommercialRole = "OWNER" | "ADMIN" | "MANAGER" | "VIEWER";
-export type CommercialPermission = "READ_DASHBOARD" | "INGEST_DATA" | "CREATE_DECISION" | "MANAGE_USERS";
-
-export interface CommercialSession {
-    token: string;
-    username: string;
-    organization: string;
-    tenantId: string;
-    role: CommercialRole;
-    createdAt: string;
-    active: boolean;
-}
-
-export interface IdentityAuditEvent {
-    type: "SESSION_CREATED" | "SESSION_REVOKED" | "AUTHORIZATION_ALLOWED" | "AUTHORIZATION_DENIED";
-    username: string;
-    organization: string;
-    permission?: CommercialPermission;
-    createdAt: string;
-}
+import type { CommercialPermission, CommercialRole, CommercialSession, IdentityAuditEvent } from "./Contracts/CommercialIdentityContract";
+export type { CommercialPermission, CommercialRole, CommercialSession, IdentityAuditEvent } from "./Contracts/CommercialIdentityContract";
 
 const permissions: Record<CommercialRole, ReadonlySet<CommercialPermission>> = {
     OWNER: new Set(["READ_DASHBOARD", "INGEST_DATA", "CREATE_DECISION", "MANAGE_USERS"]),
