@@ -5,6 +5,7 @@ import { UserManagementEngine } from "../Engines/UserManagementEngine";
 import { OrganizationModelEngine } from "../Engines/OrganizationModelEngine";
 import { SQLiteIdentityStore } from "./SQLiteIdentityStore";
 import type { CommercialPermission, CommercialRole, CommercialSession, IdentityAuditEvent } from "./Contracts/CommercialIdentityContract";
+export type { CommercialPermission, CommercialRole, CommercialSession, IdentityAuditEvent } from "./Contracts/CommercialIdentityContract";
 
 const permissions: Record<CommercialRole, ReadonlySet<CommercialPermission>> = {
     OWNER: new Set(["READ_DASHBOARD", "INGEST_DATA", "CREATE_DECISION", "MANAGE_USERS"]),
