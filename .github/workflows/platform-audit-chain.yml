@@ -18,6 +18,7 @@ concurrency:
 env:
   NODE_VERSION: '24'
   PYTHON_VERSION: '3.12'
+  PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/Backend
 
 jobs:
   node-runtime:
