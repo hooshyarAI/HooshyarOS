@@ -4,11 +4,12 @@ import {
   FinancialIntelligenceEngine,
 } from "../Engines/FinancialIntelligenceEngine";
 import { ReasoningEngine, ReasoningResult } from "../Engines/ReasoningEngine";
-import { FinancialSourceEvidence } from "./FinancialDataIngestionAdapter";
+import { FinancialDataIngestionAdapter, FinancialIngestionResult, FinancialSourceEvidence } from "./FinancialDataIngestionAdapter";
 
 export interface FinancialStatementAnalysisInput extends FinancialAnalysisInput {
   readonly tenantId: string;
   readonly source: FinancialSourceEvidence;
+  readonly ingestion?: FinancialIngestionResult;
 }
 
 export interface FinancialObservation {
@@ -29,7 +30,7 @@ export interface FinancialStatementAnalysisResult {
 
 /**
  * Canonical product boundary for financial statement analysis.
- * It composes existing engine contracts and does not create a second financial engine.
+ * It consumes the canonical ingestion result when available and does not create a second financial engine.
  */
 export class FinancialStatementAnalysisService {
   readonly capabilityId = "product.financial-statement-analysis" as const;
@@ -47,12 +48,15 @@ export class FinancialStatementAnalysisService {
   execute(input: FinancialStatementAnalysisInput): FinancialStatementAnalysisResult {
     this.assertBoundaryInput(input);
 
-    const metrics = this.financialIntelligence.analyze({
-      revenue: input.revenue,
-      expenses: input.expenses,
-      assets: input.assets,
-      liabilities: input.liabilities,
-    });
+    const canonical = input.ingestion?.model;
+    const metrics = canonical
+      ? input.ingestion!.intelligence
+      : this.financialIntelligence.analyze({
+          revenue: input.revenue,
+          expenses: input.expenses,
+          assets: input.assets,
+          liabilities: input.liabilities,
+        });
 
     if (metrics.status !== "READY") {
       return this.blocked(input, metrics, "financial-analysis-blocked");
@@ -69,7 +73,7 @@ export class FinancialStatementAnalysisService {
       capabilityId: this.capabilityId,
       targetEngine: this.targetEngine,
       tenantId: input.tenantId.trim(),
-      source: input.source,
+      source: canonical?.source ?? input.source,
       metrics,
       observations,
       reasoningEvidence: { status: reasoningResult.status, success: true },
@@ -91,7 +95,7 @@ export class FinancialStatementAnalysisService {
     return [
       "Explain verified financial statement analysis from repository-owned metrics; do not invent thresholds or business rules.",
       `tenant=${input.tenantId.trim()}`,
-      `source=${input.source.sourceName}`,
+      `source=${(input.ingestion?.model.source ?? input.source).sourceName}`,
       `profit=${metrics.profit}`,
       `profitMargin=${metrics.profitMargin}`,
       `debtRatio=${metrics.debtRatio}`,
@@ -109,7 +113,7 @@ export class FinancialStatementAnalysisService {
       capabilityId: this.capabilityId,
       targetEngine: this.targetEngine,
       tenantId: input.tenantId.trim(),
-      source: input.source,
+      source: input.ingestion?.model.source ?? input.source,
       metrics,
       observations: [],
       reasoningEvidence: {
@@ -125,7 +129,7 @@ export class FinancialStatementAnalysisService {
       throw new Error("financial-statement-analysis-tenant-required");
     }
 
-    const source = input.source;
+    const source = input.ingestion?.model.source ?? input.source;
     if (
       !source?.sourceName?.trim() ||
       source.sourceType !== "CSV" ||
