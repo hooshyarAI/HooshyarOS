@@ -23,7 +23,24 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 DAEMON = ROOT / "Backend" / "HBOS" / "Autonomous" / "Runtime" / "AutonomousBuildDaemon.ts"
 TSX = ROOT / "node_modules" / ".bin" / ("tsx.cmd" if os.name == "nt" else "tsx")
-LOCK = ROOT / ".git" / "hooshyar-commercial-build.lock"
+
+
+def resolve_lock_path() -> Path:
+    """Resolve the Git metadata path correctly for normal repos and worktrees."""
+    try:
+        raw = subprocess.check_output(
+            ["git", "-C", str(ROOT), "rev-parse", "--git-path", "hooshyar-commercial-build.lock"],
+            cwd=ROOT,
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        path = Path(raw)
+        return path if path.is_absolute() else ROOT / path
+    except (OSError, subprocess.CalledProcessError):
+        return ROOT / ".hooshyar-commercial-build.lock"
+
+
+LOCK = resolve_lock_path()
 HANDOFF_MARKER = '"type":"AUTONOMOUS_PLATFORM_CONTINUATION"'
 COMPLETE_MARKER = '"type":"AUTONOMOUS_PLATFORM_CONSTRUCTION_COMPLETE"'
 BLOCKED_MARKER = '"type":"AUTONOMOUS_BLOCKED"'
