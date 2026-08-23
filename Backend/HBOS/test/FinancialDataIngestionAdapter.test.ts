@@ -94,7 +94,6 @@ describe("FinancialDataIngestionAdapter", () => {
             `financial-ingestion:${expectedHash}`,
         )).resolves.toMatchObject({ tenantId: "tenant-a", value: result.model });
         reopened.close();
-        persistence = new SQLitePersistenceStore({ databasePath: join(tempDir, "financial.sqlite") });
     });
 
     it("rejects an invalid financial CSV schema before persistence", async () => {
