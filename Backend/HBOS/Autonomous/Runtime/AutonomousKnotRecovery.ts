@@ -70,7 +70,7 @@ export class AutonomousKnotRecovery {
             stdio: ["ignore", "pipe", "pipe"]
         }).trim();
 
-        const beforeStatus = execFileSync(
+        const status = () => execFileSync(
             "git",
             ["status", "--porcelain=v1", "--untracked-files=all", "--", ".", ":(exclude)node_modules"],
             {
@@ -80,9 +80,9 @@ export class AutonomousKnotRecovery {
             }
         ).trim();
 
-        if (head === checkpoint.commit && !beforeStatus) {
-            return;
-        }
+        const beforeStatus = status();
+
+        if (head === checkpoint.commit && !beforeStatus) return;
 
         execFileSync("git", ["reset", "--hard", checkpoint.commit], {
             cwd: root,
@@ -90,58 +90,47 @@ export class AutonomousKnotRecovery {
             stdio: ["ignore", "pipe", "pipe"]
         });
 
-        const canonicalId = checkpoint.capabilityId.startsWith("repair-")
-            ? checkpoint.capabilityId.slice("repair-".length)
-            : checkpoint.capabilityId;
-
         const roadmapPath = join(root, "Docs", "Product", "PRODUCT_CONSTRUCTION_ROADMAP.json");
+        const canonicalGenerated = new Set<string>();
 
         if (existsSync(roadmapPath)) {
             try {
                 const roadmap = JSON.parse(readFileSync(roadmapPath, "utf8")) as {
                     capabilities?: Array<{
-                        capabilityId?: string;
                         implementationPath?: string;
                         testPath?: string;
                         documentationPath?: string;
                     }>;
                 };
-
-                const capability = roadmap.capabilities?.find(
-                    item => item.capabilityId === canonicalId
-                );
-
-                const ownedPaths = [
-                    capability?.implementationPath,
-                    capability?.testPath,
-                    capability?.documentationPath
-                ].filter(Boolean) as string[];
-
-                for (const relativePath of ownedPaths) {
-                    execFileSync("git", ["clean", "-fd", "--", relativePath], {
-                        cwd: root,
-                        encoding: "utf8",
-                        stdio: ["ignore", "pipe", "pipe"]
-                    });
+                for (const capability of roadmap.capabilities ?? []) {
+                    for (const relativePath of [
+                        capability.implementationPath,
+                        capability.testPath,
+                        capability.documentationPath
+                    ]) {
+                        if (relativePath) canonicalGenerated.add(relativePath.replace(/\\/g, "/"));
+                    }
                 }
             } catch {
-                // Rollback remains safe even when the product roadmap is unavailable.
+                // Without the roadmap we must remain fail-closed.
             }
         }
 
-        const status = execFileSync(
-            "git",
-            ["status", "--porcelain=v1", "--untracked-files=all", "--", ".", ":(exclude)node_modules"],
-            {
-                cwd: root,
-                encoding: "utf8",
-                stdio: ["ignore", "pipe", "pipe"]
-            }
-        ).trim();
+        const postRollbackStatus = status();
+        if (!postRollbackStatus) return;
 
-        if (status) {
+        const unexpected = postRollbackStatus
+            .split(/\r?\n/)
+            .filter(Boolean)
+            .filter(line => {
+                const path = line.slice(3).replace(/\\/g, "/");
+                const untracked = line.startsWith("?? ");
+                return !(untracked && canonicalGenerated.has(path));
+            });
+
+        if (unexpected.length > 0) {
             throw new Error(
-                `Checkpoint rollback did not restore a clean worktree for ${checkpoint.commit}: ${status}`
+                `Checkpoint rollback did not restore a trusted worktree for ${checkpoint.commit}: ${unexpected.join("; ")}`
             );
         }
     }
