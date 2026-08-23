@@ -29,6 +29,7 @@ export interface WeavingPlan {
 export class AutonomousWeavingPlanner {
     plan(mission: WeavingMission, workspaceClean: boolean): WeavingPlan {
         const repair = mission.capabilityId.startsWith("repair-");
+        const canonicalProductContinuation = mission.capabilityId.startsWith("product.") && !repair;
         const risk = this.riskFor(mission);
         const preconditions = [
             "selected capability belongs to the canonical mission",
@@ -37,7 +38,7 @@ export class AutonomousWeavingPlanner {
             "verification evidence is required before advancement"
         ];
 
-        if (!workspaceClean && !repair) {
+        if (!workspaceClean && !repair && !canonicalProductContinuation) {
             return {
                 safe: false,
                 action: "BUILD",
@@ -66,9 +67,11 @@ export class AutonomousWeavingPlanner {
             targetEngine: mission.targetEngine,
             rationale: repair
                 ? "repair the current knot before touching the next knot"
-                : dependencyOrder.length > 0
-                    ? "weave the selected knot only after its dependency colors are already anchored"
-                    : "weave the selected root knot in canonical order",
+                : canonicalProductContinuation && !workspaceClean
+                    ? "continue the canonical product knot using only preflight-classified generated artifacts; checkpoint them during construction"
+                    : dependencyOrder.length > 0
+                        ? "weave the selected knot only after its dependency colors are already anchored"
+                        : "weave the selected root knot in canonical order",
             preconditions,
             dependencyOrder,
             verificationOrder,
