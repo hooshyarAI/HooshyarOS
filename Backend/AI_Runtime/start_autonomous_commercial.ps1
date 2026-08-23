@@ -9,9 +9,37 @@ if ($branch -ne "agent/release-final") {
     throw "Canonical continuation must run from agent/release-final. Current branch: $branch"
 }
 
-$status = git status --porcelain
-if ($status) {
-    throw "Working tree is not clean. Preserve local changes; do not let autonomous construction overwrite them."
+$statusLines = @(git status --porcelain)
+if ($statusLines) {
+    # Allow only untracked artifacts that are explicitly declared by the
+    # canonical product roadmap. These are owned by the active autonomous knot
+    # and must be verified/checkpointed by the daemon rather than discarded.
+    $roadmapPath = Join-Path $root "Docs\Product\PRODUCT_CONSTRUCTION_ROADMAP.json"
+    if (!(Test-Path $roadmapPath)) {
+        throw "WORKTREE_NOT_CLEAN: canonical roadmap is unavailable to classify generated artifacts."
+    }
+
+    $roadmap = Get-Content $roadmapPath -Raw | ConvertFrom-Json
+    $allowedGenerated = @(
+        $roadmap.capabilities | ForEach-Object { $_.implementationPath }
+        $roadmap.capabilities | ForEach-Object { $_.testPath }
+        $roadmap.capabilities | ForEach-Object { $_.documentationPath }
+    ) | Where-Object { $_ }
+
+    $unexpected = @()
+    foreach ($line in $statusLines) {
+        $path = $line.Substring(3)
+        $isUntracked = $line.StartsWith("?? ")
+        if (-not ($isUntracked -and ($allowedGenerated -contains $path))) {
+            $unexpected += $path
+        }
+    }
+
+    if ($unexpected.Count -gt 0) {
+        throw "WORKING_TREE_HAS_UNEXPECTED_CHANGES: $($unexpected -join '; ')"
+    }
+
+    Write-Host "Canonical generated artifacts detected; preserving them for autonomous knot verification/checkpoint."
 }
 
 git fetch origin agent/release-final
