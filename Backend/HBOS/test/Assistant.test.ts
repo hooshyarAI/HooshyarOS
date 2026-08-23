@@ -1,5 +1,5 @@
 import { AssistantEngine } from "../Core/AssistantEngine";
-import { Project } from "../Core/Project";
+import { Project } from "../Entities/Project";
 
 
 test("AssistantEngine analyzes project context", () => {
