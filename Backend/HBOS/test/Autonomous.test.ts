@@ -1,4 +1,4 @@
-import { ProjectPilotEngine } from "../Core/ProjectPilotEngine";
+import { ProjectPilotEngine } from "../Engines/ProjectPilotEngine";
 
 
 test("Project creation triggers autonomous memory flow", () => {
