@@ -22,7 +22,7 @@ describe("AutonomousWeavingPlanner", () => {
         expect(plan.stopConditions).toContain("verification evidence is incomplete");
     });
 
-    it("refuses a new knot when the workspace is dirty", () => {
+    it("refuses a new non-product knot when the workspace is dirty", () => {
         const plan = planner.plan({
             capabilityId: "platform.dashboard",
             capability: "implement Dashboard capability",
@@ -32,6 +32,19 @@ describe("AutonomousWeavingPlanner", () => {
 
         expect(plan.safe).toBe(false);
         expect(plan.rationale).toContain("working tree is dirty");
+    });
+
+    it("allows a canonical product knot to continue from preflight-classified generated artifacts", () => {
+        const plan = planner.plan({
+            capabilityId: "product.decision-workbench",
+            capability: "provide explainable decision scenarios",
+            targetEngine: "Decision Intelligence Engine",
+            dependencies: ["Decision Engine", "Reasoning Engine", "Governance Engine"]
+        }, false);
+
+        expect(plan.safe).toBe(true);
+        expect(plan.action).toBe("BUILD");
+        expect(plan.rationale).toContain("preflight-classified generated artifacts");
     });
 
     it("classifies deployment as high risk without changing canonical order", () => {
