@@ -1,183 +1,102 @@
 #!/usr/bin/env python3
-"""Deterministic multi-agent audit and evidence-fusion engine for HooshyarOS.
-
-This tool never treats Cursor, Claude Code, or Zapier output as truth. Their
-reports are external evidence that is normalized and cross-checked against
-the repository and Git state.
-"""
+"""Deterministic audit evidence collector and multi-agent fusion gate."""
 from __future__ import annotations
-
-import argparse
-import json
-import re
-import subprocess
+import argparse, json, subprocess
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-EXCLUDED = {".git", "node_modules", ".venv", "venv", "dist", "build", "coverage"}
-TEXT_EXTENSIONS = {".ts", ".tsx", ".js", ".jsx", ".py", ".md", ".json", ".yaml", ".yml"}
-AUDITORS = ("python", "cursor", "claude-code", "zapier")
+EXCLUDED={'.git','node_modules','.venv','venv','dist','build','coverage'}
+TEXT_EXTENSIONS={'.ts','.tsx','.js','.jsx','.py','.md','.json','.yaml','.yml'}
+EXTERNAL_AUDITORS=('cursor','claude-code')
+ALLOWED_AUDITORS=set(EXTERNAL_AUDITORS)
+REQUIRED_FIELDS={'auditor','timestamp','scope','commit','findings'}
+SEVERITIES={'LOW','MEDIUM','HIGH','CRITICAL'}
 
 
-def norm(path: Path, root: Path) -> str:
-    return path.relative_to(root).as_posix()
+def git(root:Path,*args:str)->str:
+    try:return subprocess.check_output(['git',*args],cwd=root,text=True,stderr=subprocess.STDOUT).strip()
+    except (OSError,subprocess.CalledProcessError):return ''
 
 
-def run_git(root: Path, *args: str) -> str:
-    try:
-        return subprocess.check_output(["git", *args], cwd=root, text=True, stderr=subprocess.STDOUT).strip()
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return ""
+def read(path:Path)->str:
+    try:return path.read_text(encoding='utf-8',errors='replace')
+    except OSError:return ''
 
 
-def files(root: Path):
-    for p in root.rglob("*"):
-        if not p.is_file() or any(part in EXCLUDED for part in p.parts):
-            continue
-        if p.suffix.lower() in TEXT_EXTENSIONS:
-            yield p
+def repository_evidence(root:Path)->dict[str,Any]:
+    paths=[]
+    for p in root.rglob('*'):
+        if p.is_file() and not any(x in EXCLUDED for x in p.parts) and p.suffix.lower() in TEXT_EXTENSIONS:
+            paths.append(p.relative_to(root).as_posix())
+    roadmap=root/'Docs/Product/PRODUCT_CONSTRUCTION_ROADMAP.json'
+    data={}
+    if roadmap.exists():
+        try:data=json.loads(read(roadmap))
+        except json.JSONDecodeError:data={'_parse_error':True}
+    ids=[x.get('capabilityId') for x in data.get('capabilities',[]) if isinstance(x,dict) and isinstance(x.get('capabilityId'),str)]
+    dup=sorted(k for k,v in _dupes(ids).items() if len(v)>1)
+    return {'commit':git(root,'rev-parse','HEAD'),'branch':git(root,'branch','--show-current'),'status':git(root,'status','--porcelain=v1','--untracked-files=all'),'fileCount':len(paths),'documentationCount':sum(p.lower().startswith('docs/') for p in paths),'capabilityIds':sorted(ids),'duplicateCapabilityIds':dup,'masterCharterPresent':(root/'Docs/HOOSHYAROS_MASTER_CHARTER.md').exists(),'architecturePresent':(root/'Docs/ARCHITECTURE.md').exists(),'governanceCharterPresent':(root/'Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md').exists()}
 
 
-def read_text(path: Path) -> str:
-    try:
-        return path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return ""
+def _dupes(values:list[str])->dict[str,list[str]]:
+    out=defaultdict(list)
+    for v in values:out[v].append(v)
+    return out
 
 
-def collect_repository_evidence(root: Path) -> dict[str, Any]:
-    paths = [norm(p, root) for p in files(root)]
-    docs = [p for p in paths if p.lower().startswith("docs/")]
-    engines = sorted({p for p in paths if "/engines/" in p.lower() and p.endswith((".ts", ".md"))})
-
-    roadmap_path = root / "Docs/Product/PRODUCT_CONSTRUCTION_ROADMAP.json"
-    roadmap: dict[str, Any] = {}
-    if roadmap_path.exists():
-        try:
-            roadmap = json.loads(read_text(roadmap_path))
-        except json.JSONDecodeError:
-            roadmap = {"_parse_error": True}
-
-    capability_ids: list[str] = []
-    if isinstance(roadmap.get("capabilities"), list):
-        for item in roadmap["capabilities"]:
-            if isinstance(item, dict) and isinstance(item.get("capabilityId"), str):
-                capability_ids.append(item["capabilityId"])
-
-    duplicate_ids = sorted(k for k, v in _duplicates(capability_ids).items() if len(v) > 1)
-    return {
-        "commit": run_git(root, "rev-parse", "HEAD"),
-        "branch": run_git(root, "branch", "--show-current"),
-        "status": run_git(root, "status", "--porcelain=v1", "--untracked-files=all"),
-        "fileCount": len(paths),
-        "documentationCount": len(docs),
-        "engineArtifacts": engines,
-        "capabilityIds": sorted(capability_ids),
-        "duplicateCapabilityIds": duplicate_ids,
-        "masterCharterPresent": (root / "Docs/HOOSHYAROS_MASTER_CHARTER.md").exists(),
-        "architecturePresent": (root / "Docs/ARCHITECTURE.md").exists(),
-        "governanceCharterPresent": (root / "Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md").exists(),
-    }
+def deterministic(e:dict[str,Any])->list[dict[str,Any]]:
+    f=[]
+    for key,msg in [('masterCharterPresent','Master charter must exist'),('architecturePresent','Architecture contract must exist'),('governanceCharterPresent','Governance charter must exist')]:
+        if not e[key]:f.append({'id':key.upper()+'_MISSING','severity':'HIGH','claim':msg})
+    if e['duplicateCapabilityIds']:f.append({'id':'CAPABILITY_DUPLICATE','severity':'HIGH','claim':'Capability identifiers must be unique','evidence':e['duplicateCapabilityIds']})
+    return f
 
 
-def _duplicates(values: list[str]) -> dict[str, list[str]]:
-    result: dict[str, list[str]] = defaultdict(list)
-    for value in values:
-        result[value].append(value)
-    return dict(result)
-
-
-def load_external_reports(root: Path) -> list[dict[str, Any]]:
-    evidence_dir = root / ".audit" / "evidence"
-    reports: list[dict[str, Any]] = []
-    if not evidence_dir.exists():
-        return reports
-    for auditor in AUDITORS:
-        path = evidence_dir / f"{auditor}.json"
+def load_reports(root:Path)->tuple[list[dict[str,Any]],list[dict[str,Any]]]:
+    reports=[]; defects=[]; directory=root/'.audit/evidence'
+    for auditor in EXTERNAL_AUDITORS:
+        path=directory/f'{auditor}.json'
         if not path.exists():
-            continue
-        try:
-            report = json.loads(read_text(path))
+            defects.append({'id':'EXTERNAL_EVIDENCE_MISSING','severity':'HIGH','auditor':auditor,'path':str(path.relative_to(root))});continue
+        try:r=json.loads(read(path))
         except json.JSONDecodeError:
-            report = {"auditor": auditor, "findings": [], "parseError": True}
-        if not isinstance(report, dict):
-            report = {"auditor": auditor, "findings": [], "invalidReport": True}
-        report.setdefault("auditor", auditor)
-        report.setdefault("findings", [])
-        reports.append(report)
-    return reports
+            defects.append({'id':'EXTERNAL_EVIDENCE_INVALID_JSON','severity':'HIGH','auditor':auditor});continue
+        if not isinstance(r,dict) or not REQUIRED_FIELDS.issubset(r):
+            defects.append({'id':'EXTERNAL_EVIDENCE_SCHEMA_INVALID','severity':'HIGH','auditor':auditor});continue
+        if r.get('auditor')!=auditor or r.get('auditor') not in ALLOWED_AUDITORS:
+            defects.append({'id':'EXTERNAL_AUDITOR_UNAUTHORIZED','severity':'CRITICAL','auditor':r.get('auditor')});continue
+        if not isinstance(r.get('findings'),list):
+            defects.append({'id':'EXTERNAL_FINDINGS_INVALID','severity':'HIGH','auditor':auditor});continue
+        if not isinstance(r.get('commit'),str) or not r['commit']:
+            defects.append({'id':'EXTERNAL_COMMIT_MISSING','severity':'HIGH','auditor':auditor});continue
+        reports.append(r)
+    return reports,defects
 
 
-def normalize_findings(reports: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    groups: dict[str, dict[str, Any]] = {}
-    for report in reports:
-        auditor = str(report.get("auditor", "unknown"))
-        for finding in report.get("findings", []):
-            if not isinstance(finding, dict):
-                continue
-            key = str(finding.get("fingerprint") or finding.get("id") or finding.get("claim") or "unknown")
-            group = groups.setdefault(key, {"fingerprint": key, "auditors": [], "findings": []})
-            if auditor not in group["auditors"]:
-                group["auditors"].append(auditor)
-            group["findings"].append(finding)
-    for group in groups.values():
-        group["auditors"] = sorted(group["auditors"])
-        group["independentSupport"] = len(group["auditors"])
-        group["consensus"] = group["independentSupport"] >= 2
-        group["conflict"] = len({json.dumps(f, sort_keys=True) for f in group["findings"]}) > 1
-    return sorted(groups.values(), key=lambda item: item["fingerprint"])
+def fuse(reports:list[dict[str,Any]])->list[dict[str,Any]]:
+    groups={}
+    for r in reports:
+        for f in r['findings']:
+            if not isinstance(f,dict):continue
+            key=str(f.get('fingerprint') or f.get('id') or f.get('claim') or 'unknown')
+            g=groups.setdefault(key,{'fingerprint':key,'auditors':[],'findings':[]})
+            if r['auditor'] not in g['auditors']:g['auditors'].append(r['auditor'])
+            g['findings'].append(f)
+    for g in groups.values():
+        g['auditors']=sorted(g['auditors']);g['independentSupport']=len(g['auditors']);g['consensus']=g['independentSupport']>=2;g['conflict']=len({json.dumps(x,sort_keys=True) for x in g['findings']})>1
+    return sorted(groups.values(),key=lambda x:x['fingerprint'])
 
 
-def deterministic_findings(evidence: dict[str, Any]) -> list[dict[str, Any]]:
-    findings: list[dict[str, Any]] = []
-    if not evidence["masterCharterPresent"]:
-        findings.append({"id": "CHARTER_MISSING", "severity": "HIGH", "claim": "Master charter must exist"})
-    if not evidence["architecturePresent"]:
-        findings.append({"id": "ARCHITECTURE_DOC_MISSING", "severity": "HIGH", "claim": "Architecture contract must exist"})
-    if not evidence["governanceCharterPresent"]:
-        findings.append({"id": "GOVERNANCE_CHARTER_MISSING", "severity": "HIGH", "claim": "Governance charter must exist"})
-    if evidence["duplicateCapabilityIds"]:
-        findings.append({"id": "CAPABILITY_DUPLICATE", "severity": "HIGH", "claim": "Capability identifiers must be unique", "evidence": evidence["duplicateCapabilityIds"]})
-    return findings
+def build_audit(root:Path)->dict[str,Any]:
+    repo=repository_evidence(root);reports,defects=load_reports(root);det=deterministic(repo);fused=fuse(reports)
+    all_findings=det+defects
+    conflicts=[x for x in fused if x['conflict']]
+    status='REVIEW_REQUIRED' if all_findings or conflicts else 'CLEAN'
+    return {'schema':'hooshyar.multi-agent-audit.v2','authority':{'construction':['python','github','assistant'],'audit':['python','cursor','claude-code','zapier'],'externalAuditorsAreNonAuthoritative':True},'repository':repo,'deterministicFindings':det,'evidenceDefects':defects,'externalReports':reports,'fusedFindings':fused,'conflicts':conflicts,'externalEvidenceComplete':not defects,'status':status}
 
 
-def build_audit(root: Path) -> dict[str, Any]:
-    repo = collect_repository_evidence(root)
-    external = load_external_reports(root)
-    deterministic = deterministic_findings(repo)
-    fused = normalize_findings(external)
-    conflicts = [item for item in fused if item["conflict"]]
-    return {
-        "schema": "hooshyar.multi-agent-audit.v1",
-        "auditors": list(AUDITORS),
-        "authority": {
-            "construction": ["python", "github", "assistant"],
-            "audit": ["python", "cursor", "claude-code", "zapier"],
-            "externalAuditorsAreNonAuthoritative": True,
-        },
-        "repository": repo,
-        "deterministicFindings": deterministic,
-        "externalReports": external,
-        "fusedFindings": fused,
-        "conflicts": conflicts,
-        "status": "REVIEW_REQUIRED" if conflicts or deterministic else "CLEAN",
-    }
+def main()->int:
+    p=argparse.ArgumentParser();p.add_argument('--repo',default='.');p.add_argument('--out',default='.audit/multi-agent-audit.json');a=p.parse_args();root=Path(a.repo).resolve();result=build_audit(root);out=root/a.out;out.parent.mkdir(parents=True,exist_ok=True);out.write_text(json.dumps(result,indent=2,ensure_ascii=False)+'\n',encoding='utf-8');print(json.dumps({'status':result['status'],'commit':result['repository']['commit'],'fusedFindings':len(result['fusedFindings']),'evidenceDefects':len(result['evidenceDefects'])},ensure_ascii=False));return 0 if result['status'] in {'CLEAN','REVIEW_REQUIRED'} else 1
 
-
-def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--repo", default=".")
-    parser.add_argument("--out", default=".audit/multi-agent-audit.json")
-    args = parser.parse_args()
-    root = Path(args.repo).resolve()
-    result = build_audit(root)
-    output = root / args.out
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(json.dumps({"status": result["status"], "commit": result["repository"]["commit"], "fusedFindings": len(result["fusedFindings"])}, ensure_ascii=False))
-    return 0 if result["status"] in {"CLEAN", "REVIEW_REQUIRED"} else 1
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+if __name__=='__main__':raise SystemExit(main())
