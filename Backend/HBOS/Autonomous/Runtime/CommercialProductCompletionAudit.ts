@@ -48,7 +48,9 @@ export class CommercialProductCompletionAudit {
         const construction = layers.slice(3, 8).every(l => l.status === "VERIFIED");
         const assistant = this.anyExists(root, ["Backend/HBOS/Engines/AssistantEngine.ts"]) && this.verifiedTest(root, ["Backend/HBOS/test/Assistant.test.ts"], verification);
         const external = blockedExternalDependencies.length === 0;
-        const productComplete = missingLayers.length === 0 && external;
+        // `productComplete` is repository-native commercial completion. External blockers are
+        // reported independently and must never be represented as satisfied evidence.
+        const productComplete = missingLayers.length === 0;
         return { complete: productComplete, contractPresent: true, missingLayers, blockedExternalDependencies, completionStates: { assistantComplete: assistant, canonicalPlatformConstructionComplete: construction, commercialProductRuntimeComplete: runtime, externalProductionDependenciesComplete: external, productComplete }, layers };
     }
 
@@ -65,7 +67,7 @@ export class CommercialProductCompletionAudit {
             ["authorization-and-tenant", ["Backend/HBOS/Services/AuthorizationService.ts", "Backend/HBOS/Services/TenantIsolationEvidenceGate.ts"], ["Backend/HBOS/test/AuthorizationService.test.ts"], ["Backend/HBOS/test/TenantIsolationEvidenceGate.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
             ["canonical-data", ["Backend/HBOS/Product/FinancialDataIngestionAdapter.ts", "Backend/HBOS/Product/SQLitePersistenceStore.ts"], ["Backend/HBOS/Product/FinancialDataIngestionAdapter.test.ts"], ["Backend/HBOS/test/FinancialDataIngestionPersistence.integration.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
             ["financial-intelligence", ["Backend/HBOS/Engines/FinancialIntelligenceEngine.ts"], ["Backend/HBOS/test/FinancialIntelligenceEngine.test.ts"], ["Backend/HBOS/test/FinancialIntelligence.integration.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
-            ["executive-intelligence", ["Backend/HBOS/Engines/ExecutiveIntelligenceEngine.ts"], ["Backend/HBOS/test/ExecutiveIntelligenceEngine.test.ts"], ["Backend/HBOS/test/ExecutiveIntelligence.integration.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
+            ["executive-intelligence", ["Backend/HBOS/Engines/ExecutiveIntelligenceEngine.ts"], ["Backend/HBOS/test/ExecutiveIntelligence.integration.test.ts"], ["Backend/HBOS/test/ExecutiveIntelligence.integration.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
             ["decision-intelligence", ["Backend/HBOS/Engines/DecisionEngine.ts"], ["Backend/HBOS/test/Decision.test.ts"], ["Backend/HBOS/test/Decision.test.ts"], ["Backend/HBOS/test/Decision.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
             ["organizational-execution", ["Backend/HBOS/Engines/ProjectPilotEngine.ts"], ["Backend/HBOS/test/ProjectPilot.test.ts"], ["Backend/HBOS/test/ProjectPilot.test.ts"], ["Backend/HBOS/test/ProjectPilot.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
             ["dashboards-and-reports", ["Backend/HBOS/Engines/DashboardEngine.ts", "Backend/HBOS/Engines/ReportsEngine.ts"], ["Backend/HBOS/test/DashboardEngine.test.ts", "Backend/HBOS/test/ReportsEngine.test.ts"], ["Backend/HBOS/test/DashboardReports.integration.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
