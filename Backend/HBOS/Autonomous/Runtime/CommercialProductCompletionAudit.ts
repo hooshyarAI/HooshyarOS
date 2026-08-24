@@ -45,12 +45,12 @@ export class CommercialProductCompletionAudit {
             ["organizational-execution", ["Backend/HBOS/Engines/ProjectPilotEngine.ts"], ["Backend/HBOS/test/ProjectPilot.test.ts"], ["Backend/HBOS/test/ProjectPilot.test.ts"], ["Backend/HBOS/test/ProjectPilot.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
             ["dashboards-and-reports", ["Backend/HBOS/Engines/DashboardEngine.ts", "Backend/HBOS/Engines/ReportsEngine.ts"], ["Backend/HBOS/test/DashboardEngine.test.ts", "Backend/HBOS/test/ReportsEngine.test.ts"], ["Backend/HBOS/Engines/DashboardReports.integration.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
             ["web-application", ["web/index.html", "Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
-            ["offline-online", ["Backend/HBOS/Engines/OfflineOnlineEngine.ts"], ["Backend/HBOS/test/OfflineOnlineEngine.test.ts"], ["Backend/HBOS/test/OfflineOnline.integration.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
+            ["offline-online", ["Backend/HBOS/Product/CommercialOfflineOnlineService.ts"], ["Backend/HBOS/Product/CommercialOfflineOnlineService.test.ts"], ["Backend/HBOS/Product/CommercialOfflineOnline.integration.test.ts"], ["Backend/HBOS/Product/CommercialCompletionApplication.test.ts"], ["Backend/HBOS/Product/CommercialCompletionAcceptance.test.ts"]],
             ["security-privacy", ["Backend/HBOS/Engines/SecurityLayerEngine.ts", "Backend/HBOS/Security/SecurityAuditStore.ts"], ["Backend/HBOS/test/SecurityLayerEngine.test.ts", "Backend/HBOS/Security/SecurityAuditStore.test.ts"], ["Backend/HBOS/Product/CommercialIdentitySecurity.integration.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
             ["observability", ["Backend/HBOS/Core/Health/HealthMonitorEngine.ts"], ["Backend/HBOS/test/HealthMonitor.test.ts"], ["Backend/HBOS/Core/Health/CommercialObservability.integration.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
             ["deployment", ["Backend/HBOS/Engines/DeploymentContractEngine.ts"], ["Backend/HBOS/test/DeploymentContractEngine.test.ts"], ["Backend/HBOS/test/DeploymentContract.integration.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
-            ["subscription-commercial-controls", ["Backend/HBOS/Engines/SubscriptionEngine.ts"], ["Backend/HBOS/test/SubscriptionEngine.test.ts"], ["Backend/HBOS/test/Subscription.integration.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
-            ["customer-onboarding", ["Backend/HBOS/Engines/OnboardingEngine.ts"], ["Backend/HBOS/test/OnboardingEngine.test.ts"], ["Backend/HBOS/test/Onboarding.integration.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]]
+            ["subscription-commercial-controls", ["Backend/HBOS/Product/CommercialSubscriptionService.ts"], ["Backend/HBOS/Product/CommercialSubscriptionService.test.ts"], ["Backend/HBOS/Product/CommercialSubscription.integration.test.ts"], ["Backend/HBOS/Product/CommercialCompletionApplication.test.ts"], ["Backend/HBOS/Product/CommercialCompletionAcceptance.test.ts"]],
+            ["customer-onboarding", ["Backend/HBOS/Product/CommercialOnboardingService.ts"], ["Backend/HBOS/Product/CommercialOnboardingService.test.ts"], ["Backend/HBOS/Product/CommercialOnboarding.integration.test.ts"], ["Backend/HBOS/Product/CommercialCompletionApplication.test.ts"], ["Backend/HBOS/Product/CommercialCompletionAcceptance.test.ts"]]
         ];
         return s.map(([layer, impl, unit, integration, application, acceptance]) => {
             const checks = [this.anyExists(root, impl), this.verifiedTest(root, unit, verification), this.verifiedTest(root, integration, verification), this.verifiedTest(root, application, verification), this.verifiedTest(root, acceptance, verification)];
@@ -63,11 +63,7 @@ export class CommercialProductCompletionAudit {
         const existing = paths.filter(p => existsSync(join(root, p))).map(p => p.replace(/\\/g, "/"));
         if (!existing.length) return false;
         const results = verification.testResults ?? [];
-        if (results.length) return existing.some(p => results.some(r => {
-            if (!r.passed) return false;
-            const actual = r.path.replace(/\\/g, "/").replace(/^\.\//, "");
-            return actual === p || actual.endsWith(`/${p}`);
-        }));
+        if (results.length) return existing.some(p => results.some(r => { if (!r.passed) return false; const actual = r.path.replace(/\\/g, "/").replace(/^\.\//, ""); return actual === p || actual.endsWith(`/${p}`); }));
         if (verification.fullVerify) return false;
         const executed = new Set((verification.executedTests ?? []).map(p => p.replace(/\\/g, "/").replace(/^\.\//, "")));
         if (verification.focusedTest) executed.add(verification.focusedTest.replace(/\\/g, "/").replace(/^\.\//, ""));
