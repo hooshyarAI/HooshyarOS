@@ -187,13 +187,40 @@ jobs:
           name: architecture-evidence
           path: audit-artifacts/
 
+  commercial-product:
+    name: Commercial Product Completion Re-Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: Full Jest provenance
+        run: >-
+          mkdir -p artifacts &&
+          node ./node_modules/jest/bin/jest.js --runInBand
+          --testPathIgnorePatterns=CommercialProductCompletionAudit.reaudit.test.ts
+          --json --outputFile=artifacts/commercial-jest-results.json
+      - name: Authoritative 16-layer commercial re-audit
+        run: >-
+          node ./node_modules/jest/bin/jest.js --runInBand
+          Backend/HBOS/test/CommercialProductCompletionAudit.reaudit.test.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: commercial-verification-evidence
+          path: artifacts/
+          if-no-files-found: error
+
   audit-summary:
     name: Required platform gates
     if: always()
-    needs: [node-runtime, python-runtime, codeql, secrets, optional-surfaces, architecture-observability]
+    needs: [node-runtime, python-runtime, codeql, secrets, optional-surfaces, architecture-observability, commercial-product]
     runs-on: ubuntu-latest
     steps:
-      - name: Enforce operational/static gates
+      - name: Enforce operational/static and commercial gates
         run: |
           echo "Node=${{ needs.node-runtime.result }}"
           echo "Python=${{ needs.python-runtime.result }}"
@@ -201,4 +228,5 @@ jobs:
           echo "Secrets=${{ needs.secrets.result }}"
           echo "Optional=${{ needs.optional-surfaces.result }}"
           echo "Architecture=${{ needs.architecture-observability.result }}"
-          for s in "${{ needs.node-runtime.result }}" "${{ needs.python-runtime.result }}" "${{ needs.codeql.result }}" "${{ needs.secrets.result }}" "${{ needs.optional-surfaces.result }}" "${{ needs.architecture-observability.result }}"; do test "$s" = success || exit 1; done
+          echo "CommercialProduct=${{ needs.commercial-product.result }}"
+          for s in "${{ needs.node-runtime.result }}" "${{ needs.python-runtime.result }}" "${{ needs.codeql.result }}" "${{ needs.secrets.result }}" "${{ needs.optional-surfaces.result }}" "${{ needs.architecture-observability.result }}" "${{ needs.commercial-product.result }}"; do test "$s" = success || exit 1; done
