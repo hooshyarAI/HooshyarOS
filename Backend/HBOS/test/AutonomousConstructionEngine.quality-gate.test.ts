@@ -3,12 +3,16 @@ import { AutonomousConstructionEngine, ConstructionTool } from "../Builder/Auton
 type VerifyArtifact = {
     testsPassed?: boolean;
     jestVerified?: boolean;
+    builderTestsRun?: boolean;
+    builderTestsVerified?: boolean;
+    focusedTest?: string | null;
+    fullVerify?: boolean;
     behavioralEvidenceVerified?: boolean;
     integrationVerified?: boolean;
     cleanRepository?: boolean;
 };
 
-function buildTools(verify: VerifyArtifact, generateChanged = true): ConstructionTool[] {
+function buildTools(verify: VerifyArtifact, generateChanged = true, generateEvidence = true): ConstructionTool[] {
     return [
         {
             name: "architecture",
@@ -21,7 +25,14 @@ function buildTools(verify: VerifyArtifact, generateChanged = true): Constructio
             name: "python",
             execute: stage => ({
                 ok: true,
-                artifact: stage === "GENERATE" ? { changed: generateChanged } : stage === "VERIFY" ? verify : undefined
+                artifact: stage === "GENERATE"
+                    ? {
+                        changed: generateChanged,
+                        unexpectedPaths: generateEvidence ? [] : ["unexpected/path.ts"],
+                        missingRequiredArtifacts: generateEvidence ? [] : ["missing.ts"],
+                        allDeclaredArtifactsReady: generateEvidence
+                    }
+                    : stage === "VERIFY" ? verify : undefined
             })
         },
         {
@@ -88,7 +99,39 @@ describe("AutonomousConstructionEngine quality gate", () => {
         expect(result.issues).toContain("QUALITY_IMPLEMENTATION_UNVERIFIED");
     });
 
-    test("permits finalize only when all quality evidence is present", () => {
+    test("blocks finalize when runtime verification passes but generated-artifact evidence is unsafe", () => {
+        const engine = new AutonomousConstructionEngine(buildTools({
+            jestVerified: true,
+            focusedTest: null,
+            fullVerify: false,
+            builderTestsRun: false,
+            builderTestsVerified: false
+        }, true, false));
+
+        const result = engine.build(plan);
+
+        expect(result.ok).toBe(false);
+        expect(result.stage).toBe("VERIFY");
+        expect(result.issues).toContain("QUALITY_REPOSITORY_UNVERIFIED");
+    });
+
+    test("accepts runtime verification evidence when Jest and declared artifact boundaries agree", () => {
+        const engine = new AutonomousConstructionEngine(buildTools({
+            jestVerified: true,
+            focusedTest: null,
+            fullVerify: false,
+            builderTestsRun: false,
+            builderTestsVerified: false
+        }));
+
+        const result = engine.build(plan);
+
+        expect(result.ok).toBe(true);
+        expect(result.stage).toBe("FINALIZE");
+        expect(result.trace).toContain("FINALIZE");
+    });
+
+    test("permits finalize only when all explicit quality evidence is present", () => {
         const engine = new AutonomousConstructionEngine(buildTools({
             testsPassed: true,
             behavioralEvidenceVerified: true,
