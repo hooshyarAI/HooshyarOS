@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { CommercialProductCompletionAudit } from "../Autonomous/Runtime/CommercialProductCompletionAudit";
 
@@ -6,6 +6,7 @@ type JestSuiteResult = { name?: string; status?: string };
 type JestJson = { testResults?: JestSuiteResult[] };
 
 const RESULT_FILE = process.env.COMMERCIAL_JEST_RESULT_FILE ?? join(process.cwd(), "artifacts/commercial-jest-results.json");
+const VERDICT_FILE = process.env.COMMERCIAL_VERDICT_FILE ?? join(process.cwd(), "artifacts/commercial-product-verdict.json");
 
 function normalize(p: string): string {
     const absolute = resolve(p);
@@ -14,7 +15,7 @@ function normalize(p: string): string {
 }
 
 describe("CommercialProductCompletionAudit re-audit bridge", () => {
-    it("feeds actual full-Jest suite provenance into the commercial audit", () => {
+    it("feeds actual full-Jest suite provenance into the commercial audit and enforces the verdict", () => {
         expect(existsSync(RESULT_FILE)).toBe(true);
         const report = JSON.parse(readFileSync(RESULT_FILE, "utf8")) as JestJson;
         const testResults = (report.testResults ?? [])
@@ -32,13 +33,21 @@ describe("CommercialProductCompletionAudit re-audit bridge", () => {
         });
 
         const failedSuites = testResults.filter(test => !test.passed).map(test => test.path);
-        expect(failedSuites).toEqual([]);
-        expect(result.contractPresent).toBe(true);
-
-        console.log(JSON.stringify({
+        const verdict = {
+            schemaVersion: 1,
             commercialAudit: result,
             jestSuites: testResults.length,
             failedSuites,
-        }, null, 2));
+            allLayersVerified: result.layers.length === 16 && result.layers.every(layer => layer.status === "VERIFIED"),
+        };
+
+        mkdirSync(join(process.cwd(), "artifacts"), { recursive: true });
+        writeFileSync(VERDICT_FILE, JSON.stringify(verdict, null, 2) + "\n", "utf8");
+
+        expect(failedSuites).toEqual([]);
+        expect(result.contractPresent).toBe(true);
+        expect(verdict.allLayersVerified).toBe(true);
+        expect(result.completionStates.commercialProductRuntimeComplete).toBe(true);
+        expect(result.completionStates.productComplete).toBe(true);
     });
 });
