@@ -60,6 +60,7 @@ export class CommercialProductCompletionAudit {
             if (!hasRunnableWebScript && !hasWebRuntime) missingLayers.push("web-entrypoint");
         }
 
+        if (!this.hasWebApplicationEvidence(root)) missingLayers.push("web-application-evidence");
         if (!this.hasCanonicalPersistenceEvidence(root)) missingLayers.push("persistence-boundary");
 
         const authCandidates = ["Backend/HBOS/Auth", "Backend/HBOS/Security", "Backend/HBOS/Identity"];
@@ -70,6 +71,15 @@ export class CommercialProductCompletionAudit {
         if (contract.includes("Cloud deployment may remain externally blocked")) blockedExternalDependencies.push("production-cloud-resources");
 
         return { complete: missingLayers.length === 0, contractPresent: true, missingLayers, blockedExternalDependencies };
+    }
+
+    private hasWebApplicationEvidence(root: string): boolean {
+        const testPaths = [
+            "Backend/HBOS/test/CommercialRuntimeServer.test.ts",
+            "Backend/HBOS/test/CommercialRuntimeApplication.test.ts",
+            "Backend/HBOS/test/CommercialWebApplication.test.ts"
+        ];
+        return testPaths.some(path => existsSync(join(root, path)));
     }
 
     private hasCanonicalPersistenceEvidence(root: string): boolean {
