@@ -17,6 +17,19 @@ def evaluate(metric: str) -> dict[str, str]:
     return {"metric": metric, "status": "evaluated"}
 
 
+class PerformanceEngine:
+    """Object-oriented compatibility facade over repository-native primitives."""
+
+    def evaluate(self, metric: str) -> dict[str, str]:
+        return evaluate(metric)
+
+    def measure(self, operation: str, fn: Callable[[], T]) -> tuple[T, PerformanceSample]:
+        return measure(operation, fn)
+
+    def benchmark(self, operation: str, fn: Callable[[], T], iterations: int = 1) -> PerformanceSample:
+        return benchmark(operation, fn, iterations)
+
+
 def measure(operation: str, fn: Callable[[], T]) -> tuple[T, PerformanceSample]:
     started = perf_counter()
     value = fn()
