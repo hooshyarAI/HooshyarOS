@@ -2,18 +2,13 @@ import { CommercialProductCompletionAudit } from "../Autonomous/Runtime/Commerci
 
 describe("CommercialProductCompletionAudit", () => {
     it("requires the canonical commercial completion contract", () => {
-        const audit = new CommercialProductCompletionAudit();
-        const result = audit.audit(process.cwd());
-
+        const result = new CommercialProductCompletionAudit().audit(process.cwd());
         expect(result.contractPresent).toBe(true);
         expect(result.missingLayers).not.toContain("commercial-completion-contract");
     });
 
-    it("does not equate engine artifacts with a missing web product entrypoint", () => {
-        const audit = new CommercialProductCompletionAudit();
-        const result = audit.audit(process.cwd());
-
-        expect(result.complete).toBe(false);
-        expect(result.missingLayers).toContain("web-entrypoint");
+    it("requires a canonical runnable web product entrypoint", () => {
+        const result = new CommercialProductCompletionAudit().audit(process.cwd());
+        expect(result.missingLayers).not.toContain("web-entrypoint");
     });
 });
