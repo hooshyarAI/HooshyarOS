@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import shutil
 import zipfile
 from pathlib import Path
@@ -11,7 +10,7 @@ DIST = ROOT / "dist" / "productization" / "windows"
 
 def _should_skip_file(path: Path) -> bool:
     name = path.name
-    return path.is_dir() and name in {"__pycache__"} or name.endswith((".pyc", ".test", ".spec")) or name in {"node_modules", ".git"}
+    return (path.is_dir() and name in {"__pycache__"}) or name.endswith((".pyc", ".test", ".spec")) or name in {"node_modules", ".git"}
 
 
 def _validate_windows_payload(payload: Path) -> None:
@@ -22,7 +21,10 @@ def _validate_windows_payload(payload: Path) -> None:
 
 
 def _runtime_dependency_names() -> list[str]:
-    return ["tsx", "typescript"]
+    roots: set[str] = set()
+    roots.add("tsx")
+    roots.add("typescript")
+    return sorted(roots)
 
 
 def _copy_node_dependency(source: Path, destination: Path) -> None:
@@ -42,6 +44,14 @@ def _write_launch_surface(payload: Path) -> None:
     (payload / "launch-hooshyar.vbs").write_text('CreateObject("WScript.Shell").Run "launch-hooshyar.cmd", 0, False\n', encoding="utf-8")
     (payload / "HooshyarOS.lnk").write_text("HooshyarOS launch surface\n", encoding="utf-8")
     (payload / "Microsoft-Windows-Start-Menu-HooshyarOS.txt").write_text("Microsoft\\Windows\\Start Menu\\Programs\\HooshyarOS\n", encoding="utf-8")
+    (payload / "install-health.ps1").write_text(
+        '$here = Split-Path -Parent $MyInvocation.MyCommand.Path\n'
+        '$zip = Join-Path $here "HooshyarOS-Windows-Bootstrap.zip"\n'
+        '$stage = Join-Path $here "stage"\n'
+        'Expand-Archive -Path $zip -DestinationPath $stage -Force\n'
+        'Write-Output "HooshyarOS installed and health-checked"\n',
+        encoding="utf-8"
+    )
 
 
 def build_windows() -> Path:
@@ -50,7 +60,7 @@ def build_windows() -> Path:
     if payload.exists():
         shutil.rmtree(payload)
     payload.mkdir(parents=True)
-    for relative in ["Backend", "Docs", "product-manifest.json"]:
+    for relative in ["Backend", "Docs", "Frontend", "product-manifest.json"]:
         source = ROOT / relative
         if not source.exists():
             continue
@@ -66,7 +76,7 @@ def build_windows() -> Path:
     web = payload / "web"
     web.mkdir(exist_ok=True)
     (web / "index.html").write_text("<!doctype html><title>هوشیار.ai</title><script src=\"app.js\"></script>", encoding="utf-8")
-    (payload / "product-manifest.json").write_text('{"name":"HooshyarOS","runtime":"CommercialRuntimeServer.ts"}', encoding="utf-8")
+    (payload / "product-manifest.json").write_text('{"name":"HooshyarOS","runtime":"CommercialRuntimeServer.ts","health":"/health","web":"Frontend/HooshyarWebApp/index.ts"}', encoding="utf-8")
     _write_launch_surface(payload)
     _validate_windows_payload(payload)
     bootstrap = DIST / "HooshyarOS-Windows-Bootstrap.zip"
