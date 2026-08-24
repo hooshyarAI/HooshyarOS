@@ -38,7 +38,7 @@ export class CommercialProductCompletionAudit {
         if (!existsSync(contractFile) || !existsSync(matrixFile)) return this.result(false, existsSync(contractFile), ["commercial-evidence-contract"], []);
         const contract = readFileSync(contractFile, "utf8"), matrix = readFileSync(matrixFile, "utf8"), missingLayers: string[] = [];
         for (const marker of ["## Commercial completion layers", "## Evidence model", "## Completion states"]) if (!contract.includes(marker)) missingLayers.push(`contract-marker:${marker}`);
-        if (!["Implementation", "Unit", "Integration", "Application", "Acceptance"].every(m => matrix.includes(m))) missingLayers.push("invalid-commercial-evidence-matrix");
+        if (!this.isCanonicalMatrix(matrix)) missingLayers.push("invalid-commercial-evidence-matrix");
         const layers = this.evaluateLayers(root, verification);
         for (const layer of layers) if (layer.status !== "VERIFIED") missingLayers.push(layer.layer);
         const blockedExternalDependencies: string[] = [];
@@ -50,6 +50,12 @@ export class CommercialProductCompletionAudit {
         const external = blockedExternalDependencies.length === 0;
         const productComplete = missingLayers.length === 0 && external;
         return { complete: productComplete, contractPresent: true, missingLayers, blockedExternalDependencies, completionStates: { assistantComplete: assistant, canonicalPlatformConstructionComplete: construction, commercialProductRuntimeComplete: runtime, externalProductionDependenciesComplete: external, productComplete }, layers };
+    }
+
+    private isCanonicalMatrix(matrix: string): boolean {
+        const required = ["# Commercial Evidence Matrix", "Canonical audit model for `CommercialProductCompletionAudit`.", "| Layer | Minimum evidence gate |", "Presence of an engine, directory, documentation file, or unit test alone is never sufficient for commercial completion."];
+        const layers = ["Product runtime", "Identity", "Multi-tenancy/authorization", "Data ingestion", "Financial intelligence", "Executive intelligence", "Decision intelligence", "Organizational execution", "Dashboards/reports", "Web/mobile", "Offline/online", "Security/privacy", "Observability", "Deployment", "Subscription", "Onboarding"];
+        return required.every(marker => matrix.includes(marker)) && layers.every(layer => matrix.includes(`| ${layer} |`));
     }
 
     private evaluateLayers(root: string, verification?: VerificationEvidence): CommercialLayerEvidence[] {
