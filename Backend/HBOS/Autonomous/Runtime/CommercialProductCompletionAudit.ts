@@ -80,13 +80,13 @@ export class CommercialProductCompletionAudit {
 
     private verifiedTest(root: string, paths: string[], verification?: VerificationEvidence): boolean {
         if (!verification?.verified) return false;
-        const existing = paths.filter(p => existsSync(join(root, p))).map(p => p.replaceAll("\\", "/"));
+        const existing = paths.filter(p => existsSync(join(root, p))).map(p => p.replace(/\\/g, "/"));
         if (!existing.length) return false;
         const results = verification.testResults ?? [];
-        if (results.length) return existing.some(p => results.some(r => r.passed && r.path.replaceAll("\\", "/") === p));
+        if (results.length) return existing.some(p => results.some(r => r.passed && r.path.replace(/\\/g, "/") === p));
         if (verification.fullVerify) return false;
-        const executed = new Set((verification.executedTests ?? []).map(p => p.replaceAll("\\", "/")));
-        if (verification.focusedTest) executed.add(verification.focusedTest.replaceAll("\\", "/"));
+        const executed = new Set((verification.executedTests ?? []).map(p => p.replace(/\\/g, "/")));
+        if (verification.focusedTest) executed.add(verification.focusedTest.replace(/\\/g, "/"));
         return existing.some(p => executed.has(p));
     }
 
