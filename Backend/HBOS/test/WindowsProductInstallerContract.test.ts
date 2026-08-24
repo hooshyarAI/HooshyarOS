@@ -44,6 +44,7 @@ describe("Windows product installer contract", () => {
         expect(builder).toContain("CommercialRuntimeServer.ts");
         expect(builder).toContain("Frontend/HooshyarWebApp/index.ts");
         expect(builder).toContain("product-manifest.json");
-        expect(builder).toContain("web/index.html");
+        expect(builder).toContain('web = payload / "web"');
+        expect(builder).toContain('index = web / "index.html"');
     });
 });
