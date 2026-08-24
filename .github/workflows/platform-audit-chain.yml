@@ -33,6 +33,8 @@ jobs:
           --testPathIgnorePatterns=CommercialProductCompletionAudit.reaudit.test.ts
           --json --outputFile=artifacts/commercial-jest-results.json
       - name: Commercial Product Completion Re-Audit
+        env:
+          COMMERCIAL_REAUDIT_REQUIRED: "true"
         run: >-
           node ./node_modules/jest/bin/jest.js --runInBand
           Backend/HBOS/test/CommercialProductCompletionAudit.reaudit.test.ts
@@ -204,6 +206,8 @@ jobs:
           --testPathIgnorePatterns=CommercialProductCompletionAudit.reaudit.test.ts
           --json --outputFile=artifacts/commercial-jest-results.json
       - name: Authoritative 16-layer commercial re-audit
+        env:
+          COMMERCIAL_REAUDIT_REQUIRED: "true"
         run: >-
           node ./node_modules/jest/bin/jest.js --runInBand
           Backend/HBOS/test/CommercialProductCompletionAudit.reaudit.test.ts
