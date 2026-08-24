@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 export interface KnotCheckpoint {
@@ -119,14 +119,29 @@ export class AutonomousKnotRecovery {
         const postRollbackStatus = status();
         if (!postRollbackStatus) return;
 
-        const unexpected = postRollbackStatus
+        const canonicalUntracked = postRollbackStatus
             .split(/\r?\n/)
             .filter(Boolean)
-            .filter(line => {
-                const path = line.slice(3).replace(/\\/g, "/");
-                const untracked = line.startsWith("?? ");
-                return !(untracked && canonicalGenerated.has(path));
-            });
+            .map(line => ({
+                line,
+                path: line.slice(3).replace(/\\/g, "/"),
+                untracked: line.startsWith("?? ")
+            }))
+            .filter(entry => entry.untracked && canonicalGenerated.has(entry.path));
+
+        // The generator is only allowed to start from a clean worktree. Therefore,
+        // any canonical artifact that is still untracked after rollback was created
+        // by the failed/repaired knot itself and can be safely removed before repair.
+        for (const entry of canonicalUntracked) {
+            rmSync(join(root, entry.path), { force: true });
+        }
+
+        const finalStatus = status();
+        if (!finalStatus) return;
+
+        const unexpected = finalStatus
+            .split(/\r?\n/)
+            .filter(Boolean);
 
         if (unexpected.length > 0) {
             throw new Error(
