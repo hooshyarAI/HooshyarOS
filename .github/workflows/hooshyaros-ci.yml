@@ -46,5 +46,14 @@ jobs:
           Backend/HBOS/test/AutonomousCompletionGate.test.ts
           Backend/HBOS/test/AutonomousBuildDaemon.test.ts
 
-      - name: Full Jest suite
-        run: node ./node_modules/jest/bin/jest.js --runInBand
+      - name: Full Jest suite with machine-readable provenance
+        run: >-
+          mkdir -p artifacts &&
+          node ./node_modules/jest/bin/jest.js --runInBand
+          --testPathIgnorePatterns=CommercialProductCompletionAudit.reaudit.test.ts
+          --json --outputFile=artifacts/commercial-jest-results.json
+
+      - name: Commercial Product Completion Re-Audit
+        run: >-
+          node ./node_modules/jest/bin/jest.js --runInBand
+          Backend/HBOS/test/CommercialProductCompletionAudit.reaudit.test.ts
