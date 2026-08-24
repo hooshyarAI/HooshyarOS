@@ -5,14 +5,14 @@ describe("Commercial evidence contract", () => {
     const result = new CommercialProductCompletionAudit().audit(process.cwd());
     expect(result.completionStates.productComplete).toBe(false);
     expect(result.missingLayers).toEqual(expect.arrayContaining([
-      "identity-and-session-evidence",
-      "authorization-and-tenant-evidence",
-      "financial-intelligence-evidence",
-      "executive-intelligence-evidence",
-      "dashboard-report-application-evidence",
-      "security-privacy-evidence",
-      "subscription-commercial-controls-evidence",
-      "customer-onboarding-evidence"
+      "identity-and-session",
+      "authorization-and-tenant",
+      "financial-intelligence",
+      "executive-intelligence",
+      "dashboards-and-reports",
+      "security-privacy",
+      "subscription-commercial-controls",
+      "customer-onboarding"
     ]));
   });
 
