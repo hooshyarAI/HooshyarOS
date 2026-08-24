@@ -22,21 +22,7 @@ export class CommercialProductCompletionAudit {
 
     audit(root: string): CommercialProductCompletionAuditResult {
         const contractFile = join(root, this.contractPath);
-        if (!existsSync(contractFile)) {
-            return {
-                complete: false,
-                contractPresent: false,
-                missingLayers: ["commercial-completion-contract"],
-                blockedExternalDependencies: [],
-                completionStates: {
-                    assistantComplete: false,
-                    canonicalPlatformConstructionComplete: false,
-                    commercialProductRuntimeComplete: false,
-                    externalProductionDependenciesComplete: false,
-                    productComplete: false
-                }
-            };
-        }
+        if (!existsSync(contractFile)) return this.result(false, false, ["commercial-completion-contract"], []);
 
         const contract = readFileSync(contractFile, "utf8");
         const missingLayers: string[] = [];
@@ -61,50 +47,34 @@ export class CommercialProductCompletionAudit {
             "## Evidence model",
             "## Completion states"
         ];
-        for (const marker of requiredContractMarkers) {
-            if (!contract.includes(marker)) missingLayers.push(`contract-marker:${marker}`);
-        }
+        for (const marker of requiredContractMarkers) if (!contract.includes(marker)) missingLayers.push(`contract-marker:${marker}`);
 
-        const productRuntimeEvidence = this.hasProductRuntimeEvidence(root);
-        if (!productRuntimeEvidence) missingLayers.push("product-runtime");
-
-        const identityEvidence = this.hasIdentityEvidence(root);
-        if (!identityEvidence) missingLayers.push("identity-and-session-evidence");
-
-        const authorizationEvidence = this.hasAuthorizationEvidence(root);
-        if (!authorizationEvidence) missingLayers.push("authorization-and-tenant-evidence");
-
-        if (!this.hasCanonicalDataEvidence(root)) missingLayers.push("canonical-data-evidence");
-        if (!this.hasFinancialIntelligenceEvidence(root)) missingLayers.push("financial-intelligence-evidence");
-        if (!this.hasExecutiveIntelligenceEvidence(root)) missingLayers.push("executive-intelligence-evidence");
-        if (!this.hasDecisionIntelligenceEvidence(root)) missingLayers.push("decision-intelligence-evidence");
-        if (!this.hasOrganizationalExecutionEvidence(root)) missingLayers.push("organizational-execution-evidence");
-        if (!this.hasDashboardReportEvidence(root)) missingLayers.push("dashboard-report-application-evidence");
-        if (!this.hasWebApplicationEvidence(root)) missingLayers.push("web-application-evidence");
-        if (!this.hasOfflineOnlineEvidence(root)) missingLayers.push("offline-online-evidence");
-        if (!this.hasSecurityPrivacyEvidence(root)) missingLayers.push("security-privacy-evidence");
-        if (!this.hasObservabilityEvidence(root)) missingLayers.push("observability-operations-evidence");
-        if (!this.hasDeploymentEvidence(root)) missingLayers.push("deployment-installation-evidence");
-        if (!this.hasSubscriptionEvidence(root)) missingLayers.push("subscription-commercial-controls-evidence");
-        if (!this.hasCustomerOnboardingEvidence(root)) missingLayers.push("customer-onboarding-evidence");
+        const gates: Array<[string, boolean]> = [
+            ["product-runtime", this.hasProductRuntimeEvidence(root)],
+            ["identity-and-session-evidence", this.hasIdentityEvidence(root)],
+            ["authorization-and-tenant-evidence", this.hasAuthorizationEvidence(root)],
+            ["canonical-data-evidence", this.hasCanonicalDataEvidence(root)],
+            ["financial-intelligence-evidence", this.hasFinancialIntelligenceEvidence(root)],
+            ["executive-intelligence-evidence", this.hasExecutiveIntelligenceEvidence(root)],
+            ["decision-intelligence-evidence", this.hasDecisionIntelligenceEvidence(root)],
+            ["organizational-execution-evidence", this.hasOrganizationalExecutionEvidence(root)],
+            ["dashboard-report-application-evidence", this.hasDashboardReportEvidence(root)],
+            ["web-application-evidence", this.hasWebApplicationEvidence(root)],
+            ["offline-online-evidence", this.hasOfflineOnlineEvidence(root)],
+            ["security-privacy-evidence", this.hasSecurityPrivacyEvidence(root)],
+            ["observability-operations-evidence", this.hasObservabilityEvidence(root)],
+            ["deployment-installation-evidence", this.hasDeploymentEvidence(root)],
+            ["subscription-commercial-controls-evidence", this.hasSubscriptionEvidence(root)],
+            ["customer-onboarding-evidence", this.hasCustomerOnboardingEvidence(root)]
+        ];
+        for (const [layer, verified] of gates) if (!verified) missingLayers.push(layer);
 
         const blockedExternalDependencies: string[] = [];
-        if (contract.includes("Payment-provider activation is an external dependency")) {
-            blockedExternalDependencies.push("payment-provider-activation");
-        }
-        if (contract.includes("Cloud deployment may remain externally blocked")) {
-            blockedExternalDependencies.push("production-cloud-resources");
-        }
+        if (contract.includes("Payment-provider activation is an external dependency")) blockedExternalDependencies.push("payment-provider-activation");
+        if (contract.includes("Cloud deployment may remain externally blocked")) blockedExternalDependencies.push("production-cloud-resources");
 
-        const commercialProductRuntimeComplete =
-            productRuntimeEvidence && identityEvidence && authorizationEvidence &&
-            this.hasCanonicalPersistenceEvidence(root) && this.hasObservabilityEvidence(root);
-
-        const canonicalPlatformConstructionComplete =
-            this.hasCanonicalDataEvidence(root) && this.hasFinancialIntelligenceEvidence(root) &&
-            this.hasExecutiveIntelligenceEvidence(root) && this.hasDecisionIntelligenceEvidence(root) &&
-            this.hasOrganizationalExecutionEvidence(root);
-
+        const productRuntimeComplete = gates.slice(0, 3).every(([, verified]) => verified) && this.hasCanonicalPersistenceEvidence(root) && this.hasObservabilityEvidence(root);
+        const canonicalPlatformConstructionComplete = gates.slice(3, 8).every(([, verified]) => verified);
         const assistantComplete = this.hasAssistantEvidence(root);
         const externalProductionDependenciesComplete = blockedExternalDependencies.length === 0;
         const productComplete = missingLayers.length === 0 && externalProductionDependenciesComplete;
@@ -117,16 +87,31 @@ export class CommercialProductCompletionAudit {
             completionStates: {
                 assistantComplete,
                 canonicalPlatformConstructionComplete,
-                commercialProductRuntimeComplete,
+                commercialProductRuntimeComplete: productRuntimeComplete,
                 externalProductionDependenciesComplete,
                 productComplete
             }
         };
     }
 
+    private result(complete: boolean, contractPresent: boolean, missingLayers: string[], blockedExternalDependencies: string[]): CommercialProductCompletionAuditResult {
+        return {
+            complete,
+            contractPresent,
+            missingLayers,
+            blockedExternalDependencies,
+            completionStates: {
+                assistantComplete: false,
+                canonicalPlatformConstructionComplete: false,
+                commercialProductRuntimeComplete: false,
+                externalProductionDependenciesComplete: blockedExternalDependencies.length === 0,
+                productComplete: complete
+            }
+        };
+    }
+
     private hasAssistantEvidence(root: string): boolean {
-        return existsSync(join(root, "Backend/HBOS/Engines/AssistantEngine.ts")) &&
-            existsSync(join(root, "Backend/HBOS/test/Assistant.test.ts"));
+        return this.hasImplementationAndBehaviorTest(root, "Backend/HBOS/Engines/AssistantEngine.ts", "Backend/HBOS/test/Assistant.test.ts");
     }
 
     private hasProductRuntimeEvidence(root: string): boolean {
@@ -135,72 +120,56 @@ export class CommercialProductCompletionAudit {
         if (!existsSync(packagePath) || !existsSync(runtimePath)) return false;
         const packageJson = JSON.parse(readFileSync(packagePath, "utf8")) as { scripts?: Record<string, string> };
         const scripts = packageJson.scripts ?? {};
-        const hasRunnableWebScript = Boolean(scripts.start || scripts.dev || scripts.serve || scripts.preview);
+        const runnable = Boolean(scripts.start || scripts.dev || scripts.serve || scripts.preview);
         const webArtifacts = ["web/index.html", "web/app.js", "web/styles.css", "web/manifest.webmanifest"];
-        return (hasRunnableWebScript || webArtifacts.every(artifact => existsSync(join(root, artifact)))) &&
-            this.hasWebApplicationEvidence(root) &&
-            this.hasCanonicalPersistenceEvidence(root);
+        return (runnable || webArtifacts.every(artifact => existsSync(join(root, artifact)))) && this.hasWebApplicationEvidence(root) && this.hasCanonicalPersistenceEvidence(root) && this.hasObservabilityEvidence(root);
     }
 
     private hasIdentityEvidence(root: string): boolean {
-        const implementation = join(root, "Backend/HBOS/Engines/UserManagementEngine.ts");
-        const test = join(root, "Backend/HBOS/test/UserManagement.test.ts");
-        if (!existsSync(implementation) || !existsSync(test)) return false;
-        const source = readFileSync(implementation, "utf8");
-        const evidence = readFileSync(test, "utf8");
-        return ["registerUser", "session", "logout", "invalidate"].every(marker => source.includes(marker) || evidence.includes(marker));
+        return this.hasBehavioralContract(root, "Backend/HBOS/Engines/UserManagementEngine.ts", "Backend/HBOS/test/UserManagement.test.ts", ["registerUser", "session", "logout", "invalidate"]);
     }
 
     private hasAuthorizationEvidence(root: string): boolean {
-        const implementation = join(root, "Backend/HBOS/Engines/SecurityLayerEngine.ts");
-        const test = join(root, "Backend/HBOS/test/SecurityLayerEngine.test.ts");
-        if (!existsSync(implementation) || !existsSync(test)) return false;
-        const source = readFileSync(implementation, "utf8");
-        const evidence = readFileSync(test, "utf8");
-        return ["authorize", "role", "permission", "tenant", "cross-tenant"].every(marker => source.includes(marker) || evidence.includes(marker));
+        return this.hasBehavioralContract(root, "Backend/HBOS/Engines/SecurityLayerEngine.ts", "Backend/HBOS/test/SecurityLayerEngine.test.ts", ["authorize", "role", "permission", "tenant", "cross-tenant"]);
     }
 
     private hasCanonicalDataEvidence(root: string): boolean {
-        return existsSync(join(root, "Backend/HBOS/Product/FinancialDataIngestionAdapter.ts")) &&
-            existsSync(join(root, "Backend/HBOS/Product/FinancialDataIngestionAdapter.test.ts"));
+        return this.hasImplementationAndBehaviorTest(root, "Backend/HBOS/Product/FinancialDataIngestionAdapter.ts", "Backend/HBOS/Product/FinancialDataIngestionAdapter.test.ts") &&
+            existsSync(join(root, "Backend/HBOS/test/FinancialDataIngestionPersistence.integration.test.ts"));
     }
 
     private hasFinancialIntelligenceEvidence(root: string): boolean {
-        return existsSync(join(root, "Backend/HBOS/Engines/FinancialIntelligenceEngine.ts"));
+        return this.hasImplementationAndBehaviorTest(root, "Backend/HBOS/Engines/FinancialIntelligenceEngine.ts", "Backend/HBOS/test/FinancialIntelligenceEngine.test.ts");
     }
 
     private hasExecutiveIntelligenceEvidence(root: string): boolean {
-        return existsSync(join(root, "Backend/HBOS/Engines/ExecutiveIntelligenceEngine.ts"));
+        return this.hasImplementationAndBehaviorTest(root, "Backend/HBOS/Engines/ExecutiveIntelligenceEngine.ts", "Backend/HBOS/test/ExecutiveIntelligenceEngine.test.ts");
     }
 
     private hasDecisionIntelligenceEvidence(root: string): boolean {
-        return existsSync(join(root, "Backend/HBOS/Engines/DecisionEngine.ts")) &&
-            existsSync(join(root, "Backend/HBOS/test/Decision.test.ts"));
+        return this.hasImplementationAndBehaviorTest(root, "Backend/HBOS/Engines/DecisionEngine.ts", "Backend/HBOS/test/Decision.test.ts") &&
+            this.hasTestContaining(root, "Backend/HBOS/test/Decision.test.ts", ["scenario", "recommendation", "approval"]);
     }
 
     private hasOrganizationalExecutionEvidence(root: string): boolean {
-        return existsSync(join(root, "Backend/HBOS/Engines/ProjectPilotEngine.ts")) &&
-            existsSync(join(root, "Backend/HBOS/test/ProjectPilot.test.ts"));
+        return this.hasImplementationAndBehaviorTest(root, "Backend/HBOS/Engines/ProjectPilotEngine.ts", "Backend/HBOS/test/ProjectPilot.test.ts") &&
+            this.hasTestContaining(root, "Backend/HBOS/test/ProjectPilot.test.ts", ["decision", "task", "workflow"]);
     }
 
     private hasDashboardReportEvidence(root: string): boolean {
-        return existsSync(join(root, "Backend/HBOS/Engines/DashboardEngine.ts")) &&
-            existsSync(join(root, "Backend/HBOS/Engines/ReportsEngine.ts"));
+        return this.hasImplementationAndBehaviorTest(root, "Backend/HBOS/Engines/DashboardEngine.ts", "Backend/HBOS/test/DashboardEngine.test.ts") &&
+            this.hasImplementationAndBehaviorTest(root, "Backend/HBOS/Engines/ReportsEngine.ts", "Backend/HBOS/test/ReportsEngine.test.ts") &&
+            this.hasWebApplicationEvidence(root);
     }
 
     private hasWebApplicationEvidence(root: string): boolean {
-        const testPaths = [
-            "Backend/HBOS/test/CommercialRuntimeServer.test.ts",
-            "Backend/HBOS/test/CommercialRuntimeApplication.test.ts",
-            "Backend/HBOS/test/CommercialWebApplication.test.ts"
-        ];
-        for (const path of testPaths) {
+        const testPaths = ["Backend/HBOS/test/CommercialRuntimeServer.test.ts", "Backend/HBOS/test/CommercialRuntimeApplication.test.ts", "Backend/HBOS/test/CommercialWebApplication.test.ts"];
+        return testPaths.some(path => {
             const file = join(root, path);
-            if (!existsSync(file)) continue;
+            if (!existsSync(file)) return false;
             const test = readFileSync(file, "utf8");
-            if (["createCommercialRuntimeServer", "request(", "expect(", "status"].every(marker => test.includes(marker))) return true;
-        }
-        return false;
+            return ["createCommercialRuntimeServer", "request(", "expect(", "status"].every(marker => test.includes(marker));
+        });
     }
 
     private hasCanonicalPersistenceEvidence(root: string): boolean {
@@ -215,39 +184,54 @@ export class CommercialProductCompletionAudit {
             ["interface TenantScope", "interface PersistenceRecord", "interface PersistenceStore", "read(scope: TenantScope", "write(scope: TenantScope", "persistence-tenant-scope-required"],
             ["implements PersistenceStore", "DatabaseSync", "CREATE TABLE IF NOT EXISTS persistence_records", "tenant_id TEXT NOT NULL", "read(scope: TenantScope", "write(scope: TenantScope", "WHERE tenant_id = ? AND key = ?"],
             ["SQLitePersistenceStore", "survives database restart", "database.close()", "new SQLitePersistenceStore({ databasePath })", "tenant-scoped"]
-        ].every((markers, index) => {
-            const source = [boundary, adapter, behaviorTest][index];
-            return markers.every(marker => source.includes(marker));
-        });
+        ].every((markers, index) => markers.every(marker => [boundary, adapter, behaviorTest][index].includes(marker)));
     }
 
     private hasOfflineOnlineEvidence(root: string): boolean {
-        return existsSync(join(root, "web")) && existsSync(join(root, "Backend/HBOS/test/CommercialWebApplication.test.ts")) &&
-            readFileSync(join(root, "Backend/HBOS/test/CommercialWebApplication.test.ts"), "utf8").includes("offline");
+        const testPath = join(root, "Backend/HBOS/test/CommercialWebApplication.test.ts");
+        return existsSync(join(root, "web")) && existsSync(testPath) && this.hasTestContaining(root, "Backend/HBOS/test/CommercialWebApplication.test.ts", ["offline", "online", "sync"]);
     }
 
     private hasSecurityPrivacyEvidence(root: string): boolean {
-        const candidates = ["Backend/HBOS/Security", "Backend/HBOS/Auth", "Backend/HBOS/Identity"];
-        return candidates.some(dir => existsSync(join(root, dir))) && existsSync(join(root, "Docs/SECURITY.md"));
+        const testCandidates = ["Backend/HBOS/test/SecurityLayerEngine.test.ts", "Backend/HBOS/test/Security.test.ts", "Backend/HBOS/test/HealthMonitor.test.ts"];
+        return ["Backend/HBOS/Security", "Backend/HBOS/Auth", "Backend/HBOS/Identity"].some(dir => existsSync(join(root, dir))) &&
+            existsSync(join(root, "Docs/SECURITY.md")) && testCandidates.some(path => existsSync(join(root, path)));
     }
 
     private hasObservabilityEvidence(root: string): boolean {
         const runtime = join(root, "Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts");
         if (!existsSync(runtime)) return false;
         const source = readFileSync(runtime, "utf8");
-        return ["/health", "/api/ready"].every(marker => source.includes(marker));
+        return ["/health", "/api/ready"].every(marker => source.includes(marker)) && this.hasWebApplicationEvidence(root);
     }
 
     private hasDeploymentEvidence(root: string): boolean {
-        return existsSync(join(root, "Backend/HBOS/Engines/DeploymentContractEngine.ts")) &&
-            existsSync(join(root, "package.json"));
+        return this.hasImplementationAndBehaviorTest(root, "Backend/HBOS/Engines/DeploymentContractEngine.ts", "Backend/HBOS/test/DeploymentContractEngine.test.ts") && existsSync(join(root, "package.json"));
     }
 
     private hasSubscriptionEvidence(root: string): boolean {
-        return existsSync(join(root, "Backend/HBOS/Engines/SubscriptionEngine.ts"));
+        return this.hasImplementationAndBehaviorTest(root, "Backend/HBOS/Engines/SubscriptionEngine.ts", "Backend/HBOS/test/SubscriptionEngine.test.ts") && this.hasWebApplicationEvidence(root);
     }
 
     private hasCustomerOnboardingEvidence(root: string): boolean {
-        return existsSync(join(root, "Backend/HBOS/Engines/OnboardingEngine.ts"));
+        return this.hasImplementationAndBehaviorTest(root, "Backend/HBOS/Engines/OnboardingEngine.ts", "Backend/HBOS/test/OnboardingEngine.test.ts") && this.hasWebApplicationEvidence(root);
+    }
+
+    private hasImplementationAndBehaviorTest(root: string, implementationPath: string, testPath: string): boolean {
+        return existsSync(join(root, implementationPath)) && existsSync(join(root, testPath));
+    }
+
+    private hasBehavioralContract(root: string, implementationPath: string, testPath: string, markers: string[]): boolean {
+        if (!this.hasImplementationAndBehaviorTest(root, implementationPath, testPath)) return false;
+        const source = readFileSync(join(root, implementationPath), "utf8");
+        const test = readFileSync(join(root, testPath), "utf8");
+        return markers.every(marker => source.includes(marker) && test.includes(marker)) && /expect\(/.test(test);
+    }
+
+    private hasTestContaining(root: string, testPath: string, markers: string[]): boolean {
+        const file = join(root, testPath);
+        if (!existsSync(file)) return false;
+        const test = readFileSync(file, "utf8");
+        return markers.every(marker => test.toLowerCase().includes(marker.toLowerCase())) && /expect\(/.test(test);
     }
 }
