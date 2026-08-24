@@ -60,8 +60,7 @@ export class CommercialProductCompletionAudit {
             if (!hasRunnableWebScript && !hasWebRuntime) missingLayers.push("web-entrypoint");
         }
 
-        const persistenceCandidates = ["Backend/HBOS/Infrastructure", "Backend/HBOS/Persistence", "Backend/AI_Runtime/persistence", "prisma", "database"];
-        if (!persistenceCandidates.some(dir => existsSync(join(root, dir)))) missingLayers.push("persistence-boundary");
+        if (!this.hasCanonicalPersistenceEvidence(root)) missingLayers.push("persistence-boundary");
 
         const authCandidates = ["Backend/HBOS/Auth", "Backend/HBOS/Security", "Backend/HBOS/Identity"];
         if (!authCandidates.some(dir => existsSync(join(root, dir)))) missingLayers.push("authentication-authorization-boundary");
@@ -71,5 +70,45 @@ export class CommercialProductCompletionAudit {
         if (contract.includes("Cloud deployment may remain externally blocked")) blockedExternalDependencies.push("production-cloud-resources");
 
         return { complete: missingLayers.length === 0, contractPresent: true, missingLayers, blockedExternalDependencies };
+    }
+
+    private hasCanonicalPersistenceEvidence(root: string): boolean {
+        const boundaryPath = join(root, "Backend/HBOS/Product/CommercialPersistenceBoundary.ts");
+        const adapterPath = join(root, "Backend/HBOS/Product/SQLitePersistenceStore.ts");
+        const behaviorTestPath = join(root, "Backend/HBOS/Product/FinancialDataIngestionAdapter.test.ts");
+        if (!existsSync(boundaryPath) || !existsSync(adapterPath) || !existsSync(behaviorTestPath)) return false;
+
+        const boundary = readFileSync(boundaryPath, "utf8");
+        const adapter = readFileSync(adapterPath, "utf8");
+        const behaviorTest = readFileSync(behaviorTestPath, "utf8");
+
+        const boundaryContract = [
+            "interface TenantScope",
+            "interface PersistenceRecord",
+            "interface PersistenceStore",
+            "async read(scope: TenantScope",
+            "async write(scope: TenantScope",
+            "persistence-tenant-scope-required"
+        ].every(marker => boundary.includes(marker));
+
+        const durableAdapter = [
+            "implements PersistenceStore",
+            "DatabaseSync",
+            "CREATE TABLE IF NOT EXISTS persistence_records",
+            "tenant_id TEXT NOT NULL",
+            "async read(scope: TenantScope",
+            "async write(scope: TenantScope",
+            "WHERE tenant_id = ? AND key = ?"
+        ].every(marker => adapter.includes(marker));
+
+        const behavioralEvidence = [
+            "SQLitePersistenceStore",
+            "survives database restart",
+            "database.close()",
+            "new SQLitePersistenceStore({ databasePath })",
+            "tenant-scoped"
+        ].every(marker => behaviorTest.includes(marker));
+
+        return boundaryContract && durableAdapter && behavioralEvidence;
     }
 }
