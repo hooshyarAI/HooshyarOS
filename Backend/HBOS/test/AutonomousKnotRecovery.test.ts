@@ -57,7 +57,8 @@ describe("AutonomousKnotRecovery", () => {
 
     it("removes canonical untracked artifacts after rollback so repair can restart cleanly", () => {
         execFileSyncMock
-            .mockReturnValueOnce("head-sha")
+            .mockReturnValueOnce("working-head")
+            .mockReturnValueOnce("")
             .mockReturnValueOnce("")
             .mockReturnValueOnce("?? Backend/HBOS/Product/ExecutiveIntelligenceWorkbench.ts")
             .mockReturnValueOnce("");
