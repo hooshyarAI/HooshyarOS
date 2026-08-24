@@ -1,75 +1,75 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-
-export interface CommercialProductCompletionAuditResult {
-    complete: boolean;
-    contractPresent: boolean;
-    missingLayers: string[];
-    blockedExternalDependencies: string[];
-}
-
+export type CommercialEvidenceStatus = "VERIFIED" | "PARTIAL" | "MISSING";
+export interface VerificationTestResult { path: string; passed: boolean; }
+export interface VerificationEvidence { verified: boolean; fullVerify: boolean; focusedTest: string | null; executedTests?: string[]; testResults?: VerificationTestResult[]; }
+export interface CommercialLayerEvidence { layer: string; status: CommercialEvidenceStatus; implementation: boolean; unit: boolean; integration: boolean; application: boolean; acceptance: boolean; reasons: string[]; }
+export interface CommercialCompletionStates { assistantComplete: boolean; canonicalPlatformConstructionComplete: boolean; commercialProductRuntimeComplete: boolean; externalProductionDependenciesComplete: boolean; productComplete: boolean; }
+export interface CommercialProductCompletionAuditResult { complete: boolean; contractPresent: boolean; missingLayers: string[]; blockedExternalDependencies: string[]; completionStates: CommercialCompletionStates; layers: CommercialLayerEvidence[]; }
+type LayerSpec = [string, string[], string[], string[], string[], string[]];
 export class CommercialProductCompletionAudit {
     private readonly contractPath = "Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md";
-
-    audit(root: string): CommercialProductCompletionAuditResult {
-        const contractFile = join(root, this.contractPath);
-        if (!existsSync(contractFile)) {
-            return { complete: false, contractPresent: false, missingLayers: ["commercial-completion-contract"], blockedExternalDependencies: [] };
-        }
-
-        const contract = readFileSync(contractFile, "utf8");
-        const requiredMarkers = [
-            "## Commercial completion layers",
-            "1. Product runtime",
-            "2. Identity, users and organizations",
-            "4. Data ingestion and canonical data",
-            "9. Dashboards and reports",
-            "14. Deployment and installation",
-            "## Evidence model",
-            "## Completion states"
-        ];
-        const missingLayers = requiredMarkers.filter(marker => !contract.includes(marker)).map(marker => `contract-marker:${marker}`);
-
-        const requiredArtifacts: Array<[string, string]> = [
-            ["api-gateway", "Backend/HBOS/Engines/APIGatewayEngine.ts"],
-            ["user-management", "Backend/HBOS/Engines/UserManagementEngine.ts"],
-            ["organization-model", "Backend/HBOS/Engines/OrganizationModelEngine.ts"],
-            ["dashboard-engine", "Backend/HBOS/Engines/DashboardEngine.ts"],
-            ["reports-engine", "Backend/HBOS/Engines/ReportsEngine.ts"],
-            ["deployment-contract", "Backend/HBOS/Engines/DeploymentContractEngine.ts"]
-        ];
-        for (const [layer, artifact] of requiredArtifacts) {
-            if (!existsSync(join(root, artifact))) missingLayers.push(layer);
-        }
-
-        const packagePath = join(root, "package.json");
-        if (!existsSync(packagePath)) {
-            missingLayers.push("web-entrypoint");
-        } else {
-            const packageJson = JSON.parse(readFileSync(packagePath, "utf8")) as { scripts?: Record<string, string> };
-            const scripts = packageJson.scripts ?? {};
-            const hasRunnableWebScript = Boolean(scripts.start || scripts.dev || scripts.serve || scripts.preview);
-            const webArtifacts = [
-                "web/index.html",
-                "web/app.js",
-                "web/styles.css",
-                "web/manifest.webmanifest",
-                "Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts"
-            ];
-            const hasWebRuntime = webArtifacts.every(artifact => existsSync(join(root, artifact)));
-            if (!hasRunnableWebScript && !hasWebRuntime) missingLayers.push("web-entrypoint");
-        }
-
-        const persistenceCandidates = ["Backend/HBOS/Infrastructure", "Backend/HBOS/Persistence", "Backend/AI_Runtime/persistence", "prisma", "database"];
-        if (!persistenceCandidates.some(dir => existsSync(join(root, dir)))) missingLayers.push("persistence-boundary");
-
-        const authCandidates = ["Backend/HBOS/Auth", "Backend/HBOS/Security", "Backend/HBOS/Identity"];
-        if (!authCandidates.some(dir => existsSync(join(root, dir)))) missingLayers.push("authentication-authorization-boundary");
-
+    private readonly matrixPath = "Docs/AUDIT_COMMERCIAL_EVIDENCE_MATRIX.md";
+    audit(root: string, verification?: VerificationEvidence): CommercialProductCompletionAuditResult {
+        const contractFile = join(root, this.contractPath), matrixFile = join(root, this.matrixPath);
+        if (!existsSync(contractFile) || !existsSync(matrixFile)) return this.result(false, existsSync(contractFile), ["commercial-evidence-contract"], []);
+        const contract = readFileSync(contractFile, "utf8"), matrix = readFileSync(matrixFile, "utf8"), missingLayers: string[] = [];
+        for (const marker of ["## Commercial completion layers", "## Evidence model", "## Completion states"]) if (!contract.includes(marker)) missingLayers.push(`contract-marker:${marker}`);
+        if (!this.isCanonicalMatrix(matrix)) missingLayers.push("invalid-commercial-evidence-matrix");
+        const layers = this.evaluateLayers(root, verification);
+        for (const layer of layers) if (layer.status !== "VERIFIED") missingLayers.push(layer.layer);
         const blockedExternalDependencies: string[] = [];
         if (contract.includes("Payment-provider activation is an external dependency")) blockedExternalDependencies.push("payment-provider-activation");
         if (contract.includes("Cloud deployment may remain externally blocked")) blockedExternalDependencies.push("production-cloud-resources");
-
-        return { complete: missingLayers.length === 0, contractPresent: true, missingLayers, blockedExternalDependencies };
+        const runtime = ["product-runtime", "identity-and-session", "authorization-and-tenant", "observability"].every(name => layers.find(l => l.layer === name)?.status === "VERIFIED") && this.hasCanonicalPersistenceEvidence(root, verification);
+        const construction = layers.slice(3, 8).every(l => l.status === "VERIFIED");
+        const assistant = this.anyExists(root, ["Backend/HBOS/Engines/AssistantEngine.ts"]) && this.verifiedTest(root, ["Backend/HBOS/test/Assistant.test.ts"], verification);
+        const external = blockedExternalDependencies.length === 0;
+        const productComplete = missingLayers.length === 0;
+        return { complete: productComplete, contractPresent: true, missingLayers, blockedExternalDependencies, completionStates: { assistantComplete: assistant, canonicalPlatformConstructionComplete: construction, commercialProductRuntimeComplete: runtime, externalProductionDependenciesComplete: external, productComplete }, layers };
     }
+    private isCanonicalMatrix(matrix: string): boolean {
+        const required = ["# Commercial Evidence Matrix", "Canonical audit model for `CommercialProductCompletionAudit`.", "| Layer | Minimum evidence gate |", "Presence of an engine, directory, documentation file, or unit test alone is never sufficient for commercial completion."];
+        const layers = ["Product runtime", "Identity", "Multi-tenancy/authorization", "Data ingestion", "Financial intelligence", "Executive intelligence", "Decision intelligence", "Organizational execution", "Dashboards/reports", "Web/mobile", "Offline/online", "Security/privacy", "Observability", "Deployment", "Subscription", "Onboarding"];
+        return required.every(marker => matrix.includes(marker)) && layers.every(layer => matrix.includes(`| ${layer} |`));
+    }
+    private evaluateLayers(root: string, verification?: VerificationEvidence): CommercialLayerEvidence[] {
+        const s: LayerSpec[] = [
+            ["product-runtime", ["Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts"], ["Backend/HBOS/test/CommercialRuntimeServer.test.ts"], ["Backend/HBOS/test/CommercialRuntimeApplication.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
+            ["identity-and-session", ["Backend/HBOS/Product/CommercialIdentityService.ts", "Backend/HBOS/Security/AuthenticationService.ts"], ["Backend/HBOS/Product/CommercialIdentityService.test.ts"], ["Backend/HBOS/Security/AuthenticationService.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
+            ["authorization-and-tenant", ["Backend/HBOS/Security/AuthorizationService.ts", "Backend/HBOS/Autonomous/Analyzer/TenantIsolationEvidenceGate.ts"], ["Backend/HBOS/Security/AuthorizationService.test.ts"], ["Backend/HBOS/Autonomous/Analyzer/TenantIsolationEvidenceGate.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
+            ["canonical-data", ["Backend/HBOS/Product/FinancialDataIngestionAdapter.ts", "Backend/HBOS/Product/SQLitePersistenceStore.ts"], ["Backend/HBOS/Product/FinancialDataIngestionAdapter.test.ts"], ["Backend/HBOS/Engines/FinancialDataIngestionPersistence.integration.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
+            ["financial-intelligence", ["Backend/HBOS/Engines/FinancialIntelligenceEngine.ts"], ["Backend/HBOS/test/FinancialIntelligenceEngine.test.ts"], ["Backend/HBOS/Engines/FinancialIntelligence.integration.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
+            ["executive-intelligence", ["Backend/HBOS/Engines/ExecutiveIntelligenceEngine.ts"], ["Backend/HBOS/test/ExecutiveIntelligenceEngine.test.ts"], ["Backend/HBOS/Engines/ExecutiveIntelligence.integration.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
+            ["decision-intelligence", ["Backend/HBOS/Engines/DecisionEngine.ts"], ["Backend/HBOS/test/Decision.test.ts"], ["Backend/HBOS/test/Decision.test.ts"], ["Backend/HBOS/test/Decision.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
+            ["organizational-execution", ["Backend/HBOS/Engines/ProjectPilotEngine.ts"], ["Backend/HBOS/test/ProjectPilot.test.ts"], ["Backend/HBOS/test/ProjectPilot.test.ts"], ["Backend/HBOS/test/ProjectPilot.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
+            ["dashboards-and-reports", ["Backend/HBOS/Engines/DashboardEngine.ts", "Backend/HBOS/Engines/ReportsEngine.ts"], ["Backend/HBOS/test/DashboardEngine.test.ts", "Backend/HBOS/test/ReportsEngine.test.ts"], ["Backend/HBOS/Engines/DashboardReports.integration.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
+            ["web-application", ["web/index.html", "Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
+            ["offline-online", ["Backend/HBOS/Product/CommercialOfflineOnlineService.ts"], ["Backend/HBOS/Product/CommercialOfflineOnlineService.test.ts"], ["Backend/HBOS/Product/CommercialOfflineOnline.integration.test.ts"], ["Backend/HBOS/Product/CommercialCompletionApplication.test.ts"], ["Backend/HBOS/Product/CommercialCompletionAcceptance.test.ts"]],
+            ["security-privacy", ["Backend/HBOS/Engines/SecurityLayerEngine.ts", "Backend/HBOS/Security/SecurityAuditStore.ts"], ["Backend/HBOS/test/SecurityLayerEngine.test.ts", "Backend/HBOS/Security/SecurityAuditStore.test.ts"], ["Backend/HBOS/Product/CommercialIdentitySecurity.integration.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
+            ["observability", ["Backend/HBOS/Core/Health/HealthMonitorEngine.ts"], ["Backend/HBOS/test/HealthMonitor.test.ts"], ["Backend/HBOS/Core/Health/CommercialObservability.integration.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
+            ["deployment", ["Backend/HBOS/Engines/DeploymentContractEngine.ts"], ["Backend/HBOS/test/DeploymentContractEngine.test.ts"], ["Backend/HBOS/test/DeploymentContract.integration.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
+            ["subscription-commercial-controls", ["Backend/HBOS/Product/CommercialSubscriptionService.ts"], ["Backend/HBOS/Product/CommercialSubscriptionService.test.ts"], ["Backend/HBOS/Product/CommercialSubscription.integration.test.ts"], ["Backend/HBOS/Product/CommercialCompletionApplication.test.ts"], ["Backend/HBOS/Product/CommercialCompletionAcceptance.test.ts"]],
+            ["customer-onboarding", ["Backend/HBOS/Product/CommercialOnboardingService.ts"], ["Backend/HBOS/Product/CommercialOnboardingService.test.ts"], ["Backend/HBOS/Product/CommercialOnboarding.integration.test.ts"], ["Backend/HBOS/Product/CommercialCompletionApplication.test.ts"], ["Backend/HBOS/Product/CommercialCompletionAcceptance.test.ts"]]
+        ];
+        return s.map(([layer, impl, unit, integration, application, acceptance]) => {
+            const checks = [this.anyExists(root, impl), this.verifiedTest(root, unit, verification), this.verifiedTest(root, integration, verification), this.verifiedTest(root, application, verification), this.verifiedTest(root, acceptance, verification)];
+            const labels = ["implementation", "unit", "integration", "application", "acceptance"], score = checks.filter(Boolean).length;
+            return { layer, status: score === 5 ? "VERIFIED" : score ? "PARTIAL" : "MISSING", implementation: checks[0], unit: checks[1], integration: checks[2], application: checks[3], acceptance: checks[4], reasons: checks.map((ok, i) => ok ? "" : labels[i]).filter(Boolean) };
+        });
+    }
+    private verifiedTest(root: string, paths: string[], verification?: VerificationEvidence): boolean {
+        if (!verification?.verified) return false;
+        const existing = paths.filter(p => existsSync(join(root, p))).map(p => p.replace(/\\/g, "/"));
+        if (!existing.length) return false;
+        const results = verification.testResults ?? [];
+        if (results.length) return existing.some(p => results.some(r => { if (!r.passed) return false; const actual = r.path.replace(/\\/g, "/").replace(/^\.\//, ""); return actual === p || actual.endsWith(`/${p}`); }));
+        if (verification.fullVerify) return false;
+        const executed = new Set((verification.executedTests ?? []).map(p => p.replace(/\\/g, "/").replace(/^\.\//, "")));
+        if (verification.focusedTest) executed.add(verification.focusedTest.replace(/\\/g, "/").replace(/^\.\//, ""));
+        return existing.some(p => [...executed].some(e => e === p || e.endsWith(`/${p}`)));
+    }
+    private anyExists(root: string, paths: string[]): boolean { return paths.some(p => existsSync(join(root, p))); }
+    private hasCanonicalPersistenceEvidence(root: string, v?: VerificationEvidence): boolean { return this.anyExists(root, ["Backend/HBOS/Product/CommercialPersistenceBoundary.ts", "Backend/HBOS/Product/SQLitePersistenceStore.ts"]) && this.verifiedTest(root, ["Backend/HBOS/Product/FinancialDataIngestionAdapter.test.ts"], v) && this.verifiedTest(root, ["Backend/HBOS/Engines/FinancialDataIngestionPersistence.integration.test.ts"], v); }
+    private result(complete: boolean, contractPresent: boolean, missingLayers: string[], blockedExternalDependencies: string[]): CommercialProductCompletionAuditResult { return { complete, contractPresent, missingLayers, blockedExternalDependencies, completionStates: { assistantComplete: false, canonicalPlatformConstructionComplete: false, commercialProductRuntimeComplete: false, externalProductionDependenciesComplete: !blockedExternalDependencies.length, productComplete: complete }, layers: [] }; }
 }
