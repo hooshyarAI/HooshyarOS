@@ -59,7 +59,6 @@ describe("AutonomousKnotRecovery", () => {
         execFileSyncMock
             .mockReturnValueOnce("head-sha")
             .mockReturnValueOnce("")
-            .mockReturnValueOnce("")
             .mockReturnValueOnce("?? Backend/HBOS/Product/ExecutiveIntelligenceWorkbench.ts")
             .mockReturnValueOnce("");
 
