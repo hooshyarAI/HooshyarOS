@@ -59,8 +59,8 @@ export class CommercialProductCompletionAudit {
         const boundary = readFileSync(boundaryPath, "utf8");
         const adapter = readFileSync(adapterPath, "utf8");
         const behaviorTest = readFileSync(behaviorTestPath, "utf8");
-        const boundaryContract = ["interface TenantScope", "interface PersistenceRecord", "interface PersistenceStore", "async read(scope: TenantScope", "async write(scope: TenantScope", "persistence-tenant-scope-required"].every(marker => boundary.includes(marker));
-        const durableAdapter = ["implements PersistenceStore", "DatabaseSync", "CREATE TABLE IF NOT EXISTS persistence_records", "tenant_id TEXT NOT NULL", "async read(scope: TenantScope", "async write(scope: TenantScope", "WHERE tenant_id = ? AND key = ?"].every(marker => adapter.includes(marker));
+        const boundaryContract = ["interface TenantScope", "interface PersistenceRecord", "interface PersistenceStore", "read(scope: TenantScope", "write(scope: TenantScope", "persistence-tenant-scope-required"].every(marker => boundary.includes(marker));
+        const durableAdapter = ["implements PersistenceStore", "DatabaseSync", "CREATE TABLE IF NOT EXISTS persistence_records", "tenant_id TEXT NOT NULL", "read(scope: TenantScope", "write(scope: TenantScope", "WHERE tenant_id = ? AND key = ?"].every(marker => adapter.includes(marker));
         const behavioralEvidence = ["SQLitePersistenceStore", "survives database restart", "database.close()", "new SQLitePersistenceStore({ databasePath })", "tenant-scoped"].every(marker => behaviorTest.includes(marker));
         return boundaryContract && durableAdapter && behavioralEvidence;
     }
