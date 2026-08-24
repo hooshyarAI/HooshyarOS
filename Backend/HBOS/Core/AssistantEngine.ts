@@ -1,8 +1,8 @@
-import { Project } from "./Project";
-import { DecisionEngine } from "./DecisionEngine";
+import { Project } from "../Entities/Project";
+import { DecisionEngine } from "../Engines/DecisionEngine";
 import { AssistantContext } from "./AssistantContext";
 import { AssistantMemory } from "./AssistantMemory";
-import { MemoryEngine } from "./MemoryEngine";
+import { MemoryEngine } from "../Engines/MemoryEngine";
 import { AssistantReasoning } from "./AssistantReasoning";
 import { AssistantResponse } from "./AssistantResponse";
 import { AssistantConfidence } from "./AssistantConfidence";

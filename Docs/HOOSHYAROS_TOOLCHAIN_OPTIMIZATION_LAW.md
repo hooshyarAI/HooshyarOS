@@ -84,3 +84,20 @@ Tool success, file existence or a generated artifact without evidence is not com
 ## 10. Governance rule
 
 Any future change to the construction method must preserve this law unless repository evidence demonstrates a genuine architectural contradiction. Such a change must update the governing repository memory and its verification before construction continues.
+
+## 11. Independent audit toolchain
+
+The canonical construction path remains Python + GitHub/Git + the HooshyarOS Assistant. However, **independent audit and evidence collection may use additional tools** when they are treated as non-authoritative reviewers rather than construction authorities.
+
+Approved audit participants are:
+
+1. **Cursor** — adversarial repository/code review for implementation, ownership, dependencies, contracts and test/runtime consistency.
+2. **Claude Code** — adversarial architecture/code review for hidden coupling, incomplete behavior, reasoning assumptions and false completion.
+3. **Zapier** — audit orchestration, triggering, evidence routing, notification and preservation of audit events; never an architecture decision-maker.
+4. **Python** — deterministic repository audit and evidence fusion across all reports.
+
+External audit participants must not silently modify the canonical architecture, governance, product decisions or runtime. Any proposed change must pass the same governing gates as a Python/GitHub/Assistant change.
+
+No single auditor is sufficient evidence for a material architecture claim. Conflicts between auditors must be preserved as `REVIEW_REQUIRED` evidence and resolved explicitly.
+
+The operational contract is defined by `Docs/HOOSHYAROS_MULTI_AGENT_AUDIT_CHARTER.md` and `Docs/Audit/EXTERNAL_AUDITOR_PROTOCOL.md`.

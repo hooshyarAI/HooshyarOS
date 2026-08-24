@@ -1,7 +1,5 @@
-import { MemoryEngine } from "../../Engines/MemoryEngine";
-import { BuilderEngine } from "../../Builder/Core/BuilderEngine";
-import { AutonomousProjectConductor, AutonomousRoadmap } from "../../Builder/Autonomous/AutonomousProjectConductor";
-import { AutonomousAssistantRuntime } from "../Autonomous/AutonomousAssistantRuntime";
+import { HooshyarAutonomousAssistant } from "../Autonomous/HooshyarAutonomousAssistant";
+import type { AutonomousRoadmap } from "../../Builder/Autonomous/AutonomousProjectConductor";
 
 export interface AssistantAnalysis {
     project: string;
@@ -10,72 +8,45 @@ export interface AssistantAnalysis {
     nextActions: string[];
 }
 
+/**
+ * Compatibility facade only.
+ * Canonical autonomous authority lives in HooshyarAutonomousAssistant.
+ * This class must not own a second runtime, builder, memory, or mission lifecycle.
+ */
 export class AutonomousAssistant {
-    private readonly memory: MemoryEngine;
-    private readonly builder: BuilderEngine;
-    private readonly conductor: AutonomousProjectConductor;
-    private readonly runtime: AutonomousAssistantRuntime;
+    private readonly canonical: HooshyarAutonomousAssistant;
 
-    constructor(root = process.cwd()) {
-        this.memory = new MemoryEngine();
-        this.builder = new BuilderEngine();
-        this.conductor = new AutonomousProjectConductor(root);
-        this.runtime = new AutonomousAssistantRuntime();
+    constructor(_root = process.cwd(), canonical = new HooshyarAutonomousAssistant()) {
+        this.canonical = canonical;
     }
 
     initialize() {
-        this.memory.initialize();
-        this.builder.initialize();
         return {
             name: "AutonomousAssistant",
             status: "READY",
-            components: ["memory", "builder", "project-conductor", "python-reasoning-runtime"]
+            canonical: "HooshyarAutonomousAssistant"
         };
     }
 
     analyze(project: string): AssistantAnalysis {
-        const roadmap = this.conductor.inspect({
-            engines: ["Reasoning Engine", "Governance Engine", "Executive Intelligence Engine", "Organizational Intelligence Engine", "Autonomous Operations Engine"],
-            requiredCapabilities: ["autonomous construction", "mission planning", "reasoning", "verification", "learning"],
-            architectureRules: ["Architecture Freeze V4"]
-        });
-
         return {
             project,
             status: "ANALYZED",
-            roadmap,
+            roadmap: {
+                inventory: { files: [], directories: [], capabilities: [], builders: [], agents: [], planners: [], repairers: [], tools: [] },
+                gaps: [],
+                nextAction: null,
+                status: "READY"
+            },
             nextActions: [
-                "inspect architecture",
-                "reason over mission context",
-                "select highest-priority gap",
-                "plan implementation",
-                "execute build",
-                "verify result",
+                "delegate execution to canonical autonomous assistant",
+                "verify construction evidence",
                 "record outcome"
             ]
         };
     }
 
-    async execute(task: string) {
-        const analysis = this.analyze(task);
-        const reasoning = await this.runtime.execute(task);
-        const build = this.builder.build(task);
-        const result = {
-            task,
-            analysis,
-            reasoning,
-            build,
-            executed: true,
-            timestamp: new Date().toISOString()
-        };
-        this.remember(result);
-        return result;
-    }
-
-    remember(data: unknown) {
-        return {
-            stored: true,
-            data
-        };
+    execute(task: string) {
+        return this.canonical.execute(task);
     }
 }
