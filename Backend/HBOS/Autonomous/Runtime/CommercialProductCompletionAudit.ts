@@ -39,7 +39,7 @@ export class CommercialProductCompletionAudit {
             ["identity-and-session", ["Backend/HBOS/Product/CommercialIdentityService.ts", "Backend/HBOS/Security/AuthenticationService.ts"], ["Backend/HBOS/Product/CommercialIdentityService.test.ts"], ["Backend/HBOS/Security/AuthenticationService.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
             ["authorization-and-tenant", ["Backend/HBOS/Security/AuthorizationService.ts", "Backend/HBOS/Autonomous/Analyzer/TenantIsolationEvidenceGate.ts"], ["Backend/HBOS/Security/AuthorizationService.test.ts"], ["Backend/HBOS/Autonomous/Analyzer/TenantIsolationEvidenceGate.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
             ["canonical-data", ["Backend/HBOS/Product/FinancialDataIngestionAdapter.ts", "Backend/HBOS/Product/SQLitePersistenceStore.ts"], ["Backend/HBOS/Product/FinancialDataIngestionAdapter.test.ts"], ["Backend/HBOS/Engines/FinancialDataIngestionPersistence.integration.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
-            ["financial-intelligence", ["Backend/HBOS/Engines/FinancialIntelligenceEngine.ts"], ["Backend/HBOS/test/FinancialIntelligenceEngine.test.ts"], ["Backend/HBOS/test/FinancialIntelligence.integration.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
+            ["financial-intelligence", ["Backend/HBOS/Engines/FinancialIntelligenceEngine.ts"], ["Backend/HBOS/test/FinancialIntelligenceEngine.test.ts"], ["Backend/HBOS/Engines/FinancialIntelligence.integration.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
             ["executive-intelligence", ["Backend/HBOS/Engines/ExecutiveIntelligenceEngine.ts"], ["Backend/HBOS/test/ExecutiveIntelligenceEngine.test.ts"], ["Backend/HBOS/test/ExecutiveIntelligence.integration.test.ts"], ["Backend/HBOS/test/CommercialWebApplication.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
             ["decision-intelligence", ["Backend/HBOS/Engines/DecisionEngine.ts"], ["Backend/HBOS/test/Decision.test.ts"], ["Backend/HBOS/test/Decision.test.ts"], ["Backend/HBOS/test/Decision.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
             ["organizational-execution", ["Backend/HBOS/Engines/ProjectPilotEngine.ts"], ["Backend/HBOS/test/ProjectPilot.test.ts"], ["Backend/HBOS/test/ProjectPilot.test.ts"], ["Backend/HBOS/test/ProjectPilot.test.ts"], ["Backend/HBOS/test/ProductionAcceptanceEngine.test.ts"]],
@@ -63,11 +63,15 @@ export class CommercialProductCompletionAudit {
         const existing = paths.filter(p => existsSync(join(root, p))).map(p => p.replace(/\\/g, "/"));
         if (!existing.length) return false;
         const results = verification.testResults ?? [];
-        if (results.length) return existing.some(p => results.some(r => r.passed && r.path.replace(/\\/g, "/") === p));
+        if (results.length) return existing.some(p => results.some(r => {
+            if (!r.passed) return false;
+            const actual = r.path.replace(/\\/g, "/").replace(/^\.\//, "");
+            return actual === p || actual.endsWith(`/${p}`);
+        }));
         if (verification.fullVerify) return false;
-        const executed = new Set((verification.executedTests ?? []).map(p => p.replace(/\\/g, "/")));
-        if (verification.focusedTest) executed.add(verification.focusedTest.replace(/\\/g, "/"));
-        return existing.some(p => executed.has(p));
+        const executed = new Set((verification.executedTests ?? []).map(p => p.replace(/\\/g, "/").replace(/^\.\//, "")));
+        if (verification.focusedTest) executed.add(verification.focusedTest.replace(/\\/g, "/").replace(/^\.\//, ""));
+        return existing.some(p => [...executed].some(e => e === p || e.endsWith(`/${p}`)));
     }
     private anyExists(root: string, paths: string[]): boolean { return paths.some(p => existsSync(join(root, p))); }
     private hasCanonicalPersistenceEvidence(root: string, v?: VerificationEvidence): boolean { return this.anyExists(root, ["Backend/HBOS/Product/CommercialPersistenceBoundary.ts", "Backend/HBOS/Product/SQLitePersistenceStore.ts"]) && this.verifiedTest(root, ["Backend/HBOS/Product/FinancialDataIngestionAdapter.test.ts"], v) && this.verifiedTest(root, ["Backend/HBOS/Engines/FinancialDataIngestionPersistence.integration.test.ts"], v); }
