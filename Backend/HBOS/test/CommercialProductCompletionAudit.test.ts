@@ -12,13 +12,13 @@ describe("CommercialProductCompletionAudit", () => {
         expect(result.missingLayers).not.toContain("commercial-completion-contract");
     });
 
-    it("recognizes the real canonical persistence boundary instead of treating the product folder as missing", () => {
+    it("recognizes persistence while still requiring application-level web evidence", () => {
         const audit = new CommercialProductCompletionAudit();
         const result = audit.audit(process.cwd());
 
         expect(result.complete).toBe(false);
-        expect(result.missingLayers).not.toContain("web-entrypoint");
         expect(result.missingLayers).not.toContain("persistence-boundary");
+        expect(result.missingLayers).toContain("web-application-evidence");
     });
 
     it("does not accept a persistence directory as proof of a persistence boundary", () => {
