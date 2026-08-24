@@ -53,11 +53,11 @@ describe("CommercialProductCompletionAudit", () => {
             writeFileSync(join(root, "Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md"), "## Commercial completion layers\n## Evidence model\n## Completion states\nPayment-provider activation is an external dependency\nCloud deployment may remain externally blocked");
             writeFileSync(join(root, "Docs/AUDIT_COMMERCIAL_EVIDENCE_MATRIX.md"), CANONICAL_MATRIX);
             writeFileSync(join(root, "Backend/HBOS/Product/FinancialDataIngestionAdapter.ts"), "export class FinancialDataIngestionAdapter {}");
-            writeFileSync(join(root, "Backend/HBOS/test/FinancialDataIngestionAdapter.test.ts"), "test('focused', () => expect(true).toBe(true));");
+            writeFileSync(join(root, "Backend/HBOS/Product/FinancialDataIngestionAdapter.test.ts"), "test('focused', () => expect(true).toBe(true));");
             const audit = new CommercialProductCompletionAudit();
             const withoutResults = audit.audit(root, { verified: true, fullVerify: true, focusedTest: null, testResults: [] });
             expect(withoutResults.layers.find(l => l.layer === "canonical-data")?.unit).toBe(false);
-            const withResult = audit.audit(root, { verified: true, fullVerify: true, focusedTest: null, testResults: [{ path: "Backend/HBOS/test/FinancialDataIngestionAdapter.test.ts", passed: true }] });
+            const withResult = audit.audit(root, { verified: true, fullVerify: true, focusedTest: null, testResults: [{ path: "Backend/HBOS/Product/FinancialDataIngestionAdapter.test.ts", passed: true }] });
             expect(withResult.layers.find(l => l.layer === "canonical-data")?.unit).toBe(true);
         } finally { rmSync(root, { recursive: true, force: true }); }
     });
