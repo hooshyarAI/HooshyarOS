@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import { AutonomousKnotRecovery } from "../Autonomous/Runtime/AutonomousKnotRecovery";
 
 jest.mock("node:child_process", () => ({
@@ -71,19 +72,20 @@ describe("AutonomousKnotRecovery", () => {
             }]
         }));
 
-        recovery.rollback("C:\\repo", {
+        const root = join("repo-root");
+        recovery.rollback(root, {
             capabilityId: "product.executive-intelligence-workbench",
             commit: "head-sha"
         });
 
         expect(rmSyncMock).toHaveBeenCalledWith(
-            "C:\\repo\\Backend/HBOS/Product/ExecutiveIntelligenceWorkbench.ts",
+            join(root, "Backend/HBOS/Product/ExecutiveIntelligenceWorkbench.ts"),
             { force: true }
         );
         expect(execFileSyncMock).toHaveBeenCalledWith(
             "git",
             ["reset", "--hard", "head-sha"],
-            expect.objectContaining({ cwd: "C:\\repo" })
+            expect.objectContaining({ cwd: root })
         );
     });
 });
