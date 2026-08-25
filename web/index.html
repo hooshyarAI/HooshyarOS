@@ -30,19 +30,31 @@
         <div class="metrics">
           <div><span>درآمد</span><strong id="revenue">—</strong></div>
           <div><span>سود</span><strong id="profit">—</strong></div>
-          <div><span>ریسک هزینه</span><strong id="risk">—</strong></div>
+          <div><span>ریسک بدهی</span><strong id="risk">—</strong></div>
         </div>
       </article>
     </section>
 
     <section class="card onboarding">
-      <h2>ورود به مسیر ارزش</h2>
+      <h2>ایجاد نشست</h2>
       <form id="session-form">
         <label>نام کاربری<input id="username" value="مدیرعامل" required /></label>
         <label>سازمان<input id="organization" value="تست هوشیار" required /></label>
         <button class="primary" type="submit">ایجاد نشست</button>
       </form>
       <p id="session-result" class="result" aria-live="polite"></p>
+    </section>
+
+    <section class="card onboarding">
+      <h2>تحلیل واقعی صورت مالی</h2>
+      <p>یک فایل CSV با ستون‌های date, account, debit, credit, currency انتخاب کنید.</p>
+      <form id="analysis-form">
+        <label>فایل CSV<input id="csv-file" type="file" accept=".csv,text/csv" required /></label>
+        <label>دارایی‌ها<input id="assets" type="number" min="0" step="0.01" value="1000" required /></label>
+        <label>بدهی‌ها<input id="liabilities" type="number" min="0" step="0.01" value="250" required /></label>
+        <button class="primary" type="submit">تحلیل کن</button>
+      </form>
+      <p id="analysis-result" class="result" aria-live="polite"></p>
     </section>
   </main>
   <script src="/app.js" defer></script>
