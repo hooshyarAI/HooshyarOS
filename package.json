@@ -7,7 +7,8 @@
     "test": "node ./node_modules/jest/bin/jest.js",
     "autonomous:build": "tsx Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts",
     "autonomous:assistant": "python Backend/AI_Runtime/hooshyar_build.py assistant",
-    "autonomous:platform": "python Backend/AI_Runtime/hooshyar_build.py platform"
+    "autonomous:platform": "python Backend/AI_Runtime/hooshyar_build.py platform",
+    "product:windows": "python Backend/AI_Runtime/release_product_builder.py"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
