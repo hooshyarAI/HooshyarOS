@@ -14,21 +14,20 @@ import android.widget.LinearLayout;
 public final class MainActivity extends Activity {
     private static final String PREFS = "hooshyar";
     private static final String SERVER = "server";
-    private EditText serverInput;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
-        String saved = prefs.getString(SERVER, "http://10.0.2.2:4173");
+        String saved = prefs.getString(SERVER, "");
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(24, 24, 24, 24);
 
-        serverInput = new EditText(this);
+        EditText serverInput = new EditText(this);
         serverInput.setSingleLine(true);
-        serverInput.setHint("Hooshyar runtime URL");
+        serverInput.setHint("https://your-hooshyar-runtime.example");
         serverInput.setText(saved);
         root.addView(serverInput, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
@@ -46,11 +45,11 @@ public final class MainActivity extends Activity {
 
         connect.setOnClickListener(v -> {
             String url = serverInput.getText().toString().trim().replaceAll("/$", "");
-            if (!url.startsWith("http://") && !url.startsWith("https://")) return;
+            if (!url.startsWith("https://")) return;
             prefs.edit().putString(SERVER, url).apply();
             web.loadUrl(url + "/");
         });
 
-        web.loadUrl(saved + "/");
+        if (saved.startsWith("https://")) web.loadUrl(saved + "/");
     }
 }
