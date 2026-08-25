@@ -39,32 +39,20 @@ export class SQLitePersistenceStore {
     this.assertScope(scope);
     this.assertKey(key);
     const row = this.database
-      .prepare(
-        "SELECT tenant_id, key, value_json FROM persistence_records WHERE tenant_id = ? AND key = ?",
-      )
-      .get(scope.tenantId, key) as
-      | { tenant_id?: string; key?: string; value_json?: string }
-      | undefined;
-
+      .prepare("SELECT tenant_id, key, value_json FROM persistence_records WHERE tenant_id = ? AND key = ?")
+      .get(scope.tenantId, key) as { tenant_id?: string; key?: string; value_json?: string } | undefined;
     if (!row?.tenant_id || !row.key || typeof row.value_json !== "string") return null;
-    return {
-      tenantId: row.tenant_id,
-      key: row.key,
-      value: JSON.parse(row.value_json) as unknown,
-    };
+    return { tenantId: row.tenant_id, key: row.key, value: JSON.parse(row.value_json) as unknown };
   }
 
   async write(scope: TenantScope, key: string, value: unknown): Promise<PersistenceRecord> {
     this.assertScope(scope);
     this.assertKey(key);
-    const record: PersistenceRecord = { tenantId: scope.tenantId, key, value };
+    const record = { tenantId: scope.tenantId, key, value };
     this.database
-      .prepare(
-        `INSERT INTO persistence_records (tenant_id, key, value_json, updated_at)
-         VALUES (?, ?, ?, ?)
-         ON CONFLICT(tenant_id, key)
-         DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at`,
-      )
+      .prepare(`INSERT INTO persistence_records (tenant_id, key, value_json, updated_at)
+        VALUES (?, ?, ?, ?) ON CONFLICT(tenant_id, key)
+        DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at`)
       .run(scope.tenantId, key, JSON.stringify(value), new Date().toISOString());
     return record;
   }
