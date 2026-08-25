@@ -50,7 +50,7 @@ const allTests = [...new Set(Object.values(gates).flat())];
 const missing = allTests.filter((file) => !fs.existsSync(file));
 
 const result = {
-  version: 1,
+  version: 2,
   commit: process.env.GITHUB_SHA || 'local',
   timestamp: new Date().toISOString(),
   gates: {},
@@ -61,12 +61,11 @@ const result = {
     paymentActivation: 'EXTERNAL_NOT_EXECUTED',
     productionCloudActivation: 'EXTERNAL_NOT_EXECUTED',
   },
-  overall: 'BLOCK',
+  overall: 'BLOCK_INTERNAL',
 };
 
 if (missing.length) {
   result.missingTests = missing;
-  result.overall = 'BLOCK';
 } else {
   let allInternalPass = true;
   for (const [gate, tests] of Object.entries(gates)) {
@@ -83,7 +82,7 @@ if (missing.length) {
     };
     if (!passed) allInternalPass = false;
   }
-  result.overall = allInternalPass ? 'BLOCK_EXTERNAL' : 'BLOCK';
+  result.overall = allInternalPass ? 'BLOCK_EXTERNAL' : 'BLOCK_INTERNAL';
 }
 
 const outputDir = path.join(process.cwd(), 'AuditOutput');
@@ -95,4 +94,4 @@ fs.writeFileSync(
 );
 
 console.log(JSON.stringify(result, null, 2));
-process.exit(result.overall === 'BLOCK' ? 1 : 0);
+process.exit(result.overall === 'BLOCK_INTERNAL' ? 1 : 0);
