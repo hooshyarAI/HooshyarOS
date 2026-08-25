@@ -33,15 +33,18 @@ describe("Windows product installer contract", () => {
         expect(builder).toContain("launch-hooshyar.cmd");
         expect(builder).toContain("launch-hooshyar.vbs");
         expect(builder).toContain("Install-HooshyarOS.ps1");
-    });
-
-    it("uses valid PowerShell quoting for archive/bootstrap operations", () => {
-        expect(builder).toContain('Expand-Archive -Path $zip -DestinationPath $stage -Force');
         expect(builder).toContain('$installRoot = Join-Path $env:LOCALAPPDATA "HooshyarOS"');
     });
 
+    it("creates a reproducible bootstrap archive without fake PowerShell extraction", () => {
+        expect(builder).toContain("HooshyarOS-Windows-Bootstrap.zip");
+        expect(builder).toContain("zipfile.ZipFile");
+        expect(builder).toContain("zipfile.ZIP_DEFLATED");
+        expect(builder).not.toContain("Expand-Archive -Path $zip -DestinationPath $stage -Force");
+    });
+
     it("requires the commercial runtime and web entrypoint in the payload", () => {
-        expect(builder).toContain("CommercialRuntimeServer.ts");
+        expect(builder).toContain("CommercialRuntimeEntrypoint.ts");
         expect(builder).toContain("Frontend/HooshyarWebApp/index.ts");
         expect(builder).toContain("product-manifest.json");
         expect(builder).toContain('web = payload / "web"');
