@@ -9,12 +9,12 @@ describe("Final Architecture Qualification", () => {
 
     const health = hbos.health();
     expect(health.map((entry) => entry.name)).toEqual([
-      "Memory Engine",
-      "Reaction Engine",
-      "Decision Engine",
-      "Project Pilot Engine",
-      "Knowledge Engine",
-      "Assistant Engine",
+      "MemoryEngine",
+      "ReactionEngine",
+      "DecisionEngine",
+      "ProjectPilotEngine",
+      "KnowledgeEngine",
+      "AssistantEngine",
     ]);
     expect(health.every((entry) => entry.healthy)).toBe(true);
   });
