@@ -8,8 +8,8 @@ export interface SQLitePersistenceStoreOptions { readonly databasePath: string; 
 export class SQLitePersistenceStore {
   private readonly database: DatabaseSync;
   constructor(options: SQLitePersistenceStoreOptions) {
-    const databasePath = resolve(options.databasePath);
-    mkdirSync(dirname(databasePath), { recursive: true });
+    const databasePath = options.databasePath === ":memory:" ? ":memory:" : resolve(options.databasePath);
+    if (databasePath !== ":memory:") mkdirSync(dirname(databasePath), { recursive: true });
     this.database = new DatabaseSync(databasePath);
     this.database.exec(`CREATE TABLE IF NOT EXISTS persistence_records (tenant_id TEXT NOT NULL,key TEXT NOT NULL,value_json TEXT NOT NULL,updated_at TEXT NOT NULL,PRIMARY KEY (tenant_id, key));`);
   }
