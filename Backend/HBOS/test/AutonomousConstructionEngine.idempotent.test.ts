@@ -15,24 +15,16 @@ describe("AutonomousConstructionEngine idempotent construction", () => {
             {
                 name: "generator",
                 execute: stage => stage === "GENERATE"
-                    ? {
-                        ok: false,
-                        issue: "AUTONOMOUS_AGENT_NO_REPOSITORY_CHANGE",
-                        artifact: {
-                            changed: false,
-                            exitCode: 0,
-                            output: "Already implemented: product.financial-data-ingestion"
-                        }
-                    }
+                    ? { ok: false, issue: "AUTONOMOUS_AGENT_NO_REPOSITORY_CHANGE", artifact: { changed: false, exitCode: 0, output: "Already implemented: product.financial-data-ingestion" } }
                     : { ok: true }
             },
-            { name: "python", execute: stage => stage === "VERIFY" ? { ok: true } : { ok: true } },
             {
-                name: "git",
-                execute: stage => stage === "FINALIZE"
-                    ? { ok: false, issue: "GIT_NO_REPOSITORY_CHANGE" }
+                name: "python",
+                execute: stage => stage === "VERIFY"
+                    ? { ok: true, artifact: { testsPassed: true, behavioralEvidenceVerified: true, integrationVerified: true, cleanRepository: true } }
                     : { ok: true }
-            }
+            },
+            { name: "git", execute: stage => stage === "FINALIZE" ? { ok: false, issue: "GIT_NO_REPOSITORY_CHANGE" } : { ok: true } }
         ];
 
         const result = new AutonomousConstructionEngine(tools).build(plan);
@@ -48,16 +40,7 @@ describe("AutonomousConstructionEngine idempotent construction", () => {
     it("does not hide an unexplained generation no-op", () => {
         const tools: ConstructionTool[] = [
             { name: "architecture", execute: () => ({ ok: true }) },
-            {
-                name: "generator",
-                execute: stage => stage === "GENERATE"
-                    ? {
-                        ok: false,
-                        issue: "AUTONOMOUS_AGENT_NO_REPOSITORY_CHANGE",
-                        artifact: { changed: false, exitCode: 0, output: "no change" }
-                    }
-                    : { ok: true }
-            },
+            { name: "generator", execute: stage => stage === "GENERATE" ? { ok: false, issue: "AUTONOMOUS_AGENT_NO_REPOSITORY_CHANGE", artifact: { changed: false, exitCode: 0, output: "no change" } } : { ok: true } },
             { name: "python", execute: () => ({ ok: true }) },
             { name: "git", execute: () => ({ ok: true }) }
         ];

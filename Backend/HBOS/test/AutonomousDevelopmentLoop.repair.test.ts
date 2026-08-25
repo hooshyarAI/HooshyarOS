@@ -5,23 +5,16 @@ describe("AutonomousDevelopmentLoop repair identity", () => {
     it("preserves the repair- capability id through planning and generation", () => {
         const observed: string[] = [];
         const tools: ConstructionTool[] = [
-            {
-                name: "architecture",
-                execute: () => ({ ok: true })
-            },
+            { name: "architecture", execute: () => ({ ok: true }) },
             {
                 name: "python",
                 execute: (stage, context) => {
-                    if (stage === "GENERATE") {
-                        observed.push(context.plan.capabilityId);
-                    }
+                    if (stage === "GENERATE") observed.push(context.plan.capabilityId);
+                    if (stage === "VERIFY") return { ok: true, artifact: { testsPassed: true, behavioralEvidenceVerified: true, integrationVerified: true, cleanRepository: true } };
                     return { ok: true };
                 }
             },
-            {
-                name: "git",
-                execute: () => ({ ok: true })
-            }
+            { name: "git", execute: () => ({ ok: true }) }
         ];
 
         const result = new AutonomousDevelopmentLoop(tools).execute({

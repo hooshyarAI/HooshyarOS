@@ -3,11 +3,11 @@ import { declaredArtifactPaths, productRoadmapPaths } from "../Autonomous/Runtim
 describe("Autonomous repair product boundary", () => {
     it("resolves repair-prefixed product capabilities to their durable product artifacts", () => {
         const root = process.cwd();
-        const paths = productRoadmapPaths(root, "repair-product.financial-data-ingestion");
+        const paths = productRoadmapPaths(root, "repair-product.financial-data-ingestion").map(path => path.replace(/\\/g, "/"));
         expect(paths).toEqual([
-            expect.stringContaining("Backend\\HBOS\\Product\\FinancialDataIngestionAdapter.ts"),
-            expect.stringContaining("Backend\\HBOS\\test\\FinancialDataIngestionAdapter.test.ts"),
-            expect.stringContaining("Docs\\Product\\FinancialDataIngestionAdapter.md")
+            expect.stringContaining("Backend/HBOS/Product/FinancialDataIngestionAdapter.ts"),
+            expect.stringContaining("Backend/HBOS/test/FinancialDataIngestionAdapter.test.ts"),
+            expect.stringContaining("Docs/Product/FinancialDataIngestionAdapter.md")
         ]);
     });
 
