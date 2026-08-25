@@ -18,11 +18,11 @@ describe("Windows product installer contract", () => {
         expect(builder).not.toContain('shutil.copytree(src, payload / name, dirs_exist_ok=True)');
     });
 
-    it("copies only the runtime dependency closure", () => {
-        expect(builder).toContain("def _runtime_dependency_names");
-        expect(builder).toContain("def _copy_node_dependency");
-        expect(builder).toContain("def _copy_runtime_node_modules");
-        expect(builder).toContain('roots.add("tsx")');
+    it("packages the runtime executable and entrypoint", () => {
+        expect(builder).toContain('shutil.which("node")');
+        expect(builder).toContain('payload / "node.exe"');
+        expect(builder).toContain("CommercialRuntimeEntrypoint.ts");
+        expect(builder).toContain("--experimental-strip-types");
     });
 
     it("makes installation observable and creates a launch surface", () => {
@@ -32,19 +32,22 @@ describe("Windows product installer contract", () => {
         expect(builder).toContain("HooshyarOS installed and health-checked");
         expect(builder).toContain("launch-hooshyar.cmd");
         expect(builder).toContain("launch-hooshyar.vbs");
+        expect(builder).toContain("Install-HooshyarOS.ps1");
+        expect(builder).toContain('$installRoot = Join-Path $env:LOCALAPPDATA "HooshyarOS"');
     });
 
-    it("uses valid PowerShell quoting instead of backslash-escaped PowerShell strings", () => {
-        expect(builder).toContain('$zip = Join-Path $here "HooshyarOS-Windows-Bootstrap.zip"');
-        expect(builder).not.toContain('$zip=Join-Path $here \\"HooshyarOS-Windows-Bootstrap.zip\\"');
-        expect(builder).toContain('Expand-Archive -Path $zip -DestinationPath $stage -Force');
+    it("creates a reproducible bootstrap archive without fake PowerShell extraction", () => {
+        expect(builder).toContain("HooshyarOS-Windows-Bootstrap.zip");
+        expect(builder).toContain("zipfile.ZipFile");
+        expect(builder).toContain("zipfile.ZIP_DEFLATED");
+        expect(builder).not.toContain("Expand-Archive -Path $zip -DestinationPath $stage -Force");
     });
 
     it("requires the commercial runtime and web entrypoint in the payload", () => {
-        expect(builder).toContain("CommercialRuntimeServer.ts");
+        expect(builder).toContain("CommercialRuntimeEntrypoint.ts");
         expect(builder).toContain("Frontend/HooshyarWebApp/index.ts");
         expect(builder).toContain("product-manifest.json");
         expect(builder).toContain('web = payload / "web"');
-        expect(builder).toContain('index = web / "index.html"');
+        expect(builder).toContain('"index.html"');
     });
 });

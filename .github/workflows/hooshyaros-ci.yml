@@ -45,3 +45,48 @@ jobs:
 
       - name: Full Jest suite
         run: node ./node_modules/jest/bin/jest.js --runInBand
+
+  windows-release:
+    runs-on: windows-latest
+    needs: verify
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Node dependencies
+        run: npm install
+
+      - name: Build Windows product payload
+        run: python Backend/AI_Runtime/release_product_builder.py
+
+      - name: Install and health-check Windows product
+        shell: powershell
+        run: |
+          $installer = Join-Path $PWD 'dist/productization/windows/payload/Install-HooshyarOS.ps1'
+          powershell -ExecutionPolicy Bypass -File $installer
+
+      - name: Upload Windows release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HooshyarOS-Windows-Bootstrap
+          path: dist/productization/windows/HooshyarOS-Windows-Bootstrap.zip
+          if-no-files-found: error
+
+      - name: Cleanup installed runtime
+        if: always()
+        shell: powershell
+        run: |
+          Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          Remove-Item -Recurse -Force "$env:LOCALAPPDATA\HooshyarOS" -ErrorAction SilentlyContinue
+          Remove-Item -Force "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\HooshyarOS.lnk" -ErrorAction SilentlyContinue
