@@ -43,7 +43,8 @@ def _write_launch_surface(payload: Path) -> None:
     (payload / "launch-hooshyar.cmd").write_text("@echo off\npython Backend\\hooshyar_build.py assistant\n", encoding="utf-8")
     (payload / "launch-hooshyar.vbs").write_text('CreateObject("WScript.Shell").Run "launch-hooshyar.cmd", 0, False\n', encoding="utf-8")
     (payload / "HooshyarOS.lnk").write_text("HooshyarOS launch surface\n", encoding="utf-8")
-    (payload / "Microsoft-Windows-Start-Menu-HooshyarOS.txt").write_text("Microsoft\\Windows\\Start Menu\\Programs\\HooshyarOS\n", encoding="utf-8")
+    start_menu_path = r"Microsoft\Windows\Start Menu\Programs\HooshyarOS"
+    (payload / "Microsoft-Windows-Start-Menu-HooshyarOS.txt").write_text(start_menu_path + "\n", encoding="utf-8")
     (payload / "install-health.ps1").write_text(
         '$here = Split-Path -Parent $MyInvocation.MyCommand.Path\n'
         '$zip = Join-Path $here "HooshyarOS-Windows-Bootstrap.zip"\n'
@@ -75,7 +76,8 @@ def build_windows() -> Path:
     _copy_runtime_node_modules(ROOT / "node_modules", runtime / "node_modules")
     web = payload / "web"
     web.mkdir(exist_ok=True)
-    (web / "index.html").write_text("<!doctype html><title>هوشیار.ai</title><script src=\"app.js\"></script>", encoding="utf-8")
+    index = web / "index.html"
+    index.write_text("<!doctype html><title>هوشیار.ai</title><script src=\"app.js\"></script>", encoding="utf-8")
     (payload / "product-manifest.json").write_text('{"name":"HooshyarOS","runtime":"CommercialRuntimeServer.ts","health":"/health","web":"Frontend/HooshyarWebApp/index.ts"}', encoding="utf-8")
     _write_launch_surface(payload)
     _validate_windows_payload(payload)
