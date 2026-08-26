@@ -128,7 +128,7 @@ export class AutonomousProductFactory {
         execFileSync(process.platform === "win32" ? "git.exe" : "git", ["push"], { cwd: this.root, encoding: "utf8" });
         record("PUSH", true, "verified branch pushed", "git");
       } catch (error) {
-        return this.blocked(evidence, repairAttempts, error instanceof Error ? error.message : String(error), "PUSH");
+        return this.blocked(evidence, repairAttempts, "PUSH", error instanceof Error ? error.message : String(error));
       }
     } else {
       record("PUSH", true, "push withheld by policy; CI/release integration remains an explicit external step", "git");
