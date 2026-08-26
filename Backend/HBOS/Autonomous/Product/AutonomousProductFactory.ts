@@ -75,6 +75,32 @@ export class AutonomousProductFactory {
     this.repair = options.repair;
   }
 
+  static repositoryContract(root: string): ProductFactoryEvidence {
+    const required = [
+      "Docs/HOOSHYAROS_MASTER_CHARTER.md",
+      "Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md",
+      "Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts",
+      "Backend/HBOS/Autonomous/Runtime/start-commercial-runtime.ts",
+      "Backend/HBOS/Product/SQLitePersistenceStore.ts",
+    ];
+    const missing = required.filter(file => !existsSync(resolve(root, file)));
+    return {
+      stage: "READ",
+      ok: missing.length === 0,
+      details: missing.length === 0 ? "governing product and autonomous-construction contracts present" : `missing: ${missing.join(",")}`,
+      source: "repository",
+    };
+  }
+
+  static gitAvailable(root: string): ProductFactoryEvidence {
+    try {
+      execFileSync(process.platform === "win32" ? "git.exe" : "git", ["--version"], { cwd: root, stdio: "ignore" });
+      return { stage: "AUDIT", ok: true, details: "git executable available", source: "git" };
+    } catch (error) {
+      return { stage: "AUDIT", ok: false, details: error instanceof Error ? error.message : String(error), source: "git" };
+    }
+  }
+
   async run(): Promise<ProductFactoryResult> {
     const evidence: ProductFactoryEvidence[] = [];
     let repairAttempts = 0;
@@ -83,7 +109,8 @@ export class AutonomousProductFactory {
       return ok;
     };
 
-    if (!record("READ", this.requiredArtifactsPresent(), "governing product and autonomous-construction contracts present", "repository")) return this.blocked(evidence, repairAttempts, "READ");
+    const repositoryContract = AutonomousProductFactory.repositoryContract(this.root);
+    if (!record(repositoryContract.stage, repositoryContract.ok, repositoryContract.details, repositoryContract.source)) return this.blocked(evidence, repairAttempts, "READ");
     if (!record("AUDIT", this.gitClean(), "working tree is clean before qualification", "git")) return this.blocked(evidence, repairAttempts, "AUDIT");
     if (!record("SELECT", true, "selected MVP customer journey: session → ingestion → analysis → dashboard → restart → recovery", "assistant")) return this.blocked(evidence, repairAttempts, "SELECT");
 
@@ -121,7 +148,7 @@ export class AutonomousProductFactory {
       child = spawn(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "start:commercial"], {
         cwd: this.root,
         stdio: ["ignore", "pipe", "pipe"],
-        env: { ...process.env, HOOSHYAR_DB_PATH: this.databasePath, PORT: String(this.port) }
+        env: { ...process.env, HOOSHYAR_DB_PATH: this.databasePath, HOOSHYAR_PORT: String(this.port) }
       });
       await waitForHealth(this.port);
       recordLocal(evidence, "RUN", true, `commercial runtime healthy on 127.0.0.1:${this.port}`, "runtime");
@@ -147,7 +174,7 @@ export class AutonomousProductFactory {
       child = spawn(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "start:commercial"], {
         cwd: this.root,
         stdio: "ignore",
-        env: { ...process.env, HOOSHYAR_DB_PATH: this.databasePath, PORT: String(this.port) }
+        env: { ...process.env, HOOSHYAR_DB_PATH: this.databasePath, HOOSHYAR_PORT: String(this.port) }
       });
       await waitForHealth(this.port);
       const session2 = await jsonRequest(this.port, "/api/session", {
@@ -164,17 +191,12 @@ export class AutonomousProductFactory {
       return { ok: false, failure: error instanceof Error ? error.message : String(error) };
     } finally {
       if (child && !child.killed) child.kill();
+      try { rmSync(this.databasePath, { force: true }); } catch { /* best-effort cleanup of runtime state */ }
     }
   }
 
   private requiredArtifactsPresent(): boolean {
-    return [
-      "Docs/HOOSHYAROS_MASTER_CHARTER.md",
-      "Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md",
-      "Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts",
-      "Backend/HBOS/Autonomous/Runtime/start-commercial-runtime.ts",
-      "Backend/HBOS/Product/SQLitePersistenceStore.ts"
-    ].every(path => existsSync(resolve(this.root, path)));
+    return AutonomousProductFactory.repositoryContract(this.root).ok;
   }
 
   private gitClean(): boolean {
