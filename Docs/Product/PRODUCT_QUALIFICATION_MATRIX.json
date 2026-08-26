@@ -7,7 +7,7 @@
     {"id":"win-recovery","capability":"persistence","environment":"windows","workflow":"analyze-stop-start-login-dashboard-recovery","evidence":"acceptance"},
     {"id":"win-security","capability":"security","environment":"windows","workflow":"unauthenticated-api-is-denied","evidence":"application"},
     {"id":"web-core","capability":"commercial-runtime","environment":"web","workflow":"launch-health-ready-ui","evidence":"runtime"},
-    {"id":"web-business","capability":"financial-platform","environment":"web","workflow":"login-tenant-ingest-analyze-dashboard","evidence":"application"},
+    {"id":"web-business","capability":"financial-platform","environment":"web","workflow":"browser-login-tenant-ingest-analyze-dashboard","evidence":"application"},
     {"id":"android-release","capability":"commercial-client","environment":"android","workflow":"build-install-launch-smoke","evidence":"acceptance"},
     {"id":"tenant-isolation","capability":"security","environment":"all","workflow":"cross-tenant-access-denied","evidence":"acceptance"},
     {"id":"ci-feedback","capability":"autonomous-factory","environment":"ci","workflow":"failure-normalize-repair-retest","evidence":"ci"},
