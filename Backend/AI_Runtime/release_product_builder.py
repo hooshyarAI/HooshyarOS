@@ -29,6 +29,8 @@ def _validate_windows_payload(payload: Path) -> None:
         payload / "Backend" / "HBOS" / "Autonomous" / "Runtime" / "start-commercial-runtime.ts",
         payload / "Backend" / "AI_Runtime" / "node_modules" / "tsx",
         payload / "web" / "index.html",
+        payload / "web" / "app.js",
+        payload / "web" / "styles.css",
     ]
     missing = [str(path) for path in required if not path.exists()]
     if missing:
@@ -81,7 +83,13 @@ def _write_launch_surface(payload: Path) -> None:
         encoding="utf-8",
     )
     (payload / "launch-hooshyar.vbs").write_text(
-        'CreateObject("WScript.Shell").Run """" & CreateObject("Scripting.FileSystemObject").GetParentFolderName(WScript.ScriptFullName) & "\\launch-hooshyar.cmd"""", 0, False\r\n',
+        'Dim shell, fso, here\r\n'
+        'Set shell = CreateObject("WScript.Shell")\r\n'
+        'Set fso = CreateObject("Scripting.FileSystemObject")\r\n'
+        'here = fso.GetParentFolderName(WScript.ScriptFullName)\r\n'
+        'shell.Run """" & here & "\\launch-hooshyar.cmd"""", 0, False\r\n'
+        'WScript.Sleep 1800\r\n'
+        'shell.Run "http://127.0.0.1:4173/", 1, False\r\n',
         encoding="utf-8",
     )
     start_menu_path = r"Microsoft\Windows\Start Menu\Programs\HooshyarOS"
@@ -102,6 +110,37 @@ def _write_launch_surface(payload: Path) -> None:
         "finally {\n"
         "  if ($process -and -not $process.HasExited) { Stop-Process -Id $process.Id -Force }\n"
         "}\n",
+        encoding="utf-8",
+    )
+
+
+def _write_web_surface(web: Path) -> None:
+    (web / "index.html").write_text(
+        "<!doctype html><html lang='fa' dir='rtl'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
+        "<title>هوشیار.ai</title><link rel='stylesheet' href='/styles.css'></head>"
+        "<body><div class='shell'><header><h1>هوشیار.ai</h1><p>سامانه هوشمند تحلیل مالی و مدیریتی</p></header>"
+        "<section class='card'><h2>ورود سازمان</h2><div class='grid'>"
+        "<input id='username' placeholder='نام کاربری' value='qa-user'><input id='organization' placeholder='سازمان' value='Hooshyar QA'>"
+        "</div><button id='login'>ورود</button><span id='sessionStatus' class='status'></span></section>"
+        "<section class='card'><h2>تحلیل مالی</h2><textarea id='csv' rows='8'>date,account,debit,credit,currency\n2026-08-01,Cash,1000,0,IRR\n2026-08-02,Sales,0,1500,IRR\n2026-08-03,Expense,300,0,IRR\n2026-08-04,Receivable,0,800,IRR</textarea>"
+        "<div class='grid'><input id='assets' type='number' value='10000' placeholder='دارایی'><input id='liabilities' type='number' value='4000' placeholder='بدهی'></div>"
+        "<button id='analyze'>تحلیل کن</button><span id='analysisStatus' class='status'></span></section>"
+        "<section class='card'><h2>داشبورد</h2><div id='dashboard' class='dashboard'>ابتدا وارد شوید و تحلیل را اجرا کنید.</div></section>"
+        "<script src='/app.js'></script></div></body></html>",
+        encoding="utf-8",
+    )
+    (web / "styles.css").write_text(
+        "body{margin:0;background:#0f172a;color:#e2e8f0;font-family:Segoe UI,Tahoma,sans-serif}.shell{max-width:980px;margin:0 auto;padding:32px}header{text-align:center;margin-bottom:24px}h1{margin:0 0 8px;font-size:42px}.card{background:#111827;border:1px solid #334155;border-radius:16px;padding:20px;margin:16px 0;box-shadow:0 8px 24px rgba(0,0,0,.18)}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0}@media(max-width:700px){.grid{grid-template-columns:1fr}}input,textarea{width:100%;box-sizing:border-box;background:#0b1220;color:#e2e8f0;border:1px solid #475569;border-radius:10px;padding:12px;font-size:16px}textarea{resize:vertical}button{background:#2563eb;color:white;border:0;border-radius:10px;padding:12px 20px;font-size:16px;cursor:pointer}.status{display:inline-block;margin-right:12px}.dashboard{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.metric{background:#0b1220;padding:18px;border-radius:12px}.metric b{display:block;font-size:28px;margin-top:8px}@media(max-width:700px){.dashboard{grid-template-columns:1fr}}.ok{color:#4ade80}.err{color:#f87171}",
+        encoding="utf-8",
+    )
+    (web / "app.js").write_text(
+        "const $=id=>document.getElementById(id);\n"
+        "async function api(url,options={}){const r=await fetch(url,{credentials:'same-origin',...options});const body=await r.json().catch(()=>({}));if(!r.ok)throw new Error(body.error||`HTTP ${r.status}`);return body;}\n"
+        "function status(id,text,ok=true){const e=$(id);e.textContent=text;e.className='status '+(ok?'ok':'err');}\n"
+        "$('login').onclick=async()=>{try{const b=await api('/api/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:$('username').value,organization:$('organization').value})});status('sessionStatus',`ورود موفق — ${b.organization.name}`);await loadDashboard()}catch(e){status('sessionStatus',e.message,false)}};\n"
+        "$('analyze').onclick=async()=>{try{const b=await api('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({csv:$('csv').value,sourceName:'desktop-ledger.csv',assets:Number($('assets').value),liabilities:Number($('liabilities').value)})});status('analysisStatus',`تحلیل آماده — سود ${b.metrics.profit}`);await loadDashboard()}catch(e){status('analysisStatus',e.message,false)}};\n"
+        "async function loadDashboard(){try{const b=await api('/api/dashboard');if(!b.analysisAvailable){$('dashboard').innerHTML='<div>هنوز تحلیلی ثبت نشده است.</div>';return}$('dashboard').innerHTML=`<div class='metric'>درآمد<b>${b.metrics.revenue}</b></div><div class='metric'>سود<b>${b.metrics.profit}</b></div><div class='metric'>ریسک<b>${b.metrics.risk}%</b></div>`}catch(e){$('dashboard').textContent=e.message}}\n"
+        "loadDashboard();",
         encoding="utf-8",
     )
 
@@ -136,8 +175,7 @@ def build_windows() -> Path:
 
     web = payload / "web"
     web.mkdir(exist_ok=True)
-    index = web / "index.html"
-    index.write_text("<!doctype html><html lang=\"fa\" dir=\"rtl\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>هوشیار.ai</title></head><body><main><h1>هوشیار.ai</h1><p>Commercial runtime is starting…</p></main></body></html>", encoding="utf-8")
+    _write_web_surface(web)
     (payload / "product-manifest.json").write_text('{"name":"HooshyarOS","runtime":"Backend/HBOS/Autonomous/Runtime/start-commercial-runtime.ts","health":"/health","web":"web/index.html"}', encoding="utf-8")
     _write_launch_surface(payload)
     _validate_windows_payload(payload)
