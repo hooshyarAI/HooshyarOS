@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 function calculateNet(revenue, expense) {
-  // CONTROLLED DEFECT: intentional wrong sign used only for the Cline repair drill.
-  return revenue + expense;
+  // CONTROLLED DEFECT: the drill intentionally uses the wrong sign.
+  return revenue - expense;
 }
 
 const result = calculateNet(1500, -300);
