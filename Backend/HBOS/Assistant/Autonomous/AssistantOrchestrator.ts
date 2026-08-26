@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { AutonomousAssistantRuntime } from "./AutonomousAssistantRuntime";
 import { AutonomousBuildDaemon } from "../../Autonomous/Runtime/AutonomousBuildDaemon";
 
@@ -9,10 +10,46 @@ export type AssistantOrchestratorStatus =
     | "PLATFORM_BLOCKED";
 
 export class AssistantOrchestrator {
+    private readonly runCheckpoint: { commit: string; clean: boolean };
+
     constructor(
         private readonly runtime = new AutonomousAssistantRuntime(),
         private readonly daemon = new AutonomousBuildDaemon()
-    ) {}
+    ) {
+        this.runCheckpoint = this.repositorySnapshot();
+    }
+
+    private repositorySnapshot(): { commit: string; clean: boolean } {
+        try {
+            const commit = execFileSync("git", ["rev-parse", "HEAD"], {
+                cwd: process.cwd(), encoding: "utf8", stdio: ["ignore", "pipe", "ignore"]
+            }).trim();
+            const status = execFileSync("git", ["status", "--porcelain=v1", "--untracked-files=all", "--", ".", ":(exclude)node_modules"], {
+                cwd: process.cwd(), encoding: "utf8", stdio: ["ignore", "pipe", "ignore"]
+            }).trim();
+            return { commit, clean: status === "" };
+        } catch {
+            return { commit: "", clean: false };
+        }
+    }
+
+    private repairRunOwnedWorkspace(): void {
+        if (!this.runCheckpoint.clean || !this.runCheckpoint.commit) {
+            throw new Error("ASSISTANT_HANDOFF_REQUIRES_CLEAN_RUN_CHECKPOINT");
+        }
+
+        execFileSync("git", ["reset", "--hard", this.runCheckpoint.commit], {
+            cwd: process.cwd(), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"]
+        });
+        execFileSync("git", ["clean", "-fd", "--", ".", ":(exclude)node_modules"], {
+            cwd: process.cwd(), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"]
+        });
+
+        const repaired = this.repositorySnapshot();
+        if (!repaired.clean || repaired.commit !== this.runCheckpoint.commit) {
+            throw new Error("ASSISTANT_HANDOFF_WORKSPACE_REPAIR_FAILED");
+        }
+    }
 
     async start(goal: string) {
         const result = await this.runtime.execute(goal);
@@ -32,6 +69,11 @@ export class AssistantOrchestrator {
                 result,
                 platform: null
             };
+        }
+
+        const beforeHandoff = this.repositorySnapshot();
+        if (!beforeHandoff.clean) {
+            this.repairRunOwnedWorkspace();
         }
 
         const platform = this.daemon.run();
