@@ -11,6 +11,10 @@ Always read, in order:
 4. Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md
 5. Assistant/SYSTEM_PROMPT.md
 6. Docs/Product/PRODUCT_CONSTRUCTION_ROADMAP.json
+7. Docs/Product/PRODUCT_PLATFORM_MANIFEST.json
+8. Docs/Product/PRODUCT_QUALIFICATION_MATRIX.json
+
+The Manifest defines what the product is. The Qualification Matrix defines what must be proven. Never replace either with intuition.
 
 ## Mandatory execution loop
 Run the real product factory, not a simulated audit:
@@ -18,23 +22,45 @@ Run the real product factory, not a simulated audit:
 
 Use `npm run product:factory` as the primary local acceptance command.
 
+## Full-platform review
+For a product-affecting task, review the complete impacted surface: architecture, capabilities, engine ownership, APIs, UI/dashboard, persistence, security, Windows/Web/Android runtime, tests, CI workflows, packaging, release scripts, and deployment contracts. Map every finding to a Manifest layer and a Matrix cell.
+
 ## Repair behavior
 When the factory returns BLOCKED:
-- read the emitted JSON evidence;
-- identify the first failing stage and root cause;
+- preserve the emitted evidence;
+- identify the first failing stage, Matrix cell, environment, workflow, and root cause;
 - make the smallest coherent repair;
 - never weaken/remove a failing test to obtain green;
 - never modify Architecture Freeze V4 to bypass a failure;
-- rerun the focused verification;
+- add or update a regression test for the repaired defect;
+- rerun focused verification;
 - rerun `npm run product:factory`;
-- after acceptance passes, run `npm test -- --runInBand`.
+- after application acceptance passes, run `npm test -- --runInBand`.
 
 ## Product acceptance
 A green engine/unit test is not commercial completion. The real Windows journey must pass:
 `health -> ready -> session -> tenant -> ingestion -> financial analysis -> dashboard -> restart -> same tenant -> restored dashboard`.
 
+Equivalent customer workflows must be proven for Web and Android before those environments are marked PASS.
+
+## Evidence protocol
+Every finding must contain:
+- severity
+- evidence source
+- Manifest layer
+- Qualification Matrix cell
+- environment
+- workflow
+- root cause
+- required change
+- regression verification
+- acceptance verification
+- release impact
+
+Unknown is not PASS. BLOCKED is not PASS. Passing one environment never proves another environment.
+
 ## Git discipline
 Before risky changes create a checkpoint/commit when possible. Keep one coherent capability/fix per commit. Do not force-push. Do not push or merge unless the repository policy explicitly permits it.
 
 ## Cline boundary
-Cline may execute commands, inspect files, apply the smallest implementation repair, and run verification. Cline must not invent a new engine, duplicate business semantics, or claim product completion without application and acceptance evidence.
+Cline may execute commands, inspect the repository and GitHub evidence available through configured tooling, apply the smallest implementation repair, and run verification. Cline must not invent a new engine, duplicate business semantics, or claim product completion without application and acceptance evidence.
