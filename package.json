@@ -10,6 +10,7 @@
     "product:factory:contract": "tsx Backend/HBOS/Autonomous/Product/AutonomousProductFactory.ts",
     "product:factory:handoff": "node scripts/product-factory-handoff.cjs",
     "product:assurance": "node scripts/product-platform-assurance.cjs",
+    "product:web:acceptance": "node scripts/web-product-acceptance.cjs",
     "autonomous:build": "tsx Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts",
     "autonomous:assistant": "python Backend/AI_Runtime/hooshyar_build.py assistant",
     "autonomous:platform": "python Backend/AI_Runtime/hooshyar_build.py platform"
