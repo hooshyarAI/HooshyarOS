@@ -11,7 +11,7 @@ const successEvidencePath = resolve(evidenceDir, "factory-success.json");
 const node = process.execPath;
 const tsxCli = resolve(root, "node_modules", "tsx", "dist", "cli.mjs");
 const runtimeEntrypoint = resolve(root, "Backend", "HBOS", "Autonomous", "Runtime", "start-commercial-runtime.ts");
-const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+const jestEntrypoint = resolve(root, "node_modules", "jest", "bin", "jest.js");
 const git = process.platform === "win32" ? "git.exe" : "git";
 const shell = process.platform === "win32" ? (process.env.ComSpec ?? "cmd.exe") : undefined;
 
@@ -59,8 +59,15 @@ async function main(): Promise<void> {
   const success = { type: "FINAL_PRODUCT_FACTORY_SUCCESS", version: 1, createdAt: new Date().toISOString(), status: "ACCEPTED", repository: root, branch: identity.branch, commit: identity.commit, acceptance: ["runtime-health", "session", "tenant", "ingestion", "analysis", "dashboard", "restart", "tenant-recovery", "dashboard-recovery"] };
   writeEvidence(successEvidencePath, success);
   console.log(JSON.stringify({ type: "FINAL_PRODUCT_FACTORY", stage: "RELEASE_GATE", ok: true, details: "application acceptance passed; running full Jest" }));
-  run(npm, ["test", "--", "--runInBand"]);
+  if (!existsSync(jestEntrypoint)) throw new Error(`FACTORY_JEST_ENTRYPOINT_MISSING:${jestEntrypoint}`);
+  try {
+    run(node, [jestEntrypoint, "--runInBand"]);
+  } catch (error) {
+    const failure = error instanceof Error ? error.message : String(error);
+    writeEvidence(failureEvidencePath, { type: "FINAL_PRODUCT_FACTORY_FAILURE", version: 1, createdAt: new Date().toISOString(), status: "BLOCKED", stage: "RELEASE_GATE", failure, repository: root, branch: identity.branch, commit: identity.commit, repairContract: "ASSISTANT_REPAIR_MISSION_V1", nextAction: "run npm run product:factory:handoff and perform the smallest coherent repair" });
+    throw error;
+  }
   writeEvidence(successEvidencePath, { ...success, acceptance: [...success.acceptance, "full-jest"], fullJest: "PASS", status: "PASS" });
   console.log(JSON.stringify({ type: "FINAL_PRODUCT_FACTORY", stage: "COMPLETE", ok: true, details: "runtime acceptance + restart recovery + full Jest passed" }));
 }
-main().catch(() => { process.exitCode = 1; });
+main().catch((error) => { console.error(JSON.stringify({ type: "FINAL_PRODUCT_FACTORY_PROCESS_ERROR", ok: false, error: error instanceof Error ? error.message : String(error) }, null, 2)); process.exitCode = 1; });
