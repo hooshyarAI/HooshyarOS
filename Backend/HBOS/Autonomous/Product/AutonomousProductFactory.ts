@@ -216,8 +216,8 @@ export class AutonomousProductFactory {
     catch { return false; }
   }
 
-  private blocked(evidence: ProductFactoryEvidence[], repairAttempts: number, stage: ProductFactoryStage): ProductFactoryResult {
-    evidence.push({ stage: "BLOCKED", ok: false, source: "assistant", details: `Product factory blocked at ${stage}; evidence preserved.` });
+  private blocked(evidence: ProductFactoryEvidence[], repairAttempts: number, stage: ProductFactoryStage, details?: string): ProductFactoryResult {
+    evidence.push({ stage: "BLOCKED", ok: false, source: "assistant", details: details ?? `Product factory blocked at ${stage}; evidence preserved.` });
     return { status: "BLOCKED", stage, repairAttempts, evidence };
   }
 }
