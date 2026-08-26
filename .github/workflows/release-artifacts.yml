@@ -1,0 +1,90 @@
+name: HooshyarOS Release Artifacts
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+
+jobs:
+  windows-installer:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: npm install
+      - name: Validate product contract
+        run: npm run product:assurance
+      - name: Install Inno Setup
+        shell: powershell
+        run: choco install innosetup --yes --no-progress
+      - name: Build Windows installer
+        shell: powershell
+        run: npm run product:windows:installer
+      - name: Validate installer exists
+        shell: powershell
+        run: |
+          $installer = Join-Path $PWD 'dist/productization/windows/installer/HooshyarOS-Setup-1.0.0.exe'
+          if (-not (Test-Path $installer)) { throw "Missing installer: $installer" }
+          Write-Host "INSTALLER=$installer"
+      - name: Install product and run post-install health check
+        shell: powershell
+        run: |
+          $installer = Join-Path $PWD 'dist/productization/windows/installer/HooshyarOS-Setup-1.0.0.exe'
+          $target = Join-Path $env:RUNNER_TEMP 'HooshyarOS-Installed'
+          if (Test-Path $target) { Remove-Item -Recurse -Force $target }
+          Start-Process -FilePath $installer -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=$target") -Wait
+          & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $target 'install-health.ps1')
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: hooshyaros-windows-installer
+          path: dist/productization/windows/installer/HooshyarOS-Setup-1.0.0.exe
+          if-no-files-found: error
+          retention-days: 30
+
+  android-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm install
+      - name: Validate product contract
+        run: npm run product:assurance
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build Android APK
+        working-directory: android
+        run: gradle :app:assembleDebug --no-daemon
+      - name: Install and launch APK on emulator
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_2
+          script: |
+            adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+            adb shell am start -n ai.hooshyar.client/.MainActivity
+            test -n "$(adb shell pidof ai.hooshyar.client)"
+            adb shell dumpsys activity activities | grep -q 'ai.hooshyar.client/.MainActivity'
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: hooshyaros-android-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
