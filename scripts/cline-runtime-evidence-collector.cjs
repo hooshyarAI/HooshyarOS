@@ -22,8 +22,15 @@ function current(record) {
 const commit = gitCommit();
 const factory = read('factory-success.json');
 const web = read('web-acceptance-success.json');
+const android = read('android-acceptance-success.json');
+const security = read('security-acceptance-success.json');
+const agent = read('agent-repair-success.json');
+
 const factoryCurrent = current(factory);
 const webCurrent = current(web);
+const androidCurrent = current(android);
+const securityCurrent = current(security);
+const agentCurrent = current(agent);
 const factoryComplete = factoryCurrent && Array.isArray(factory.acceptance) && factory.acceptance.includes('full-jest') && factory.fullJest === 'PASS' && factory.status === 'PASS';
 
 const evidence = {
@@ -37,14 +44,17 @@ const evidence = {
     'web-core': webCurrent ? 'PASS' : 'REQUIRES_EXECUTION',
     'web-business': webCurrent ? 'PASS' : 'REQUIRES_EXECUTION',
     'full-suite': factoryComplete ? 'PASS' : 'REQUIRES_EXECUTION',
-    'android-release': 'REQUIRES_DEVICE_EXECUTION',
-    'win-security': 'REQUIRES_EXECUTION',
-    'tenant-isolation': 'REQUIRES_EXECUTION',
-    'ci-feedback': 'REQUIRES_AGENT_EXECUTION'
+    'android-release': androidCurrent ? 'PASS' : 'REQUIRES_DEVICE_EXECUTION',
+    'win-security': securityCurrent ? 'PASS' : 'REQUIRES_EXECUTION',
+    'tenant-isolation': securityCurrent ? 'PASS' : 'REQUIRES_EXECUTION',
+    'ci-feedback': agentCurrent ? 'PASS' : 'REQUIRES_AGENT_EXECUTION'
   },
   sources: {
     factory: factoryCurrent ? '.hooshyar/factory-success.json' : null,
-    web: webCurrent ? '.hooshyar/web-acceptance-success.json' : null
+    web: webCurrent ? '.hooshyar/web-acceptance-success.json' : null,
+    android: androidCurrent ? '.hooshyar/android-acceptance-success.json' : null,
+    security: securityCurrent ? '.hooshyar/security-acceptance-success.json' : null,
+    agent: agentCurrent ? '.hooshyar/agent-repair-success.json' : null
   },
   verdict: 'REQUIRES_ADDITIONAL_EVIDENCE'
 };
@@ -53,4 +63,4 @@ if (Object.values(evidence.cells).every(x => x === 'PASS')) evidence.verdict = '
 fs.mkdirSync(dir, { recursive: true });
 fs.writeFileSync(out, JSON.stringify(evidence, null, 2), 'utf8');
 console.log(JSON.stringify(evidence, null, 2));
-process.exitCode = 0;
+process.exitCode = evidence.verdict === 'QUALIFICATION_COMPLETE' ? 0 : 1;
