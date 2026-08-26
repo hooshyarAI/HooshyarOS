@@ -1,0 +1,28 @@
+name: Final Product Factory
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  windows-product-factory:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run executable product factory
+        run: npm run product:factory
+        env:
+          HOOSHYAR_FACTORY_ALLOW_PUSH: "0"
