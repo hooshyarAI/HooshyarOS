@@ -13,6 +13,7 @@
     "product:cline:audit": "node scripts/cline-full-platform-audit.cjs",
     "product:cline:evidence": "node scripts/cline-runtime-evidence-collector.cjs",
     "product:web:acceptance": "node scripts/web-product-acceptance.cjs",
+    "product:security:acceptance": "node scripts/security-tenant-acceptance.cjs",
     "autonomous:build": "tsx Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts",
     "autonomous:assistant": "python Backend/AI_Runtime/hooshyar_build.py assistant",
     "autonomous:platform": "python Backend/AI_Runtime/hooshyar_build.py platform"
