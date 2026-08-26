@@ -1,7 +1,12 @@
 import { AutonomousAssistantRuntime } from "./AutonomousAssistantRuntime";
 import { AutonomousBuildDaemon } from "../../Autonomous/Runtime/AutonomousBuildDaemon";
 
-export type AssistantOrchestratorStatus = "RUNNING" | "ASSISTANT_COMPLETED" | "PLATFORM_COMPLETED" | "PLATFORM_BLOCKED";
+export type AssistantOrchestratorStatus =
+    | "RUNNING"
+    | "ASSISTANT_FAILED"
+    | "ASSISTANT_BLOCKED"
+    | "PLATFORM_COMPLETED"
+    | "PLATFORM_BLOCKED";
 
 export class AssistantOrchestrator {
     constructor(
@@ -14,9 +19,16 @@ export class AssistantOrchestrator {
         const mission = result.mission;
 
         if (mission?.status !== "COMPLETED") {
+            const status: AssistantOrchestratorStatus =
+                mission?.status === "BLOCKED"
+                    ? "ASSISTANT_BLOCKED"
+                    : mission?.status === "FAILED"
+                        ? "ASSISTANT_FAILED"
+                        : "RUNNING";
+
             return {
-                status: (mission?.status === "BLOCKED" || mission?.status === "FAILED" ? "ASSISTANT_COMPLETED" : "RUNNING") as AssistantOrchestratorStatus,
-                assistant: "ACTIVE",
+                status,
+                assistant: status === "RUNNING" ? "ACTIVE" : "STOPPED",
                 result,
                 platform: null
             };
