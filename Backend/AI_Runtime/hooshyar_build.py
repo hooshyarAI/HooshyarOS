@@ -51,6 +51,8 @@ def run_daemon(*, assistant_phase: bool) -> tuple[int, bool]:
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         bufsize=1,
     )
 
