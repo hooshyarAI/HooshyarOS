@@ -175,7 +175,10 @@ def build_windows() -> Path:
 
     web = payload / "web"
     web.mkdir(exist_ok=True)
+    index = web / "index.html"
     _write_web_surface(web)
+    if not index.exists():
+        raise RuntimeError(f"customer payload web entrypoint missing: {index}")
     (payload / "product-manifest.json").write_text('{"name":"HooshyarOS","runtime":"Backend/HBOS/Autonomous/Runtime/start-commercial-runtime.ts","health":"/health","web":"web/index.html"}', encoding="utf-8")
     _write_launch_surface(payload)
     _validate_windows_payload(payload)
