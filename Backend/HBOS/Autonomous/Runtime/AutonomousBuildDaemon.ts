@@ -12,6 +12,7 @@ import { createLocalConstructionTools } from "./LocalConstructionToolset";
 import { AutonomousPerformanceBudget } from "./AutonomousPerformanceBudget";
 
 export interface DaemonOptions {
+    knotRecovery?: AutonomousKnotRecovery;
     root?: string;
     maxCycles?: number;
     reportEvery?: number;
@@ -46,6 +47,7 @@ export class AutonomousBuildDaemon {
         this.mission = options.mission ?? new AutonomousProjectMission(this.root);
         this.continuation = options.continuation ?? new AutonomousPlatformContinuation();
         this.development = options.development ?? new AutonomousDevelopmentLoop(createLocalConstructionTools(this.root));
+        this.knotRecovery = options.knotRecovery ?? new AutonomousKnotRecovery();
         this.maxCycles = options.maxCycles ?? 1000;
         this.reportEvery = options.reportEvery ?? 1;
         this.performanceBudget = options.performanceBudget ?? new AutonomousPerformanceBudget({
