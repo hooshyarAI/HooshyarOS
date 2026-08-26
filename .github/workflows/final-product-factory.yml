@@ -8,7 +8,7 @@ on:
 jobs:
   windows-product-factory:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -22,10 +22,29 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Validate canonical product assurance contracts
+      - name: Validate canonical product assurance contract
         run: npm run product:assurance
 
       - name: Run executable product factory
+        id: product-factory
+        continue-on-error: true
         run: npm run product:factory
         env:
           HOOSHYAR_FACTORY_ALLOW_PUSH: "0"
+
+      - name: Emit assistant repair handoff on failure
+        if: steps.product-factory.outcome == 'failure'
+        run: npm run product:factory:handoff
+
+      - name: Upload product factory evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hooshyar-final-product-factory-evidence
+          path: .hooshyar/*.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Fail release gate on factory failure
+        if: steps.product-factory.outcome == 'failure'
+        run: exit 1
