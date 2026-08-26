@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 
 function calculateNet(revenue, expense) {
-  // CONTROLLED DEFECT: the drill intentionally uses the wrong sign.
-  return revenue - expense;
+  return revenue + expense;
 }
 
 const result = calculateNet(1500, -300);
