@@ -13,6 +13,7 @@
         {"label": "HooshyarOS: Product Factory", "type": "shell", "command": "npm run product:factory", "problemMatcher": []},
         {"label": "HooshyarOS: Factory Handoff", "type": "shell", "command": "npm run product:factory:handoff", "problemMatcher": []},
         {"label": "HooshyarOS: Full Qualification", "type": "shell", "command": "npm test -- --runInBand", "problemMatcher": []},
+        {"label": "HooshyarOS: Agent Repair Drill", "type": "shell", "command": "npm run product:agent:drill", "problemMatcher": []},
         {"label": "HooshyarOS: Agent Repair Evidence", "type": "shell", "command": "npm run product:agent:evidence", "problemMatcher": []}
     ]
 }
