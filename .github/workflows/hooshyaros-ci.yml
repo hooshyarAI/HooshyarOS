@@ -45,3 +45,50 @@ jobs:
 
       - name: Full Jest suite
         run: node ./node_modules/jest/bin/jest.js --runInBand
+
+  windows-product-package:
+    runs-on: windows-latest
+    needs: verify
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Node dependencies
+        shell: pwsh
+        run: npm install
+
+      - name: Build Windows customer payload
+        shell: pwsh
+        run: python Backend/AI_Runtime/release_product_builder.py
+
+      - name: Verify Windows PE runtime
+        shell: pwsh
+        run: |
+          $node = 'dist/productization/windows/payload/node-runtime/node.exe'
+          if (-not (Test-Path $node)) { throw "Missing Windows node runtime: $node" }
+          $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path $node))
+          if ($bytes.Length -lt 2 -or $bytes[0] -ne 0x4D -or $bytes[1] -ne 0x5A) {
+            throw "Payload node.exe is not a Windows PE executable"
+          }
+
+      - name: Launch and health-check customer payload
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File dist/productization/windows/payload/install-health.ps1
+
+      - name: Upload Windows customer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HooshyarOS-Windows-Bootstrap
+          path: dist/productization/windows/HooshyarOS-Windows-Bootstrap.zip
+          if-no-files-found: error
