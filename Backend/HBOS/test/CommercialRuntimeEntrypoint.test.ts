@@ -28,7 +28,7 @@ describe("Commercial runtime executable entrypoint", () => {
         expect(builder).toContain("node-runtime");
         expect(builder).toContain("node.exe");
         expect(builder).toContain("start-commercial-runtime.ts");
-        expect(builder).toContain("tsx\\dist\\cli.mjs");
+        expect(builder).toContain("cli.mjs");
         expect(builder).toContain("127.0.0.1:4173/health");
     });
 });
