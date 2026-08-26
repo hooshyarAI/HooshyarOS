@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { createServer, IncomingMessage, ServerResponse, Server } from "node:http";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -15,8 +15,10 @@ export interface CommercialRuntimeOptions {
 
 const WEB_ROOT = resolve(process.cwd(), "web");
 const MAX_BODY_BYTES = 1024 * 1024;
+const LATEST_ANALYSIS_KEY = "financial-analysis:latest";
 
 type Session = { token: string; tenantId: string; organization: string };
+type PersistedAnalysis = Awaited<ReturnType<FinancialStatementAnalysisService["execute"]>>;
 
 const send = (res: ServerResponse, status: number, contentType: string, body: string, headers: Record<string, string> = {}) => {
     res.statusCode = status;
@@ -28,7 +30,7 @@ const send = (res: ServerResponse, status: number, contentType: string, body: st
 const json = (res: ServerResponse, status: number, payload: unknown, headers: Record<string, string> = {}) =>
     send(res, status, "application/json; charset=utf-8", JSON.stringify(payload), headers);
 
-const parseCookies = (header: string | undefined): Record<string, string> => Object.fromEntries(
+const parseCookies = (header: string | undefined): Record<string, string> = Object.fromEntries(
     (header ?? "").split(";").map((part) => part.trim().split("=")).filter(([key, value]) => key && value).map(([key, ...value]) => [key, value.join("=")]),
 );
 
@@ -57,13 +59,19 @@ const asset = async (res: ServerResponse, name: string, contentType: string) => 
     }
 };
 
+const stableTenantId = (username: string, organization: string): string => {
+    const identity = `${username}\u0000${organization}`;
+    return `tenant:${createHash("sha256").update(identity, "utf8").digest("hex").slice(0, 32)}`;
+
+};
+
 export function createCommercialRuntimeServer(options: CommercialRuntimeOptions = {}): Server {
     const persistence = new SQLitePersistenceStore({ databasePath: options.databasePath ?? process.env.HOOSHYAR_DB_PATH ?? "data/hooshyar.sqlite" });
     const ingestion = new FinancialDataIngestionAdapter(persistence);
     const reasoning = options.reasoning ?? new ReasoningEngine();
     const analysis = new FinancialStatementAnalysisService(new FinancialIntelligenceEngine(), reasoning);
     const sessions = new Map<string, Session>();
-    const latestResults = new Map<string, ReturnType<FinancialStatementAnalysisService["execute"]>>();
+    const latestResults = new Map<string, PersistedAnalysis>();
 
     const close = () => persistence.close();
     const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
@@ -86,7 +94,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const organization = String(body.organization ?? "").trim();
                 if (!username || !organization) return json(res, 400, { error: "SESSION_FIELDS_REQUIRED" });
                 const token = randomBytes(24).toString("hex");
-                const created: Session = { token, tenantId: `tenant:${token.slice(0, 16)}`, organization };
+                const created: Session = { token, tenantId: stableTenantId(username, organization), organization };
                 sessions.set(token, created);
                 return json(res, 201, { authenticated: true, organization: { name: organization }, tenantId: created.tenantId }, {
                     "Set-Cookie": `hooshyar_session=${token}; HttpOnly; SameSite=Lax; Path=/`,
@@ -111,12 +119,14 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const result = analysis.execute({ tenantId: session.tenantId, revenue: ingested.model.totals.credit, expenses: ingested.model.totals.debit, assets, liabilities, source: ingested.evidence });
                 if (result.status !== "READY") return json(res, 422, result);
                 latestResults.set(session.tenantId, result);
+                await persistence.write({ tenantId: session.tenantId }, LATEST_ANALYSIS_KEY, result);
                 return json(res, 200, result);
             }
 
             if (req.method === "GET" && path === "/api/dashboard") {
-                const result = latestResults.get(session.tenantId);
+                const result = latestResults.get(session.tenantId) ?? (await persistence.read({ tenantId: session.tenantId }, LATEST_ANALYSIS_KEY))?.value as PersistedAnalysis | undefined;
                 if (!result) return json(res, 200, { status: "READY", tenantId: session.tenantId, metrics: { revenue: 0, profit: 0, risk: 0 }, analysisAvailable: false });
+                latestResults.set(session.tenantId, result);
                 return json(res, 200, {
                     status: result.status,
                     tenantId: result.tenantId,
