@@ -1,10 +1,13 @@
 import { execFileSync, spawn, ChildProcess } from "node:child_process";
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = process.cwd();
 const port = Number(process.env.HOOSHYAR_FACTORY_PORT ?? "4173");
 const databasePath = resolve(root, process.env.HOOSHYAR_FACTORY_DB ?? "data/hooshyar-final-factory.sqlite");
+const evidenceDir = resolve(root, ".hooshyar");
+const failureEvidencePath = resolve(evidenceDir, "factory-failure.json");
+const successEvidencePath = resolve(evidenceDir, "factory-success.json");
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 const git = process.platform === "win32" ? "git.exe" : "git";
 const shell = process.platform === "win32" ? (process.env.ComSpec ?? "cmd.exe") : undefined;
@@ -18,6 +21,23 @@ function run(command: string, args: string[], timeout = 15 * 60 * 1000): void {
 function assertCleanRepo(): void {
   const status = execFileSync(git, ["status", "--porcelain", "--untracked-files=all"], { cwd: root, encoding: "utf8" }).trim();
   if (status) throw new Error(`FACTORY_WORKTREE_DIRTY:\n${status}`);
+}
+
+function repositoryIdentity(): { branch: string; commit: string } {
+  const branch = execFileSync(git, ["branch", "--show-current"], { cwd: root, encoding: "utf8" }).trim() || "DETACHED";
+  const commit = execFileSync(git, ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  return { branch, commit };
+}
+
+function clearPreviousEvidence(): void {
+  mkdirSync(evidenceDir, { recursive: true });
+  rmSync(failureEvidencePath, { force: true });
+  rmSync(successEvidencePath, { force: true });
+}
+
+function writeEvidence(path: string, payload: unknown): void {
+  mkdirSync(evidenceDir, { recursive: true });
+  writeFileSync(path, JSON.stringify(payload, null, 2), "utf8");
 }
 
 async function waitHealth(): Promise<void> {
@@ -74,7 +94,9 @@ async function stopRuntime(child: ChildProcess): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  console.log(JSON.stringify({ type: "FINAL_PRODUCT_FACTORY", stage: "READ", ok: true, mode: "runtime-first" }));
+  clearPreviousEvidence();
+  const identity = repositoryIdentity();
+  console.log(JSON.stringify({ type: "FINAL_PRODUCT_FACTORY", stage: "READ", ok: true, mode: "runtime-first", ...identity }));
   assertCleanRepo();
 
   let runtime: ChildProcess | undefined;
@@ -129,17 +151,44 @@ async function main(): Promise<void> {
       throw new Error(`FACTORY_RECOVERY_FAILED:${JSON.stringify(dashboard2.body)}`);
     }
     console.log(JSON.stringify({ type: "FINAL_PRODUCT_FACTORY", stage: "RECOVERY", ok: true, tenantId, profit: dashboard2.body.metrics.profit }));
+  } catch (error) {
+    const failure = error instanceof Error ? error.message : String(error);
+    const evidence = {
+      type: "FINAL_PRODUCT_FACTORY_FAILURE",
+      version: 1,
+      createdAt: new Date().toISOString(),
+      status: "BLOCKED",
+      stage: failure.startsWith("FACTORY_RUNTIME_HEALTH") ? "RUN" : failure.startsWith("FACTORY_SESSION") ? "ACCEPT" : failure.startsWith("FACTORY_TENANT") ? "ACCEPT" : failure.startsWith("FACTORY_ANALYSIS") ? "ACCEPT" : failure.startsWith("FACTORY_DASHBOARD") ? "ACCEPT" : failure.startsWith("FACTORY_RECOVERY") ? "RECOVERY" : "RUN",
+      failure,
+      repository: root,
+      branch: identity.branch,
+      commit: identity.commit,
+      repairContract: "ASSISTANT_REPAIR_MISSION_V1",
+      nextAction: "run npm run product:factory:handoff and perform the smallest coherent repair",
+    };
+    writeEvidence(failureEvidencePath, evidence);
+    console.error(JSON.stringify({ type: "FINAL_PRODUCT_FACTORY", stage: "BLOCKED", ok: false, ...evidence }, null, 2));
+    throw error;
   } finally {
     if (runtime) await stopRuntime(runtime);
     try { rmSync(databasePath, { force: true }); } catch {}
   }
+
+  const success = {
+    type: "FINAL_PRODUCT_FACTORY_SUCCESS",
+    version: 1,
+    createdAt: new Date().toISOString(),
+    status: "ACCEPTED",
+    repository: root,
+    branch: identity.branch,
+    commit: identity.commit,
+    acceptance: ["runtime-health", "session", "tenant", "ingestion", "analysis", "dashboard", "restart", "tenant-recovery", "dashboard-recovery"]
+  };
+  writeEvidence(successEvidencePath, success);
 
   console.log(JSON.stringify({ type: "FINAL_PRODUCT_FACTORY", stage: "RELEASE_GATE", ok: true, details: "application acceptance passed; running full Jest" }));
   run(npm, ["test", "--", "--runInBand"]);
   console.log(JSON.stringify({ type: "FINAL_PRODUCT_FACTORY", stage: "COMPLETE", ok: true, details: "runtime acceptance + restart recovery + full Jest passed" }));
 }
 
-main().catch(error => {
-  console.error(JSON.stringify({ type: "FINAL_PRODUCT_FACTORY", stage: "BLOCKED", ok: false, error: error instanceof Error ? error.message : String(error) }, null, 2));
-  process.exitCode = 1;
-});
+main().catch(() => { process.exitCode = 1; });
