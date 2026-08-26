@@ -8,6 +8,7 @@
     "start:commercial": "tsx Backend/HBOS/Autonomous/Runtime/start-commercial-runtime.ts",
     "product:factory": "tsx Backend/HBOS/Autonomous/Product/FinalProductFactoryRunner.ts",
     "product:factory:contract": "tsx Backend/HBOS/Autonomous/Product/AutonomousProductFactory.ts",
+    "product:factory:handoff": "node scripts/product-factory-handoff.cjs",
     "product:assurance": "node scripts/product-platform-assurance.cjs",
     "autonomous:build": "tsx Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts",
     "autonomous:assistant": "python Backend/AI_Runtime/hooshyar_build.py assistant",
