@@ -1,5 +1,5 @@
 import { execFileSync, spawn, ChildProcess } from "node:child_process";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = process.cwd();
@@ -8,6 +8,9 @@ const databasePath = resolve(root, process.env.HOOSHYAR_FACTORY_DB ?? "data/hoos
 const evidenceDir = resolve(root, ".hooshyar");
 const failureEvidencePath = resolve(evidenceDir, "factory-failure.json");
 const successEvidencePath = resolve(evidenceDir, "factory-success.json");
+const node = process.execPath;
+const tsxCli = resolve(root, "node_modules", "tsx", "dist", "cli.mjs");
+const runtimeEntrypoint = resolve(root, "Backend", "HBOS", "Autonomous", "Runtime", "start-commercial-runtime.ts");
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 const git = process.platform === "win32" ? "git.exe" : "git";
 const shell = process.platform === "win32" ? (process.env.ComSpec ?? "cmd.exe") : undefined;
@@ -61,19 +64,18 @@ async function request(path: string, init: RequestInit = {}): Promise<{ status: 
 }
 
 function spawnCommercialRuntime(): ChildProcess {
-  const args = process.platform === "win32"
-    ? ["/d", "/s", "/c", `"${npm}" run start:commercial`]
-    : ["run", "start:commercial"];
-  return spawn(process.platform === "win32" ? shell! : npm, args, {
+  return spawn(node, [tsxCli, runtimeEntrypoint], {
     cwd: root,
     stdio: "inherit",
     shell: false,
     windowsHide: true,
-    env: { ...process.env, HOOSHYAR_DB_PATH: databasePath, PORT: String(port) }
+    env: { ...process.env, HOOSHYAR_DB_PATH: databasePath, HOOSHYAR_PORT: String(port) }
   });
 }
 
 async function startRuntime(): Promise<ChildProcess> {
+  if (!existsSync(tsxCli)) throw new Error(`FACTORY_RUNTIME_LAUNCHER_MISSING:${tsxCli}`);
+  if (!existsSync(runtimeEntrypoint)) throw new Error(`FACTORY_RUNTIME_ENTRYPOINT_MISSING:${runtimeEntrypoint}`);
   mkdirSync(resolve(root, "data"), { recursive: true });
   const child = spawnCommercialRuntime();
   child.once("error", error => console.error(JSON.stringify({ type: "FINAL_PRODUCT_FACTORY", stage: "RUN", ok: false, error: error.message })));
