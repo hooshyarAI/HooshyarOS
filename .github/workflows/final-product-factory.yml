@@ -56,6 +56,14 @@ jobs:
         run: npm run product:assurance
       - name: Run executable Web product acceptance
         run: npm run product:web:acceptance
+      - name: Upload web acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hooshyar-web-product-acceptance-evidence
+          path: .hooshyar/web-acceptance-success.json
+          if-no-files-found: warn
+          retention-days: 14
 
   android-product-acceptance:
     runs-on: ubuntu-latest
@@ -105,9 +113,41 @@ jobs:
       - name: Full Jest
         run: npm test -- --runInBand
 
+  runtime-evidence-qualification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [windows-product-factory, web-product-acceptance, android-product-acceptance, full-qualification]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm install
+      - name: Download Windows factory evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: hooshyar-final-product-factory-evidence
+          path: .hooshyar
+          merge-multiple: true
+      - name: Download Web acceptance evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: hooshyar-web-product-acceptance-evidence
+          path: .hooshyar
+          merge-multiple: true
+      - name: Run Cline runtime evidence collector
+        run: npm run product:cline:evidence
+      - name: Upload consolidated qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: hooshyar-cline-runtime-evidence
+          path: .hooshyar/cline-runtime-evidence.json
+          retention-days: 14
+
   release-gate:
     runs-on: ubuntu-latest
-    needs: [windows-product-factory, web-product-acceptance, android-product-acceptance, full-qualification]
+    needs: [windows-product-factory, web-product-acceptance, android-product-acceptance, full-qualification, runtime-evidence-qualification]
     if: ${{ always() }}
     steps:
       - name: Require every release gate to pass
@@ -117,4 +157,5 @@ jobs:
           test "${{ needs.web-product-acceptance.result }}" = "success"
           test "${{ needs.android-product-acceptance.result }}" = "success"
           test "${{ needs.full-qualification.result }}" = "success"
+          test "${{ needs.runtime-evidence-qualification.result }}" = "success"
           echo "FINAL_PRODUCT_RELEASE_GATE=PASS"
