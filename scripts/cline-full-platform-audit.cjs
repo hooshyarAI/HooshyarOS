@@ -33,11 +33,12 @@ function scripts() {
 }
 function workflowFiles() {
   const dir = path.join(root, '.github', 'workflows');
-  return fs.existsSync(dir) ? fs.readdirSync(dir).filter(x => /\\.(yml|yaml)$/.test(x)) : [];
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir).filter(x => /\.(yml|yaml)$/i.test(x)).sort();
 }
 function classifyStaticCell(cell, context) {
   if (cell.id === 'full-suite' && context.testCommand) return 'REQUIRES_EXECUTION';
-  if (cell.id === 'ci-feedback' && context.handoff && context.clineRules) return 'REQUIRES_AGENT_EXECUTION';
+  if (cell.id === 'ci-feedback' && context.handoff && context.clineRules && context.factory) return 'REQUIRES_AGENT_EXECUTION';
   if (cell.environment === 'windows' && context.factory) return 'REQUIRES_EXECUTION';
   if (cell.environment === 'web' && context.webAcceptance) return 'REQUIRES_EXECUTION';
   if (cell.environment === 'android' && context.androidWorkflow) return 'REQUIRES_DEVICE_EXECUTION';
@@ -71,6 +72,15 @@ for (const required of [
   if (!exists(required)) findings.push({ severity: 'CRITICAL', code: 'MISSING_SOURCE_OF_TRUTH', file: required });
 }
 
+if (workflows.length === 0) {
+  findings.push({
+    severity: 'CRITICAL',
+    code: 'WORKFLOW_DISCOVERY_FAILURE',
+    file: '.github/workflows',
+    message: 'No GitHub Actions workflow files were discovered by the audit runner.'
+  });
+}
+
 const cells = matrix.required.map(cell => ({
   ...cell,
   staticStatus: classifyStaticCell(cell, context),
@@ -93,6 +103,7 @@ const audit = {
     environments: manifest.environments ?? [],
     filesScanned: files.length,
     workflowsScanned: workflows.length,
+    workflowFiles: workflows,
     packageScripts: pkgScripts
   },
   findings,
