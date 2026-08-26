@@ -4,17 +4,8 @@ import { AutonomousBuildDaemon } from "../Autonomous/Runtime/AutonomousBuildDaem
 
 describe("Assistant platform handoff", () => {
     it("automatically invokes the canonical platform daemon when the Assistant mission completes", async () => {
-        const runtime = {
-            execute: jest.fn().mockResolvedValue({
-                goal: "continue construction",
-                mission: { status: "COMPLETED", completed: true, stage: "LEARN", progress: 100 },
-                ctx: {},
-                reasoning: {}
-            })
-        } as unknown as AutonomousAssistantRuntime;
-        const daemon = {
-            run: jest.fn().mockReturnValue({ status: "completed", cycles: 1, history: [] })
-        } as unknown as AutonomousBuildDaemon;
+        const runtime = { execute: jest.fn().mockResolvedValue({ goal: "continue construction", mission: { status: "COMPLETED", completed: true, stage: "LEARN", progress: 100 }, ctx: {}, reasoning: {} }) } as unknown as AutonomousAssistantRuntime;
+        const daemon = { run: jest.fn().mockReturnValue({ status: "completed", cycles: 1, history: [] }) } as unknown as AutonomousBuildDaemon;
         const orchestrator = new AssistantOrchestrator(runtime, daemon);
         const result = await orchestrator.start("continue construction");
         expect(daemon.run).toHaveBeenCalledTimes(1);
@@ -23,13 +14,7 @@ describe("Assistant platform handoff", () => {
         expect(result.platform).toEqual(expect.objectContaining({ status: "completed" }));
     });
     it("does not start platform construction after an Assistant failure", async () => {
-        const runtime = {
-            execute: jest.fn().mockResolvedValue({
-                goal: "repair construction",
-                mission: { status: "FAILED", completed: false, stage: "EXECUTE", progress: 0 },
-                ctx: {}, reasoning: {}
-            })
-        } as unknown as AutonomousAssistantRuntime;
+        const runtime = { execute: jest.fn().mockResolvedValue({ goal: "repair construction", mission: { status: "FAILED", completed: false, stage: "EXECUTE", progress: 0 }, ctx: {}, reasoning: {} }) } as unknown as AutonomousAssistantRuntime;
         const daemon = { run: jest.fn() } as unknown as AutonomousBuildDaemon;
         const orchestrator = new AssistantOrchestrator(runtime, daemon);
         const result = await orchestrator.start("repair construction");
