@@ -89,13 +89,19 @@ def _write_launch_surface(payload: Path) -> None:
     (payload / "install-health.ps1").write_text(
         "$ErrorActionPreference='Stop'\n"
         "$here = Split-Path -Parent $MyInvocation.MyCommand.Path\n"
-        "& (Join-Path $here 'launch-hooshyar.cmd')\n"
-        "$deadline=(Get-Date).AddSeconds(20)\n"
-        "do {\n"
-        "  try { $response=Invoke-RestMethod -Uri 'http://127.0.0.1:4173/health' -TimeoutSec 2; break } catch { Start-Sleep -Milliseconds 500 }\n"
-        "} while ((Get-Date) -lt $deadline)\n"
-        "if (-not $response -or $response.status -ne 'ok') { throw 'HooshyarOS runtime health check failed' }\n"
-        "Write-Output 'HooshyarOS installed and health-checked'\n",
+        "$launcher = Join-Path $here 'launch-hooshyar.cmd'\n"
+        "$process = Start-Process -FilePath $launcher -WorkingDirectory $here -PassThru\n"
+        "try {\n"
+        "  $deadline=(Get-Date).AddSeconds(20)\n"
+        "  do {\n"
+        "    try { $response=Invoke-RestMethod -Uri 'http://127.0.0.1:4173/health' -TimeoutSec 2; break } catch { Start-Sleep -Milliseconds 500 }\n"
+        "  } while ((Get-Date) -lt $deadline)\n"
+        "  if (-not $response -or $response.status -ne 'ok') { throw 'HooshyarOS runtime health check failed' }\n"
+        "  Write-Output 'HooshyarOS installed and health-checked'\n"
+        "}\n"
+        "finally {\n"
+        "  if ($process -and -not $process.HasExited) { Stop-Process -Id $process.Id -Force }\n"
+        "}\n",
         encoding="utf-8",
     )
 
