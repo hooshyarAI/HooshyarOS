@@ -12,6 +12,12 @@
             "problemMatcher": []
         },
         {
+            "label": "HooshyarOS: Cline Full Platform Audit",
+            "type": "shell",
+            "command": "npm run product:cline:audit",
+            "problemMatcher": []
+        },
+        {
             "label": "HooshyarOS: Product Assurance",
             "type": "shell",
             "command": "npm run product:assurance",
