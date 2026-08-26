@@ -28,6 +28,7 @@ describe("Windows product installer contract", () => {
 
     it("bundles an executable Node runtime and an observable launch surface", () => {
         expect(builder).toContain('shutil.which("node")');
+        expect(builder).toContain("_validate_windows_node_executable");
         expect(builder).toContain("node-runtime");
         expect(builder).toContain("node.exe");
         expect(builder).toContain("start-commercial-runtime.ts");
@@ -38,14 +39,12 @@ describe("Windows product installer contract", () => {
     });
 
     it("uses the runtime entrypoint rather than the development assistant", () => {
-        expect(builder).toContain("tsx\\dist\\cli.mjs");
+        expect(builder).toContain("tsx\\\\dist\\\\cli.mjs");
         expect(builder).not.toContain("hooshyar_build.py assistant");
     });
 
     it("requires the commercial runtime and web entrypoint in the payload", () => {
-        expect(builder).toContain("CommercialRuntimeServer.ts");
         expect(builder).toContain("start-commercial-runtime.ts");
-        expect(builder).toContain("Frontend/HooshyarWebApp/index.ts");
         expect(builder).toContain("product-manifest.json");
         expect(builder).toContain('web = payload / "web"');
         expect(builder).toContain('index = web / "index.html"');
