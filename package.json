@@ -15,6 +15,7 @@
     "product:web:acceptance": "node scripts/web-product-acceptance.cjs",
     "product:security:acceptance": "node scripts/security-tenant-acceptance.cjs",
     "product:agent:evidence": "node scripts/agent-repair-evidence-check.cjs",
+    "product:agent:drill": "node qa/agent-repair-drill/repair-target.cjs",
     "autonomous:build": "tsx Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts",
     "autonomous:assistant": "python Backend/AI_Runtime/hooshyar_build.py assistant",
     "autonomous:platform": "python Backend/AI_Runtime/hooshyar_build.py platform"
