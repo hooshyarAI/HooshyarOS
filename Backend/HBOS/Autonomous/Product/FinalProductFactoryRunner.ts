@@ -1,5 +1,5 @@
 import { execFileSync, spawn, ChildProcess } from "node:child_process";
-import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = process.cwd();
@@ -7,6 +7,7 @@ const port = Number(process.env.HOOSHYAR_FACTORY_PORT ?? "4173");
 const databasePath = resolve(root, process.env.HOOSHYAR_FACTORY_DB ?? "data/hooshyar-final-factory.sqlite");
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 const git = process.platform === "win32" ? "git.exe" : "git";
+const shell = process.platform === "win32" ? (process.env.ComSpec ?? "cmd.exe") : undefined;
 
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
@@ -39,20 +40,35 @@ async function request(path: string, init: RequestInit = {}): Promise<{ status: 
   return { status: response.status, body, cookie: response.headers.get("set-cookie") ?? undefined };
 }
 
-async function startRuntime(): Promise<ChildProcess> {
-  mkdirSync(resolve(root, "data"), { recursive: true });
-  const child = spawn(npm, ["run", "start:commercial"], {
+function spawnCommercialRuntime(): ChildProcess {
+  const args = process.platform === "win32"
+    ? ["/d", "/s", "/c", `"${npm}" run start:commercial`]
+    : ["run", "start:commercial"];
+  return spawn(process.platform === "win32" ? shell! : npm, args, {
     cwd: root,
     stdio: "inherit",
+    shell: false,
+    windowsHide: true,
     env: { ...process.env, HOOSHYAR_DB_PATH: databasePath, PORT: String(port) }
   });
+}
+
+async function startRuntime(): Promise<ChildProcess> {
+  mkdirSync(resolve(root, "data"), { recursive: true });
+  const child = spawnCommercialRuntime();
+  child.once("error", error => console.error(JSON.stringify({ type: "FINAL_PRODUCT_FACTORY", stage: "RUN", ok: false, error: error.message })));
   await waitHealth();
   return child;
 }
 
 async function stopRuntime(child: ChildProcess): Promise<void> {
   if (child.exitCode === null) {
-    child.kill();
+    if (process.platform === "win32") {
+      try { execFileSync(shell!, ["/d", "/s", "/c", `taskkill /PID ${child.pid} /T /F`], { cwd: root, stdio: "ignore" }); }
+      catch {}
+    } else {
+      child.kill("SIGTERM");
+    }
     await sleep(750);
   }
 }
@@ -82,7 +98,7 @@ async function main(): Promise<void> {
       "2026-08-02,Sales,0,1500,IRR",
       "2026-08-03,Expense,300,0,IRR",
       "2026-08-04,Receivable,0,800,IRR"
-    ].join("\\n");
+    ].join("\n");
 
     const analysis = await request("/api/analyze", {
       method: "POST",
