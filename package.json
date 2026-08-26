@@ -11,6 +11,7 @@
     "product:factory:handoff": "node scripts/product-factory-handoff.cjs",
     "product:assurance": "node scripts/product-platform-assurance.cjs",
     "product:cline:audit": "node scripts/cline-full-platform-audit.cjs",
+    "product:cline:evidence": "node scripts/cline-runtime-evidence-collector.cjs",
     "product:web:acceptance": "node scripts/web-product-acceptance.cjs",
     "autonomous:build": "tsx Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts",
     "autonomous:assistant": "python Backend/AI_Runtime/hooshyar_build.py assistant",
