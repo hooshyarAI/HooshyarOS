@@ -5,7 +5,10 @@ const path = require('node:path');
 const root = process.cwd();
 const port = 4174;
 const db = path.join(root, 'data', 'web-acceptance.sqlite');
-const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const node = process.execPath;
+const tsxCli = path.join(root, 'node_modules', 'tsx', 'dist', 'cli.mjs');
+const runtimeEntrypoint = path.join(root, 'Backend', 'HBOS', 'Autonomous', 'Runtime', 'start-commercial-runtime.ts');
+const shell = process.platform === 'win32' ? (process.env.ComSpec || 'cmd.exe') : undefined;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function waitHealth() {
@@ -28,19 +31,30 @@ async function request(pathname, options = {}) {
   return { status: response.status, body, setCookie: response.headers.get('set-cookie') || '' };
 }
 
-async function main() {
-  fs.mkdirSync(path.dirname(db), { recursive: true });
-  const child = spawn(npm, ['run', 'start:commercial'], {
+function spawnRuntime() {
+  return spawn(node, [tsxCli, runtimeEntrypoint], {
     cwd: root,
     stdio: 'inherit',
-    env: { ...process.env, HOOSHYAR_PORT: String(port), HOOSHYAR_DB_PATH: db }
+    shell: false,
+    windowsHide: true,
+    env: { ...process.env, HOOSHYAR_HOST: '127.0.0.1', HOOSHYAR_PORT: String(port), HOOSHYAR_DB_PATH: db }
   });
+}
+
+async function main() {
+  if (!fs.existsSync(tsxCli)) throw new Error(`WEB_ACCEPTANCE_LAUNCHER_MISSING:${tsxCli}`);
+  if (!fs.existsSync(runtimeEntrypoint)) throw new Error(`WEB_ACCEPTANCE_ENTRYPOINT_MISSING:${runtimeEntrypoint}`);
+  fs.mkdirSync(path.dirname(db), { recursive: true });
+  const child = spawnRuntime();
 
   const stop = async () => {
     if (child.exitCode === null) {
-      child.kill('SIGTERM');
+      if (process.platform === 'win32') {
+        try { require('node:child_process').execFileSync(shell, ['/d', '/s', '/c', `taskkill /PID ${child.pid} /T /F`], { cwd: root, stdio: 'ignore' }); } catch {}
+      } else {
+        child.kill('SIGTERM');
+      }
       await sleep(500);
-      if (child.exitCode === null) child.kill('SIGKILL');
     }
     try { fs.rmSync(db, { force: true }); } catch {}
   };
