@@ -26,6 +26,17 @@ jobs:
       - name: Build debug APK
         working-directory: android
         run: gradle :app:assembleDebug --no-daemon
+      - name: Android emulator install and launch smoke
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_2
+          script: |
+            adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+            adb shell am start -n ai.hooshyar.client/.MainActivity
+            adb shell pidof ai.hooshyar.client
+            adb shell dumpsys activity activities | grep -q 'ai.hooshyar.client/.MainActivity'
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
