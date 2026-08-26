@@ -20,10 +20,10 @@ The Manifest defines what the product is. The Qualification Matrix defines what 
 Run the real product factory, not a simulated audit:
 `READ -> AUDIT -> SELECT -> IMPLEMENT -> TEST -> INTEGRATE -> RUN -> ACCEPT -> REPAIR -> TEST -> ACCEPT -> COMMIT -> PUSH -> REPLAN`
 
-Use `npm run product:factory` as the primary local acceptance command.
+Use `npm run product:cline:audit` as the first full-platform review command, then `npm run product:factory` as the primary local acceptance command.
 
 ## Full-platform review
-For a product-affecting task, review the complete impacted surface: architecture, capabilities, engine ownership, APIs, UI/dashboard, persistence, security, Windows/Web/Android runtime, tests, CI workflows, packaging, release scripts, and deployment contracts. Map every finding to a Manifest layer and a Matrix cell.
+For a product-affecting task, run `npm run product:cline:audit` before changing code. Review the complete surface: architecture, capabilities, engine ownership, APIs, UI/dashboard, persistence, security, Windows/Web/Android runtime, tests, CI workflows, packaging, release scripts, and deployment contracts. The audit writes `.hooshyar/cline-platform-audit.json` and maps every required Qualification Matrix cell to static status. Static review never upgrades a runtime/acceptance/CI cell to PASS.
 
 ## Repair behavior
 When the factory returns BLOCKED:
@@ -34,6 +34,7 @@ When the factory returns BLOCKED:
 - never weaken/remove a failing test to obtain green;
 - never modify Architecture Freeze V4 to bypass a failure;
 - add or update a regression test for the repaired defect;
+- rerun `npm run product:cline:audit`;
 - rerun focused verification;
 - rerun `npm run product:factory`;
 - after application acceptance passes, run `npm test -- --runInBand`.
