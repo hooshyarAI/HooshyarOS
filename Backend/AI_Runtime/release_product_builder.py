@@ -13,6 +13,12 @@ def _should_skip_file(path: Path) -> bool:
     return (path.is_dir() and name in {"__pycache__", "node_modules"}) or name.endswith((".pyc", ".test", ".spec")) or name in {".git"}
 
 
+def _validate_windows_node_executable(node_exe: Path) -> None:
+    data = node_exe.read_bytes()[:2]
+    if data != b"MZ":
+        raise RuntimeError(f"Windows packaging requires a Windows PE node.exe; got non-PE executable: {node_exe}")
+
+
 def _validate_windows_payload(payload: Path) -> None:
     if not payload.exists():
         raise FileNotFoundError(payload)
@@ -27,6 +33,7 @@ def _validate_windows_payload(payload: Path) -> None:
     missing = [str(path) for path in required if not path.exists()]
     if missing:
         raise RuntimeError(f"customer payload incomplete: {missing}")
+    _validate_windows_node_executable(payload / "node-runtime" / "node.exe")
 
 
 def _runtime_dependency_names() -> list[str]:
