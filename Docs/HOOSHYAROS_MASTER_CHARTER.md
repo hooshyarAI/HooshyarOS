@@ -156,6 +156,37 @@ The next capability is the first genuinely missing capability whose dependencies
 
 The Assistant must never stop simply because its own construction layer is complete.
 
+### 6.1 Autonomous Platform Self-Management Law — PERMANENT
+
+The platform's construction fabric is required to autonomously plan and execute the complete engineering lifecycle for platform construction, repair, standardization, commercialization, qualification and continuation. The human owner is not the mechanical lifecycle driver.
+
+The canonical lifecycle is:
+
+**READ → AUDIT → DISCOVER → PRIORITIZE → PLAN → DEPENDENCY CHECK → CHECKPOINT → IMPLEMENT → FOCUSED TEST → INTEGRATE → RUNTIME/APPLICATION ACCEPTANCE → VERIFY → REPAIR IF NEEDED → STANDARDIZE → COMMERCIALIZE → QUALIFY → EVIDENCE → COMMIT/PUSH → CI FEEDBACK → RE-PLAN**
+
+The Assistant, Autonomous Operations Engine and approved construction fabric must choose and execute this lifecycle automatically from repository state. A human shell command may bootstrap or intentionally approve a governed action, but routine mechanical advancement must not require a human to manually choose the next stage, invoke a repair handoff, or stitch together separate commands.
+
+A factory failure, CI failure or acceptance failure must automatically enter the governed failure path and produce or invoke the canonical repair contract (`ASSISTANT_REPAIR_MISSION`) without synthetic success and without repeated blind retries.
+
+### 6.2 Canonical Reuse Law — PERMANENT
+
+Before creating any new Agent, Engine, Tool, Service, orchestration layer or alternative implementation path, autonomous planning must inventory the existing canonical architecture and registry and select reusable components wherever they satisfy the required contract.
+
+The platform must preferentially reuse existing:
+
+- Engines and Engine Registry entries;
+- Assistants and Assistant capabilities;
+- Builder, Planner, Orchestrator, Memory, Knowledge and Reasoning components;
+- autonomous construction and self-repair runners;
+- Product runtime, persistence, security and acceptance services;
+- repository-native Python and TypeScript workers;
+- tests, contracts and evidence collectors;
+- existing GitHub/CI workflows and release tooling.
+
+Creating a parallel Agent, duplicate Engine, duplicate business semantic, duplicate orchestration hierarchy or provider-specific construction path is prohibited unless an explicit architecture decision establishes a genuine missing capability or contradiction.
+
+The construction fabric must not depend on an external coding agent. Existing product provider integrations may exist only where approved by product architecture; they must never become dependencies of the construction fabric itself.
+
 ---
 
 ## 7. Expert Weaving Doctrine — Permanent Platform Law
