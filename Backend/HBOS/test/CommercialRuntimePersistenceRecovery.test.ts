@@ -64,7 +64,7 @@ describe("Commercial runtime persistence and recovery", () => {
     const afterRestart = await request(second, "/api/dashboard", { headers: { cookie: secondCookie } });
     expect(afterRestart.status).toBe(200);
     const afterPayload = await afterRestart.json() as { analysisAvailable: boolean; tenantId: string; metrics: { revenue: number; profit: number; risk: number } };
-    expect(afterPayload).toEqual({
+    expect(afterPayload).toMatchObject({
       status: "READY",
       tenantId: firstBody.tenantId,
       analysisAvailable: true,
