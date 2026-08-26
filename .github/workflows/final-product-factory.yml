@@ -96,6 +96,19 @@ jobs:
             adb shell am start -n ai.hooshyar.client/.MainActivity
             adb shell pidof ai.hooshyar.client
             adb shell dumpsys activity activities | grep -q 'ai.hooshyar.client/.MainActivity'
+      - name: Write Android acceptance evidence
+        shell: bash
+        run: |
+          mkdir -p .hooshyar
+          node -e "require('fs').writeFileSync('.hooshyar/android-acceptance-success.json', JSON.stringify({type:'ANDROID_PRODUCT_ACCEPTANCE_SUCCESS',version:1,status:'PASS',createdAt:new Date().toISOString(),commit:require('child_process').execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),acceptance:['apk-build','emulator-install','launch','process-smoke']},null,2))"
+      - name: Upload Android acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hooshyar-android-product-acceptance-evidence
+          path: .hooshyar/android-acceptance-success.json
+          if-no-files-found: warn
+          retention-days: 14
 
   full-qualification:
     runs-on: ubuntu-latest
@@ -136,13 +149,21 @@ jobs:
           name: hooshyar-web-product-acceptance-evidence
           path: .hooshyar
           merge-multiple: true
+      - name: Download Android acceptance evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: hooshyar-android-product-acceptance-evidence
+          path: .hooshyar
+          merge-multiple: true
       - name: Run Cline runtime evidence collector
         run: npm run product:cline:evidence
       - name: Upload consolidated qualification evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: hooshyar-cline-runtime-evidence
           path: .hooshyar/cline-runtime-evidence.json
+          if-no-files-found: warn
           retention-days: 14
 
   release-gate:
