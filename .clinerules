@@ -27,7 +27,8 @@ For a product-affecting task, review the complete impacted surface: architecture
 
 ## Repair behavior
 When the factory returns BLOCKED:
-- preserve the emitted evidence;
+- first run `npm run product:factory:handoff`;
+- treat the emitted `ASSISTANT_REPAIR_MISSION` as the canonical repair input;
 - identify the first failing stage, Matrix cell, environment, workflow, and root cause;
 - make the smallest coherent repair;
 - never weaken/remove a failing test to obtain green;
