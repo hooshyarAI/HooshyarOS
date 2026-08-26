@@ -12,7 +12,7 @@ DefaultDirName={localappdata}\Programs\HooshyarOS
 DefaultGroupName=HooshyarOS
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
-OutputDir=dist\productization\windows\installer
+OutputDir=..\dist\productization\windows\installer
 OutputBaseFilename=HooshyarOS-Setup-{#AppVersion}
 Compression=lzma2
 SolidCompression=yes
@@ -21,7 +21,7 @@ WizardStyle=modern
 UninstallDisplayName=HooshyarOS
 
 [Files]
-Source: "dist\productization\windows\payload\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+Source: "..\dist\productization\windows\payload\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 
 [Icons]
 Name: "{autoprograms}\HooshyarOS\HooshyarOS"; Filename: "{app}\launch-hooshyar.vbs"; WorkingDir: "{app}"
