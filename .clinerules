@@ -39,6 +39,9 @@ When the factory returns BLOCKED:
 - rerun `npm run product:factory`;
 - after application acceptance passes, run `npm test -- --runInBand`.
 
+## Agent repair evidence
+A completed Cline repair is not trusted until `.hooshyar/agent-repair-success.json` exists and `npm run product:agent:evidence` passes. The evidence must be type `ASSISTANT_REPAIR_MISSION_V1_RESULT`, status `PASS`, and bound to the current commit. It must identify the mission/finding, list an actual implementation change, report regression status `PASS`, and report factory acceptance status `PASS`. Never fabricate this file and never mark `ci-feedback` PASS without it.
+
 ## Product acceptance
 A green engine/unit test is not commercial completion. The real Windows journey must pass:
 `health -> ready -> session -> tenant -> ingestion -> financial analysis -> dashboard -> restart -> same tenant -> restored dashboard`.
