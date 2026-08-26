@@ -6,18 +6,29 @@ on:
       - 'android/**'
       - 'web/**'
       - 'Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts'
+      - 'Docs/Product/PRODUCT_PLATFORM_MANIFEST.json'
+      - 'Docs/Product/PRODUCT_QUALIFICATION_MATRIX.json'
   push:
     branches: [main]
     paths:
       - 'android/**'
       - 'web/**'
       - 'Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts'
+      - 'Docs/Product/PRODUCT_PLATFORM_MANIFEST.json'
+      - 'Docs/Product/PRODUCT_QUALIFICATION_MATRIX.json'
 
 jobs:
   android-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm install
+      - name: Validate canonical product assurance contract
+        run: npm run product:assurance
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
