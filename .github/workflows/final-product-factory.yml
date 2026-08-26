@@ -65,6 +65,29 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  security-tenant-acceptance:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm install
+      - name: Validate canonical product assurance contract
+        run: npm run product:assurance
+      - name: Run executable security and tenant isolation acceptance
+        run: npm run product:security:acceptance
+      - name: Upload security acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hooshyar-security-tenant-evidence
+          path: .hooshyar/security-acceptance-success.json
+          if-no-files-found: warn
+          retention-days: 14
+
   android-product-acceptance:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -100,12 +123,21 @@ jobs:
         shell: bash
         run: |
           mkdir -p .hooshyar
-          node -e "require('fs').writeFileSync('.hooshyar/android-acceptance-success.json', JSON.stringify({type:'ANDROID_PRODUCT_ACCEPTANCE_SUCCESS',version:1,status:'PASS',createdAt:new Date().toISOString(),commit:require('child_process').execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),acceptance:['apk-build','emulator-install','launch','process-smoke']},null,2))"
+          cat > .hooshyar/android-acceptance-success.json <<EOF
+          {
+            "type": "ANDROID_PRODUCT_ACCEPTANCE_SUCCESS",
+            "version": 1,
+            "status": "PASS",
+            "createdAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit": "$(git rev-parse HEAD)",
+            "acceptance": ["apk-build", "emulator-install", "launcher-start", "process-alive", "main-activity-visible"]
+          }
+          EOF
       - name: Upload Android acceptance evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: hooshyar-android-product-acceptance-evidence
+          name: hooshyar-android-acceptance-evidence
           path: .hooshyar/android-acceptance-success.json
           if-no-files-found: warn
           retention-days: 14
@@ -113,7 +145,7 @@ jobs:
   full-qualification:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [windows-product-factory, web-product-acceptance, android-product-acceptance]
+    needs: [windows-product-factory, web-product-acceptance, security-tenant-acceptance, android-product-acceptance]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -129,7 +161,7 @@ jobs:
   runtime-evidence-qualification:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [windows-product-factory, web-product-acceptance, android-product-acceptance, full-qualification]
+    needs: [windows-product-factory, web-product-acceptance, security-tenant-acceptance, android-product-acceptance, full-qualification]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -152,23 +184,27 @@ jobs:
       - name: Download Android acceptance evidence
         uses: actions/download-artifact@v4
         with:
-          name: hooshyar-android-product-acceptance-evidence
+          name: hooshyar-android-acceptance-evidence
+          path: .hooshyar
+          merge-multiple: true
+      - name: Download security acceptance evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: hooshyar-security-tenant-evidence
           path: .hooshyar
           merge-multiple: true
       - name: Run Cline runtime evidence collector
         run: npm run product:cline:evidence
       - name: Upload consolidated qualification evidence
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: hooshyar-cline-runtime-evidence
           path: .hooshyar/cline-runtime-evidence.json
-          if-no-files-found: warn
           retention-days: 14
 
   release-gate:
     runs-on: ubuntu-latest
-    needs: [windows-product-factory, web-product-acceptance, android-product-acceptance, full-qualification, runtime-evidence-qualification]
+    needs: [windows-product-factory, web-product-acceptance, security-tenant-acceptance, android-product-acceptance, full-qualification, runtime-evidence-qualification]
     if: ${{ always() }}
     steps:
       - name: Require every release gate to pass
@@ -176,6 +212,7 @@ jobs:
         run: |
           test "${{ needs.windows-product-factory.result }}" = "success"
           test "${{ needs.web-product-acceptance.result }}" = "success"
+          test "${{ needs.security-tenant-acceptance.result }}" = "success"
           test "${{ needs.android-product-acceptance.result }}" = "success"
           test "${{ needs.full-qualification.result }}" = "success"
           test "${{ needs.runtime-evidence-qualification.result }}" = "success"
