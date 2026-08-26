@@ -10,6 +10,30 @@
                 "isDefault": true
             },
             "problemMatcher": []
+        },
+        {
+            "label": "HooshyarOS: Product Assurance",
+            "type": "shell",
+            "command": "npm run product:assurance",
+            "problemMatcher": []
+        },
+        {
+            "label": "HooshyarOS: Product Factory",
+            "type": "shell",
+            "command": "npm run product:factory",
+            "problemMatcher": []
+        },
+        {
+            "label": "HooshyarOS: Factory Handoff",
+            "type": "shell",
+            "command": "npm run product:factory:handoff",
+            "problemMatcher": []
+        },
+        {
+            "label": "HooshyarOS: Full Qualification",
+            "type": "shell",
+            "command": "npm test -- --runInBand",
+            "problemMatcher": []
         }
     ]
 }
