@@ -119,6 +119,16 @@ jobs:
             adb shell am start -n ai.hooshyar.client/.MainActivity
             adb logcat -d AndroidRuntime:E *:S | tail -n 50 || true
             adb shell dumpsys activity activities | grep -i hooshyar || true
+            echo "=== Android process diagnostics ==="
+            adb shell ps -A | grep -i 'ai.hooshyar' || true
+            adb shell dumpsys activity processes | grep -i -A 20 -B 10 'ai.hooshyar.client' || true
+            adb shell dumpsys activity top | grep -i -A 10 -B 10 'ai.hooshyar.client' || true
+            adb shell dumpsys package ai.hooshyar.client | grep -i -E 'packageName|versionName|versionCode|MAIN|LAUNCHER' || true
+            for i in $(seq 1 15); do
+              echo "pidof attempt $i: $(adb shell pidof ai.hooshyar.client)" || true
+              sleep 2
+            done || true
+            echo "=== end diagnostics ==="
             adb shell pidof ai.hooshyar.client
             adb shell dumpsys activity activities | grep -q 'ai.hooshyar.client/.MainActivity'
       - name: Write Android acceptance evidence
