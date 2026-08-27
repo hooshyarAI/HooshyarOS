@@ -120,6 +120,25 @@ Before each capability executes, the system must produce an explicit plan coveri
 
 The system must never invent a capability or silently reorder the canonical backlog merely to make a cycle easier.
 
+### Approved execution operators
+
+**Kilo Code** is an approved local VS Code execution/operator layer for repository inspection, governed implementation, command execution, testing, repair, standardization, evidence production and Git operations when safely automatable.
+
+Kilo Code has **no architecture ownership** and no authority to redefine:
+
+- Architecture Freeze V4
+- governance decisions
+- product semantics
+- source-of-truth hierarchy
+- completion rules
+- canonical engine ownership
+
+Kilo Code must operate under the same lifecycle, evidence, scope, security and anti-drift rules as the autonomous construction Assistant.
+
+Kilo Code may be used as an execution tool even when other external coding providers are prohibited. **No external coding provider, model service or agent may become a hidden architectural dependency or mandatory product runtime component.**
+
+When Kilo Code is used, repository rules remain authoritative; the agent's prompt, memory, model preference or local configuration never overrides repository governance.
+
 ### Wrong-unit recovery
 
 If a capability is found to be wrong, incomplete, incompatible or harmful to dependent capabilities, the system must not continue building on it.
@@ -157,6 +176,8 @@ The human supplies product intent, approved decisions and governance. The constr
 Repository-native tooling is preferred. **Python is the preferred implementation/orchestration worker for autonomous construction, analysis, generation, verification and repair where appropriate**, because it provides a reproducible local execution layer.
 
 The autonomous construction path must remain provider-independent. Codex, GitHub Copilot, Claude or another external coding provider must not become hidden architectural dependencies or mandatory runtime components.
+
+Kilo Code is permitted as an execution/operator layer only and does not alter this provider-independence rule.
 
 ---
 
@@ -228,7 +249,7 @@ The autonomous construction system must never:
 - replace a frozen engine boundary with a convenient alternative;
 - create duplicate engines;
 - turn the Assistant into the platform's end-user financial or managerial advisor;
-- depend on Codex, Copilot, Claude or another external coding provider;
+- make Codex, Copilot, Claude, Kilo Code, or another coding tool a hidden architectural dependency or mandatory runtime component;
 - ask the human to perform mechanical file-by-file construction when the repository-native construction fabric can do it;
 - declare completion from file existence alone;
 - bypass tests, static validation, integration verification or architecture compliance;
@@ -236,6 +257,8 @@ The autonomous construction system must never:
 - forget the approved product intent when selecting the next capability;
 - continue weaving after an unverified or invalid capability without repairing or isolating it first;
 - redesign Architecture Freeze V4 without repository evidence of a genuine contradiction or missing architectural capability.
+
+**Kilo Code may execute governed local construction operations, but it must remain subject to every rule above.**
 
 ---
 
@@ -251,6 +274,7 @@ The repository therefore becomes the durable memory of:
 - final engine boundaries
 - product principles
 - autonomous construction role
+- approved execution operators
 - construction loop
 - expert weaving method
 - trusted checkpoints and recovery rules
@@ -297,4 +321,6 @@ For the autonomous Assistant itself, DONE additionally means the verified comple
 
 **GITHUB REPOSITORY CONTROL: REQUIRED**
 
-**EXTERNAL CODING AGENTS: PROHIBITED**
+**KILO CODE: APPROVED LOCAL EXECUTION / OPERATOR LAYER**
+
+**EXTERNAL CODING PROVIDERS: NON-MANDATORY AND MUST NOT BECOME ARCHITECTURAL DEPENDENCIES**
