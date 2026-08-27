@@ -1,17 +1,20 @@
-﻿export class GovernanceEngine {
+﻿import { Engine } from "../Core/Engine";
 
-    initialize(){
+export class GovernanceEngine implements Engine {
+    name = "GovernanceEngine";
 
+    initialize() {
         console.log("GovernanceEngine Started");
-
         return {
-            name:"GovernanceEngine",
-            status:"READY",
-        health:"HEALTHY"
+            name: "GovernanceEngine",
+            status: "READY",
+            health: "HEALTHY"
         };
-
     }
 
+    health(): boolean {
+        return true;
+    }
 }
 
 

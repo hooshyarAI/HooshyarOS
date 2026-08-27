@@ -15,6 +15,11 @@ describe("Final Architecture Qualification", () => {
       "ProjectPilotEngine",
       "KnowledgeEngine",
       "AssistantEngine",
+      "ReasoningEngine",
+      "GovernanceEngine",
+      "ExecutiveIntelligenceEngine",
+      "OrganizationalIntelligenceEngine",
+      "AutonomousOperationsEngine",
     ]);
     expect(health.every((entry) => entry.healthy)).toBe(true);
   });

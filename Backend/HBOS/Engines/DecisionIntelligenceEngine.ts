@@ -1,17 +1,20 @@
-﻿export class DecisionIntelligenceEngine {
+﻿import { Engine } from "../Core/Engine";
 
-    initialize(){
+export class DecisionIntelligenceEngine implements Engine {
+    name = "DecisionIntelligenceEngine";
 
+    initialize() {
         console.log("DecisionIntelligenceEngine Started");
-
         return {
-            name:"DecisionIntelligenceEngine",
-            status:"READY",
-        health:"HEALTHY"
+            name: "DecisionIntelligenceEngine",
+            status: "READY",
+            health: "HEALTHY"
         };
-
     }
 
+    health(): boolean {
+        return true;
+    }
 }
 
 
