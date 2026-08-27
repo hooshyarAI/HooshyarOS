@@ -1,7 +1,7 @@
-# HooshyarOS Cline execution rules
+# HooshyarOS Cline / Kilo execution rules
 
 ## Role
-Cline is a local VS Code execution/operator layer. It is NOT the architecture owner and must not redefine Architecture Freeze V4, governance, product semantics, or completion rules.
+Cline and Kilo Code are local VS Code execution/operator layers. They are NOT the architecture owner and must not redefine Architecture Freeze V4, governance, product semantics, or completion rules.
 
 ## Source of truth
 Always read, in order:
@@ -17,12 +17,12 @@ Always read, in order:
 The Manifest defines what the product is. The Qualification Matrix defines what must be proven. Never replace either with intuition.
 
 ## Autonomous lifecycle law
-The Assistant/construction fabric is the lifecycle owner for routine mechanical construction, repair, standardization, commercialization, qualification, evidence production and continuation. Cline is an execution/operator layer, not a manual workflow coordinator.
+The Assistant/construction fabric is the lifecycle owner for routine mechanical construction, repair, standardization, commercialization, qualification, evidence production and continuation. Cline and Kilo are execution/operator layers, not manual workflow coordinators and not architecture owners.
 
 The canonical lifecycle is:
 `READ -> AUDIT -> DISCOVER -> PRIORITIZE -> PLAN -> DEPENDENCY CHECK -> CHECKPOINT -> IMPLEMENT -> FOCUSED TEST -> INTEGRATE -> RUNTIME/APPLICATION ACCEPTANCE -> VERIFY -> REPAIR IF NEEDED -> STANDARDIZE -> COMMERCIALIZE -> QUALIFY -> EVIDENCE -> COMMIT/PUSH -> CI FEEDBACK -> REPLAN`
 
-Human shell commands may bootstrap or explicitly approve governed actions, but Cline must not require the human to manually stitch routine lifecycle stages together. When the current stage produces a factory/CI/acceptance failure, Cline must transition into the canonical repair path rather than repeatedly retrying the failed command unchanged.
+Human shell commands may bootstrap or explicitly approve governed actions, but Cline/Kilo must not require the human to manually stitch routine lifecycle stages together. When the current stage produces a factory/CI/acceptance failure, the operator must transition into the canonical repair path rather than repeatedly retrying the failed command unchanged.
 
 ## Canonical reuse law
 Before creating or proposing any new Agent, Engine, Tool, Service, orchestration layer, business semantic or provider-specific construction path, inspect the existing canonical architecture, Engine/Capability registries, Assistant/Builder/Planner/Orchestrator components, autonomous runtime and repair runners, Product runtime/services, tests, evidence collectors and CI/release workflows.
@@ -37,6 +37,15 @@ Use `npm run product:cline:audit` as the first full-platform review command, the
 
 ## Full-platform review
 For a product-affecting task, run `npm run product:cline:audit` before changing code. Review the complete surface: architecture, capabilities, engine ownership, APIs, UI/dashboard, persistence, security, Windows/Web/Android runtime, tests, CI workflows, packaging, release scripts, and deployment contracts. The audit writes `.hooshyar/cline-platform-audit.json` and maps every required Qualification Matrix cell to static status. Static review never upgrades a runtime/acceptance/CI cell to PASS.
+
+## Approved local execution operators
+Kilo Code is an approved local VS Code execution/operator layer alongside Cline. It may inspect the repository, execute governed commands, apply the smallest implementation repair, run verification, produce evidence, and perform Git operations when safely automatable.
+
+Kilo Code must obey the same source-of-truth order, lifecycle, scope discipline, evidence protocol, security boundaries, Git discipline and anti-drift rules defined here and in the Governance Charter.
+
+Kilo Code does not have authority to redefine Architecture Freeze V4, governance decisions, product semantics, completion rules, or canonical engine/capability ownership.
+
+Provider choice for the operator is an implementation detail. No external coding provider, model, SaaS service or agent may become a hidden architectural dependency or mandatory HooshyarOS runtime component.
 
 ## Repair behavior
 When the factory returns BLOCKED or the governed verification path fails:
@@ -58,7 +67,7 @@ When the factory returns BLOCKED or the governed verification path fails:
 Repeated blind retries of an unchanged failing command are prohibited. If a persistent failure is not safely repairable within the governed budget, enter BLOCKED with evidence instead of looping indefinitely.
 
 ## Agent repair evidence
-A completed Cline repair is not trusted until `.hooshyar/agent-repair-success.json` exists and `npm run product:agent:evidence` passes. The evidence must be type `ASSISTANT_REPAIR_MISSION_V1_RESULT`, status `PASS`, and bound to the current commit. It must identify the mission/finding, list an actual implementation change, report regression status `PASS`, and report factory acceptance status `PASS`. Never fabricate this file and never mark `ci-feedback` PASS without it.
+A completed repair is not trusted until `.hooshyar/agent-repair-success.json` exists and `npm run product:agent:evidence` passes. The evidence must be type `ASSISTANT_REPAIR_MISSION_V1_RESULT`, status `PASS`, and bound to the current commit. It must identify the mission/finding, list an actual implementation change, report regression status `PASS`, and report factory acceptance status `PASS`. Never fabricate this file and never mark `ci-feedback` PASS without it.
 
 ## Product acceptance
 A green engine/unit test is not commercial completion. The real Windows journey must pass:
@@ -85,5 +94,5 @@ Unknown is not PASS. BLOCKED is not PASS. Passing one environment never proves a
 ## Git discipline
 Before risky changes create a checkpoint/commit when possible. Keep one coherent capability/fix per commit. Do not force-push. Do not push or merge unless the repository policy explicitly permits it.
 
-## Cline boundary
-Cline may execute commands, inspect the repository and GitHub evidence available through configured tooling, apply the smallest implementation repair, and run verification. Cline must not invent a new engine, duplicate business semantics, or claim product completion without application and acceptance evidence.
+## Operator boundary
+Cline and Kilo may execute commands, inspect the repository and available GitHub evidence, apply the smallest governed repair, and run verification. Neither is permitted to invent a new engine, duplicate business semantics, alter Architecture Freeze V4, or claim product completion without application and acceptance evidence.
