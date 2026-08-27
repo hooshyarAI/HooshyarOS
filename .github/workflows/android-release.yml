@@ -46,7 +46,8 @@ jobs:
           script: |
             echo "=== Waiting for Android Package Manager service ==="
             _PM_READY=0
-            for i in $(seq 1 30); do
+            i=1
+            while [ "$i" -le 30 ]; do
               if adb shell cmd package list packages >/dev/null 2>&1; then
                 echo "Package Manager service ready (attempt $i)"
                 _PM_READY=1
@@ -54,6 +55,7 @@ jobs:
               fi
               echo "Package Manager not ready (attempt $i/30), retrying in 2s..."
               sleep 2
+              i=$((i + 1))
             done
             if [ "$_PM_READY" != "1" ]; then
               echo "ERROR: Package Manager service did not become ready within 60s"
