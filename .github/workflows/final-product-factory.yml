@@ -117,6 +117,8 @@ jobs:
           script: |
             adb install -r android/app/build/outputs/apk/debug/app-debug.apk
             adb shell am start -n ai.hooshyar.client/.MainActivity
+            adb logcat -d AndroidRuntime:E *:S | tail -n 50 || true
+            adb shell dumpsys activity activities | grep -i hooshyar || true
             adb shell pidof ai.hooshyar.client
             adb shell dumpsys activity activities | grep -q 'ai.hooshyar.client/.MainActivity'
       - name: Write Android acceptance evidence
