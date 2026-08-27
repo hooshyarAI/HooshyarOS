@@ -44,6 +44,22 @@ jobs:
           arch: x86_64
           profile: pixel_2
           script: |
+            echo "=== Waiting for Android Package Manager service ==="
+            _PM_READY=0
+            for i in $(seq 1 30); do
+              if adb shell cmd package list packages >/dev/null 2>&1; then
+                echo "Package Manager service ready (attempt $i)"
+                _PM_READY=1
+                break
+              fi
+              echo "Package Manager not ready (attempt $i/30), retrying in 2s..."
+              sleep 2
+            done
+            if [ "$_PM_READY" != "1" ]; then
+              echo "ERROR: Package Manager service did not become ready within 60s"
+              exit 1
+            fi
+            echo "=== Package Manager ready ==="
             adb install -r android/app/build/outputs/apk/debug/app-debug.apk
             adb shell am start -n ai.hooshyar.client/.MainActivity
             adb logcat -d AndroidRuntime:E *:S | tail -n 50 || true
