@@ -4,7 +4,7 @@ const path = require('node:path');
 const cp = require('node:child_process');
 
 const root = process.cwd();
-const port = 4174;
+const port = Number(process.env.HOOSHYAR_WEB_ACCEPTANCE_PORT ?? '4174');
 const db = path.join(root, 'data', 'web-acceptance.sqlite');
 const evidenceDir = path.join(root, '.hooshyar');
 const evidencePath = path.join(evidenceDir, 'web-acceptance-success.json');
@@ -15,20 +15,61 @@ const shell = process.platform === 'win32' ? (process.env.ComSpec || 'cmd.exe') 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 function gitCommit() { try { return cp.execFileSync(process.platform === 'win32' ? 'git.exe' : 'git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(); } catch { return 'UNKNOWN'; } }
 
-async function waitHealth() { const deadline = Date.now() + 30000; while (Date.now() < deadline) { try { const response = await fetch(`http://127.0.0.1:${port}/health`); if (response.ok && (await response.json()).status === 'ok') return; } catch {} await sleep(250); } throw new Error('WEB_ACCEPTANCE_HEALTH_TIMEOUT'); }
-async function request(pathname, options = {}) { const response = await fetch(`http://127.0.0.1:${port}${pathname}`, options); const text = await response.text(); let body = {}; try { body = text ? JSON.parse(text) : {}; } catch { body = { raw: text }; } return { status: response.status, body, setCookie: response.headers.get('set-cookie') || '' }; }
-function spawnRuntime() { return spawn(node, [tsxCli, runtimeEntrypoint], { cwd: root, stdio: 'inherit', shell: false, windowsHide: true, env: { ...process.env, HOOSHYAR_HOST: '127.0.0.1', HOOSHYAR_PORT: String(port), HOOSHYAR_DB_PATH: db } }); }
+async function waitHealth(child) {
+  const deadline = Date.now() + 30000;
+  while (Date.now() < deadline) {
+    if (child.spawnError) throw new Error(`WEB_ACCEPTANCE_RUNTIME_SPAWN_ERROR:${child.spawnError.message}`);
+    if (child.exitCode !== null) throw new Error(`WEB_ACCEPTANCE_RUNTIME_EXITED_BEFORE_HEALTH:code=${child.exitCode}`);
+    if (child.signalCode) throw new Error(`WEB_ACCEPTANCE_RUNTIME_SIGNALED_BEFORE_HEALTH:${child.signalCode}`);
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/health`);
+      if (response.ok && (await response.json()).status === 'ok') return;
+    } catch {}
+    await sleep(250);
+  }
+  throw new Error(`WEB_ACCEPTANCE_HEALTH_TIMEOUT:port=${port}`);
+}
+
+async function request(pathname, options = {}) {
+  const response = await fetch(`http://127.0.0.1:${port}${pathname}`, options);
+  const text = await response.text();
+  let body = {};
+  try { body = text ? JSON.parse(text) : {}; } catch { body = { raw: text }; }
+  return { status: response.status, body, setCookie: response.headers.get('set-cookie') || '' };
+}
+
+function spawnRuntime() {
+  const child = spawn(node, [tsxCli, runtimeEntrypoint], {
+    cwd: root,
+    stdio: ['ignore', 'inherit', 'inherit'],
+    shell: false,
+    windowsHide: true,
+    env: { ...process.env, HOOSHYAR_HOST: '127.0.0.1', HOOSHYAR_PORT: String(port), HOOSHYAR_DB_PATH: db }
+  });
+  child.spawnError = null;
+  child.on('error', (error) => { child.spawnError = error; });
+  return child;
+}
 
 async function main() {
   fs.mkdirSync(evidenceDir, { recursive: true });
   try { fs.rmSync(evidencePath, { force: true }); } catch {}
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`WEB_ACCEPTANCE_INVALID_PORT:${port}`);
   if (!fs.existsSync(tsxCli)) throw new Error(`WEB_ACCEPTANCE_LAUNCHER_MISSING:${tsxCli}`);
   if (!fs.existsSync(runtimeEntrypoint)) throw new Error(`WEB_ACCEPTANCE_ENTRYPOINT_MISSING:${runtimeEntrypoint}`);
   fs.mkdirSync(path.dirname(db), { recursive: true });
   const child = spawnRuntime();
-  const stop = async () => { if (child.exitCode === null) { if (process.platform === 'win32') { try { require('node:child_process').execFileSync(shell, ['/d', '/s', '/c', `taskkill /PID ${child.pid} /T /F`], { cwd: root, stdio: 'ignore' }); } catch {} } else child.kill('SIGTERM'); await sleep(500); } try { fs.rmSync(db, { force: true }); } catch {} };
+  const stop = async () => {
+    if (child.exitCode === null && !child.signalCode) {
+      if (process.platform === 'win32') {
+        try { cp.execFileSync(shell, ['/d', '/s', '/c', `taskkill /PID ${child.pid} /T /F`], { cwd: root, stdio: 'ignore' }); } catch {}
+      } else child.kill('SIGTERM');
+      await sleep(500);
+    }
+    try { fs.rmSync(db, { force: true }); } catch {}
+  };
   try {
-    await waitHealth();
+    await waitHealth(child);
     const rootPage = await fetch(`http://127.0.0.1:${port}/`);
     if (!rootPage.ok || !(await rootPage.text()).includes('هوشیار.ai')) throw new Error('WEB_ACCEPTANCE_ROOT_FAILED');
     const session = await request('/api/session', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'web-qa', organization: 'Hooshyar Web QA' }) });
@@ -44,4 +85,4 @@ async function main() {
     console.log(JSON.stringify({ type: 'WEB_PRODUCT_ACCEPTANCE', status: 'PASS', tenantId: session.body.tenantId, profit: dashboard.body.metrics.profit, root: true, session: true, analysis: true, dashboard: true }, null, 2));
   } finally { await stop(); }
 }
-main().catch((error) => { try { fs.rmSync(evidencePath, { force: true }); } catch {} console.error(JSON.stringify({ type: 'WEB_PRODUCT_ACCEPTANCE', status: 'BLOCKED', error: error.message }, null, 2)); process.exitCode = 1; });
+main().catch((error) => { try { fs.rmSync(evidencePath, { force: true }); } catch {} console.error(JSON.stringify({ type: 'WEB_PRODUCT_ACCEPTANCE', status: 'BLOCKED', error: error.message, platform: process.platform, node: process.version }, null, 2)); process.exitCode = 1; });
