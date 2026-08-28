@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { FinancialIntelligenceEngine } from "../../Engines/FinancialIntelligenceEngine";
 import { ExecutiveIntelligenceEngine } from "../../Engines/ExecutiveIntelligenceEngine";
 import { ReasoningEngine } from "../../Engines/ReasoningEngine";
+import { ReportsEngine } from "../../Engines/ReportsEngine";
 import { FinancialDataIngestionAdapter } from "../../Product/FinancialDataIngestionAdapter";
 import { FinancialStatementAnalysisService } from "../../Product/FinancialStatementAnalysisService";
 import { ExecutiveIntelligenceWorkbench, ExecutiveIntelligenceWorkbenchInput, ExecutiveIntelligenceWorkbenchResult } from "../../Product/ExecutiveIntelligenceWorkbench";
@@ -22,7 +23,6 @@ const LATEST_EXECUTIVE_WORKBENCH_KEY = "executive-intelligence-workbench:latest"
 
 type Session = { token: string; tenantId: string; organization: string };
 type StoredAnalysis = ReturnType<FinancialStatementAnalysisService["execute"]>;
-
 type ExecutiveTargets = ExecutiveIntelligenceWorkbenchInput["targets"];
 
 const send = (res: ServerResponse, status: number, contentType: string, body: string, headers: Record<string, string> = {}) => {
@@ -87,9 +87,30 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     const reasoning = options.reasoning ?? new ReasoningEngine();
     const analysis = new FinancialStatementAnalysisService(new FinancialIntelligenceEngine(), reasoning);
     const executiveWorkbench = new ExecutiveIntelligenceWorkbench(new ExecutiveIntelligenceEngine());
+    const reports = new ReportsEngine();
     const sessions = new Map<string, Session>();
     const latestResults = new Map<string, StoredAnalysis>();
     const latestWorkbenchResults = new Map<string, ExecutiveIntelligenceWorkbenchResult>();
+
+    const loadAnalysis = async (tenantId: string): Promise<StoredAnalysis | undefined> => {
+        let result = latestResults.get(tenantId);
+        if (!result) {
+            const persisted = await persistence.read({ tenantId }, LATEST_ANALYSIS_KEY);
+            result = persisted?.value as StoredAnalysis | undefined;
+            if (result?.tenantId === tenantId && result.status === "READY") latestResults.set(tenantId, result);
+        }
+        return result?.tenantId === tenantId && result.status === "READY" ? result : undefined;
+    };
+
+    const loadWorkbench = async (tenantId: string): Promise<ExecutiveIntelligenceWorkbenchResult | undefined> => {
+        let workbench = latestWorkbenchResults.get(tenantId);
+        if (!workbench) {
+            const persisted = await persistence.read({ tenantId }, LATEST_EXECUTIVE_WORKBENCH_KEY);
+            workbench = persisted?.value as ExecutiveIntelligenceWorkbenchResult | undefined;
+            if (workbench?.tenantId === tenantId && workbench.status === "READY") latestWorkbenchResults.set(tenantId, workbench);
+        }
+        return workbench?.tenantId === tenantId && workbench.status === "READY" ? workbench : undefined;
+    };
 
     const dashboardPayload = (result: StoredAnalysis, workbench?: ExecutiveIntelligenceWorkbenchResult) => ({
         status: result.status,
@@ -106,7 +127,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
         try {
             const path = req.url?.split("?")[0] ?? "/";
             if (req.method === "GET" && path === "/health") return json(res, 200, { status: "ok", service: "hooshyar-commercial-runtime" });
-            if (req.method === "GET" && path === "/api/ready") return json(res, 200, { status: "READY", capabilities: ["financial-ingestion", "financial-statement-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-workbench"] });
+            if (req.method === "GET" && path === "/api/ready") return json(res, 200, { status: "READY", capabilities: ["financial-ingestion", "financial-statement-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-workbench", "reports", "assistant-context"] });
             if (req.method === "GET" && path === "/") return asset(res, "index.html", "text/html; charset=utf-8");
             if (req.method === "GET" && path === "/app.js") return asset(res, "app.js", "text/javascript; charset=utf-8");
             if (req.method === "GET" && path === "/styles.css") return asset(res, "styles.css", "text/css; charset=utf-8");
@@ -155,17 +176,8 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const body = await readJson(req);
                 const targets = parseExecutiveTargets(body.targets);
                 if (!targets) return json(res, 400, { error: "EXECUTIVE_TARGETS_REQUIRED" });
-
-                let result = latestResults.get(session.tenantId);
-                if (!result) {
-                    const persisted = await persistence.read({ tenantId: session.tenantId }, LATEST_ANALYSIS_KEY);
-                    result = persisted?.value as StoredAnalysis | undefined;
-                    if (result?.tenantId === session.tenantId && result.status === "READY") latestResults.set(session.tenantId, result);
-                }
-                if (!result || result.tenantId !== session.tenantId || result.status !== "READY") {
-                    return json(res, 422, { error: "EXECUTIVE_ANALYSIS_REQUIRED" });
-                }
-
+                const result = await loadAnalysis(session.tenantId);
+                if (!result) return json(res, 422, { error: "EXECUTIVE_ANALYSIS_REQUIRED" });
                 const workbenchResult = executiveWorkbench.execute({ tenantId: session.tenantId, metrics: result.metrics, targets });
                 if (workbenchResult.status !== "READY") return json(res, 422, workbenchResult);
                 await persistence.write({ tenantId: session.tenantId }, LATEST_EXECUTIVE_WORKBENCH_KEY, workbenchResult);
@@ -173,22 +185,50 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 return json(res, 200, workbenchResult);
             }
 
-            if (req.method === "GET" && path === "/api/dashboard") {
-                let result = latestResults.get(session.tenantId);
-                if (!result) {
-                    const persisted = await persistence.read({ tenantId: session.tenantId }, LATEST_ANALYSIS_KEY);
-                    result = persisted?.value as StoredAnalysis | undefined;
-                    if (result?.tenantId === session.tenantId && result.status === "READY") latestResults.set(session.tenantId, result);
-                }
-                if (!result) return json(res, 200, { status: "READY", tenantId: session.tenantId, metrics: { revenue: 0, profit: 0, risk: 0 }, analysisAvailable: false, executiveIntelligence: null });
+            if (req.method === "GET" && path === "/api/report") {
+                const result = await loadAnalysis(session.tenantId);
+                if (!result) return json(res, 422, { error: "REPORT_ANALYSIS_REQUIRED" });
+                const workbench = await loadWorkbench(session.tenantId);
+                const sections = [
+                    `Tenant: ${session.tenantId}`,
+                    `Source: ${result.source.sourceName}`,
+                    `Revenue: ${result.metrics.revenue}`,
+                    `Profit: ${result.metrics.profit}`,
+                    `Profit margin: ${result.metrics.profitMargin}`,
+                    `Debt ratio: ${result.metrics.debtRatio}`,
+                    `Observations: ${result.observations.map((item) => item.message).join(" | ")}`,
+                ];
+                if (workbench) sections.push(`Recommendations: ${workbench.recommendations.map((item) => item.message).join(" | ")}`);
+                const report = reports.build("HooshyarOS Financial and Executive Report", sections);
+                return json(res, report.status === "READY" ? 200 : 422, { ...report, tenantId: session.tenantId, source: result.source });
+            }
 
-                let workbench = latestWorkbenchResults.get(session.tenantId);
-                if (!workbench) {
-                    const persistedWorkbench = await persistence.read({ tenantId: session.tenantId }, LATEST_EXECUTIVE_WORKBENCH_KEY);
-                    workbench = persistedWorkbench?.value as ExecutiveIntelligenceWorkbenchResult | undefined;
-                    if (workbench?.tenantId !== session.tenantId) workbench = undefined;
-                    if (workbench) latestWorkbenchResults.set(session.tenantId, workbench);
-                }
+            if (req.method === "POST" && path === "/api/assistant") {
+                const body = await readJson(req);
+                const question = String(body.question ?? "").trim();
+                if (!question) return json(res, 400, { error: "ASSISTANT_QUESTION_REQUIRED" });
+                const result = await loadAnalysis(session.tenantId);
+                if (!result) return json(res, 422, { error: "ASSISTANT_ANALYSIS_REQUIRED" });
+                const workbench = await loadWorkbench(session.tenantId);
+                const context = [
+                    `Answer using only verified persisted context for tenant ${session.tenantId}.`,
+                    `Question: ${question}`,
+                    `Revenue=${result.metrics.revenue}`,
+                    `Profit=${result.metrics.profit}`,
+                    `ProfitMargin=${result.metrics.profitMargin}`,
+                    `DebtRatio=${result.metrics.debtRatio}`,
+                    `Observations=${result.observations.map((item) => item.message).join(" | ")}`,
+                    workbench ? `Recommendations=${workbench.recommendations.map((item) => item.message).join(" | ")}` : "No executive workbench result is available yet.",
+                ].join(" | ");
+                const answer = reasoning.reason(context);
+                if (!answer.success) return json(res, 503, { error: "ASSISTANT_REASONING_UNAVAILABLE" });
+                return json(res, 200, { status: "READY", tenantId: session.tenantId, question, answer: answer.status, evidence: { analysisSource: result.source, executiveWorkbench: Boolean(workbench) } });
+            }
+
+            if (req.method === "GET" && path === "/api/dashboard") {
+                const result = await loadAnalysis(session.tenantId);
+                if (!result) return json(res, 200, { status: "READY", tenantId: session.tenantId, metrics: { revenue: 0, profit: 0, risk: 0 }, analysisAvailable: false, executiveIntelligence: null });
+                const workbench = await loadWorkbench(session.tenantId);
                 return json(res, 200, dashboardPayload(result, workbench));
             }
 
