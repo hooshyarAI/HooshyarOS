@@ -7,7 +7,7 @@ const crypto = require("node:crypto");
 const root = process.cwd();
 const repo = process.env.GITHUB_REPOSITORY || "hooshyarAI/HooshyarOS";
 const branch = process.env.GITHUB_HEAD_REF || cp.execFileSync("git", ["branch", "--show-current"], { cwd: root, encoding: "utf8" }).trim();
-const runId = process.env.GITHUB_RUN_ID;
+const runId = process.env.HOOSHYAR_TARGET_RUN_ID || process.env.GITHUB_RUN_ID;
 const headSha = process.env.GITHUB_SHA;
 const maxLog = 30000;
 if (!runId || !headSha || !branch || ["main", "master"].includes(branch)) {
@@ -33,7 +33,7 @@ async function getText(url) {
 function exec(command, args, options = {}) {
   return cp.spawnSync(command, args, { cwd: root, env: process.env, encoding: "utf8", stdio: options.stdio || "inherit", shell: false, windowsHide: true });
 }
-async function missionForCurrentRun() {
+async function missionForRun() {
   const jobs = await getJson(`https://api.github.com/repos/${repo}/actions/runs/${runId}/jobs?per_page=100`);
   const failures = [];
   for (const job of (jobs.jobs || []).filter(item => item.conclusion === "failure")) {
@@ -94,14 +94,14 @@ function commitPush() {
   if ((exec("git", ["push", "origin", `HEAD:${branch}"]).status ?? 1) !== 0) throw new Error("git push failed");
 }
 async function main() {
-  const mission = await missionForCurrentRun();
+  const mission = await missionForRun();
   const fingerprint = crypto.createHash("sha256").update(JSON.stringify(mission.failure)).digest("hex");
   const dir = path.join(root, ".hooshyar");
   fs.mkdirSync(dir, { recursive: true });
   const handoff = path.join(dir, "autonomous-repair-handoff.json");
   fs.writeFileSync(handoff, JSON.stringify(mission, null, 2) + "\n", "utf8");
   console.log(JSON.stringify({ type: "ASSISTANT_REPAIR_MISSION_CREATED", runId, commit: headSha, fingerprint, handoff }));
-  if (!mission.failure.firstFailedJob) throw new Error("NO_FAILED_JOB_IN_CURRENT_RUN");
+  if (!mission.failure.firstFailedJob) throw new Error("NO_FAILED_JOB_IN_TARGET_RUN");
   const kilo = runKilo(handoff);
   if (kilo.code !== 0) throw new Error(`KILO_REPAIR_FAILED:${kilo.code}\n${kilo.output}`);
   const py = exec(process.env.HOOSHYAR_PYTHON || "python", ["-m", "compileall", "-q", "Backend/AI_Runtime"]);
