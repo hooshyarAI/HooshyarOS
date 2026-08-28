@@ -3,6 +3,7 @@ import { execFileSync } from "child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join, normalize } from "node:path";
 import { ConstructionContext, ConstructionTool } from "../../Builder/Autonomous/AutonomousConstructionEngine";
+import { KiloCodeExecutionAdapter } from "./KiloCodeExecutionAdapter";
 import { ensurePytest } from "./PythonVerificationBootstrap";
 
 function run(command: string, args: string[], cwd: string, timeout = 15 * 60 * 1000) {
@@ -10,6 +11,7 @@ function run(command: string, args: string[], cwd: string, timeout = 15 * 60 * 1
     try {
         let executable = command;
         let executableArgs = args;
+        let useShell = false;
         if (process.platform === "win32") {
             if (command === "git") executable = "git.exe";
             if (command === "npx") {
@@ -21,7 +23,7 @@ function run(command: string, args: string[], cwd: string, timeout = 15 * 60 * 1
             cwd,
             encoding: "utf8",
             timeout,
-            shell: false,
+            shell: useShell,
             windowsHide: true,
             stdio: ["ignore", "pipe", "pipe"]
         });
@@ -63,19 +65,36 @@ function commandExists(command: string, cwd: string): boolean {
     }
 }
 
-export type ImplementationAgent = "python";
+export type ImplementationAgent = "kilo" | "python";
+
+export function selectImplementationAgent(
+    requested: string | undefined,
+    kiloAvailable: boolean,
+    pythonAvailable: boolean
+): ImplementationAgent | null {
+    const normalized = requested?.trim().toLowerCase() || "auto";
+    if (normalized === "kilo") return kiloAvailable ? "kilo" : pythonAvailable ? "python" : null;
+    if (normalized === "python") return pythonAvailable ? "python" : null;
+    if (normalized !== "auto") return null;
+    if (kiloAvailable) return "kilo";
+    if (pythonAvailable) return "python";
+    return null;
+}
 
 export function resolveImplementationAgent(root = process.cwd()): ImplementationAgent | null {
-    const requested = process.env.HOOSHYAR_AGENT?.trim().toLowerCase();
-    if (requested && requested !== "python") return null;
-    return commandExists("python", root) ? "python" : null;
+    return selectImplementationAgent(
+        process.env.HOOSHYAR_AGENT,
+        commandExists("kilo", root),
+        commandExists("python", root)
+    );
 }
 
 export function repositoryStateChanged(before: string, after: string): boolean {
     return before.trim() !== after.trim();
 }
 
-export function buildAgentArgs(_agent: ImplementationAgent, prompt: string): string[] {
+export function buildAgentArgs(agent: ImplementationAgent, prompt: string): string[] {
+    if (agent === "kilo") return ["run", "--auto", prompt];
     return ["Backend/AI_Runtime/autonomous_builder.py", "--prompt", prompt];
 }
 
@@ -160,8 +179,8 @@ function relativeStatusPaths(statusOutput: string, root: string): string[] {
 function buildAgentPrompt(context: ConstructionContext): string {
     const requiredPaths = declaredArtifactPaths(process.cwd(), context.plan.capabilityId, context.plan.targetEngine);
     return [
-        "You are the repository-native Python implementation worker inside HooshyarOS Autonomous Operations Engine.",
-        "Read AGENTS.md, Docs/ARCHITECTURE.md, and Assistant/SYSTEM_PROMPT.md before changing code.",
+        "You are an approved execution operator inside HooshyarOS Autonomous Operations Engine.",
+        "Read AGENTS.md, Docs/ARCHITECTURE.md, Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md, and Assistant/SYSTEM_PROMPT.md before changing code.",
         "The frozen platform architecture, its Engines, decision logic, lifecycle, governance and autonomous construction rules are authoritative inputs to this mission.",
         "Architecture Freeze V4 is authoritative; do not redesign or duplicate existing engines.",
         "Implement exactly ONE capability for this mission:",
@@ -173,7 +192,7 @@ function buildAgentPrompt(context: ConstructionContext): string {
         `Architecture rules: ${context.plan.architectureRules.join(" ; ") || "preserve existing rules"}`,
         `Directives: ${DEFAULT_DIRECTIVES.join(" ; ")}`,
         "For product capabilities, the required artifact paths above are the authoritative product boundary. Do not implement the capability by rewriting an existing engine unless one of those paths is that engine path.",
-        "Use only repository-native Python construction. Do not invoke Copilot, Codex, Claude, or any cloud coding CLI.",
+        "Use only approved repository-local operators. Do not invoke Copilot, Codex, Claude, or another unapproved coding agent.",
         "Reuse existing capabilities and engine boundaries; never invent business semantics that are absent from repository architecture or evidence.",
         "Produce a real repository change when the selected deterministic capability is missing."
     ].join("\n");
@@ -181,6 +200,7 @@ function buildAgentPrompt(context: ConstructionContext): string {
 
 export function createLocalConstructionTools(root = process.cwd()): ConstructionTool[] {
     let verificationCount = 0;
+    const kiloOperator = new KiloCodeExecutionAdapter();
     return [
         {
             name: "architecture",
@@ -203,40 +223,69 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                 const before = run("git", REPOSITORY_STATUS_ARGS, root);
                 if (!before.ok) return { ok: false, issue: "AUTONOMOUS_REPOSITORY_STATE_UNAVAILABLE", artifact: before };
                 if (before.output.trim()) return { ok: false, issue: "AUTONOMOUS_WORKTREE_DIRTY", artifact: { clean: false, output: before.output } };
-                const agent = resolveImplementationAgent(root);
-                if (!agent) return { ok: false, issue: "AUTONOMOUS_AGENT_UNAVAILABLE", artifact: { provider: null, changed: false } };
-                const requiredPaths = declaredArtifactPaths(root, context.plan.capabilityId, context.plan.targetEngine);
-                const result = run(agent, buildAgentArgs(agent, buildAgentPrompt(context)), root, 30 * 60 * 1000);
-                const after = run("git", REPOSITORY_STATUS_ARGS, root);
-                const changed = after.ok && repositoryStateChanged(before.output, after.output);
-                const changedPaths = after.ok ? relativeStatusPaths(after.output, root) : [];
-                const allowed = requiredPaths.map(path => normalize(path));
-                const unexpectedPaths = changedPaths.filter(path => !allowed.includes(path));
-                const touchesDeclaredArtifact = changedPaths.some(path => allowed.includes(path));
-                const artifact = {
-                    type: "AUTONOMOUS_AGENT_GENERATION_RESULT",
-                    provider: agent,
-                    capabilityId: context.plan.capabilityId,
-                    capability: context.plan.capability,
-                    targetEngine: context.plan.targetEngine,
-                    requiredPaths,
-                    changedPaths,
-                    unexpectedPaths,
-                    exitCode: result.code,
-                    changed,
-                    elapsedMs: result.elapsedMs,
-                    output: result.output,
-                    error: result.error,
-                    timestamp: new Date().toISOString()
-                };
-                console.log(JSON.stringify(artifact, null, 2));
-                if (!result.ok) return { ok: false, issue: "AUTONOMOUS_AGENT_GENERATION_FAILED", artifact };
-                if (!after.ok) return { ok: false, issue: "AUTONOMOUS_REPOSITORY_STATE_UNAVAILABLE", artifact };
-                if (!changed) return { ok: false, issue: "AUTONOMOUS_AGENT_NO_REPOSITORY_CHANGE", artifact };
-                if (!touchesDeclaredArtifact || unexpectedPaths.length > 0) {
-                    return { ok: false, issue: "AUTONOMOUS_ARTIFACT_BOUNDARY_VIOLATION", artifact };
+
+                const requested = process.env.HOOSHYAR_AGENT?.trim().toLowerCase() || "auto";
+                const primaryAgent = resolveImplementationAgent(root);
+                const candidates: ImplementationAgent[] = primaryAgent === "kilo"
+                    ? ["kilo", "python"]
+                    : primaryAgent === "python"
+                        ? ["python"]
+                        : [];
+                if (requested !== "auto" && !["kilo", "python"].includes(requested)) {
+                    return { ok: false, issue: "AUTONOMOUS_AGENT_REQUEST_INVALID", artifact: { requested } };
                 }
-                return { ok: true, artifact };
+                if (candidates.length === 0) {
+                    return { ok: false, issue: "AUTONOMOUS_AGENT_UNAVAILABLE", artifact: { providersTried: [], changed: false } };
+                }
+
+                const requiredPaths = declaredArtifactPaths(root, context.plan.capabilityId, context.plan.targetEngine);
+                const allowed = requiredPaths.map(path => normalize(path));
+                const attempts: unknown[] = [];
+
+                for (const agent of candidates) {
+                    const prompt = buildAgentPrompt(context);
+                    const result = agent === "kilo"
+                        ? kiloOperator.execute(prompt, root)
+                        : run(agent, buildAgentArgs(agent, prompt), root, 30 * 60 * 1000);
+                    const after = run("git", REPOSITORY_STATUS_ARGS, root);
+                    const changed = after.ok && repositoryStateChanged(before.output, after.output);
+                    const changedPaths = after.ok ? relativeStatusPaths(after.output, root) : [];
+                    const unexpectedPaths = changedPaths.filter(path => !allowed.includes(path));
+                    const touchesDeclaredArtifact = changedPaths.some(path => allowed.includes(path));
+                    const artifact = {
+                        type: "AUTONOMOUS_AGENT_GENERATION_RESULT",
+                        provider: agent,
+                        capabilityId: context.plan.capabilityId,
+                        capability: context.plan.capability,
+                        targetEngine: context.plan.targetEngine,
+                        requiredPaths,
+                        changedPaths,
+                        unexpectedPaths,
+                        exitCode: result.code,
+                        changed,
+                        elapsedMs: result.elapsedMs,
+                        output: result.output,
+                        error: result.error,
+                        timestamp: new Date().toISOString()
+                    };
+                    attempts.push(artifact);
+                    console.log(JSON.stringify(artifact, null, 2));
+
+                    if (!after.ok) return { ok: false, issue: "AUTONOMOUS_REPOSITORY_STATE_UNAVAILABLE", artifact: { attempts } };
+                    if (unexpectedPaths.length > 0) {
+                        return { ok: false, issue: "AUTONOMOUS_ARTIFACT_BOUNDARY_VIOLATION", artifact: { attempts } };
+                    }
+                    if (result.ok && changed && touchesDeclaredArtifact) {
+                        return { ok: true, artifact: { ...artifact, fallbackUsed: attempts.length > 1 } };
+                    }
+                    if (changed) {
+                        return { ok: false, issue: "AUTONOMOUS_AGENT_PARTIAL_CHANGE_REQUIRES_REPAIR", artifact: { attempts } };
+                    }
+                    if (agent === "kilo" && !result.ok) continue;
+                    if (!result.ok) return { ok: false, issue: "AUTONOMOUS_AGENT_GENERATION_FAILED", artifact: { attempts } };
+                }
+
+                return { ok: false, issue: "AUTONOMOUS_AGENT_NO_REPOSITORY_CHANGE", artifact: { attempts } };
             }
         },
         {
