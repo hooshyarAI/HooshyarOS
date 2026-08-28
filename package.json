@@ -18,7 +18,7 @@
     "product:agent:drill": "node qa/agent-repair-drill/repair-target.cjs",
     "product:windows:installer": "powershell -ExecutionPolicy Bypass -File scripts/build-windows-installer.ps1",
     "autonomous:build": "tsx Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts",
-    "autonomous:factory-loop": "node scripts/autonomous-factory-loop.cjs",
+    "autonomous:factory-loop": "python Backend/AI_Runtime/hooshyar_build.py commercial",
     "autonomous:assistant": "python Backend/AI_Runtime/hooshyar_build.py assistant",
     "autonomous:platform": "python Backend/AI_Runtime/hooshyar_build.py platform"
   },
