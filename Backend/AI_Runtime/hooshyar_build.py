@@ -36,8 +36,8 @@ def run_daemon(*, assistant_phase: bool) -> tuple[int, bool, bool]:
         return 2, False, False
 
     env = os.environ.copy()
-    # Never overwrite the requested implementation agent. The canonical
-    # LocalConstructionToolset selects kilo/python according to this value.
+    # Preserve the selected implementation agent. The canonical
+    # LocalConstructionToolset owns the kilo/python selection policy.
     env["HOOSHYAR_AGENT"] = env.get("HOOSHYAR_AGENT", "auto")
     env["HOOSHYAR_AUTONOMOUS_DEADLINE_DAYS"] = env.get("HOOSHYAR_AUTONOMOUS_DEADLINE_DAYS", "7")
     env["HOOSHYAR_BUILD_PHASE"] = "assistant" if assistant_phase else "platform"
