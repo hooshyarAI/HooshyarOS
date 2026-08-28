@@ -2,18 +2,23 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const cp = require('node:child_process');
+const crypto = require('node:crypto');
 
 const root = process.cwd();
 const dir = path.join(root, '.hooshyar');
 const statePath = path.join(dir, 'autonomous-factory-loop.json');
 const failurePath = path.join(dir, 'factory-failure.json');
-const handoffPath = path.join(dir, 'assistant-repair-mission.json');
 const maxAttempts = Number(process.env.HOOSHYAR_AUTONOMOUS_MAX_ATTEMPTS || 12);
-const branch = cp.execFileSync('git', ['branch', '--show-current'], { cwd: root, encoding: 'utf8' }).trim();
+const branchResult = cp.spawnSync('git', ['branch', '--show-current'], { cwd: root, encoding: 'utf8' });
+const branch = (branchResult.stdout || '').trim();
 
 if (!branch || branch === 'main' || branch === 'master') {
   console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', reason: 'UNSAFE_BRANCH', branch }));
   process.exit(2);
+}
+
+function executable(name) {
+  return process.platform === 'win32' ? `${name}.cmd` : name;
 }
 
 function run(command, args = [], options = {}) {
@@ -42,13 +47,11 @@ function readJson(file) {
 }
 
 function sha256(value) {
-  const crypto = require('node:crypto');
   return crypto.createHash('sha256').update(value).digest('hex');
 }
 
 function repositoryChanged() {
-  const status = git(['status', '--porcelain']).stdout.trim();
-  return status.length > 0;
+  return git(['status', '--porcelain']).stdout.trim().length > 0;
 }
 
 function commitAndPush() {
@@ -64,7 +67,7 @@ function commitAndPush() {
   if ((commit.status ?? 1) !== 0) throw new Error('git commit failed');
 
   if (process.env.HOOSHYAR_AUTONOMOUS_ALLOW_PUSH !== '1') {
-    console.log(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_COMMITTED', pushed: false, reason: 'PUSH_DISABLED_BY_POLICY' }));
+    console.log(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_COMMITTED', pushed: false, reason: 'PUSH_DISABLED_BY_POLICY', branch }));
     return { changed: true, pushed: false };
   }
 
@@ -75,14 +78,17 @@ function commitAndPush() {
 }
 
 function invokeKilo(prompt) {
-  const executable = process.platform === 'win32' ? 'kilo.cmd' : 'kilo';
-  const result = run(executable, ['run', '--auto', prompt], { stdio: 'inherit' });
-  return result.status ?? 1;
+  if (process.platform !== 'win32') {
+    return run('kilo', ['run', '--auto', prompt]).status ?? 1;
+  }
+  const comspec = process.env.ComSpec || 'cmd.exe';
+  const quotedPrompt = `"${prompt.replace(/"/g, '""')}"`;
+  const commandLine = `kilo.cmd run --auto ${quotedPrompt}`;
+  return run(comspec, ['/d', '/s', '/c', commandLine]).status ?? 1;
 }
 
 fs.mkdirSync(dir, { recursive: true });
 const state = readJson(statePath) || { attempts: [], lastFailureFingerprint: null };
-
 console.log(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_LOOP_START', branch, maxAttempts }));
 
 for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -92,7 +98,11 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
   run('git', ['fetch', 'origin']);
   const upstream = capture('git', ['rev-parse', `origin/${branch}`]);
   if (upstream.code === 0 && upstream.stdout.trim() !== before && !repositoryChanged()) {
-    run('git', ['merge', '--ff-only', `origin/${branch}`]);
+    const merge = run('git', ['merge', '--ff-only', `origin/${branch}`]);
+    if ((merge.status ?? 1) !== 0) {
+      console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'UPSTREAM_FAST_FORWARD_FAILED' }));
+      process.exit(1);
+    }
   }
 
   if (repositoryChanged()) {
@@ -100,26 +110,30 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     process.exit(2);
   }
 
-  const audit = run(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'product:cline:audit']);
+  const audit = run(executable('npm'), ['run', 'product:cline:audit']);
   if ((audit.status ?? 1) !== 0) {
     console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'PLATFORM_AUDIT_FAILED' }));
     process.exit(1);
   }
 
-  const factory = run(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'product:factory']);
+  const factory = run(executable('npm'), ['run', 'product:factory']);
   if ((factory.status ?? 1) === 0) {
-    const evidence = run(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'product:cline:evidence']);
+    const evidence = run(executable('npm'), ['run', 'product:cline:evidence']);
     const after = git(['rev-parse', 'HEAD']).stdout.trim();
-    state.attempts.push({ attempt, before, after, factory: 'PASS', evidence: evidence.status ?? 1, at: new Date().toISOString() });
+    state.attempts.push({ attempt, before, after, factory: 'PASS', evidenceExitCode: evidence.status ?? 1, at: new Date().toISOString() });
     fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
     console.log(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_PROGRESS', attempt, status: 'PASS', commit: after, evidenceExitCode: evidence.status ?? 1 }));
     process.exit(evidence.status ?? 1);
   }
 
-  const handoff = run(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'product:factory:handoff'], { stdio: 'pipe' });
+  const handoff = capture(executable('npm'), ['run', 'product:factory:handoff']);
   const failure = readJson(failurePath) || {};
-  const mission = readJson(handoffPath) || failure;
-  const payload = JSON.stringify({ failure: failure.failure || failure, mission, branch, commit: before }, null, 2);
+  const payload = JSON.stringify({
+    failure: failure.failure || failure,
+    handoff: handoff.stdout || handoff.stderr,
+    branch,
+    commit: before
+  }, null, 2);
   const fingerprint = sha256(payload);
 
   if (state.lastFailureFingerprint === fingerprint) {
@@ -132,16 +146,13 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
 
   const prompt = [
     'You are the HooshyarOS autonomous repair operator.',
-    'Operate only on the current repository and obey AGENTS.md, .clinerules, Architecture Freeze V4, the governance charter, the commercial completion contract, and the qualification matrix.',
+    'Operate only on the current repository and obey AGENTS.md, .clinerules, Architecture Freeze V4, governance, the commercial completion contract, and the qualification matrix.',
     'Repair the FIRST concrete failure in the supplied factory evidence.',
-    'Do not weaken tests, bypass gates, invent completion, or modify frozen architecture semantics.',
-    'Inspect the existing implementation before adding anything.',
-    'Apply the smallest coherent repair.',
-    'Add/update a focused regression test.',
-    'Run the focused test and the relevant acceptance path.',
-    'Do not stop at a plan: implement the repair.',
-    'Do not create unrelated changes.',
-    'When the repair is verified, leave the repository in a clean committed state when safe; pushing is handled by the outer loop.',
+    'Do not weaken tests, bypass gates, invent completion, or alter frozen architecture semantics.',
+    'Inspect and reuse existing implementations before adding anything.',
+    'Apply the smallest coherent repair and add/update a focused regression test.',
+    'Run focused verification and the affected acceptance path. Do not stop at a plan; implement the repair.',
+    'Do not create unrelated changes. Do not force-push. Leave a clean verified repository when possible; the outer loop handles the final Git push.',
     '',
     'FACTORY FAILURE / REPAIR HANDOFF:',
     payload
@@ -153,15 +164,7 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     process.exit(1);
   }
 
-  if (!repositoryChanged()) {
-    const current = git(['rev-parse', 'HEAD']).stdout.trim();
-    if (current === before) {
-      console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'KILO_PRODUCED_NO_REPOSITORY_CHANGE', fingerprint }));
-      process.exit(1);
-    }
-  }
-
-  const tests = run(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['test', '--', '--runInBand']);
+  const tests = run(executable('npm'), ['test', '--', '--runInBand']);
   if ((tests.status ?? 1) !== 0) {
     state.attempts.push({ attempt, before, factory: 'FAIL', repair: 'KILO', fullJest: 'FAIL', at: new Date().toISOString() });
     fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
