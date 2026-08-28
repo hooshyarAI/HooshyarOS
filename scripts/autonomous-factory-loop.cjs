@@ -102,10 +102,9 @@ function repairPrompt(payload) {
   ].join('\n');
 }
 
-function buildFailurePayload(before, currentEvidence, factoryResult, auditResult) {
-  const failure = readJson(failurePath) || {};
+function buildFailurePayload(before, currentEvidence, factoryResult, auditResult, failureOverride = null) {
   return {
-    failure: failure.failure || failure,
+    failure: failureOverride || (readJson(failurePath)?.failure || {}),
     platformAudit: readJson(auditPath) || {
       exitCode: auditResult?.code ?? null,
       stdout: auditResult?.stdout || '',
@@ -125,6 +124,13 @@ function buildFailurePayload(before, currentEvidence, factoryResult, auditResult
 function runFullJest() {
   const jestCli = path.join(root, 'node_modules', 'jest', 'bin', 'jest.js');
   return run(process.execPath, [jestCli, '--runInBand']);
+}
+
+function runPlatformAudit() {
+  // Invoke the canonical audit entrypoint directly. This avoids npm.cmd wrapper
+  // behavior and keeps audit ownership separate from the factory's verification.
+  const auditScript = path.join(root, 'scripts', 'cline-full-platform-audit.cjs');
+  return capture(process.execPath, [auditScript]);
 }
 
 fs.mkdirSync(dir, { recursive: true });
@@ -147,8 +153,12 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     process.exit(2);
   }
 
-  if (fs.existsSync(auditPath)) fs.unlinkSync(auditPath);
-  const audit = capture(executable('npm'), ['run', 'product:cline:audit']);
+  // Invalidate every prior transient evidence artifact that can contaminate this cycle.
+  for (const file of [auditPath, failurePath, evidencePath]) {
+    if (fs.existsSync(file)) fs.unlinkSync(file);
+  }
+
+  const audit = runPlatformAudit();
   const auditEvidence = readJson(auditPath);
   if (auditEvidence && auditEvidence.git?.commit !== before) {
     console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'STALE_PLATFORM_AUDIT_EVIDENCE', expectedCommit: before, observedCommit: auditEvidence.git?.commit || null }));
@@ -156,7 +166,14 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
   }
 
   if (audit.code !== 0) {
-    const payloadObject = buildFailurePayload(before, null, null, audit);
+    const failureOverride = {
+      type: 'PLATFORM_AUDIT_EXECUTION_FAILURE',
+      message: 'Canonical platform audit exited non-zero.',
+      exitCode: audit.code,
+      stdout: audit.stdout,
+      stderr: audit.stderr
+    };
+    const payloadObject = buildFailurePayload(before, null, null, audit, failureOverride);
     const payload = JSON.stringify(payloadObject, null, 2);
     const fingerprint = sha256(payload);
     if (state.lastFailureFingerprint === fingerprint) {
@@ -167,7 +184,7 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     }
     state.lastFailureFingerprint = fingerprint;
     fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
-    console.error(JSON.stringify({ type: 'AUTONOMOUS_AUDIT_REPAIR', attempt, reason: 'PLATFORM_AUDIT_FAILED', fingerprint }));
+    console.error(JSON.stringify({ type: 'AUTONOMOUS_AUDIT_REPAIR', attempt, reason: 'PLATFORM_AUDIT_EXECUTION_FAILED', fingerprint }));
 
     const kiloExit = invokeKilo(repairPrompt(payload));
     if (kiloExit !== 0) {
@@ -200,7 +217,7 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
   const evidence = run(executable('npm'), ['run', 'product:cline:evidence']);
   const currentEvidence = readJson(evidencePath);
 
-  if ((factory.status ?? 1) === 0 && currentEvidence?.verdict === 'QUALIFICATION_COMPLETE') {
+  if ((factory.status ?? 1) === 0 && evidence.status === 0 && currentEvidence?.verdict === 'QUALIFICATION_COMPLETE') {
     const after = git(['rev-parse', 'HEAD']).stdout.trim();
     state.attempts.push({ attempt, before, after, factory: 'PASS', qualification: 'COMPLETE', at: new Date().toISOString() });
     fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
