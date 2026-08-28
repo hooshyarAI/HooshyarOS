@@ -139,6 +139,82 @@ Kilo Code may be used as an execution tool even when other external coding provi
 
 When Kilo Code is used, repository rules remain authoritative; the agent's prompt, memory, model preference or local configuration never overrides repository governance.
 
+### Stage-bounded atomic construction
+
+All autonomous construction, repair, standardization and commercialization work must be decomposed into **small, coherent, bounded stages (knots)** before execution. A stage is the smallest independently understandable unit that can be planned, executed, verified, checkpointed and safely recovered without reopening unrelated work.
+
+The canonical rule is:
+
+**PLAN ONE STAGE → EXECUTE ONE STAGE → VERIFY ONE STAGE → CHECKPOINT ONE STAGE → CONTINUE TO NEXT STAGE**
+
+The system must prefer several small verified stages over one large, long-running mission whenever the larger mission can be safely decomposed. Stage boundaries must follow real capability, interface, dependency, test, packaging, deployment or evidence boundaries; arbitrary fragmentation is prohibited.
+
+Each stage must have, before execution:
+
+- a unique stage identifier;
+- one primary objective and one accountable owner;
+- explicit entry preconditions;
+- explicit dependencies and affected interfaces;
+- a bounded change scope;
+- focused verification criteria;
+- an expected evidence set;
+- a bounded execution/repair budget;
+- an explicit checkpoint target.
+
+### Stage atomicity and trusted checkpoints
+
+A stage is considered **atomic** only if the repository can identify a trusted state immediately before it and a verified state immediately after it.
+
+After a stage passes its required verification, the system should create or confirm a trusted checkpoint, preferably a verified Git commit or another durable repository state with reproducible evidence.
+
+The next stage must not begin from an unverified intermediate state unless the stage explicitly declares that state as part of its contract and its verification covers that dependency.
+
+A stage failure must never force a restart of the whole construction mission by default. The system must preserve the last trusted checkpoint and isolate the failed stage.
+
+### Failure locality and stage-only recovery
+
+When a stage fails, recovery must be local to that stage whenever possible:
+
+**FAIL → PRESERVE EVIDENCE → RETURN TO LAST STAGE CHECKPOINT → DIAGNOSE → REPAIR ONLY FAILED STAGE → RE-VERIFY STAGE → CHECKPOINT → CONTINUE**
+
+The system must not re-run completed and verified stages merely because a later stage failed.
+
+A stage may reopen an earlier stage only when evidence proves that the later failure was caused by an invalidated assumption, contract or dependency in that earlier stage. In that case, reopening must be explicit, evidence-backed and limited to the smallest affected dependency chain.
+
+### Stage state machine
+
+Every autonomous stage should be representable by a bounded state machine:
+
+**PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINTED → COMPLETE**
+
+Failure states are:
+
+**EXECUTING/VERIFYING → FAILED → DIAGNOSING → REPAIRING → RE-VERIFYING**
+
+If the stage cannot safely recover within its budget:
+
+**FAILED → BLOCKED**
+
+A stage must not be reported `COMPLETE` from intent, file existence, elapsed time or partial output alone.
+
+### Sequential progression and safe parallelism
+
+By default, stages execute sequentially according to dependency order. Parallel execution is allowed only when the system proves that the stages are independent and their writes, interfaces, evidence and checkpoints cannot conflict.
+
+When in doubt, serialize.
+
+### No half-complete large missions
+
+The autonomous system must not treat a long-running multi-stage mission as a single indivisible execution unit when meaningful safe stage boundaries exist. A large mission is an orchestration container; its stages are the actual recovery and verification units.
+
+If an execution operator, model, shell session, network connection, editor session or local process is interrupted, the system must resume from the most recent trusted stage checkpoint rather than reconstructing the entire mission from conversational memory.
+
+### Human role
+
+The human supplies product intent, approvals and governing decisions. The human must not be required to manually supervise every stage transition, repeat commands, or reconstruct completed work after an interruption when the repository contains sufficient checkpoints and evidence for automatic continuation.
+
+Kilo Code, Python, GitHub Actions and other approved tools are execution mechanisms. They must consume the stage plan and report stage evidence; they do not become the owner of the mission.
+
 ### Wrong-unit recovery
 
 If a capability is found to be wrong, incomplete, incompatible or harmful to dependent capabilities, the system must not continue building on it.
@@ -179,6 +255,8 @@ The autonomous construction path must remain provider-independent. Codex, GitHub
 
 Kilo Code is permitted as an execution/operator layer only and does not alter this provider-independence rule.
 
+All construction flows must use the stage-bounded atomic construction rules in Section 5. A routine task should be decomposed and completed one bounded stage at a time, with local recovery and checkpointing after each verified stage.
+
 ---
 
 ## 7. Autonomous Continuation
@@ -195,6 +273,8 @@ The system must select the first genuinely missing capability whose dependencies
 
 If the canonical backlog is exhausted, the system must explicitly report that the backlog is exhausted; it must not claim that the entire product is complete without repository evidence.
 
+Continuation must use the same stage-bounded progression: a completed stage becomes the trusted base for the next stage, and a failed stage is recovered locally before progression continues.
+
 ---
 
 ## 8. Self-Healing
@@ -210,6 +290,8 @@ When the failure shows that the current capability was built on an invalid repos
 Repair must be evidence-driven. Never hide a failure by marking a capability complete without evidence.
 
 If the bounded repair budget is exhausted, preserve the failure evidence and enter **BLOCKED** state for human review.
+
+Repair scope must be stage-local by default. A repair must not silently expand to unrelated completed stages, neighboring capabilities or the whole mission. Expansion requires evidence that the dependency chain itself is invalid.
 
 ---
 
@@ -256,7 +338,11 @@ The autonomous construction system must never:
 - silently weaken security, governance, explainability or recoverability;
 - forget the approved product intent when selecting the next capability;
 - continue weaving after an unverified or invalid capability without repairing or isolating it first;
-- redesign Architecture Freeze V4 without repository evidence of a genuine contradiction or missing architectural capability.
+- redesign Architecture Freeze V4 without repository evidence of a genuine contradiction or missing architectural capability;
+- combine multiple independently recoverable capabilities into one opaque stage merely for execution convenience;
+- invalidate trusted stage checkpoints without evidence;
+- restart completed verified stages solely because an operator was interrupted;
+- widen a failed stage's repair scope without explicit evidence of dependency impact.
 
 **Kilo Code may execute governed local construction operations, but it must remain subject to every rule above.**
 
@@ -282,6 +368,9 @@ The repository therefore becomes the durable memory of:
 - self-healing rules
 - continuation rules
 - anti-drift constraints
+- stage plans and stage identifiers
+- stage checkpoints and trusted transitions
+- stage evidence and failure evidence
 
 **If a future construction cycle disagrees with this charter, it must inspect the evidence and resolve the conflict rather than inventing a new method.**
 
@@ -303,6 +392,16 @@ A construction cycle is DONE only when:
 - the change is pushed;
 - the next capability is re-derived from the new repository state.
 
+For a stage, DONE additionally means:
+
+- stage plan was recorded;
+- entry preconditions were satisfied;
+- bounded scope was respected;
+- focused verification passed;
+- required evidence was produced;
+- a trusted checkpoint was created or confirmed;
+- the next stage can resume from that checkpoint without replaying completed stages.
+
 For the autonomous Assistant itself, DONE additionally means the verified completion gate hands control to the platform continuation flow.
 
 ---
@@ -322,5 +421,11 @@ For the autonomous Assistant itself, DONE additionally means the verified comple
 **GITHUB REPOSITORY CONTROL: REQUIRED**
 
 **KILO CODE: APPROVED LOCAL EXECUTION / OPERATOR LAYER**
+
+**STAGE-BOUNDED ATOMIC CONSTRUCTION: REQUIRED**
+
+**LOCAL STAGE RECOVERY: REQUIRED**
+
+**TRUSTED CHECKPOINTING: REQUIRED**
 
 **EXTERNAL CODING PROVIDERS: NON-MANDATORY AND MUST NOT BECOME ARCHITECTURAL DEPENDENCIES**
