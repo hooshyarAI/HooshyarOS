@@ -222,7 +222,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 ].join(" | ");
                 const answer = reasoning.reason(context);
                 if (!answer.success) return json(res, 503, { error: "ASSISTANT_REASONING_UNAVAILABLE" });
-                return json(res, 200, { status: "READY", tenantId: session.tenantId, question, answer: answer.status, evidence: { analysisSource: result.source, executiveWorkbench: Boolean(workbench) } });
+                return json(res, 200, { status: "READY", tenantId: session.tenantId, question, answer: answer.answer ?? answer.status, evidence: { analysisSource: result.source, executiveWorkbench: Boolean(workbench) } });
             }
 
             if (req.method === "GET" && path === "/api/dashboard") {
