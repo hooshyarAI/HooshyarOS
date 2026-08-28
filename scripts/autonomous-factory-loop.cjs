@@ -8,6 +8,7 @@ const root = process.cwd();
 const dir = path.join(root, '.hooshyar');
 const statePath = path.join(dir, 'autonomous-factory-loop.json');
 const failurePath = path.join(dir, 'factory-failure.json');
+const evidencePath = path.join(dir, 'cline-runtime-evidence.json');
 const maxAttempts = Number(process.env.HOOSHYAR_AUTONOMOUS_MAX_ATTEMPTS || 12);
 const branchResult = cp.spawnSync('git', ['branch', '--show-current'], { cwd: root, encoding: 'utf8' });
 const branch = (branchResult.stdout || '').trim();
@@ -78,13 +79,26 @@ function commitAndPush() {
 }
 
 function invokeKilo(prompt) {
-  if (process.platform !== 'win32') {
-    return run('kilo', ['run', '--auto', prompt]).status ?? 1;
-  }
+  if (process.platform !== 'win32') return run('kilo', ['run', '--auto', prompt]).status ?? 1;
   const comspec = process.env.ComSpec || 'cmd.exe';
   const quotedPrompt = `"${prompt.replace(/"/g, '""')}"`;
-  const commandLine = `kilo.cmd run --auto ${quotedPrompt}`;
-  return run(comspec, ['/d', '/s', '/c', commandLine]).status ?? 1;
+  return run(comspec, ['/d', '/s', '/c', `kilo.cmd run --auto ${quotedPrompt}`]).status ?? 1;
+}
+
+function repairPrompt(payload) {
+  return [
+    'You are the HooshyarOS autonomous repair operator.',
+    'Obey AGENTS.md, .clinerules, Architecture Freeze V4, governance, the commercial completion contract, and the qualification matrix.',
+    'Repair the FIRST concrete failure or unresolved qualification cell in the supplied evidence.',
+    'Do not weaken tests, bypass gates, invent completion, or change frozen architecture semantics.',
+    'Reuse existing implementations. Make the smallest coherent change.',
+    'Add or update a focused regression test and run the relevant acceptance test.',
+    'Do not stop at a plan: implement the repair.',
+    'Do not create unrelated changes or force-push.',
+    '',
+    'FAILURE / QUALIFICATION HANDOFF:',
+    payload
+  ].join('\n');
 }
 
 fs.mkdirSync(dir, { recursive: true });
@@ -99,10 +113,7 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
   const upstream = capture('git', ['rev-parse', `origin/${branch}`]);
   if (upstream.code === 0 && upstream.stdout.trim() !== before && !repositoryChanged()) {
     const merge = run('git', ['merge', '--ff-only', `origin/${branch}`]);
-    if ((merge.status ?? 1) !== 0) {
-      console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'UPSTREAM_FAST_FORWARD_FAILED' }));
-      process.exit(1);
-    }
+    if ((merge.status ?? 1) !== 0) throw new Error('upstream fast-forward failed');
   }
 
   if (repositoryChanged()) {
@@ -117,19 +128,22 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
   }
 
   const factory = run(executable('npm'), ['run', 'product:factory']);
-  if ((factory.status ?? 1) === 0) {
-    const evidence = run(executable('npm'), ['run', 'product:cline:evidence']);
+  const evidence = run(executable('npm'), ['run', 'product:cline:evidence']);
+  const currentEvidence = readJson(evidencePath);
+
+  if ((factory.status ?? 1) === 0 && currentEvidence?.verdict === 'QUALIFICATION_COMPLETE') {
     const after = git(['rev-parse', 'HEAD']).stdout.trim();
-    state.attempts.push({ attempt, before, after, factory: 'PASS', evidenceExitCode: evidence.status ?? 1, at: new Date().toISOString() });
+    state.attempts.push({ attempt, before, after, factory: 'PASS', qualification: 'COMPLETE', at: new Date().toISOString() });
     fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
-    console.log(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_PROGRESS', attempt, status: 'PASS', commit: after, evidenceExitCode: evidence.status ?? 1 }));
-    process.exit(evidence.status ?? 1);
+    console.log(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_COMPLETE', attempt, commit: after }));
+    process.exit(0);
   }
 
   const handoff = capture(executable('npm'), ['run', 'product:factory:handoff']);
   const failure = readJson(failurePath) || {};
   const payload = JSON.stringify({
     failure: failure.failure || failure,
+    qualification: currentEvidence || null,
     handoff: handoff.stdout || handoff.stderr,
     branch,
     commit: before
@@ -138,27 +152,14 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
 
   if (state.lastFailureFingerprint === fingerprint) {
     console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'REPEATED_IDENTICAL_FAILURE', fingerprint }));
-    state.attempts.push({ attempt, before, factory: 'FAIL', reason: 'REPEATED_IDENTICAL_FAILURE', fingerprint, at: new Date().toISOString() });
+    state.attempts.push({ attempt, before, reason: 'REPEATED_IDENTICAL_FAILURE', fingerprint, at: new Date().toISOString() });
     fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
     process.exit(1);
   }
   state.lastFailureFingerprint = fingerprint;
+  fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
 
-  const prompt = [
-    'You are the HooshyarOS autonomous repair operator.',
-    'Operate only on the current repository and obey AGENTS.md, .clinerules, Architecture Freeze V4, governance, the commercial completion contract, and the qualification matrix.',
-    'Repair the FIRST concrete failure in the supplied factory evidence.',
-    'Do not weaken tests, bypass gates, invent completion, or alter frozen architecture semantics.',
-    'Inspect and reuse existing implementations before adding anything.',
-    'Apply the smallest coherent repair and add/update a focused regression test.',
-    'Run focused verification and the affected acceptance path. Do not stop at a plan; implement the repair.',
-    'Do not create unrelated changes. Do not force-push. Leave a clean verified repository when possible; the outer loop handles the final Git push.',
-    '',
-    'FACTORY FAILURE / REPAIR HANDOFF:',
-    payload
-  ].join('\n');
-
-  const kiloExit = invokeKilo(prompt);
+  const kiloExit = invokeKilo(repairPrompt(payload));
   if (kiloExit !== 0) {
     console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'KILO_REPAIR_FAILED', kiloExit, fingerprint }));
     process.exit(1);
@@ -174,7 +175,7 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
 
   if (repositoryChanged()) commitAndPush();
   const after = git(['rev-parse', 'HEAD']).stdout.trim();
-  state.attempts.push({ attempt, before, after, factory: 'FAIL', repair: 'KILO', fullJest: 'PASS', at: new Date().toISOString() });
+  state.attempts.push({ attempt, before, after, factory: 'REPAIR', repair: 'KILO', fullJest: 'PASS', at: new Date().toISOString() });
   fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
   console.log(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_PROGRESS', attempt, status: 'REPAIRED', before, after }));
 }
