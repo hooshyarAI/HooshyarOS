@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { createServer, IncomingMessage, ServerResponse, Server } from "node:http";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -15,8 +15,11 @@ export interface CommercialRuntimeOptions {
 
 const WEB_ROOT = resolve(process.cwd(), "web");
 const MAX_BODY_BYTES = 1024 * 1024;
+const LATEST_ANALYSIS_KEY = "financial-analysis:latest";
 
 type Session = { token: string; tenantId: string; organization: string };
+
+type StoredAnalysis = ReturnType<FinancialStatementAnalysisService["execute"]>;
 
 const send = (res: ServerResponse, status: number, contentType: string, body: string, headers: Record<string, string> = {}) => {
     res.statusCode = status;
@@ -31,6 +34,11 @@ const json = (res: ServerResponse, status: number, payload: unknown, headers: Re
 const parseCookies = (header: string | undefined): Record<string, string> => Object.fromEntries(
     (header ?? "").split(";").map((part) => part.trim().split("=")).filter(([key, value]) => key && value).map(([key, ...value]) => [key, value.join("=")]),
 );
+
+const stableTenantId = (username: string, organization: string): string => {
+    const identity = `${username.trim().normalize("NFKC")}\u0000${organization.trim().normalize("NFKC")}`;
+    return `tenant:${createHash("sha256").update(identity, "utf8").digest("hex").slice(0, 16)}`;
+};
 
 const readJson = async (req: IncomingMessage): Promise<Record<string, unknown>> => {
     const chunks: Buffer[] = [];
@@ -63,7 +71,16 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     const reasoning = options.reasoning ?? new ReasoningEngine();
     const analysis = new FinancialStatementAnalysisService(new FinancialIntelligenceEngine(), reasoning);
     const sessions = new Map<string, Session>();
-    const latestResults = new Map<string, ReturnType<FinancialStatementAnalysisService["execute"]>>();
+    const latestResults = new Map<string, StoredAnalysis>();
+
+    const dashboardPayload = (result: StoredAnalysis) => ({
+        status: result.status,
+        tenantId: result.tenantId,
+        analysisAvailable: true,
+        metrics: { revenue: result.metrics.revenue, profit: result.metrics.profit, risk: result.metrics.debtRatio * 100 },
+        observations: result.observations,
+        source: result.source,
+    });
 
     const close = () => persistence.close();
     const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
@@ -86,7 +103,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const organization = String(body.organization ?? "").trim();
                 if (!username || !organization) return json(res, 400, { error: "SESSION_FIELDS_REQUIRED" });
                 const token = randomBytes(24).toString("hex");
-                const created: Session = { token, tenantId: `tenant:${token.slice(0, 16)}`, organization };
+                const created: Session = { token, tenantId: stableTenantId(username, organization), organization };
                 sessions.set(token, created);
                 return json(res, 201, { authenticated: true, organization: { name: organization }, tenantId: created.tenantId }, {
                     "Set-Cookie": `hooshyar_session=${token}; HttpOnly; SameSite=Lax; Path=/`,
@@ -110,21 +127,20 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const ingested = await ingestion.ingestCsv(session.tenantId, sourceName, csv);
                 const result = analysis.execute({ tenantId: session.tenantId, revenue: ingested.model.totals.credit, expenses: ingested.model.totals.debit, assets, liabilities, source: ingested.evidence });
                 if (result.status !== "READY") return json(res, 422, result);
+                await persistence.write({ tenantId: session.tenantId }, LATEST_ANALYSIS_KEY, result);
                 latestResults.set(session.tenantId, result);
                 return json(res, 200, result);
             }
 
             if (req.method === "GET" && path === "/api/dashboard") {
-                const result = latestResults.get(session.tenantId);
+                let result = latestResults.get(session.tenantId);
+                if (!result) {
+                    const persisted = await persistence.read({ tenantId: session.tenantId }, LATEST_ANALYSIS_KEY);
+                    result = persisted?.value as StoredAnalysis | undefined;
+                    if (result?.tenantId === session.tenantId && result.status === "READY") latestResults.set(session.tenantId, result);
+                }
                 if (!result) return json(res, 200, { status: "READY", tenantId: session.tenantId, metrics: { revenue: 0, profit: 0, risk: 0 }, analysisAvailable: false });
-                return json(res, 200, {
-                    status: result.status,
-                    tenantId: result.tenantId,
-                    analysisAvailable: true,
-                    metrics: { revenue: result.metrics.revenue, profit: result.metrics.profit, risk: result.metrics.debtRatio * 100 },
-                    observations: result.observations,
-                    source: result.source,
-                });
+                return json(res, 200, dashboardPayload(result));
             }
 
             return json(res, 404, { error: "NOT_FOUND" });
