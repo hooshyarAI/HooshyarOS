@@ -15,6 +15,7 @@
     "product:web:acceptance": "node scripts/web-product-acceptance.cjs",
     "product:security:acceptance": "node scripts/security-tenant-acceptance.cjs",
     "product:commercial:acceptance": "node scripts/commercial-application-acceptance.cjs",
+    "product:real:qualification": "node scripts/real-product-qualification.cjs",
     "product:agent:evidence": "node scripts/agent-repair-evidence-check.cjs",
     "product:agent:drill": "node qa/agent-repair-drill/repair-target.cjs",
     "product:windows:installer": "powershell -ExecutionPolicy Bypass -File scripts/build-windows-installer.ps1",
