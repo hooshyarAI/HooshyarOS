@@ -114,27 +114,53 @@ jobs:
           api-level: 35
           arch: x86_64
           profile: pixel_2
+          force-avd-creation: true
+          disable-animations: false
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: >
             set -e;
-            echo "=== Waiting for Android Package Manager service ===";
+            echo "=== Waiting for ADB device ===";
+            adb wait-for-device;
+            echo "=== Waiting for Android boot completion ===";
+            for i in $(seq 1 60); do
+              if [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then
+                echo "Boot completed (attempt $i)";
+                break;
+              fi;
+              echo "Boot not complete (attempt $i/60), retrying in 2s...";
+              sleep 2;
+            done;
+            test "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1";
+            echo "=== Waiting for Package Manager ===";
             _PM_READY=0;
-            i=1;
-            while [ "$i" -le 30 ]; do if adb shell cmd package list packages >/dev/null 2>&1; then echo "Package Manager service ready (attempt $i)"; _PM_READY=1; break; fi; echo "Package Manager not ready (attempt $i/30), retrying in 2s..."; sleep 2; i=$((i + 1)); done;
-            if [ "$_PM_READY" != "1" ]; then echo "ERROR: Package Manager service did not become ready within 60s"; exit 1; fi;
-            echo "=== Package Manager ready ===";
+            for i in $(seq 1 30); do
+              if adb shell cmd package list packages >/dev/null 2>&1; then
+                echo "Package Manager service ready (attempt $i)";
+                _PM_READY=1;
+                break;
+              fi;
+              echo "Package Manager not ready (attempt $i/30), retrying in 2s...";
+              sleep 2;
+            done;
+            test "$_PM_READY" = "1";
+            echo "=== Installing APK ===";
             adb install -r android/app/build/outputs/apk/debug/app-debug.apk;
+            echo "=== Launching application ===";
             adb shell am start -n ai.hooshyar.client/.MainActivity;
             sleep 5;
-            adb logcat -d AndroidRuntime:E *:S | tail -n 50 || true;
-            adb shell dumpsys activity activities | grep -i hooshyar || true;
-            echo "=== Android process diagnostics ===";
+            echo "=== Runtime diagnostics ===";
+            adb logcat -d AndroidRuntime:E *:S | tail -n 100 || true;
             adb shell ps -A | grep -i 'ai.hooshyar' || true;
-            adb shell dumpsys activity processes | grep -i -A 20 -B 10 'ai.hooshyar.client' || true;
             adb shell dumpsys activity top | grep -i -A 10 -B 10 'ai.hooshyar.client' || true;
-            adb shell dumpsys package ai.hooshyar.client | grep -i -E 'packageName|versionName|versionCode|MAIN|LAUNCHER' || true;
-            for i in $(seq 1 15); do echo "pidof attempt $i: $(adb shell pidof ai.hooshyar.client || true)"; sleep 2; done;
-            echo "=== end diagnostics ===";
-            test -n "$(adb shell pidof ai.hooshyar.client || true)";
+            echo "=== Process liveness ===";
+            _PID="";
+            for i in $(seq 1 15); do
+              _PID="$(adb shell pidof ai.hooshyar.client 2>/dev/null | tr -d '\r')";
+              echo "pidof attempt $i: $_PID";
+              if [ -n "$_PID" ]; then break; fi;
+              sleep 2;
+            done;
+            test -n "$_PID";
             adb shell dumpsys activity activities | grep -q 'ai.hooshyar.client/.MainActivity'
       - name: Write Android acceptance evidence
         shell: bash
