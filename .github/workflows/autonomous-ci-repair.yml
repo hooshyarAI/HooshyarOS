@@ -1,0 +1,73 @@
+name: Autonomous CI Repair
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+  actions: read
+  pull-requests: read
+
+jobs:
+  autonomous-ci-repair:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          persist-credentials: true
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install repository dependencies
+        run: npm install
+      - name: Install Kilo Code CLI
+        run: npm install --global @kilocode/cli
+      - name: Locate latest Final Product Factory result for this SHA
+        id: factory
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 120); do
+            info=$(curl -fsSL \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/${REPO}/actions/workflows/final-product-factory.yml/runs?per_page=50" \
+              | HEAD_SHA="${HEAD_SHA}" node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);const a=(j.workflow_runs||[]).filter(r=>r.head_sha===process.env.HEAD_SHA).sort((x,y)=>new Date(y.created_at)-new Date(x.created_at));const r=a[0];process.stdout.write(r?`${r.id} ${r.status} ${r.conclusion||""}`:"NONE")})')
+            echo "${info}"
+            if [ "${info}" != "NONE" ]; then
+              read -r id status conclusion <<< "${info}"
+              if [ "${status}" = "completed" ]; then
+                echo "target_run_id=${id}" >> "${GITHUB_OUTPUT}"
+                echo "repair_needed=$([[ "${conclusion}" == "failure" ]] && echo true || echo false)" >> "${GITHUB_OUTPUT}"
+                exit 0
+              fi
+            fi
+            sleep 15
+          done
+          exit 1
+      - name: Execute autonomous CI repair
+        if: steps.factory.outputs.repair_needed == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          HOOSHYAR_TARGET_RUN_ID: ${{ steps.factory.outputs.target_run_id }}
+          HOOSHYAR_GITHUB_REPOSITORY: ${{ github.repository }}
+          HOOSHYAR_AGENT: kilo
+          HOOSHYAR_AUTONOMOUS_ALLOW_PUSH: "1"
+          KILO_CONFIG_CONTENT: '{"model":"kilo/kilo-auto/free"}'
+        run: node scripts/autonomous-ci-repair-runner.cjs
+      - name: No repair required
+        if: steps.factory.outputs.repair_needed == 'false'
+        run: echo "Final Product Factory passed for this SHA; no autonomous repair is required."
