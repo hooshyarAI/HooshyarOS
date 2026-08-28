@@ -21,36 +21,18 @@ async function waitHealth(child) {
     if (child.spawnError) throw new Error(`WEB_ACCEPTANCE_RUNTIME_SPAWN_ERROR:${child.spawnError.message}`);
     if (child.exitCode !== null) throw new Error(`WEB_ACCEPTANCE_RUNTIME_EXITED_BEFORE_HEALTH:code=${child.exitCode}`);
     if (child.signalCode) throw new Error(`WEB_ACCEPTANCE_RUNTIME_SIGNALED_BEFORE_HEALTH:${child.signalCode}`);
-    try {
-      const response = await fetch(`http://127.0.0.1:${port}/health`);
-      if (response.ok && (await response.json()).status === 'ok') return;
-    } catch {}
+    try { const response = await fetch(`http://127.0.0.1:${port}/health`); if (response.ok && (await response.json()).status === 'ok') return; } catch {}
     await sleep(250);
   }
   throw new Error(`WEB_ACCEPTANCE_HEALTH_TIMEOUT:port=${port}`);
 }
-
-async function request(pathname, options = {}) {
-  const response = await fetch(`http://127.0.0.1:${port}${pathname}`, options);
-  const text = await response.text();
-  let body = {};
-  try { body = text ? JSON.parse(text) : {}; } catch { body = { raw: text }; }
-  return { status: response.status, body, setCookie: response.headers.get('set-cookie') || '' };
-}
-
+async function request(pathname, options = {}) { const response = await fetch(`http://127.0.0.1:${port}${pathname}`, options); const text = await response.text(); let body = {}; try { body = text ? JSON.parse(text) : {}; } catch { body = { raw: text }; } return { status: response.status, body, setCookie: response.headers.get('set-cookie') || '' }; }
 function spawnRuntime() {
-  const child = spawn(node, [tsxCli, runtimeEntrypoint], {
-    cwd: root,
-    stdio: ['ignore', 'inherit', 'inherit'],
-    shell: false,
-    windowsHide: true,
-    env: { ...process.env, HOOSHYAR_HOST: '127.0.0.1', HOOSHYAR_PORT: String(port), HOOSHYAR_DB_PATH: db }
-  });
+  const child = spawn(node, [tsxCli, runtimeEntrypoint], { cwd: root, stdio: ['ignore', 'inherit', 'inherit'], shell: false, windowsHide: true, env: { ...process.env, HOOSHYAR_HOST: '127.0.0.1', HOOSHYAR_PORT: String(port), HOOSHYAR_DB_PATH: db } });
   child.spawnError = null;
   child.on('error', (error) => { child.spawnError = error; });
   return child;
 }
-
 async function main() {
   fs.mkdirSync(evidenceDir, { recursive: true });
   try { fs.rmSync(evidencePath, { force: true }); } catch {}
@@ -59,15 +41,7 @@ async function main() {
   if (!fs.existsSync(runtimeEntrypoint)) throw new Error(`WEB_ACCEPTANCE_ENTRYPOINT_MISSING:${runtimeEntrypoint}`);
   fs.mkdirSync(path.dirname(db), { recursive: true });
   const child = spawnRuntime();
-  const stop = async () => {
-    if (child.exitCode === null && !child.signalCode) {
-      if (process.platform === 'win32') {
-        try { cp.execFileSync(shell, ['/d', '/s', '/c', `taskkill /PID ${child.pid} /T /F`], { cwd: root, stdio: 'ignore' }); } catch {}
-      } else child.kill('SIGTERM');
-      await sleep(500);
-    }
-    try { fs.rmSync(db, { force: true }); } catch {}
-  };
+  const stop = async () => { if (child.exitCode === null && !child.signalCode) { if (process.platform === 'win32') { try { cp.execFileSync(shell, ['/d','/s','/c',`taskkill /PID ${child.pid} /T /F`], { cwd: root, stdio: 'ignore' }); } catch {} } else child.kill('SIGTERM'); await sleep(500); } try { fs.rmSync(db, { force: true }); } catch {} };
   try {
     await waitHealth(child);
     const rootPage = await fetch(`http://127.0.0.1:${port}/`);
@@ -78,11 +52,17 @@ async function main() {
     const csv = ['date,account,debit,credit,currency','2026-08-01,Cash,1000,0,IRR','2026-08-02,Sales,0,1500,IRR','2026-08-03,Expense,300,0,IRR','2026-08-04,Receivable,0,800,IRR'].join('\n');
     const analysis = await request('/api/analyze', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ csv, sourceName: 'web-qa.csv', assets: 10000, liabilities: 4000 }) });
     if (analysis.status !== 200 || analysis.body.status !== 'READY' || analysis.body.metrics.profit !== 1000) throw new Error(`WEB_ACCEPTANCE_ANALYSIS_FAILED:${analysis.status}`);
+    const executive = await request('/api/executive/workbench', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ targets: { revenue: 2000, profit: 1200, profitMargin: 0.3, debtRatio: 0.25 } }) });
+    if (executive.status !== 200 || executive.body.status !== 'READY' || !Array.isArray(executive.body.recommendations) || executive.body.recommendations.length !== 4) throw new Error(`WEB_ACCEPTANCE_EXECUTIVE_FAILED:${executive.status}`);
+    const report = await request('/api/report', { headers: { cookie } });
+    if (report.status !== 200 || report.body.status !== 'READY' || !Array.isArray(report.body.sections) || report.body.sections.length < 7) throw new Error(`WEB_ACCEPTANCE_REPORT_FAILED:${report.status}`);
+    const assistant = await request('/api/assistant', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ question: 'وضعیت سود و درآمد من چیست؟' }) });
+    if (assistant.status !== 200 || assistant.body.status !== 'READY' || typeof assistant.body.answer !== 'string' || !assistant.body.answer.includes('1000')) throw new Error(`WEB_ACCEPTANCE_ASSISTANT_FAILED:${assistant.status}`);
     const dashboard = await request('/api/dashboard', { headers: { cookie } });
-    if (dashboard.status !== 200 || dashboard.body.analysisAvailable !== true || dashboard.body.metrics.profit !== 1000) throw new Error(`WEB_ACCEPTANCE_DASHBOARD_FAILED:${JSON.stringify(dashboard.body)}`);
-    const success = { type: 'WEB_PRODUCT_ACCEPTANCE_SUCCESS', version: 1, status: 'PASS', createdAt: new Date().toISOString(), repository: root, commit: gitCommit(), tenantId: session.body.tenantId, profit: dashboard.body.metrics.profit, acceptance: ['root', 'health', 'session', 'tenant', 'ingestion', 'analysis', 'dashboard'] };
+    if (dashboard.status !== 200 || dashboard.body.analysisAvailable !== true || dashboard.body.metrics.profit !== 1000 || dashboard.body.executiveIntelligence?.status !== 'READY') throw new Error(`WEB_ACCEPTANCE_DASHBOARD_FAILED:${JSON.stringify(dashboard.body)}`);
+    const success = { type: 'WEB_PRODUCT_ACCEPTANCE_SUCCESS', version: 2, status: 'PASS', createdAt: new Date().toISOString(), repository: root, commit: gitCommit(), tenantId: session.body.tenantId, profit: dashboard.body.metrics.profit, acceptance: ['root','health','session','tenant','ingestion','analysis','executive-workbench','report','assistant','dashboard'] };
     fs.writeFileSync(evidencePath, JSON.stringify(success, null, 2), 'utf8');
-    console.log(JSON.stringify({ type: 'WEB_PRODUCT_ACCEPTANCE', status: 'PASS', tenantId: session.body.tenantId, profit: dashboard.body.metrics.profit, root: true, session: true, analysis: true, dashboard: true }, null, 2));
+    console.log(JSON.stringify({ type: 'WEB_PRODUCT_ACCEPTANCE', status: 'PASS', tenantId: session.body.tenantId, profit: dashboard.body.metrics.profit, root: true, session: true, analysis: true, executive: true, report: true, assistant: true, dashboard: true }, null, 2));
   } finally { await stop(); }
 }
 main().catch((error) => { try { fs.rmSync(evidencePath, { force: true }); } catch {} console.error(JSON.stringify({ type: 'WEB_PRODUCT_ACCEPTANCE', status: 'BLOCKED', error: error.message, platform: process.platform, node: process.version }, null, 2)); process.exitCode = 1; });
