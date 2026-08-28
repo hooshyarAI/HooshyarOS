@@ -14,6 +14,28 @@ describe("KiloCodeExecutionAdapter", () => {
         });
     });
 
+    it("executes the Windows command through cmd.exe without splitting the prompt", () => {
+        const runner = jest.fn().mockReturnValue("KILO_ADAPTER_RUNTIME_OK");
+        const adapter = new KiloCodeExecutionAdapter(runner as never);
+        const prompt = "Do not modify files with spaces in this prompt";
+        const result = adapter.execute(prompt, process.cwd(), 30_000);
+
+        expect(result.ok).toBe(true);
+        if (process.platform === "win32") {
+            expect(runner).toHaveBeenCalledWith(
+                process.env.ComSpec || "cmd.exe",
+                ["/d", "/s", "/c", `kilo.cmd run --auto "${prompt}"`],
+                expect.objectContaining({ shell: false, cwd: process.cwd() })
+            );
+        } else {
+            expect(runner).toHaveBeenCalledWith(
+                "kilo",
+                ["run", "--auto", prompt],
+                expect.objectContaining({ shell: false, cwd: process.cwd() })
+            );
+        }
+    });
+
     it("reports availability from the executable lookup", () => {
         const runner = jest.fn().mockReturnValue(Buffer.from("kilo"));
         const adapter = new KiloCodeExecutionAdapter(runner as never);
