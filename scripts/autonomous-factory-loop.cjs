@@ -82,7 +82,7 @@ function commitAndPush() {
 function invokeKilo(prompt) {
   if (process.platform !== 'win32') return run('kilo', ['run', '--auto', prompt]).status ?? 1;
   const comspec = process.env.ComSpec || 'cmd.exe';
-  const quotedPrompt = `"${prompt.replace(/"/g, '""')}"`;
+  const quotedPrompt = `\"${prompt.replace(/\"/g, '\"\"')}\"`;
   return run(comspec, ['/d', '/s', '/c', `kilo.cmd run --auto ${quotedPrompt}`]).status ?? 1;
 }
 
@@ -143,7 +143,16 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     process.exit(2);
   }
 
+  // Never let an old audit artifact become evidence for a new cycle.
+  if (fs.existsSync(auditPath)) fs.unlinkSync(auditPath);
   const audit = capture(executable('npm'), ['run', 'product:cline:audit']);
+  const auditEvidence = readJson(auditPath);
+  if (auditEvidence && auditEvidence.git?.commit !== before) {
+    const stale = { expectedCommit: before, observedCommit: auditEvidence.git?.commit || null, auditExitCode: audit.code };
+    console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'STALE_PLATFORM_AUDIT_EVIDENCE', details: stale }));
+    process.exit(1);
+  }
+
   if (audit.code !== 0) {
     const payloadObject = buildFailurePayload(before, null, null, audit);
     const payload = JSON.stringify(payloadObject, null, 2);
