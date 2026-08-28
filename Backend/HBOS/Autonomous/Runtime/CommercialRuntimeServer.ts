@@ -198,7 +198,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                     `Debt ratio: ${result.metrics.debtRatio}`,
                     `Observations: ${result.observations.map((item) => item.message).join(" | ")}`,
                 ];
-                if (workbench) sections.push(`Recommendations: ${workbench.recommendations.map((item) => item.message).join(" | ")}`);
+                if (workbench) sections.push(`Recommendations: ${workbench.recommendations.map((item) => item.action).join(" | ")}`);
                 const report = reports.build("HooshyarOS Financial and Executive Report", sections);
                 return json(res, report.status === "READY" ? 200 : 422, { ...report, tenantId: session.tenantId, source: result.source });
             }
@@ -218,7 +218,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                     `ProfitMargin=${result.metrics.profitMargin}`,
                     `DebtRatio=${result.metrics.debtRatio}`,
                     `Observations=${result.observations.map((item) => item.message).join(" | ")}`,
-                    workbench ? `Recommendations=${workbench.recommendations.map((item) => item.message).join(" | ")}` : "No executive workbench result is available yet.",
+                    workbench ? `Recommendations=${workbench.recommendations.map((item) => item.action).join(" | ")}` : "No executive workbench result is available yet.",
                 ].join(" | ");
                 const answer = reasoning.reason(context);
                 if (!answer.success) return json(res, 503, { error: "ASSISTANT_REASONING_UNAVAILABLE" });
