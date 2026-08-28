@@ -63,6 +63,11 @@ export class CommercialProductCompletionAudit {
         if (contract.includes("Payment-provider activation is an external dependency")) blockedExternalDependencies.push("payment-provider-activation");
         if (contract.includes("Cloud deployment may remain externally blocked")) blockedExternalDependencies.push("production-cloud-resources");
 
-        return { complete: missingLayers.length === 0, contractPresent: true, missingLayers, blockedExternalDependencies };
+        return {
+            complete: missingLayers.length === 0 && blockedExternalDependencies.length === 0,
+            contractPresent: true,
+            missingLayers,
+            blockedExternalDependencies
+        };
     }
 }
