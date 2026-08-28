@@ -77,27 +77,23 @@ function commitAndPush() {
 }
 
 function invokeKilo(handoffFile) {
-  const prompt = [
+  const shortPrompt = [
     'You are the HooshyarOS autonomous repair operator.',
-    'Read the exact repair handoff file below and obey its scope.',
-    `HANDOFF_FILE=${handoffFile}`,
-    'Repair ONLY the FIRST concrete failure, audit finding, or unresolved qualification cell in that handoff.',
-    'Do not perform repository-wide discovery. Do not run Get-ChildItem -Recurse, recursive globbing over the whole repository, git log, git status, git diff against main, or broad scans.',
-    'Read only the exact files named by the handoff target and its directly referenced implementation.',
-    'Do not run full Jest, npm test, product:factory, product:cline:audit, release pipelines, or other repository-wide verification.',
-    'Make the smallest coherent change. Add/update ONE focused regression test and run only its focused verification or smallest directly relevant acceptance command.',
-    'Do not modify generated evidence artifacts merely to claim success. Do not force-push or create unrelated changes.',
-    'Once the first repair and focused verification pass, STOP immediately. The outer factory owns full verification, evidence, commit, push, and continuation.'
-  ].join('\n');
-  if (process.platform !== 'win32') return run('kilo', ['run', '--auto', prompt]).status ?? 1;
-  const comspec = process.env.ComSpec || 'cmd.exe';
-  const quotedPrompt = `\"${prompt.replace(/\"/g, '\"\"')}\"`;
-  return run(comspec, ['/d', '/s', '/c', `kilo.cmd run --auto ${quotedPrompt}`]).status ?? 1;
-}
+    `Read the exact repair handoff file: ${handoffFile}`,
+    'Repair ONLY the FIRST target in that file.',
+    'Do not broaden scope, scan the repository, run full Jest, run npm test, or run repository-wide verification.',
+    'Implement the repair, add/update ONE focused regression test, run only its focused verification, then STOP.',
+    'Do not modify generated evidence merely to claim success. Do not force-push or create unrelated changes.',
+    'The outer factory owns full verification, evidence, commit, push, and continuation.'
+  ].join(' ');
 
-function writeRepairHandoff(payloadObject) {
-  fs.writeFileSync(handoffPath, JSON.stringify(payloadObject, null, 2), 'utf8');
-  return handoffPath;
+  if (process.platform !== 'win32') {
+    return run('kilo', ['run', '--auto', '-f', handoffFile, shortPrompt]).status ?? 1;
+  }
+  const comspec = process.env.ComSpec || 'cmd.exe';
+  const quotedPrompt = `"${shortPrompt.replace(/"/g, '""')}"`;
+  const quotedFile = `"${handoffFile.replace(/"/g, '""')}"`;
+  return run(comspec, ['/d', '/s', '/c', `kilo.cmd run --auto -f ${quotedFile} ${quotedPrompt}`]).status ?? 1;
 }
 
 function buildFailurePayload(before, currentEvidence, factoryResult, auditResult, failureOverride = null) {
@@ -127,6 +123,11 @@ function runFullJest() {
 function runPlatformAudit() {
   const auditScript = path.join(root, 'scripts', 'cline-full-platform-audit.cjs');
   return capture(process.execPath, [auditScript]);
+}
+
+function writeHandoff(payload) {
+  fs.writeFileSync(handoffPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+  return handoffPath;
 }
 
 fs.mkdirSync(dir, { recursive: true });
@@ -169,8 +170,8 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       stderr: audit.stderr
     };
     const payloadObject = buildFailurePayload(before, null, null, audit, failureOverride);
-    const payloadForFingerprint = JSON.stringify(payloadObject);
-    const fingerprint = sha256(payloadForFingerprint);
+    const payload = JSON.stringify(payloadObject, null, 2);
+    const fingerprint = sha256(payload);
     if (state.lastFailureFingerprint === fingerprint) {
       console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'REPEATED_IDENTICAL_AUDIT_FAILURE', fingerprint }));
       state.attempts.push({ attempt, before, reason: 'REPEATED_IDENTICAL_AUDIT_FAILURE', fingerprint, at: new Date().toISOString() });
@@ -179,10 +180,10 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     }
     state.lastFailureFingerprint = fingerprint;
     fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
-    const handoff = writeRepairHandoff(payloadObject);
-    console.error(JSON.stringify({ type: 'AUTONOMOUS_AUDIT_REPAIR', attempt, reason: 'PLATFORM_AUDIT_EXECUTION_FAILED', fingerprint, handoff }));
+    const handoffFile = writeHandoff(payloadObject);
+    console.error(JSON.stringify({ type: 'AUTONOMOUS_AUDIT_REPAIR', attempt, reason: 'PLATFORM_AUDIT_EXECUTION_FAILED', fingerprint, handoff: handoffFile }));
 
-    const kiloExit = invokeKilo(handoff);
+    const kiloExit = invokeKilo(handoffFile);
     if (kiloExit !== 0) {
       console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'KILO_REPAIR_FAILED_AFTER_AUDIT', kiloExit, fingerprint }));
       process.exit(1);
@@ -221,11 +222,11 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     process.exit(0);
   }
 
-  const handoffResult = capture(executable('npm'), ['run', 'product:factory:handoff']);
+  const handoff = capture(executable('npm'), ['run', 'product:factory:handoff']);
   const payloadObject = buildFailurePayload(before, currentEvidence, factory, null);
-  payloadObject.handoff = handoffResult.stdout || handoffResult.stderr;
-  const payloadForFingerprint = JSON.stringify(payloadObject);
-  const fingerprint = sha256(payloadForFingerprint);
+  payloadObject.handoff = handoff.stdout || handoff.stderr;
+  const payload = JSON.stringify(payloadObject, null, 2);
+  const fingerprint = sha256(payload);
 
   if (state.lastFailureFingerprint === fingerprint) {
     console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'REPEATED_IDENTICAL_FAILURE', fingerprint }));
@@ -236,10 +237,10 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
 
   state.lastFailureFingerprint = fingerprint;
   fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
+  const handoffFile = writeHandoff(payloadObject);
+  console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_REPAIR', attempt, fingerprint, handoff: handoffFile }));
 
-  const handoff = writeRepairHandoff(payloadObject);
-  console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_REPAIR', attempt, fingerprint, handoff }));
-  const kiloExit = invokeKilo(handoff);
+  const kiloExit = invokeKilo(handoffFile);
   if (kiloExit !== 0) {
     console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'KILO_REPAIR_FAILED', kiloExit, fingerprint }));
     process.exit(1);
