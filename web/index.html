@@ -39,22 +39,47 @@
       <h2>ایجاد نشست</h2>
       <form id="session-form">
         <label>نام کاربری<input id="username" value="مدیرعامل" required /></label>
-        <label>سازمان<input id="organization" value="تست هوشیار" required /></label>
-        <button class="primary" type="submit">ایجاد نشست</button>
+        <label>سازمان<input id="organization" value="سازمان من" required /></label>
+        <button class="primary" type="submit">ورود و ایجاد نشست</button>
       </form>
       <p id="session-result" class="result" aria-live="polite"></p>
     </section>
 
     <section class="card onboarding">
-      <h2>تحلیل واقعی صورت مالی</h2>
-      <p>یک فایل CSV با ستون‌های date, account, debit, credit, currency انتخاب کنید.</p>
+      <h2>ورود و تحلیل واقعی اطلاعات مالی</h2>
+      <p>فایل CSV با ستون‌های date, account, debit, credit, currency را بارگذاری کنید.</p>
       <form id="analysis-form">
         <label>فایل CSV<input id="csv-file" type="file" accept=".csv,text/csv" required /></label>
-        <label>دارایی‌ها<input id="assets" type="number" min="0" step="0.01" value="1000" required /></label>
-        <label>بدهی‌ها<input id="liabilities" type="number" min="0" step="0.01" value="250" required /></label>
-        <button class="primary" type="submit">تحلیل کن</button>
+        <label>دارایی‌ها<input id="assets" type="number" min="0" step="0.01" value="10000" required /></label>
+        <label>بدهی‌ها<input id="liabilities" type="number" min="0" step="0.01" value="2500" required /></label>
+        <button class="primary" type="submit">تحلیل واقعی</button>
       </form>
       <p id="analysis-result" class="result" aria-live="polite"></p>
+    </section>
+
+    <section class="card onboarding">
+      <h2>هوش مدیریتی و KPI</h2>
+      <form id="executive-form">
+        <label>هدف درآمد<input id="target-revenue" type="number" min="1" value="2000" required /></label>
+        <label>هدف سود<input id="target-profit" type="number" min="1" value="1200" required /></label>
+        <label>هدف حاشیه سود<input id="target-margin" type="number" min="0.01" step="0.01" value="0.30" required /></label>
+        <label>هدف نسبت بدهی<input id="target-debt" type="number" min="0.01" step="0.01" value="0.25" required /></label>
+        <button class="primary" type="submit">محاسبه KPI و پیشنهادها</button>
+      </form>
+      <pre id="executive-result" class="result" aria-live="polite"></pre>
+    </section>
+
+    <section class="card onboarding">
+      <h2>گزارش و دستیار هوشمند</h2>
+      <div class="actions">
+        <button id="report-button" class="primary" type="button">تولید گزارش</button>
+      </div>
+      <pre id="report-result" class="result" aria-live="polite"></pre>
+      <form id="assistant-form">
+        <label>سؤال از هوشیار<textarea id="assistant-question" rows="3" required placeholder="مثلاً وضعیت سود و ریسک بدهی من چیست؟"></textarea></label>
+        <button class="primary" type="submit">پرسش از دستیار</button>
+      </form>
+      <pre id="assistant-result" class="result" aria-live="polite"></pre>
     </section>
   </main>
   <script src="/app.js" defer></script>
