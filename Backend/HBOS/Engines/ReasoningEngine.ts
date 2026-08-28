@@ -5,9 +5,10 @@ export interface ReasoningResult {
     problem: string;
     status: string;
     success: boolean;
+    answer?: string;
 }
 
-/** Canonical HBOS reasoning owner; delegates model-independent reasoning to the Python AI Runtime. */
+/** Canonical HBOS reasoning owner; delegates evidence-bound reasoning to the Python AI Runtime. */
 export class ReasoningEngine implements Engine {
     name = "ReasoningEngine";
 
@@ -39,8 +40,8 @@ export class ReasoningEngine implements Engine {
                 windowsHide: true,
                 stdio: ["ignore", "pipe", "pipe"]
             }).trim();
-            const result = JSON.parse(raw) as { problem: string; status: string };
-            return { problem: result.problem, status: result.status, success: true };
+            const result = JSON.parse(raw) as { problem: string; status: string; answer?: string };
+            return { problem: result.problem, status: result.status, success: true, answer: result.answer };
         } catch {
             return { problem, status: "reasoning_failed", success: false };
         }
