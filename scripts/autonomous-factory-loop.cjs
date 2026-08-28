@@ -60,19 +60,15 @@ function commitAndPush() {
   const status = git(['status', '--porcelain']);
   if (status.code !== 0) throw new Error('git status failed');
   if (!status.stdout.trim()) return { changed: false, pushed: false };
-
   const add = run('git', ['add', '--all']);
   if ((add.status ?? 1) !== 0) throw new Error('git add failed');
-
   const message = process.env.HOOSHYAR_AUTONOMOUS_COMMIT_MESSAGE || 'fix(autonomous): repair commercial product factory failure';
   const commit = run('git', ['commit', '-m', message]);
   if ((commit.status ?? 1) !== 0) throw new Error('git commit failed');
-
   if (process.env.HOOSHYAR_AUTONOMOUS_ALLOW_PUSH !== '1') {
     console.log(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_COMMITTED', pushed: false, reason: 'PUSH_DISABLED_BY_POLICY', branch }));
     return { changed: true, pushed: false };
   }
-
   const push = run('git', ['push', 'origin', branch]);
   if ((push.status ?? 1) !== 0) throw new Error('git push failed');
   console.log(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_COMMITTED', pushed: true, branch }));
@@ -143,13 +139,13 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     process.exit(2);
   }
 
-  // Never let an old audit artifact become evidence for a new cycle.
+  // Never reuse an evidence artifact from an earlier commit/run.
   if (fs.existsSync(auditPath)) fs.unlinkSync(auditPath);
+
   const audit = capture(executable('npm'), ['run', 'product:cline:audit']);
   const auditEvidence = readJson(auditPath);
   if (auditEvidence && auditEvidence.git?.commit !== before) {
-    const stale = { expectedCommit: before, observedCommit: auditEvidence.git?.commit || null, auditExitCode: audit.code };
-    console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'STALE_PLATFORM_AUDIT_EVIDENCE', details: stale }));
+    console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'STALE_PLATFORM_AUDIT_EVIDENCE', expectedCommit: before, observedCommit: auditEvidence.git?.commit || null }));
     process.exit(1);
   }
 
@@ -157,14 +153,12 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const payloadObject = buildFailurePayload(before, null, null, audit);
     const payload = JSON.stringify(payloadObject, null, 2);
     const fingerprint = sha256(payload);
-
     if (state.lastFailureFingerprint === fingerprint) {
       console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'REPEATED_IDENTICAL_AUDIT_FAILURE', fingerprint }));
       state.attempts.push({ attempt, before, reason: 'REPEATED_IDENTICAL_AUDIT_FAILURE', fingerprint, at: new Date().toISOString() });
       fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
       process.exit(1);
     }
-
     state.lastFailureFingerprint = fingerprint;
     fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
     console.error(JSON.stringify({ type: 'AUTONOMOUS_AUDIT_REPAIR', attempt, reason: 'PLATFORM_AUDIT_FAILED', fingerprint }));
@@ -183,9 +177,8 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       process.exit(1);
     }
 
-    if (repositoryChanged()) {
-      commitAndPush();
-    } else if (git(['rev-parse', 'HEAD']).stdout.trim() === before) {
+    if (repositoryChanged()) commitAndPush();
+    else if (git(['rev-parse', 'HEAD']).stdout.trim() === before) {
       console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'KILO_PRODUCED_NO_REPOSITORY_CHANGE_AFTER_AUDIT', fingerprint }));
       process.exit(1);
     }
@@ -239,9 +232,8 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     process.exit(1);
   }
 
-  if (repositoryChanged()) {
-    commitAndPush();
-  } else if (git(['rev-parse', 'HEAD']).stdout.trim() === before) {
+  if (repositoryChanged()) commitAndPush();
+  else if (git(['rev-parse', 'HEAD']).stdout.trim() === before) {
     console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'KILO_PRODUCED_NO_REPOSITORY_CHANGE', fingerprint }));
     process.exit(1);
   }
