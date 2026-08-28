@@ -2,6 +2,7 @@ import { AutonomousBuildDaemon } from "./AutonomousBuildDaemon";
 import { AutonomousDevelopmentLoop, AutonomousDevelopmentResult } from "../../Architecture/Autonomous/AutonomousDevelopmentLoop";
 import { AutonomousProjectMission } from "./AutonomousProjectMission";
 import { AutonomousPlatformContinuation } from "./AutonomousPlatformContinuation";
+import { CommercialProductCompletionAudit } from "./CommercialProductCompletionAudit";
 
 describe("AutonomousBuildDaemon", () => {
     it("executes the first real platform capability at the assistant completion handoff", () => {
@@ -192,5 +193,15 @@ describe("AutonomousBuildDaemon", () => {
         } finally {
             logSpy.mockRestore();
         }
+    });
+
+    it("marks commercial completion incomplete while required external activation remains blocked", () => {
+        const result = new CommercialProductCompletionAudit().audit(process.cwd());
+        expect(result.complete).toBe(false);
+        expect(result.missingLayers).toEqual([]);
+        expect(result.blockedExternalDependencies).toEqual(expect.arrayContaining([
+            "payment-provider-activation",
+            "production-cloud-resources"
+        ]));
     });
 });
