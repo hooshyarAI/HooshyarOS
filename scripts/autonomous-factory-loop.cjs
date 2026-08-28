@@ -86,14 +86,11 @@ function invokeKilo(handoffFile) {
     'Do not modify generated evidence merely to claim success. Do not force-push or create unrelated changes.',
     'The outer factory owns full verification, evidence, commit, push, and continuation.'
   ].join(' ');
-
-  if (process.platform !== 'win32') {
-    return run('kilo', ['run', '--auto', '-f', handoffFile, shortPrompt]).status ?? 1;
-  }
+  const args = ['run', '--auto', '--agent', 'hooshyar-repair', '-f', handoffFile, shortPrompt];
+  if (process.platform !== 'win32') return run('kilo', args).status ?? 1;
   const comspec = process.env.ComSpec || 'cmd.exe';
-  const quotedPrompt = `"${shortPrompt.replace(/"/g, '""')}"`;
-  const quotedFile = `"${handoffFile.replace(/"/g, '""')}"`;
-  return run(comspec, ['/d', '/s', '/c', `kilo.cmd run --auto -f ${quotedFile} ${quotedPrompt}`]).status ?? 1;
+  const parts = args.map(value => `"${value.replace(/"/g, '""')}"`);
+  return run(comspec, ['/d', '/s', '/c', `kilo.cmd ${parts.join(' ')}`]).status ?? 1;
 }
 
 function buildFailurePayload(before, currentEvidence, factoryResult, auditResult, failureOverride = null) {
@@ -162,13 +159,7 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
   }
 
   if (audit.code !== 0) {
-    const failureOverride = {
-      type: 'PLATFORM_AUDIT_EXECUTION_FAILURE',
-      message: 'Canonical platform audit exited non-zero.',
-      exitCode: audit.code,
-      stdout: audit.stdout,
-      stderr: audit.stderr
-    };
+    const failureOverride = { type: 'PLATFORM_AUDIT_EXECUTION_FAILURE', message: 'Canonical platform audit exited non-zero.', exitCode: audit.code, stdout: audit.stdout, stderr: audit.stderr };
     const payloadObject = buildFailurePayload(before, null, null, audit, failureOverride);
     const payload = JSON.stringify(payloadObject, null, 2);
     const fingerprint = sha256(payload);
@@ -182,13 +173,11 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
     const handoffFile = writeHandoff(payloadObject);
     console.error(JSON.stringify({ type: 'AUTONOMOUS_AUDIT_REPAIR', attempt, reason: 'PLATFORM_AUDIT_EXECUTION_FAILED', fingerprint, handoff: handoffFile }));
-
     const kiloExit = invokeKilo(handoffFile);
     if (kiloExit !== 0) {
       console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'KILO_REPAIR_FAILED_AFTER_AUDIT', kiloExit, fingerprint }));
       process.exit(1);
     }
-
     const tests = runFullJest();
     if ((tests.status ?? 1) !== 0) {
       state.attempts.push({ attempt, before, repair: 'KILO', fullJest: 'FAIL', audit: 'FAIL', at: new Date().toISOString() });
@@ -196,13 +185,11 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'FULL_JEST_FAILED_AFTER_AUDIT_REPAIR' }));
       process.exit(1);
     }
-
     if (repositoryChanged()) commitAndPush();
     else if (git(['rev-parse', 'HEAD']).stdout.trim() === before) {
       console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'KILO_PRODUCED_NO_REPOSITORY_CHANGE_AFTER_AUDIT', fingerprint }));
       process.exit(1);
     }
-
     const after = git(['rev-parse', 'HEAD']).stdout.trim();
     state.attempts.push({ attempt, before, after, audit: 'FAIL', repair: 'KILO', fullJest: 'PASS', at: new Date().toISOString() });
     fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
@@ -213,28 +200,24 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
   const factory = run(executable('npm'), ['run', 'product:factory']);
   const evidence = run(executable('npm'), ['run', 'product:cline:evidence']);
   const currentEvidence = readJson(evidencePath);
-
   if ((factory.status ?? 1) === 0 && evidence.status === 0 && currentEvidence?.verdict === 'QUALIFICATION_COMPLETE') {
     const after = git(['rev-parse', 'HEAD']).stdout.trim();
     state.attempts.push({ attempt, before, after, factory: 'PASS', qualification: 'COMPLETE', at: new Date().toISOString() });
     fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
-    console.log(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_COMPLETE', attempt, commit: after, evidenceExitCode: evidence.status ?? 1 }));
+    console.log(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_COMPLETE', attempt, commit: after }));
     process.exit(0);
   }
 
-  const handoff = capture(executable('npm'), ['run', 'product:factory:handoff']);
   const payloadObject = buildFailurePayload(before, currentEvidence, factory, null);
-  payloadObject.handoff = handoff.stdout || handoff.stderr;
+  payloadObject.handoff = capture(executable('npm'), ['run', 'product:factory:handoff']).stdout;
   const payload = JSON.stringify(payloadObject, null, 2);
   const fingerprint = sha256(payload);
-
   if (state.lastFailureFingerprint === fingerprint) {
     console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'REPEATED_IDENTICAL_FAILURE', fingerprint }));
     state.attempts.push({ attempt, before, reason: 'REPEATED_IDENTICAL_FAILURE', fingerprint, at: new Date().toISOString() });
     fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
     process.exit(1);
   }
-
   state.lastFailureFingerprint = fingerprint;
   fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
   const handoffFile = writeHandoff(payloadObject);
@@ -248,7 +231,7 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
 
   const tests = runFullJest();
   if ((tests.status ?? 1) !== 0) {
-    state.attempts.push({ attempt, before, factory: 'FAIL', repair: 'KILO', fullJest: 'FAIL', at: new Date().toISOString() });
+    state.attempts.push({ attempt, before, repair: 'KILO', fullJest: 'FAIL', at: new Date().toISOString() });
     fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
     console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'FULL_JEST_FAILED_AFTER_REPAIR' }));
     process.exit(1);
