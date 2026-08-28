@@ -86,15 +86,19 @@ function repairPrompt(payload) {
   return [
     'You are the HooshyarOS autonomous repair operator.',
     'Obey AGENTS.md, .clinerules, Architecture Freeze V4, governance, the commercial completion contract, and the qualification matrix.',
-    'Repair ONLY the FIRST concrete failure, audit finding, or unresolved qualification cell in the supplied evidence.',
-    'Do not weaken tests, bypass gates, invent completion, or change frozen architecture semantics.',
+    'REPAIR SCOPE IS STRICTLY BOUNDED TO THE HANDOFF BELOW. Repair ONLY the FIRST concrete failure, audit finding, or unresolved qualification cell.',
+    'Do not invent a different target. Do not broaden scope after identifying the first target.',
+    'DO NOT perform repository-wide discovery. Do not run Get-ChildItem -Recurse, recursive globbing over the whole repository, git log, git status, git diff against main, or any broad repository scan.',
+    'Use the supplied handoff evidence first. Read only the exact files named by the failure, finding, qualification cell, or its directly referenced implementation.',
+    'Do not search all branches or inspect unrelated historical commits.',
+    'Do not run commands that are expected to take more than about 30 seconds unless they are the smallest directly relevant acceptance command for the selected target.',
     'Reuse existing implementations. Make the smallest coherent change.',
     'Add or update ONE focused regression test for the repaired defect and run ONLY that focused verification or the smallest directly relevant acceptance command.',
-    'DO NOT run the full Jest suite. DO NOT run `npm test`. DO NOT run `product:factory`, `product:cline:audit`, release pipelines, or other repository-wide verification. The outer factory owns full verification, evidence, commit, push, and re-planning.',
-    'DO NOT spend the session investigating unrelated failures. Once the first repair is implemented and its focused verification passes, STOP and return control to the outer factory.',
-    'Do not stop at a plan: implement the repair.',
+    'DO NOT run the full Jest suite. DO NOT run `npm test`. DO NOT run `product:factory`, `product:cline:audit`, release pipelines, recursive repository scans, or broad status/history commands. The outer factory owns full verification, evidence, commit, push, and re-planning.',
+    'Do not modify generated evidence artifacts merely to claim success.',
     'Do not create unrelated changes or force-push.',
-    'Do not create or modify generated evidence artifacts merely to claim success.',
+    'Once the first repair is implemented and its focused verification passes, STOP immediately and return control to the outer factory. Do not continue exploring.',
+    'If the supplied qualification cell is runtime/application/device evidence rather than a code defect, identify the smallest repository-native action that can produce that evidence. Do not fake external/device evidence.',
     'When repair is verified, leave the repository clean of temporary files; the outer loop handles full Jest, evidence, commit, push, and continuation.',
     '',
     'FAILURE / QUALIFICATION / AUDIT HANDOFF:',
@@ -127,8 +131,6 @@ function runFullJest() {
 }
 
 function runPlatformAudit() {
-  // Invoke the canonical audit entrypoint directly. This avoids npm.cmd wrapper
-  // behavior and keeps audit ownership separate from the factory's verification.
   const auditScript = path.join(root, 'scripts', 'cline-full-platform-audit.cjs');
   return capture(process.execPath, [auditScript]);
 }
@@ -153,7 +155,6 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     process.exit(2);
   }
 
-  // Invalidate every prior transient evidence artifact that can contaminate this cycle.
   for (const file of [auditPath, failurePath, evidencePath]) {
     if (fs.existsSync(file)) fs.unlinkSync(file);
   }
