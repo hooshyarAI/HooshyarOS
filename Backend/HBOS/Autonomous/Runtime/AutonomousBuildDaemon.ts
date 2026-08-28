@@ -88,7 +88,6 @@ export class AutonomousBuildDaemon {
         const documentation = documentationPaths.every(exists);
         const dependenciesSatisfied = dependencyPaths.every(exists);
         const verified = test && selected.evidence.clean && selected.evidence.commit.length > 0;
-
         return this.evidenceAudit.evaluate({ implementation, test, documentation, dependenciesSatisfied, verified });
     }
 
@@ -122,7 +121,7 @@ export class AutonomousBuildDaemon {
         }
 
         const commercialAudit = this.commercialAudit.audit(this.root);
-        if (!commercialAudit.complete) {
+        if (commercialAudit.missingLayers.length > 0) {
             return {
                 kind: "platform-audit-blocked",
                 mission: selected,
