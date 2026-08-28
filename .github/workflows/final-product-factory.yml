@@ -114,40 +114,27 @@ jobs:
           api-level: 35
           arch: x86_64
           profile: pixel_2
-          script: |
-            echo "=== Waiting for Android Package Manager service ==="
-            _PM_READY=0
-            i=1
-            while [ "$i" -le 30 ]; do
-              if adb shell cmd package list packages >/dev/null 2>&1; then
-                echo "Package Manager service ready (attempt $i)"
-                _PM_READY=1
-                break
-              fi
-              echo "Package Manager not ready (attempt $i/30), retrying in 2s..."
-              sleep 2
-              i=$((i + 1))
-            done
-            if [ "$_PM_READY" != "1" ]; then
-              echo "ERROR: Package Manager service did not become ready within 60s"
-              exit 1
-            fi
-            echo "=== Package Manager ready ==="
-            adb install -r android/app/build/outputs/apk/debug/app-debug.apk
-            adb shell am start -n ai.hooshyar.client/.MainActivity
-            adb logcat -d AndroidRuntime:E *:S | tail -n 50 || true
-            adb shell dumpsys activity activities | grep -i hooshyar || true
-            echo "=== Android process diagnostics ==="
-            adb shell ps -A | grep -i 'ai.hooshyar' || true
-            adb shell dumpsys activity processes | grep -i -A 20 -B 10 'ai.hooshyar.client' || true
-            adb shell dumpsys activity top | grep -i -A 10 -B 10 'ai.hooshyar.client' || true
-            adb shell dumpsys package ai.hooshyar.client | grep -i -E 'packageName|versionName|versionCode|MAIN|LAUNCHER' || true
-            for i in $(seq 1 15); do
-              echo "pidof attempt $i: $(adb shell pidof ai.hooshyar.client)" || true
-              sleep 2
-            done || true
-            echo "=== end diagnostics ==="
-            adb shell pidof ai.hooshyar.client
+          script: >
+            set -e;
+            echo "=== Waiting for Android Package Manager service ===";
+            _PM_READY=0;
+            i=1;
+            while [ "$i" -le 30 ]; do if adb shell cmd package list packages >/dev/null 2>&1; then echo "Package Manager service ready (attempt $i)"; _PM_READY=1; break; fi; echo "Package Manager not ready (attempt $i/30), retrying in 2s..."; sleep 2; i=$((i + 1)); done;
+            if [ "$_PM_READY" != "1" ]; then echo "ERROR: Package Manager service did not become ready within 60s"; exit 1; fi;
+            echo "=== Package Manager ready ===";
+            adb install -r android/app/build/outputs/apk/debug/app-debug.apk;
+            adb shell am start -n ai.hooshyar.client/.MainActivity;
+            sleep 5;
+            adb logcat -d AndroidRuntime:E *:S | tail -n 50 || true;
+            adb shell dumpsys activity activities | grep -i hooshyar || true;
+            echo "=== Android process diagnostics ===";
+            adb shell ps -A | grep -i 'ai.hooshyar' || true;
+            adb shell dumpsys activity processes | grep -i -A 20 -B 10 'ai.hooshyar.client' || true;
+            adb shell dumpsys activity top | grep -i -A 10 -B 10 'ai.hooshyar.client' || true;
+            adb shell dumpsys package ai.hooshyar.client | grep -i -E 'packageName|versionName|versionCode|MAIN|LAUNCHER' || true;
+            for i in $(seq 1 15); do echo "pidof attempt $i: $(adb shell pidof ai.hooshyar.client || true)"; sleep 2; done;
+            echo "=== end diagnostics ===";
+            test -n "$(adb shell pidof ai.hooshyar.client || true)";
             adb shell dumpsys activity activities | grep -q 'ai.hooshyar.client/.MainActivity'
       - name: Write Android acceptance evidence
         shell: bash
