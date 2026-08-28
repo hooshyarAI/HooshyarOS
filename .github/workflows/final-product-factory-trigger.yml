@@ -4,6 +4,13 @@ on:
   push:
     branches:
       - fix/autonomous-product-factory
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
 
 permissions:
   actions: write
@@ -13,11 +20,11 @@ jobs:
   dispatch-final-product-factory:
     runs-on: ubuntu-latest
     steps:
-      - name: Dispatch Final Product Factory for pushed head
+      - name: Dispatch Final Product Factory for current head
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          GH_REF: ${{ github.ref_name }}
+          GH_REF: ${{ github.head_ref || github.ref_name }}
         shell: bash
         run: |
           gh workflow run final-product-factory.yml --repo "$GH_REPO" --ref "$GH_REF"
