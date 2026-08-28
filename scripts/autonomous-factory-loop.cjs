@@ -119,6 +119,11 @@ function buildFailurePayload(before, currentEvidence, factoryResult, auditResult
   };
 }
 
+function runFullJest() {
+  const jestCli = path.join(root, 'node_modules', 'jest', 'bin', 'jest.js');
+  return run(process.execPath, [jestCli, '--runInBand']);
+}
+
 fs.mkdirSync(dir, { recursive: true });
 const state = readJson(statePath) || { attempts: [], lastFailureFingerprint: null };
 console.log(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_LOOP_START', branch, maxAttempts }));
@@ -139,9 +144,7 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     process.exit(2);
   }
 
-  // Never reuse an evidence artifact from an earlier commit/run.
   if (fs.existsSync(auditPath)) fs.unlinkSync(auditPath);
-
   const audit = capture(executable('npm'), ['run', 'product:cline:audit']);
   const auditEvidence = readJson(auditPath);
   if (auditEvidence && auditEvidence.git?.commit !== before) {
@@ -169,7 +172,7 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       process.exit(1);
     }
 
-    const tests = run(executable('npm'), ['test', '--', '--runInBand']);
+    const tests = runFullJest();
     if ((tests.status ?? 1) !== 0) {
       state.attempts.push({ attempt, before, repair: 'KILO', fullJest: 'FAIL', audit: 'FAIL', at: new Date().toISOString() });
       fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
@@ -224,7 +227,7 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     process.exit(1);
   }
 
-  const tests = run(executable('npm'), ['test', '--', '--runInBand']);
+  const tests = runFullJest();
   if ((tests.status ?? 1) !== 0) {
     state.attempts.push({ attempt, before, factory: 'FAIL', repair: 'KILO', fullJest: 'FAIL', at: new Date().toISOString() });
     fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
