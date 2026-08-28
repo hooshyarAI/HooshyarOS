@@ -7,7 +7,7 @@ on:
 
 permissions:
   contents: write
-  actions: read
+  actions: write
   pull-requests: read
 
 jobs:
@@ -51,12 +51,17 @@ jobs:
               read -r id status conclusion <<< "${info}"
               if [ "${status}" = "completed" ]; then
                 echo "target_run_id=${id}" >> "${GITHUB_OUTPUT}"
-                echo "repair_needed=$([[ "${conclusion}" == "failure" ]] && echo true || echo false)" >> "${GITHUB_OUTPUT}"
+                if [ "${conclusion}" = "failure" ]; then
+                  echo "repair_needed=true" >> "${GITHUB_OUTPUT}"
+                else
+                  echo "repair_needed=false" >> "${GITHUB_OUTPUT}"
+                fi
                 exit 0
               fi
             fi
             sleep 15
           done
+          echo "Timed out waiting for Final Product Factory result"
           exit 1
       - name: Execute autonomous CI repair
         if: steps.factory.outputs.repair_needed == 'true'
