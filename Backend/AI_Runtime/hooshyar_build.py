@@ -1,15 +1,8 @@
 """Autonomous HooshyarOS construction entrypoint.
 
-Modes:
-- assistant: build the assistant until the canonical platform handoff.
-- platform: run the canonical platform daemon once to exhaustion.
-- commercial: unattended commercial construction supervisor. It repeatedly
-  invokes the canonical daemon, allowing it to AUDIT -> SELECT -> IMPLEMENT ->
-  TEST -> INTEGRATE -> VERIFY -> COMMIT -> PUSH -> AUDIT AGAIN until the
-  commercial completion audit succeeds or a bounded supervisor deadline is hit.
-
-Python is only the repository-native implementation worker/supervisor. The
-TypeScript HBOS architecture remains authoritative.
+Python is only the repository-native supervisor/worker bridge. The TypeScript
+HBOS architecture and its AutonomousBuildDaemon remain authoritative for
+mission selection, construction, verification, commit and continuation.
 """
 from __future__ import annotations
 
@@ -27,20 +20,25 @@ LOCK = ROOT / ".git" / "hooshyar-commercial-build.lock"
 HANDOFF_MARKER = '"type":"AUTONOMOUS_PLATFORM_CONTINUATION"'
 COMPLETE_MARKER = '"type":"AUTONOMOUS_PLATFORM_CONSTRUCTION_COMPLETE"'
 BLOCKED_MARKER = '"type":"AUTONOMOUS_BLOCKED"'
-IDLE_MARKER = '"type":"AUTONOMOUS_IDLE"'
 
 
-def run_daemon(*, assistant_phase: bool) -> tuple[int, bool]:
-    """Run one canonical daemon invocation and report whether it completed."""
+def run_daemon(*, assistant_phase: bool) -> tuple[int, bool, bool]:
+    """Run one canonical daemon invocation.
+
+    The daemon owns all construction decisions. This supervisor only streams
+    output and distinguishes proven completion from a terminal blocked result.
+    """
     if not DAEMON.exists():
         print(f"ERROR: missing autonomous daemon: {DAEMON}", file=sys.stderr)
-        return 2, False
+        return 2, False, False
     if not TSX.exists():
         print(f"ERROR: missing local tsx executable: {TSX}", file=sys.stderr)
-        return 2, False
+        return 2, False, False
 
     env = os.environ.copy()
-    env["HOOSHYAR_AGENT"] = "python"
+    # Never overwrite the requested implementation agent. The canonical
+    # LocalConstructionToolset selects kilo/python according to this value.
+    env["HOOSHYAR_AGENT"] = env.get("HOOSHYAR_AGENT", "auto")
     env["HOOSHYAR_AUTONOMOUS_DEADLINE_DAYS"] = env.get("HOOSHYAR_AUTONOMOUS_DEADLINE_DAYS", "7")
     env["HOOSHYAR_BUILD_PHASE"] = "assistant" if assistant_phase else "platform"
 
@@ -59,43 +57,32 @@ def run_daemon(*, assistant_phase: bool) -> tuple[int, bool]:
     assert process.stdout is not None
     handoff_seen = False
     complete_seen = False
+    blocked_seen = False
 
     try:
         for line in process.stdout:
             print(line, end="")
-            if assistant_phase and HANDOFF_MARKER in line:
+            if HANDOFF_MARKER in line:
                 handoff_seen = True
+            if COMPLETE_MARKER in line:
+                complete_seen = True
+            if BLOCKED_MARKER in line:
+                blocked_seen = True
+            if assistant_phase and handoff_seen:
                 print('{"type":"AUTONOMOUS_ASSISTANT_PHASE_COMPLETE","status":"completed","next":"platform","deadlineDays":7}')
                 process.terminate()
                 break
-            if not assistant_phase and COMPLETE_MARKER in line:
-                complete_seen = True
     finally:
-        if process.stdout is not None:
-            process.stdout.close()
+        process.stdout.close()
 
+    return_code = process.wait()
     if assistant_phase and handoff_seen:
-        try:
-            return_code = process.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            return_code = process.wait(timeout=10)
-        if return_code not in (0, -15, 1, 130, 143):
-            return return_code, False
-        return 0, True
-
-    return process.wait(), complete_seen
+        return 0, True, False
+    return return_code, complete_seen, blocked_seen
 
 
 def commercial_supervisor(max_attempts: int, retry_seconds: int, deadline_hours: float) -> int:
-    """Keep the canonical daemon running until commercial completion is proven.
-
-    A failed/blocked daemon invocation is never treated as completion. The
-    supervisor restarts the daemon from the repository's verified checkpoint.
-    Each daemon invocation itself owns capability selection, implementation,
-    focused/full verification, commit and push. This layer only supplies
-    unattended continuity and a bounded safety envelope.
-    """
+    """Continuously run the canonical daemon until completion or terminal block."""
     started = time.monotonic()
     LOCK.parent.mkdir(parents=True, exist_ok=True)
     if LOCK.exists():
@@ -111,11 +98,14 @@ def commercial_supervisor(max_attempts: int, retry_seconds: int, deadline_hours:
                 print('{"type":"AUTONOMOUS_COMMERCIAL_DEADLINE","status":"blocked","reason":"SUPERVISOR_DEADLINE_EXCEEDED"}')
                 return 1
 
-            print(f'{{"type":"AUTONOMOUS_COMMERCIAL_ATTEMPT","attempt":{attempt},"elapsedSeconds":{int(elapsed)}}}')
-            return_code, completed = run_daemon(assistant_phase=False)
+            print(f'{{"type":"AUTONOMOUS_COMMERCIAL_ATTEMPT","attempt":{attempt},"elapsedSeconds":{int(elapsed)},"agent":"{os.environ.get("HOOSHYAR_AGENT", "auto")}"}}')
+            return_code, completed, blocked = run_daemon(assistant_phase=False)
             if completed:
                 print(f'{{"type":"AUTONOMOUS_COMMERCIAL_COMPLETE","status":"completed","attempts":{attempt}}}')
                 return 0
+            if blocked:
+                print(f'{{"type":"AUTONOMOUS_COMMERCIAL_BLOCKED","status":"blocked","attempt":{attempt},"returnCode":{return_code},"reason":"CANONICAL_DAEMON_TERMINAL_BLOCK"}}')
+                return 1
 
             print(
                 f'{{"type":"AUTONOMOUS_COMMERCIAL_RETRY","attempt":{attempt},'
