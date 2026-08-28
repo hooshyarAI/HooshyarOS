@@ -55,27 +55,28 @@ function repositoryChanged() {
   return git(['status', '--porcelain']).stdout.trim().length > 0;
 }
 
+function pushCurrentHead() {
+  if (process.env.HOOSHYAR_AUTONOMOUS_ALLOW_PUSH !== '1') {
+    console.log(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_PUSH_SKIPPED', reason: 'PUSH_DISABLED_BY_POLICY', branch }));
+    return false;
+  }
+  const push = run('git', ['push', 'origin', branch]);
+  if ((push.status ?? 1) !== 0) throw new Error('git push failed');
+  console.log(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_PUSHED', branch }));
+  return true;
+}
+
 function commitAndPush() {
   const status = git(['status', '--porcelain']);
   if (status.code !== 0) throw new Error('git status failed');
-  if (!status.stdout.trim()) return { changed: false };
+  if (!status.stdout.trim()) return pushCurrentHead();
 
   const add = run('git', ['add', '--all']);
   if ((add.status ?? 1) !== 0) throw new Error('git add failed');
-
   const message = process.env.HOOSHYAR_AUTONOMOUS_COMMIT_MESSAGE || 'fix(autonomous): repair commercial product factory failure';
   const commit = run('git', ['commit', '-m', message]);
   if ((commit.status ?? 1) !== 0) throw new Error('git commit failed');
-
-  if (process.env.HOOSHYAR_AUTONOMOUS_ALLOW_PUSH !== '1') {
-    console.log(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_COMMITTED', pushed: false, reason: 'PUSH_DISABLED_BY_POLICY', branch }));
-    return { changed: true, pushed: false };
-  }
-
-  const push = run('git', ['push', 'origin', branch]);
-  if ((push.status ?? 1) !== 0) throw new Error('git push failed');
-  console.log(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_COMMITTED', pushed: true, branch }));
-  return { changed: true, pushed: true };
+  return pushCurrentHead();
 }
 
 function invokeKilo(prompt) {
@@ -173,7 +174,9 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     process.exit(1);
   }
 
-  if (repositoryChanged()) commitAndPush();
+  const repoChanged = repositoryChanged();
+  const headAfterKilo = git(['rev-parse', 'HEAD']).stdout.trim();
+  if (repoChanged || headAfterKilo !== before) commitAndPush();
   const after = git(['rev-parse', 'HEAD']).stdout.trim();
   state.attempts.push({ attempt, before, after, factory: 'REPAIR', repair: 'KILO', fullJest: 'PASS', at: new Date().toISOString() });
   fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
