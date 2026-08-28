@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+﻿import { execFileSync } from "node:child_process";
 import { Engine } from "../Core/Engine";
 
 export interface ReasoningResult {
@@ -38,6 +38,11 @@ export class ReasoningEngine implements Engine {
                 cwd: process.cwd(),
                 encoding: "utf8",
                 windowsHide: true,
+                env: {
+                    ...process.env,
+                    PYTHONIOENCODING: "utf-8",
+                    PYTHONUTF8: "1",
+                },
                 stdio: ["ignore", "pipe", "pipe"]
             }).trim();
             const result = JSON.parse(raw) as { problem: string; status: string; answer?: string };
@@ -47,3 +52,4 @@ export class ReasoningEngine implements Engine {
         }
     }
 }
+
