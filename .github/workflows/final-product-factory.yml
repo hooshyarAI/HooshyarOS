@@ -117,51 +117,7 @@ jobs:
           force-avd-creation: true
           disable-animations: false
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: |
-            set -e
-            echo "=== Waiting for ADB device ==="
-            adb wait-for-device
-            echo "=== Waiting for Android boot completion ==="
-            for i in $(seq 1 60); do
-              if [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then
-                echo "Boot completed (attempt $i)"
-                break
-              fi
-              echo "Boot not complete (attempt $i/60), retrying in 2s..."
-              sleep 2
-            done
-            test "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1"
-            echo "=== Waiting for Package Manager ==="
-            _PM_READY=0
-            for i in $(seq 1 30); do
-              if adb shell cmd package list packages >/dev/null 2>&1; then
-                echo "Package Manager service ready (attempt $i)"
-                _PM_READY=1
-                break
-              fi
-              echo "Package Manager not ready (attempt $i/30), retrying in 2s..."
-              sleep 2
-            done
-            test "$_PM_READY" = "1"
-            echo "=== Installing APK ==="
-            adb install -r android/app/build/outputs/apk/debug/app-debug.apk
-            echo "=== Launching application ==="
-            adb shell am start -n ai.hooshyar.client/.MainActivity
-            sleep 5
-            echo "=== Runtime diagnostics ==="
-            adb logcat -d AndroidRuntime:E '*:S' | tail -n 100 || true
-            adb shell ps -A | grep -i 'ai.hooshyar' || true
-            adb shell dumpsys activity top | grep -i -A 10 -B 10 'ai.hooshyar.client' || true
-            echo "=== Process liveness ==="
-            _PID=""
-            for i in $(seq 1 15); do
-              _PID="$(adb shell pidof ai.hooshyar.client 2>/dev/null | tr -d '\r')"
-              echo "pidof attempt $i: $_PID"
-              if [ -n "$_PID" ]; then break; fi
-              sleep 2
-            done
-            test -n "$_PID"
-            adb shell dumpsys activity activities | grep -q 'ai.hooshyar.client/.MainActivity'
+          script: bash scripts/android-product-acceptance.sh
       - name: Write Android acceptance evidence
         shell: bash
         run: |
@@ -180,7 +136,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: hooshyar-android-acceptance-evidence
+          name: hooshyar-android-product-acceptance-evidence
           path: .hooshyar/android-acceptance-success.json
           if-no-files-found: warn
           retention-days: 14
@@ -227,7 +183,7 @@ jobs:
       - name: Download Android acceptance evidence
         uses: actions/download-artifact@v4
         with:
-          name: hooshyar-android-acceptance-evidence
+          name: hooshyar-android-product-acceptance-evidence
           path: .hooshyar
           merge-multiple: true
       - name: Download security acceptance evidence
