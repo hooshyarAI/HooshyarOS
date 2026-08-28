@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { ExternalProductionDependencyAudit } from "./ExternalProductionDependencyAudit";
 
 export interface CommercialProductCompletionAuditResult {
     complete: boolean;
@@ -10,6 +11,7 @@ export interface CommercialProductCompletionAuditResult {
 
 export class CommercialProductCompletionAudit {
     private readonly contractPath = "Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md";
+    private readonly externalDependencies = new ExternalProductionDependencyAudit();
 
     audit(root: string): CommercialProductCompletionAuditResult {
         const contractFile = join(root, this.contractPath);
@@ -59,9 +61,10 @@ export class CommercialProductCompletionAudit {
         const authCandidates = ["Backend/HBOS/Auth", "Backend/HBOS/Security", "Backend/HBOS/Identity"];
         if (!authCandidates.some(dir => existsSync(join(root, dir)))) missingLayers.push("authentication-authorization-boundary");
 
-        const blockedExternalDependencies: string[] = [];
-        if (contract.includes("Payment-provider activation is an external dependency")) blockedExternalDependencies.push("payment-provider-activation");
-        if (contract.includes("Cloud deployment may remain externally blocked")) blockedExternalDependencies.push("production-cloud-resources");
+        const externalEvidence = this.externalDependencies.audit(process.env);
+        const blockedExternalDependencies = externalEvidence
+            .filter(item => item.status === "BLOCKED")
+            .map(item => item.id);
 
         return {
             complete: missingLayers.length === 0 && blockedExternalDependencies.length === 0,
