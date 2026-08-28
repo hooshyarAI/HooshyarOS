@@ -1,0 +1,23 @@
+name: Final Product Factory Trigger
+
+on:
+  push:
+    branches:
+      - fix/autonomous-product-factory
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch-final-product-factory:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch Final Product Factory for pushed head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_REF: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          gh workflow run final-product-factory.yml --repo "$GH_REPO" --ref "$GH_REF"
