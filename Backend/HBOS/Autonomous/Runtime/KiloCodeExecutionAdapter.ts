@@ -16,6 +16,19 @@ export function kiloInvocation(platform: NodeJS.Platform, prompt: string): { com
     };
 }
 
+function quoteWindowsCommandArg(value: string): string {
+    return `"${value.replace(/"/g, '""')}"`;
+}
+
+function windowsShellInvocation(prompt: string): { command: string; args: string[]; shell: boolean } {
+    const invocation = kiloInvocation("win32", prompt);
+    return {
+        command: process.env.ComSpec || "cmd.exe",
+        args: ["/d", "/s", "/c", `${invocation.command} run --auto ${quoteWindowsCommandArg(prompt)}`],
+        shell: false
+    };
+}
+
 export class KiloCodeExecutionAdapter {
     constructor(private readonly runner = execFileSync) {}
 
@@ -31,7 +44,9 @@ export class KiloCodeExecutionAdapter {
 
     execute(prompt: string, cwd: string, timeout = 30 * 60 * 1000): KiloExecutionResult {
         const started = Date.now();
-        const invocation = kiloInvocation(process.platform, prompt);
+        const invocation = process.platform === "win32"
+            ? windowsShellInvocation(prompt)
+            : kiloInvocation(process.platform, prompt);
         try {
             const output = this.runner(invocation.command, invocation.args, {
                 cwd,
