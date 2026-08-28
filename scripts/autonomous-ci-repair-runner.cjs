@@ -8,24 +8,31 @@ const root = process.cwd();
 const repo = process.env.GITHUB_REPOSITORY || "hooshyarAI/HooshyarOS";
 const branch = process.env.GITHUB_HEAD_REF || cp.execFileSync("git", ["branch", "--show-current"], { cwd: root, encoding: "utf8" }).trim();
 const runId = process.env.HOOSHYAR_TARGET_RUN_ID || process.env.GITHUB_RUN_ID;
-const headSha = process.env.GITHUB_SHA;
+const initialSha = process.env.GITHUB_SHA;
+const maxAttempts = Number(process.env.HOOSHYAR_CI_REPAIR_MAX_ATTEMPTS || 3);
+const pollSeconds = Number(process.env.HOOSHYAR_CI_REPAIR_POLL_SECONDS || 10);
 const maxLog = 30000;
-if (!runId || !headSha || !branch || ["main", "master"].includes(branch)) {
-  console.error(JSON.stringify({ type: "AUTONOMOUS_CI_REPAIR_BLOCKED", reason: "INVALID_REPAIR_CONTEXT", runId, headSha, branch }));
+
+if (!runId || !initialSha || !branch || ["main", "master"].includes(branch)) {
+  console.error(JSON.stringify({ type: "AUTONOMOUS_CI_REPAIR_BLOCKED", reason: "INVALID_REPAIR_CONTEXT", runId, initialSha, branch }));
   process.exit(2);
 }
 
 function headers() {
   const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
-  return { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+  return { Accept: "application/vnd.github+json", "Content-Type": "application/json", "X-GitHub-Api-Version": "2022-11-28", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+}
+async function request(url, init = {}) {
+  const response = await fetch(url, { ...init, headers: { ...headers(), ...(init.headers || {}) } });
+  return response;
 }
 async function getJson(url) {
-  const r = await fetch(url, { headers: headers() });
+  const r = await request(url);
   if (!r.ok) throw new Error(`GitHub API ${r.status}: ${url}`);
   return r.json();
 }
 async function getText(url) {
-  const r = await fetch(url, { headers: headers(), redirect: "follow" });
+  const r = await request(url, { redirect: "follow" });
   if (!r.ok) throw new Error(`GitHub log ${r.status}: ${url}`);
   const text = await r.text();
   return text.length > maxLog ? text.slice(-maxLog) : text;
@@ -33,8 +40,29 @@ async function getText(url) {
 function exec(command, args, options = {}) {
   return cp.spawnSync(command, args, { cwd: root, env: process.env, encoding: "utf8", stdio: options.stdio || "inherit", shell: false, windowsHide: true });
 }
-async function missionForRun() {
-  const jobs = await getJson(`https://api.github.com/repos/${repo}/actions/runs/${runId}/jobs?per_page=100`);
+async function dispatchFactory(ref) {
+  const response = await request(`https://api.github.com/repos/${repo}/actions/workflows/final-product-factory.yml/dispatches`, {
+    method: "POST",
+    body: JSON.stringify({ ref })
+  });
+  if (!response.ok && response.status !== 204) throw new Error(`GitHub workflow dispatch ${response.status}: ${await response.text()}`);
+}
+async function waitForFactory(refSha) {
+  for (let i = 1; i <= 120; i += 1) {
+    const data = await getJson(`https://api.github.com/repos/${repo}/actions/workflows/final-product-factory.yml/runs?branch=${encodeURIComponent(branch)}&per_page=30`);
+    const run = (data.workflow_runs || [])
+      .filter(item => item.head_sha === refSha)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+    if (run) {
+      console.log(JSON.stringify({ type: "AUTONOMOUS_CI_REPAIR_FACTORY_OBSERVATION", runId: run.id, sha: refSha, status: run.status, conclusion: run.conclusion || null }));
+      if (run.status === "completed") return run;
+    }
+    await new Promise(resolve => setTimeout(resolve, pollSeconds * 1000));
+  }
+  throw new Error(`FINAL_PRODUCT_FACTORY_TIMEOUT_FOR_SHA:${refSha}`);
+}
+async function missionForRun(targetRun) {
+  const jobs = await getJson(`https://api.github.com/repos/${repo}/actions/runs/${targetRun.id}/jobs?per_page=100`);
   const failures = [];
   for (const job of (jobs.jobs || []).filter(item => item.conclusion === "failure")) {
     let log = "";
@@ -55,10 +83,26 @@ async function missionForRun() {
     status: "BLOCKED",
     repository: repo,
     branch,
-    commit: headSha,
-    workflow: { name: "Final Product Factory", runId: Number(runId), url: `https://github.com/${repo}/actions/runs/${runId}` },
-    failure: { source: "github-actions", runId: Number(runId), firstFailedJob: failures[0]?.job || null, failedJobs: failures.map(x => x.job), failedSteps: failures.flatMap(x => x.failedSteps.map(s => `${x.job}:${s.name}`)), details: failures },
-    rules: { preserveArchitecture: true, preserveTests: true, noTestWeakening: true, smallestCoherentRepair: true, requiredRegressionTest: true, rerunFactoryAfterRepair: true, rerunFullJestAfterAcceptance: true, pushOnlyToCurrentBranch: true },
+    commit: targetRun.head_sha,
+    workflow: { name: "Final Product Factory", runId: Number(targetRun.id), url: targetRun.html_url, conclusion: targetRun.conclusion },
+    failure: {
+      source: "github-actions",
+      runId: Number(targetRun.id),
+      firstFailedJob: failures[0]?.job || null,
+      failedJobs: failures.map(x => x.job),
+      failedSteps: failures.flatMap(x => x.failedSteps.map(s => `${x.job}:${s.name}`)),
+      details: failures
+    },
+    rules: {
+      preserveArchitecture: true,
+      preserveTests: true,
+      noTestWeakening: true,
+      smallestCoherentRepair: true,
+      requiredRegressionTest: true,
+      rerunFactoryAfterRepair: true,
+      rerunFullJestAfterAcceptance: true,
+      pushOnlyToCurrentBranch: true
+    },
     nextActions: [
       "Read the exact CI failure evidence and identify the first failed target.",
       "Inspect the concrete repository-owned code or workflow responsible for that failure.",
@@ -66,10 +110,17 @@ async function missionForRun() {
       "Run focused verification and Python syntax verification.",
       "Run the relevant product factory and full Jest verification.",
       "Commit and push only to the current autonomous branch.",
-      "Stop after push; the new branch SHA will trigger the next CI cycle."
+      "Dispatch Final Product Factory for the repaired SHA and replan from its result."
     ],
-    evidence: { runId: Number(runId), headSha, jobs: failures }
+    evidence: { runId: Number(targetRun.id), headSha: targetRun.head_sha, jobs: failures }
   };
+}
+function writeMission(mission) {
+  const dir = path.join(root, ".hooshyar");
+  fs.mkdirSync(dir, { recursive: true });
+  const handoff = path.join(dir, "autonomous-repair-handoff.json");
+  fs.writeFileSync(handoff, JSON.stringify(mission, null, 2) + "\n", "utf8");
+  return handoff;
 }
 function runKilo(handoffPath) {
   const prompt = [
@@ -92,23 +143,36 @@ function commitPush() {
   if ((exec("git", ["add", "--all"]).status ?? 1) !== 0) throw new Error("git add failed");
   if ((exec("git", ["commit", "-m", "fix(autonomous): repair CI failure from feedback"]).status ?? 1) !== 0) throw new Error("git commit failed");
   if ((exec("git", ["push", "origin", `HEAD:${branch}"]).status ?? 1) !== 0) throw new Error("git push failed");
+  return (exec("git", ["rev-parse", "HEAD"], { stdio: ["ignore", "pipe", "pipe"] }).stdout || "").trim();
 }
 async function main() {
-  const mission = await missionForRun();
-  const fingerprint = crypto.createHash("sha256").update(JSON.stringify(mission.failure)).digest("hex");
-  const dir = path.join(root, ".hooshyar");
-  fs.mkdirSync(dir, { recursive: true });
-  const handoff = path.join(dir, "autonomous-repair-handoff.json");
-  fs.writeFileSync(handoff, JSON.stringify(mission, null, 2) + "\n", "utf8");
-  console.log(JSON.stringify({ type: "ASSISTANT_REPAIR_MISSION_CREATED", runId, commit: headSha, fingerprint, handoff }));
-  if (!mission.failure.firstFailedJob) throw new Error("NO_FAILED_JOB_IN_TARGET_RUN");
-  const kilo = runKilo(handoff);
-  if (kilo.code !== 0) throw new Error(`KILO_REPAIR_FAILED:${kilo.code}\n${kilo.output}`);
-  const py = exec(process.env.HOOSHYAR_PYTHON || "python", ["-m", "compileall", "-q", "Backend/AI_Runtime"]);
-  if ((py.status ?? 1) !== 0) throw new Error("PYTHON_SYNTAX_VERIFY_FAILED");
-  const jest = exec(process.execPath, [path.join(root, "node_modules", "jest", "bin", "jest.js"), "--runInBand"]);
-  if ((jest.status ?? 1) !== 0) throw new Error("FULL_JEST_FAILED_AFTER_REPAIR");
-  commitPush();
-  console.log(JSON.stringify({ type: "AUTONOMOUS_CI_REPAIR_REPLAN", runId, before: headSha, branch, pushed: true }));
+  let currentSha = initialSha;
+  let targetRun = { id: Number(runId), head_sha: currentSha, html_url: `https://github.com/${repo}/actions/runs/${runId}`, conclusion: "failure" };
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const mission = await missionForRun(targetRun);
+    if (!mission.failure.firstFailedJob) throw new Error("NO_FAILED_JOB_IN_TARGET_RUN");
+    const fingerprint = crypto.createHash("sha256").update(JSON.stringify(mission.failure)).digest("hex");
+    const handoff = writeMission(mission);
+    console.log(JSON.stringify({ type: "ASSISTANT_REPAIR_MISSION_CREATED", attempt, runId: targetRun.id, commit: currentSha, fingerprint, handoff }));
+
+    const kilo = runKilo(handoff);
+    if (kilo.code !== 0) throw new Error(`KILO_REPAIR_FAILED:${kilo.code}\n${kilo.output}`);
+
+    const py = exec(process.env.HOOSHYAR_PYTHON || "python", ["-m", "compileall", "-q", "Backend/AI_Runtime"]);
+    if ((py.status ?? 1) !== 0) throw new Error("PYTHON_SYNTAX_VERIFY_FAILED");
+
+    const jest = exec(process.execPath, [path.join(root, "node_modules", "jest", "bin", "jest.js"), "--runInBand"]);
+    if ((jest.status ?? 1) !== 0) throw new Error("FULL_JEST_FAILED_AFTER_REPAIR");
+
+    currentSha = commitPush();
+    console.log(JSON.stringify({ type: "AUTONOMOUS_CI_REPAIR_REPLAN", runId: targetRun.id, before: mission.commit, after: currentSha, pushed: true }));
+    await dispatchFactory(branch);
+    targetRun = await waitForFactory(currentSha);
+    if (targetRun.conclusion === "success") {
+      console.log(JSON.stringify({ type: "AUTONOMOUS_CI_REPAIR_COMPLETE", attempts: attempt, commit: currentSha, factoryRunId: targetRun.id }));
+      return;
+    }
+  }
+  throw new Error(`AUTONOMOUS_CI_REPAIR_MAX_ATTEMPTS_EXCEEDED:${maxAttempts}`);
 }
 main().catch(error => { console.error(JSON.stringify({ type: "AUTONOMOUS_CI_REPAIR_FAILED", error: String(error) })); process.exit(1); });
