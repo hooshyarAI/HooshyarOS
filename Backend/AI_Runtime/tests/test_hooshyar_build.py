@@ -23,3 +23,9 @@ def test_build_entrypoint_is_python_first_and_repository_native():
     assert "HOOSHYAR_AGENT" in source
     assert '"python"' in source
     assert "subprocess.Popen" in source
+
+
+def test_build_entrypoint_preserves_selected_implementation_agent():
+    source = (ROOT / "hooshyar_build.py").read_text(encoding="utf-8")
+    assert 'env["HOOSHYAR_AGENT"] = env.get("HOOSHYAR_AGENT", "auto")' in source
+    assert 'env["HOOSHYAR_AGENT"] = "python"' not in source
