@@ -12,6 +12,7 @@ describe("KiloCodeExecutionAdapter observability", () => {
         expect(invocation.env.KILO_CONFIG_CONTENT).toContain('"task":"deny"');
         expect(invocation.env.KILO_CONFIG_CONTENT).toContain('"websearch":"deny"');
         expect(invocation.env.KILO_CONFIG_CONTENT).toContain('"webfetch":"deny"');
+        expect(invocation.env.KILO_CONFIG_CONTENT).toContain('"bash":"deny"');
         expect(invocation.env.KILO_CONFIG_CONTENT).toContain("Do not use the Task tool");
         expect(invocation.env.KILO_CONFIG_CONTENT).toContain("Do not perform repository-wide exploration");
     });
