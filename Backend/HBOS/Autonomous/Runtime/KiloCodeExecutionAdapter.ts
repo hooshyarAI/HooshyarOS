@@ -1,5 +1,5 @@
 /// <reference types="node" />
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -83,43 +83,11 @@ export function buildWindowsKiloScript(payloadPath: string): string {
     return [
         "$ErrorActionPreference = 'Continue'",
         `$payload = Get-Content -Raw -LiteralPath '${safePayloadPath}' | ConvertFrom-Json`,
-        "$stdoutPath = $payload.logPath + '.stdout'",
-        "$stderrPath = $payload.logPath + '.stderr'",
-        "Remove-Item -LiteralPath $stdoutPath,$stderrPath -Force -ErrorAction SilentlyContinue",
-        "$child = Start-Process -FilePath $payload.command -ArgumentList $payload.args -WorkingDirectory (Get-Location).Path -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath -PassThru -WindowStyle Normal",
-        "Write-Host (\"[KILO] PROCESS_STARTED pid=\" + $child.Id + \" command=\" + $payload.command)",
-        "$stdoutOffset = 0",
-        "$stderrOffset = 0",
-        "while (-not $child.HasExited) {",
-        "  foreach ($stream in @(@($stdoutPath, 'STDOUT'), @($stderrPath, 'STDERR'))) {",
-        "    $path = $stream[0]; $label = $stream[1]",
-        "    if (Test-Path -LiteralPath $path) {",
-        "      $raw = [System.IO.File]::ReadAllText($path)",
-        "      $offset = if ($label -eq 'STDOUT') { $stdoutOffset } else { $stderrOffset }",
-        "      if ($raw.Length -gt $offset) {",
-        "        $delta = $raw.Substring($offset)",
-        "        foreach ($line in ($delta -split \"`r?`n\")) { if ($line) { Write-Host (\"[KILO] [\" + $label + \"] \" + $line) } }",
-        "        if ($label -eq 'STDOUT') { $stdoutOffset = $raw.Length } else { $stderrOffset = $raw.Length }",
-        "      }",
-        "    }",
-        "  }",
-        "  Write-Host (\"[KILO] HEARTBEAT pid=\" + $child.Id + \" state=RUNNING elapsedSeconds=\" + [int]((Get-Date) - $child.StartTime).TotalSeconds)",
-        "  Start-Sleep -Seconds 5",
-        "  $child.Refresh()",
-        "}",
-        "foreach ($stream in @(@($stdoutPath, 'STDOUT'), @($stderrPath, 'STDERR'))) {",
-        "  $path = $stream[0]; $label = $stream[1]",
-        "  if (Test-Path -LiteralPath $path) {",
-        "    $raw = [System.IO.File]::ReadAllText($path)",
-        "    $offset = if ($label -eq 'STDOUT') { $stdoutOffset } else { $stderrOffset }",
-        "    if ($raw.Length -gt $offset) {",
-        "      $delta = $raw.Substring($offset)",
-        "      foreach ($line in ($delta -split \"`r?`n\")) { if ($line) { Write-Host (\"[KILO] [\" + $label + \"] \" + $line) } }",
-        "    }",
-        "  }",
-        "}",
-        "$code = $child.ExitCode",
-        "Write-Host (\"[KILO] PROCESS_FINISHED pid=\" + $child.Id + \" code=\" + $code)",
+        `Write-Host ("[KILO] EXECUTION_STARTED command=" + $payload.command + " cwd=" + (Get-Location).Path)`,
+        `& $payload.command @($payload.args) 2>&1 | ForEach-Object { $line = $_.ToString(); Add-Content -LiteralPath $payload.logPath -Value $line; Write-Host ("[KILO] " + $line) }`,
+        "$code = $LASTEXITCODE",
+        "if ($null -eq $code) { $code = 0 }",
+        "Write-Host (\"[KILO] EXECUTION_FINISHED code=\" + $code)",
         "exit [int]$code"
     ].join("\r\n");
 }
@@ -131,6 +99,10 @@ function streamWindowsKilo(invocation: KiloCommand, cwd: string, timeout: number
     const progressLogPath = join(workDir, "progress.log");
     const payloadPath = join(workDir, "payload.json");
     const scriptPath = join(workDir, "run-kilo.ps1");
+    const heartbeatCommand = process.env.ComSpec || "powershell.exe";
+    const heartbeatArgs = process.env.ComSpec
+        ? ["/d", "/s", "/c", "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", "$s=Get-Date; while($true){ Write-Host ('[KILO] HEARTBEAT state=RUNNING elapsedSeconds=' + [int]((Get-Date)-$s).TotalSeconds); Start-Sleep -Seconds 5 }"]
+        : ["-NoProfile", "-NonInteractive", "-Command", "$s=Get-Date; while($true){ Write-Host ('[KILO] HEARTBEAT state=RUNNING elapsedSeconds=' + [int]((Get-Date)-$s).TotalSeconds); Start-Sleep -Seconds 5 }"];
 
     writeFileSync(payloadPath, JSON.stringify({
         command: invocation.command,
@@ -153,6 +125,13 @@ function streamWindowsKilo(invocation: KiloCommand, cwd: string, timeout: number
         timestamp: new Date().toISOString()
     }));
 
+    const heartbeat = spawn(heartbeatCommand, heartbeatArgs, {
+        cwd,
+        env: invocation.env,
+        stdio: ["ignore", "inherit", "inherit"],
+        windowsHide: false
+    });
+
     const child = spawnSync(
         process.env.ComSpec || "powershell.exe",
         process.env.ComSpec
@@ -166,6 +145,8 @@ function streamWindowsKilo(invocation: KiloCommand, cwd: string, timeout: number
             windowsHide: false
         }
     );
+
+    heartbeat.kill();
 
     const output = existsSync(progressLogPath) ? readFileSync(progressLogPath, "utf8") : "";
     const code = child.status ?? 1;
