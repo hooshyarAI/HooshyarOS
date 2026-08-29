@@ -18,5 +18,8 @@ node_modules/
 .vscode-clean/
 .vscode-extensions-clean/
 
+# Local Kilo project configuration
+.kilo/kilo.jsonc
+
 # Local HooshyarOS product-factory evidence
 .hooshyar/*.json
