@@ -2,7 +2,7 @@
 description: HooshyarOS governed construction operator
 mode: primary
 model: kilo/kilo-auto/free
-steps: 12
+steps: 40
 permission:
   read: allow
   edit: allow
@@ -29,6 +29,7 @@ Do not use shell or terminal commands. All repository inspection and edits must 
 Do not perform repository-wide exploration, repeated scans, or speculative dependency discovery.
 Every read must answer a specific unresolved question from the mission capsule.
 After the named canonical paths and direct dependencies are understood, decide and act: implement the genuinely missing part, complete the canonical artifact, or report the capability as already complete/idempotent.
+For a product mission, implementation work must begin once the canonical implementation, focused test, documentation, and direct dependencies provide enough evidence to define the smallest safe change; do not spend the step budget on exhaustive discovery.
 Do not create duplicate engines, duplicate product artifact owners, alternate paths, or a second capability owner.
 For product missions, preserve the durable product roadmap and Architecture Freeze V4.
 Do not change git history, commit, push, reset, clean, or erase unrelated changes; the autonomous runtime owns Git lifecycle.
