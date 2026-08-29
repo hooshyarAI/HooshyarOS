@@ -1,7 +1,7 @@
 import { buildWindowsKiloScript, kiloInvocation } from "../Autonomous/Runtime/KiloCodeExecutionAdapter";
 
 describe("KiloCodeExecutionAdapter observability", () => {
-    it("uses the dedicated HooshyarOS construction agent with a finite governed budget", () => {
+    it("uses the dedicated HooshyarOS construction agent with a finite governed budget and no shell escape", () => {
         const prompt = "implement one canonical product capability";
         const invocation = kiloInvocation("win32", prompt);
         expect(invocation.args).toEqual(["run", "--agent", "hooshyar-construction", "--auto", prompt]);
