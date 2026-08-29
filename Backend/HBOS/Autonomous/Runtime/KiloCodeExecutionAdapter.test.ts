@@ -1,39 +1,36 @@
 import { KiloCodeExecutionAdapter, kiloInvocation } from "./KiloCodeExecutionAdapter";
 
 describe("KiloCodeExecutionAdapter", () => {
-    it("builds the documented autonomous CLI invocation", () => {
-        expect(kiloInvocation("win32", "Implement one capability")).toEqual({
-            command: "kilo.cmd",
-            args: ["run", "--auto", "Implement one capability"],
-            shell: true
-        });
-        expect(kiloInvocation("linux", "Implement one capability")).toEqual({
-            command: "kilo",
-            args: ["run", "--auto", "Implement one capability"],
-            shell: false
-        });
+    it("builds the governed autonomous CLI invocation with the verified free model", () => {
+        const invocation = kiloInvocation("win32", "Implement one capability");
+
+        expect(invocation.args).toEqual(["run", "--auto", "Implement one capability"]);
+        expect(invocation.shell).toBe(false);
+        expect(invocation.env.KILO_CONFIG_CONTENT).toContain("kilo/kilo-auto/free");
+        expect(invocation.env.KILO_CONFIG_CONTENT).not.toContain("gemini-3-pro-image");
+        expect(invocation.env.HOOSHYAR_AGENT).toBe("kilo");
     });
 
-    it("executes the Windows command through cmd.exe without splitting the prompt", () => {
+    it("executes the Windows command without splitting the prompt", () => {
         const runner = jest.fn().mockReturnValue("KILO_ADAPTER_RUNTIME_OK");
         const adapter = new KiloCodeExecutionAdapter(runner as never);
         const prompt = "Do not modify files with spaces in this prompt";
         const result = adapter.execute(prompt, process.cwd(), 30_000);
 
         expect(result.ok).toBe(true);
-        if (process.platform === "win32") {
-            expect(runner).toHaveBeenCalledWith(
-                process.env.ComSpec || "cmd.exe",
-                ["/d", "/s", "/c", `kilo.cmd run --auto "${prompt}"`],
-                expect.objectContaining({ shell: false, cwd: process.cwd() })
-            );
-        } else {
-            expect(runner).toHaveBeenCalledWith(
-                "kilo",
-                ["run", "--auto", prompt],
-                expect.objectContaining({ shell: false, cwd: process.cwd() })
-            );
-        }
+        expect(result.observable).toBe(false);
+        expect(runner).toHaveBeenCalledWith(
+            expect.any(String),
+            ["run", "--auto", prompt],
+            expect.objectContaining({
+                shell: false,
+                cwd: process.cwd(),
+                env: expect.objectContaining({
+                    HOOSHYAR_AGENT: "kilo",
+                    KILO_CONFIG_CONTENT: expect.stringContaining("kilo/kilo-auto/free")
+                })
+            })
+        );
     });
 
     it("reports availability from the executable lookup", () => {
@@ -42,7 +39,7 @@ describe("KiloCodeExecutionAdapter", () => {
         expect(adapter.isAvailable()).toBe(true);
         expect(runner).toHaveBeenCalledWith(
             process.platform === "win32" ? "where.exe" : "which",
-            ["kilo"],
+            ["kilo.exe"],
             expect.objectContaining({ stdio: ["ignore", "pipe", "ignore"] })
         );
     });
