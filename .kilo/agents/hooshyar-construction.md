@@ -25,6 +25,7 @@ Work directly on the declared Required artifact paths and their direct imports o
 Read the named governance and architecture documents once, then inspect the declared canonical implementation, test, documentation, and direct dependency paths.
 Do not use the Task tool and do not delegate to any subagent.
 Do not use Glob, Grep, web search, web fetch, skills, todo tools, or broad repository discovery.
+Do not use shell or terminal commands. All repository inspection and edits must use the explicitly permitted file tools.
 Do not perform repository-wide exploration, repeated scans, or speculative dependency discovery.
 Every read must answer a specific unresolved question from the mission capsule.
 After the named canonical paths and direct dependencies are understood, decide and act: implement the genuinely missing part, complete the canonical artifact, or report the capability as already complete/idempotent.
