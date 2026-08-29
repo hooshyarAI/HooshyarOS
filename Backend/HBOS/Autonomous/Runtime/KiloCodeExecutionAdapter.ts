@@ -1,4 +1,6 @@
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 
 export interface KiloExecutionResult {
     ok: boolean;
@@ -8,45 +10,102 @@ export interface KiloExecutionResult {
     elapsedMs: number;
 }
 
-export function kiloInvocation(platform: NodeJS.Platform, prompt: string): { command: string; args: string[]; shell: boolean } {
+export interface KiloCommand {
+    command: string;
+    args: string[];
+    shell: boolean;
+    env: NodeJS.ProcessEnv;
+}
+
+const FREE_MODEL_CONFIG = JSON.stringify({
+    model: "kilo-auto/free",
+    agent: {
+        "hooshyar-construction": { model: "kilo/kilo-auto/free" },
+        "hooshyar-repair": { model: "kilo/kilo-auto/free" }
+    }
+});
+
+function candidateCliPaths(): string[] {
+    const home = process.env.USERPROFILE || process.env.HOME || "";
+    const extensionRoot = join(home, ".vscode", "extensions");
+    return [
+        process.env.KILO_CLI_PATH || "",
+        join(extensionRoot, "kilocode.kilo-code-7.5.6-win32-x64", "bin", "kilo.exe"),
+        join(extensionRoot, "kilocode.kilo-code-7.5.6-win32-x64", "bin", "kilo.cmd")
+    ].filter(Boolean);
+}
+
+export function resolveKiloCliPath(): string | null {
+    try {
+        const locator = process.platform === "win32" ? "where.exe" : "which";
+        const executable = process.platform === "win32" ? "kilo.exe" : "kilo";
+        const output = execFileSync(locator, [executable], {
+            encoding: "utf8",
+            windowsHide: true,
+            stdio: ["ignore", "pipe", "ignore"]
+        }).trim().split(/\r?\n/)[0];
+        if (output) return output;
+    } catch {}
+
+    for (const candidate of candidateCliPaths()) {
+        if (existsSync(candidate)) return candidate;
+    }
+
+    return null;
+}
+
+function buildEnvironment(): NodeJS.ProcessEnv {
     return {
-        command: platform === "win32" ? "kilo.cmd" : "kilo",
-        args: ["run", "--auto", prompt],
-        shell: platform === "win32"
+        ...process.env,
+        HOOSHYAR_AGENT: "kilo",
+        KILO_CONFIG_CONTENT: FREE_MODEL_CONFIG
     };
 }
 
-function quoteWindowsCommandArg(value: string): string {
-    return `"${value.replace(/"/g, '""')}"`;
-}
+export function kiloInvocation(platform: NodeJS.Platform, prompt: string): KiloCommand {
+    const cli = resolveKiloCliPath();
+    const environment = buildEnvironment();
 
-function windowsShellInvocation(prompt: string): { command: string; args: string[]; shell: boolean } {
-    const invocation = kiloInvocation("win32", prompt);
+    if (platform === "win32") {
+        if (!cli) {
+            return {
+                command: "kilo.exe",
+                args: ["run", "--auto", prompt],
+                shell: false,
+                env: environment
+            };
+        }
+        return {
+            command: cli,
+            args: ["run", "--auto", prompt],
+            shell: false,
+            env: environment
+        };
+    }
+
     return {
-        command: process.env.ComSpec || "cmd.exe",
-        args: ["/d", "/s", "/c", `${invocation.command} run --auto ${quoteWindowsCommandArg(prompt)}`],
-        shell: false
+        command: cli || "kilo",
+        args: ["run", "--auto", prompt],
+        shell: false,
+        env: environment
     };
 }
 
 export class KiloCodeExecutionAdapter {
     constructor(private readonly runner = execFileSync) {}
 
+    resolveCliPath(): string | null {
+        return resolveKiloCliPath();
+    }
+
     isAvailable(): boolean {
-        try {
-            const locator = process.platform === "win32" ? "where.exe" : "which";
-            this.runner(locator, ["kilo"], { encoding: "utf8", windowsHide: true, stdio: ["ignore", "pipe", "ignore"] });
-            return true;
-        } catch {
-            return false;
-        }
+        return Boolean(this.resolveCliPath());
     }
 
     execute(prompt: string, cwd: string, timeout = 30 * 60 * 1000): KiloExecutionResult {
         const started = Date.now();
-        const invocation = process.platform === "win32"
-            ? windowsShellInvocation(prompt)
-            : kiloInvocation(process.platform, prompt);
+        const invocation = kiloInvocation(process.platform, prompt);
+
         try {
             const output = this.runner(invocation.command, invocation.args, {
                 cwd,
@@ -54,9 +113,17 @@ export class KiloCodeExecutionAdapter {
                 timeout,
                 shell: invocation.shell,
                 windowsHide: true,
+                env: invocation.env,
                 stdio: ["ignore", "pipe", "pipe"]
             });
-            return { ok: true, code: 0, output: String(output), error: null, elapsedMs: Date.now() - started };
+
+            return {
+                ok: true,
+                code: 0,
+                output: String(output),
+                error: null,
+                elapsedMs: Date.now() - started
+            };
         } catch (error: any) {
             return {
                 ok: false,
