@@ -122,7 +122,11 @@ def run_daemon() -> tuple[int, bool, bool]:
         return repair_code, False, True
 
     env = os.environ.copy()
-    env["HOOSHYAR_AGENT"] = env.get("HOOSHYAR_AGENT", "auto")
+    # Platform construction has one approved implementation worker: Kilo.
+    # Do not inherit "auto" here; that value is meaningful only to selection
+    # logic outside the construction boundary and previously caused an
+    # incompatible Python-generator fallback after a Kilo no-change result.
+    env["HOOSHYAR_AGENT"] = "kilo"
     env["HOOSHYAR_AUTONOMOUS_DEADLINE_DAYS"] = env.get("HOOSHYAR_AUTONOMOUS_DEADLINE_DAYS", "7")
     env["HOOSHYAR_BUILD_PHASE"] = "platform"
     code, lines = _stream_process([str(TSX), str(DAEMON)], env)
