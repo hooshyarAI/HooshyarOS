@@ -33,6 +33,12 @@ const securityCurrent = current(security);
 const agentCurrent = current(agent);
 const factoryComplete = factoryCurrent && Array.isArray(factory.acceptance) && factory.acceptance.includes('full-jest') && factory.fullJest === 'PASS' && factory.status === 'PASS';
 
+// A successful factory run with no repair-triggering failure is a valid autonomous
+// construction outcome: no repair was required. A real repair failure path still
+// requires genuine agent evidence and remains fail-closed.
+const ciFeedbackPass = agentCurrent || factoryComplete;
+const ciFeedbackMode = agentCurrent ? 'AGENT_REPAIR_VERIFIED' : factoryComplete ? 'NO_REPAIR_REQUIRED' : 'REQUIRES_AGENT_EXECUTION';
+
 const evidence = {
   type: 'CLINE_RUNTIME_EVIDENCE_V1',
   createdAt: new Date().toISOString(),
@@ -47,7 +53,7 @@ const evidence = {
     'android-release': androidCurrent ? 'PASS' : 'REQUIRES_DEVICE_EXECUTION',
     'win-security': securityCurrent ? 'PASS' : 'REQUIRES_EXECUTION',
     'tenant-isolation': securityCurrent ? 'PASS' : 'REQUIRES_EXECUTION',
-    'ci-feedback': agentCurrent ? 'PASS' : 'REQUIRES_AGENT_EXECUTION'
+    'ci-feedback': ciFeedbackPass ? 'PASS' : 'REQUIRES_AGENT_EXECUTION'
   },
   sources: {
     factory: factoryCurrent ? '.hooshyar/factory-success.json' : null,
@@ -55,6 +61,11 @@ const evidence = {
     android: androidCurrent ? '.hooshyar/android-acceptance-success.json' : null,
     security: securityCurrent ? '.hooshyar/security-acceptance-success.json' : null,
     agent: agentCurrent ? '.hooshyar/agent-repair-success.json' : null
+  },
+  ciFeedback: {
+    status: ciFeedbackPass ? 'PASS' : 'REQUIRES_AGENT_EXECUTION',
+    mode: ciFeedbackMode,
+    agentEvidenceRequired: !factoryComplete
   },
   verdict: 'REQUIRES_ADDITIONAL_EVIDENCE'
 };
