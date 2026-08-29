@@ -227,7 +227,7 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                 const requested = process.env.HOOSHYAR_AGENT?.trim().toLowerCase() || "auto";
                 const primaryAgent = resolveImplementationAgent(root);
                 const candidates: ImplementationAgent[] = primaryAgent === "kilo"
-                    ? ["kilo", "python"]
+                    ? ["kilo"]
                     : primaryAgent === "python"
                         ? ["python"]
                         : [];
@@ -276,13 +276,13 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                         return { ok: false, issue: "AUTONOMOUS_ARTIFACT_BOUNDARY_VIOLATION", artifact: { attempts } };
                     }
                     if (result.ok && changed && touchesDeclaredArtifact) {
-                        return { ok: true, artifact: { ...artifact, fallbackUsed: attempts.length > 1 } };
+                        return { ok: true, artifact: { ...artifact, fallbackUsed: false } };
                     }
                     if (changed) {
                         return { ok: false, issue: "AUTONOMOUS_AGENT_PARTIAL_CHANGE_REQUIRES_REPAIR", artifact: { attempts } };
                     }
-                    if (agent === "kilo" && !result.ok) continue;
                     if (!result.ok) return { ok: false, issue: "AUTONOMOUS_AGENT_GENERATION_FAILED", artifact: { attempts } };
+                    return { ok: false, issue: "AUTONOMOUS_AGENT_NO_REPOSITORY_CHANGE", artifact: { attempts } };
                 }
 
                 return { ok: false, issue: "AUTONOMOUS_AGENT_NO_REPOSITORY_CHANGE", artifact: { attempts } };
