@@ -68,13 +68,11 @@ function buildEnvironment(): NodeJS.ProcessEnv {
 
 export function kiloInvocation(platform: NodeJS.Platform, prompt: string): KiloCommand {
     const cli = resolveKiloCliPath();
-    const environment = buildEnvironment();
-
     return {
         command: cli || (platform === "win32" ? "kilo.exe" : "kilo"),
         args: ["run", "--auto", prompt],
         shell: false,
-        env: environment
+        env: buildEnvironment()
     };
 }
 
@@ -83,11 +81,44 @@ export function buildWindowsKiloScript(payloadPath: string): string {
     return [
         "$ErrorActionPreference = 'Continue'",
         `$payload = Get-Content -Raw -LiteralPath '${safePayloadPath}' | ConvertFrom-Json`,
-        `Write-Host ("[KILO] EXECUTION_STARTED command=" + $payload.command + " cwd=" + (Get-Location).Path)`,
-        `& $payload.command @($payload.args) 2>&1 | ForEach-Object { $line = $_.ToString(); Add-Content -LiteralPath $payload.logPath -Value $line; Write-Host ("[KILO] " + $line) }`,
-        "$code = $LASTEXITCODE",
-        "if ($null -eq $code) { $code = 0 }",
-        "Write-Host (\"[KILO] EXECUTION_FINISHED code=\" + $code)",
+        "$stdoutPath = $payload.logPath + '.stdout'",
+        "$stderrPath = $payload.logPath + '.stderr'",
+        "Remove-Item -LiteralPath $stdoutPath,$stderrPath -Force -ErrorAction SilentlyContinue",
+        "$child = Start-Process -FilePath $payload.command -ArgumentList $payload.args -WorkingDirectory (Get-Location).Path -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath -PassThru -WindowStyle Normal",
+        "Write-Host (\"[KILO] PROCESS_STARTED pid=\" + $child.Id + \" command=\" + $payload.command)",
+        "$stdoutOffset = 0",
+        "$stderrOffset = 0",
+        "while (-not $child.HasExited) {",
+        "  foreach ($stream in @(@($stdoutPath, 'STDOUT'), @($stderrPath, 'STDERR'))) {",
+        "    $path = $stream[0]; $label = $stream[1]",
+        "    if (Test-Path -LiteralPath $path) {",
+        "      $raw = [System.IO.File]::ReadAllText($path)",
+        "      $offset = if ($label -eq 'STDOUT') { $stdoutOffset } else { $stderrOffset }",
+        "      if ($raw.Length -gt $offset) {",
+        "        $delta = $raw.Substring($offset)",
+        "        foreach ($line in ($delta -split \"`r?`n\")) { if ($line) { Write-Host (\"[KILO] [\" + $label + \"] \" + $line) } }",
+        "        if ($label -eq 'STDOUT') { $stdoutOffset = $raw.Length } else { $stderrOffset = $raw.Length }",
+        "      }",
+        "    }",
+        "  }",
+        "  Write-Host (\"[KILO] HEARTBEAT pid=\" + $child.Id + \" state=RUNNING elapsedSeconds=\" + [int]((Get-Date) - $child.StartTime).TotalSeconds)",
+        "  Start-Sleep -Seconds 5",
+        "  $child.Refresh()",
+        "}",
+        "$child.Refresh()",
+        "foreach ($stream in @(@($stdoutPath, 'STDOUT'), @($stderrPath, 'STDERR'))) {",
+        "  $path = $stream[0]; $label = $stream[1]",
+        "  if (Test-Path -LiteralPath $path) {",
+        "    $raw = [System.IO.File]::ReadAllText($path)",
+        "    $offset = if ($label -eq 'STDOUT') { $stdoutOffset } else { $stderrOffset }",
+        "    if ($raw.Length -gt $offset) {",
+        "      $delta = $raw.Substring($offset)",
+        "      foreach ($line in ($delta -split \"`r?`n\")) { if ($line) { Write-Host (\"[KILO] [\" + $label + \"] \" + $line) } }",
+        "    }",
+        "  }",
+        "}",
+        "$code = $child.ExitCode",
+        "Write-Host (\"[KILO] PROCESS_FINISHED pid=\" + $child.Id + \" code=\" + $code)",
         "exit [int]$code"
     ].join("\r\n");
 }
@@ -105,7 +136,6 @@ function streamWindowsKilo(invocation: KiloCommand, cwd: string, timeout: number
         args: invocation.args,
         logPath: progressLogPath
     }), "utf8");
-
     writeFileSync(scriptPath, buildWindowsKiloScript(payloadPath), "utf8");
 
     console.log(JSON.stringify({
@@ -177,7 +207,6 @@ export class KiloCodeExecutionAdapter {
 
     execute(prompt: string, cwd: string, timeout = 30 * 60 * 1000): KiloExecutionResult {
         const invocation = kiloInvocation(process.platform, prompt);
-
         if (process.platform === "win32" && this.runner === execFileSync) {
             return streamWindowsKilo(invocation, cwd, timeout);
         }
@@ -193,7 +222,6 @@ export class KiloCodeExecutionAdapter {
                 env: invocation.env,
                 stdio: ["ignore", "pipe", "pipe"]
             });
-
             return {
                 ok: true,
                 code: 0,
