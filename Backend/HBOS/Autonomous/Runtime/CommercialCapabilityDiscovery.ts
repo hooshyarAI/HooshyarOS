@@ -22,11 +22,22 @@ export class CommercialCapabilityDiscovery {
         const read = (path: string) => existsSync(path) ? readFileSync(path, "utf8") : "";
         const index = read(p("web/index.html"));
         const app = read(p("web/app.js"));
+        const ingestionImplementation = read(p("Backend/HBOS/Product/FinancialDataIngestionAdapter.ts"));
+        const ingestionTest = read(p("Backend/HBOS/test/FinancialDataIngestionAdapter.test.ts"));
+
+        const multiFormatImplemented =
+            ["EXCEL", "PDF", "STRUCTURED"].every(format =>
+                new RegExp(`sourceType\\s*[:=]\\s*[\"']${format}[\"']`, "i").test(ingestionImplementation) ||
+                new RegExp(`ingest${format.charAt(0)}${format.slice(1).toLowerCase()}\\s*\\(`, "i").test(ingestionImplementation)
+            ) &&
+            ["EXCEL", "PDF", "STRUCTURED"].every(format =>
+                ingestionTest.includes(format) || new RegExp(`ingest${format.charAt(0)}${format.slice(1).toLowerCase()}\\s*\\(`, "i").test(ingestionTest)
+            );
 
         const candidates: Array<CommercialCapabilityCandidate & { satisfied: boolean }> = [
             {
                 capabilityId: "commercial.ingestion.multiformat",
-                capability: "implement governed multi-format financial ingestion beyond the current CSV-only browser flow (Excel/PDF/structured evidence where supported by existing architecture)",
+                capability: "implement governed multi-format financial ingestion beyond the current CSV-only browser flow (Excel/PDF/structured evidence where supported by existing architecture); documentation-only, test-only, or unchanged CSV-only behavior does not satisfy this capability",
                 targetEngine: "Financial Data Ingestion Adapter",
                 dependencies: ["Financial Data Ingestion Adapter", "Commercial Persistence Boundary"],
                 requiredPaths: [
@@ -34,7 +45,7 @@ export class CommercialCapabilityDiscovery {
                     p("Backend/HBOS/test/FinancialDataIngestionAdapter.test.ts"),
                     p("Docs/Product/FinancialDataIngestionAdapter.md")
                 ],
-                satisfied: !/accept=\"\.csv/.test(index) && /Excel|PDF|structured|document/i.test(index + app)
+                satisfied: multiFormatImplemented
             },
             {
                 capabilityId: "commercial.dashboard.surfaces",
