@@ -1,5 +1,5 @@
 /// <reference types="node" />
-import { execFileSync, spawn, spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -99,10 +99,6 @@ function streamWindowsKilo(invocation: KiloCommand, cwd: string, timeout: number
     const progressLogPath = join(workDir, "progress.log");
     const payloadPath = join(workDir, "payload.json");
     const scriptPath = join(workDir, "run-kilo.ps1");
-    const heartbeatCommand = process.env.ComSpec || "powershell.exe";
-    const heartbeatArgs = process.env.ComSpec
-        ? ["/d", "/s", "/c", "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", "$s=Get-Date; while($true){ Write-Host ('[KILO] HEARTBEAT state=RUNNING elapsedSeconds=' + [int]((Get-Date)-$s).TotalSeconds); Start-Sleep -Seconds 5 }"]
-        : ["-NoProfile", "-NonInteractive", "-Command", "$s=Get-Date; while($true){ Write-Host ('[KILO] HEARTBEAT state=RUNNING elapsedSeconds=' + [int]((Get-Date)-$s).TotalSeconds); Start-Sleep -Seconds 5 }"];
 
     writeFileSync(payloadPath, JSON.stringify({
         command: invocation.command,
@@ -125,13 +121,6 @@ function streamWindowsKilo(invocation: KiloCommand, cwd: string, timeout: number
         timestamp: new Date().toISOString()
     }));
 
-    const heartbeat = spawn(heartbeatCommand, heartbeatArgs, {
-        cwd,
-        env: invocation.env,
-        stdio: ["ignore", "inherit", "inherit"],
-        windowsHide: false
-    });
-
     const child = spawnSync(
         process.env.ComSpec || "powershell.exe",
         process.env.ComSpec
@@ -145,8 +134,6 @@ function streamWindowsKilo(invocation: KiloCommand, cwd: string, timeout: number
             windowsHide: false
         }
     );
-
-    heartbeat.kill();
 
     const output = existsSync(progressLogPath) ? readFileSync(progressLogPath, "utf8") : "";
     const code = child.status ?? 1;
