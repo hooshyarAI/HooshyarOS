@@ -1,8 +1,8 @@
 import { AutonomousProjectMission, Mission } from "./AutonomousProjectMission";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { AutonomousCapabilityDiscovery } from "./AutonomousCapabilityDiscovery";
-import { CommercialCapabilityDiscovery } from "./CommercialCapabilityDiscovery";
+import { AutonomousCapabilityDiscovery } from "./CommercialCapabilityDiscovery";
+import { AutonomousCapabilityDiscovery as CanonicalCapabilityDiscovery } from "./AutonomousCapabilityDiscovery";
 
 export interface PlatformContinuationMission {
     capabilityId: "platform.continuation";
@@ -20,8 +20,8 @@ export type PlatformCapabilityMission = Omit<Mission, "evidence" | "architecture
  * concrete capability.
  */
 export class AutonomousPlatformContinuation {
-    private readonly discovery = new AutonomousCapabilityDiscovery();
-    private readonly commercialDiscovery = new CommercialCapabilityDiscovery();
+    private readonly discovery = new CanonicalCapabilityDiscovery();
+    private readonly commercialDiscovery = new AutonomousCapabilityDiscovery();
 
     createMission(): PlatformContinuationMission {
         return {
@@ -88,13 +88,16 @@ export class AutonomousPlatformContinuation {
             if (!extension.requiredPaths.every(existsSync)) return extension;
         }
 
-        // Once the canonical file backlog is exhausted, continue from
-        // application-level commercial evidence instead of stopping merely
-        // because external payment/cloud dependencies remain unavailable.
+        // Commercial discovery identifies real application gaps, but the
+        // durable product roadmap remains authoritative for construction IDs
+        // and artifact ownership.
         const commercialGap = this.commercialDiscovery.discover(root);
         if (commercialGap) {
+            const canonicalProductCapabilityId = commercialGap.capabilityId === "commercial.ingestion.multiformat"
+                ? "product.financial-data-ingestion"
+                : commercialGap.capabilityId;
             return {
-                capabilityId: commercialGap.capabilityId,
+                capabilityId: canonicalProductCapabilityId,
                 capability: commercialGap.capability,
                 targetEngine: commercialGap.targetEngine,
                 dependencies: commercialGap.dependencies
