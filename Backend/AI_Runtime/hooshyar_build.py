@@ -17,6 +17,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 DAEMON = ROOT / "Backend" / "HBOS" / "Autonomous" / "Runtime" / "AutonomousBuildDaemon.ts"
 ASSISTANT_ENTRY = ROOT / "Backend" / "HBOS" / "Assistant" / "Autonomous" / "start-autonomous-assistant.ts"
+WORKSPACE_REPAIR = ROOT / "Backend" / "HBOS" / "Autonomous" / "Runtime" / "WorkspaceRepairRunner.ts"
 TSX = ROOT / "node_modules" / ".bin" / ("tsx.cmd" if os.name == "nt" else "tsx")
 LOCK = ROOT / ".git" / "hooshyar-commercial-build.lock"
 
@@ -69,14 +70,56 @@ def run_assistant_orchestrator() -> tuple[int, str | None]:
     return code, result_status
 
 
+def run_workspace_repair_preflight() -> tuple[int, bool]:
+    """Repair a dirty workspace before the canonical platform daemon is allowed to select a new capability."""
+    if not WORKSPACE_REPAIR.exists():
+        print(f"ERROR: missing workspace repair runner: {WORKSPACE_REPAIR}", file=sys.stderr)
+        return 2, False
+    if not TSX.exists():
+        print(f"ERROR: missing local tsx executable: {TSX}", file=sys.stderr)
+        return 2, False
+
+    env = os.environ.copy()
+    env["HOOSHYAR_AGENT"] = "kilo"
+    code, lines = _stream_process([str(TSX), str(WORKSPACE_REPAIR)], env)
+    verified_clean = False
+    for line in reversed(lines):
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if payload.get("type") == "AUTONOMOUS_WORKSPACE_REPAIR":
+            if payload.get("phase") == "PREFLIGHT" and payload.get("status") == "ALREADY_CLEAN":
+                verified_clean = True
+                break
+            if payload.get("phase") == "END":
+                verified_clean = payload.get("status") == "VERIFIED_CLEAN"
+                break
+
+    if code != 0 or not verified_clean:
+        print(json.dumps({
+            "type": "AUTONOMOUS_PLATFORM_BLOCKED",
+            "reason": "WORKSPACE_REPAIR_PREFLIGHT_FAILED",
+            "returnCode": code,
+            "verifiedClean": verified_clean,
+        }))
+        return 1, False
+
+    return 0, True
+
+
 def run_daemon() -> tuple[int, bool, bool]:
-    """Run the canonical platform daemon; it owns mission/repair decisions."""
+    """Run the canonical platform daemon only after workspace repair/cleanliness is verified."""
     if not DAEMON.exists():
         print(f"ERROR: missing autonomous daemon: {DAEMON}", file=sys.stderr)
         return 2, False, False
     if not TSX.exists():
         print(f"ERROR: missing local tsx executable: {TSX}", file=sys.stderr)
         return 2, False, False
+
+    repair_code, repaired = run_workspace_repair_preflight()
+    if not repaired:
+        return repair_code, False, True
 
     env = os.environ.copy()
     env["HOOSHYAR_AGENT"] = env.get("HOOSHYAR_AGENT", "auto")
