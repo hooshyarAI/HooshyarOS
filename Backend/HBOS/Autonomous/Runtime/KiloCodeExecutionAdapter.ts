@@ -47,6 +47,7 @@ const GOVERNED_AGENT = {
     permission: {
         read: "allow",
         edit: "allow",
+        write: "allow",
         glob: "deny",
         grep: "deny",
         task: "deny",
@@ -54,7 +55,8 @@ const GOVERNED_AGENT = {
         webfetch: "deny",
         skill: "deny",
         todoread: "deny",
-        todowrite: "deny"
+        todowrite: "deny",
+        bash: "deny"
     }
 };
 
