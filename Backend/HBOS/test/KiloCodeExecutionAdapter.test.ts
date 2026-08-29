@@ -1,12 +1,17 @@
 import { buildWindowsKiloScript, kiloInvocation } from "../Autonomous/Runtime/KiloCodeExecutionAdapter";
 
 describe("KiloCodeExecutionAdapter observability", () => {
-    it("keeps the real kilo run command intact and binds it to the governed code agent", () => {
+    it("uses the dedicated HooshyarOS construction agent with a finite governed budget", () => {
         const prompt = "implement one canonical product capability";
         const invocation = kiloInvocation("win32", prompt);
-        expect(invocation.args).toEqual(["run", "--agent", "code", "--auto", prompt]);
-        expect(invocation.env.KILO_CONFIG_CONTENT).toContain('"steps":30');
+        expect(invocation.args).toEqual(["run", "--agent", "hooshyar-construction", "--auto", prompt]);
+        expect(invocation.env.KILO_CONFIG_CONTENT).toContain('"hooshyar-construction"');
+        expect(invocation.env.KILO_CONFIG_CONTENT).toContain('"steps":12');
+        expect(invocation.env.KILO_CONFIG_CONTENT).toContain('"glob":"deny"');
+        expect(invocation.env.KILO_CONFIG_CONTENT).toContain('"grep":"deny"');
         expect(invocation.env.KILO_CONFIG_CONTENT).toContain('"task":"deny"');
+        expect(invocation.env.KILO_CONFIG_CONTENT).toContain('"websearch":"deny"');
+        expect(invocation.env.KILO_CONFIG_CONTENT).toContain('"webfetch":"deny"');
         expect(invocation.env.KILO_CONFIG_CONTENT).toContain("Do not use the Task tool");
         expect(invocation.env.KILO_CONFIG_CONTENT).toContain("Do not perform repository-wide exploration");
     });
