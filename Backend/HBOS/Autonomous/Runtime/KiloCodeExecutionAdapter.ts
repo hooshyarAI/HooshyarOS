@@ -26,12 +26,13 @@ const GOVERNED_OPERATOR_PROMPT = [
     "The current mission prompt is the authoritative mission capsule.",
     "Work directly on the declared Required artifact paths and the explicitly listed direct dependency paths only.",
     "Read the named governance and architecture documents once, then inspect only the exact mission files supplied by the runtime.",
-    "Do not read directories. Do not use directory listing, recursive discovery, search, grep, glob, or repository-wide scans.",
+    "Do not perform repository-wide exploration, recursive scans, search, grep, glob, or speculative dependency discovery.",
+    "Do not read arbitrary directories. If an explicitly named dependency is a directory or its exact file path cannot be resolved from the mission capsule, perform at most one narrow directory read to locate that dependency, then return to the declared paths.",
     "Do not use the Task tool and do not delegate to any subagent.",
     "Do not use web search, web fetch, skills, todo tools, or broad repository discovery.",
     "Do not use shell or terminal commands. All repository inspection and edits must use the explicitly permitted file tools.",
     "Every read must answer a specific unresolved question from the mission capsule.",
-    "After the supplied mission files are understood, decide and act: implement the genuinely missing part, complete the canonical artifact, or report the capability as already complete/idempotent.",
+    "After the supplied mission files and direct dependencies are understood, decide and act: implement the genuinely missing part, complete the canonical artifact, or report the capability as already complete/idempotent.",
     "Do not create duplicate engines, duplicate product artifact owners, alternate paths, or a second capability owner.",
     "For product missions, preserve the durable product roadmap and Architecture Freeze V4.",
     "Do not change git history, commit, push, reset, clean, or erase unrelated changes; the autonomous runtime owns Git lifecycle.",
@@ -39,71 +40,11 @@ const GOVERNED_OPERATOR_PROMPT = [
     "A successful run ends with concrete implementation/test/document changes or an explicit idempotent conclusion; exploration without a decision is not success."
 ].join("\n");
 
-const GOVERNED_READ_PATHS = [
-    "AGENTS.md",
-    "Assistant/SYSTEM_PROMPT.md",
-    "Docs/ARCHITECTURE.md",
-    "Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md",
-    "Docs/HOOSHYAROS_MASTER_CHARTER.md",
-    "Docs/AUTONOMOUS_7_DAY_BUILD_SLA.md",
-    "Docs/HOOSHYAROS_TOOLCHAIN_OPTIMIZATION_LAW.md",
-    "Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md",
-    "Docs/AUTONOMOUS_WEAVING_DOCTRINE.md",
-    "Docs/Product/PRODUCT_CONSTRUCTION_ROADMAP.json",
-    "Docs/Product/FinancialDataIngestionAdapter.md",
-    "package.json",
-    "tsconfig.json",
-    "Backend/HBOS/Product/FinancialDataIngestionAdapter.ts",
-    "Backend/HBOS/Product/FinancialDataIngestionAdapter.test.ts",
-    "Backend/HBOS/Product/FinancialStatementAnalysisService.ts",
-    "Backend/HBOS/Product/FinancialStatementAnalysisService.test.ts",
-    "Backend/HBOS/Product/SQLitePersistenceStore.ts",
-    "Backend/HBOS/Persistence/CommercialPersistenceBoundary.ts",
-    "Backend/HBOS/Engines/FinancialIntelligenceEngine.ts",
-    "Backend/HBOS/test/FinancialDataIngestionAdapter.test.ts",
-    "Backend/HBOS/test/FinalProductRuntimeQualification.test.ts"
-];
-
-const GOVERNED_EDIT_PATHS = [
-    "Backend/HBOS/Product/FinancialDataIngestionAdapter.ts",
-    "Backend/HBOS/test/FinancialDataIngestionAdapter.test.ts",
-    "Backend/HBOS/Product/FinancialDataIngestionAdapter.test.ts",
-    "Docs/Product/FinancialDataIngestionAdapter.md"
-];
-
-const GOVERNED_AGENT = {
-    description: "HooshyarOS governed finite-step construction operator",
-    mode: "primary",
-    model: "kilo/kilo-auto/free",
-    steps: 30,
-    prompt: GOVERNED_OPERATOR_PROMPT,
-    permission: {
-        read: Object.fromEntries([["*", "deny"], ...GOVERNED_READ_PATHS.map(path => [path, "allow"])]),
-        edit: Object.fromEntries([["*", "deny"], ...GOVERNED_EDIT_PATHS.map(path => [path, "allow"])]),
-        write: Object.fromEntries([["*", "deny"], ...GOVERNED_EDIT_PATHS.map(path => [path, "allow"])]),
-        glob: "deny",
-        grep: "deny",
-        task: "deny",
-        websearch: "deny",
-        webfetch: "deny",
-        skill: "deny",
-        todoread: "deny",
-        todowrite: "deny",
-        bash: "deny"
-    }
-};
-
-const REPAIR_AGENT = {
-    ...GOVERNED_AGENT,
-    description: "HooshyarOS governed finite-step repair operator"
-};
-
+// Kilo's repository-local agent files are the single source of truth for tool
+// permissions and step budgets. The runtime must not inject a second agent
+// definition because that can shadow the repository policy and deny valid reads.
 const FREE_MODEL_CONFIG = JSON.stringify({
-    model: "kilo/kilo-auto/free",
-    agent: {
-        "hooshyar-construction": GOVERNED_AGENT,
-        "hooshyar-repair": REPAIR_AGENT
-    }
+    model: "kilo/kilo-auto/free"
 });
 
 function candidateCliPaths(): string[] {
