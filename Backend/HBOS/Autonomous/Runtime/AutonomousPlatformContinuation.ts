@@ -1,8 +1,8 @@
 import { AutonomousProjectMission, Mission } from "./AutonomousProjectMission";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { AutonomousCapabilityDiscovery } from "./CommercialCapabilityDiscovery";
-import { AutonomousCapabilityDiscovery as CanonicalCapabilityDiscovery } from "./AutonomousCapabilityDiscovery";
+import { AutonomousCapabilityDiscovery } from "./AutonomousCapabilityDiscovery";
+import { CommercialCapabilityDiscovery } from "./CommercialCapabilityDiscovery";
 
 export interface PlatformContinuationMission {
     capabilityId: "platform.continuation";
@@ -20,8 +20,8 @@ export type PlatformCapabilityMission = Omit<Mission, "evidence" | "architecture
  * concrete capability.
  */
 export class AutonomousPlatformContinuation {
-    private readonly discovery = new CanonicalCapabilityDiscovery();
-    private readonly commercialDiscovery = new AutonomousCapabilityDiscovery();
+    private readonly discovery = new AutonomousCapabilityDiscovery();
+    private readonly commercialDiscovery = new CommercialCapabilityDiscovery();
 
     createMission(): PlatformContinuationMission {
         return {
