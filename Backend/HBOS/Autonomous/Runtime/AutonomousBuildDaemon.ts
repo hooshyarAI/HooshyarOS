@@ -28,6 +28,22 @@ type MissionDecision =
     | { kind: "platform-complete"; mission: Mission; assistantGatePassed: true; continuation: PlatformContinuationMission; canonicalAudit: ReturnType<CanonicalCapabilityAudit["audit"]>; commercialAudit: ReturnType<CommercialProductCompletionAudit["audit"]> }
     | { kind: "platform-audit-blocked"; mission: Mission; assistantGatePassed: true; continuation: PlatformContinuationMission; reason: string; details: unknown };
 
+/**
+ * Workspace cleanliness is a construction precondition, not a planner failure.
+ * Once a mission has been selected from a dirty workspace, convert that state
+ * into an explicit repair knot before any new platform capability can be
+ * handed to the weaving planner.
+ */
+export function createWorkspaceRepairMission(selected: Mission): Mission {
+    return {
+        ...selected,
+        capabilityId: `repair-${selected.evidence.commit || "workspace"}`,
+        capability: `repair and verify the current working tree before continuing ${selected.capabilityId}`,
+        targetEngine: "Autonomous Operations Engine",
+        dependencies: []
+    };
+}
+
 export class AutonomousBuildDaemon {
     private readonly root: string;
     private readonly mission: AutonomousProjectMission;
@@ -37,7 +53,7 @@ export class AutonomousBuildDaemon {
     private readonly canonicalAudit = new CanonicalCapabilityAudit();
     private readonly commercialAudit = new CommercialProductCompletionAudit();
     private readonly weavingPlanner = new AutonomousWeavingPlanner();
-    private readonly knotRecovery = new AutonomousKnotRecovery();
+    private readonly knotRecovery: AutonomousKnotRecovery;
     private readonly maxCycles: number;
     private readonly reportEvery: number;
     private readonly performanceBudget: AutonomousPerformanceBudget;
@@ -93,6 +109,18 @@ export class AutonomousBuildDaemon {
 
     private selectMission(): MissionDecision {
         const selected = this.mission.nextMission();
+
+        // The Assistant completion gate is allowed to hand off to platform
+        // construction only from a clean checkpoint. A dirty workspace is an
+        // explicit repair mission, never a reason to block the next capability.
+        if (!selected.evidence.clean && !selected.capabilityId.startsWith("repair-")) {
+            return {
+                kind: "mission",
+                mission: createWorkspaceRepairMission(selected),
+                assistantGatePassed: false
+            };
+        }
+
         if (selected.capabilityId !== "assistant.completion.gate") return { kind: "mission", mission: selected, assistantGatePassed: false };
 
         const continuation = this.continuation.createMission();
