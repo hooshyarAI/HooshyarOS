@@ -173,12 +173,26 @@ def build_windows() -> Path:
     runtime.mkdir(parents=True, exist_ok=True)
     _copy_runtime_node_modules(ROOT / "node_modules", runtime / "node_modules")
 
+    # CRITICAL: package the real repository web application.
+    # The generated demo web surface must never replace production UI.
+    source_web = ROOT / "web"
     web = payload / "web"
-    web.mkdir(exist_ok=True)
-    index = web / "index.html"
-    _write_web_surface(web)
-    if not index.exists():
-        raise RuntimeError(f"customer payload web entrypoint missing: {index}")
+    if not source_web.exists():
+        raise RuntimeError(f"real web surface missing: {source_web}")
+    if web.exists():
+        shutil.rmtree(web)
+    shutil.copytree(
+        source_web,
+        web,
+        ignore=lambda directory, names: [
+            n for n in names
+            if n in {"node_modules", "__pycache__"} or n.endswith((".pyc", ".test", ".spec"))
+        ],
+    )
+    for required_web_file in (web / "index.html", web / "app.js", web / "styles.css"):
+        if not required_web_file.exists():
+            raise RuntimeError(f"real customer web asset missing: {required_web_file}")
+
     (payload / "product-manifest.json").write_text('{"name":"HooshyarOS","runtime":"Backend/HBOS/Autonomous/Runtime/start-commercial-runtime.ts","health":"/health","web":"web/index.html"}', encoding="utf-8")
     _write_launch_surface(payload)
     _validate_windows_payload(payload)
