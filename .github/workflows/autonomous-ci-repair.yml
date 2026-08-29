@@ -76,7 +76,7 @@ jobs:
           HOOSHYAR_GITHUB_REPOSITORY: ${{ github.repository }}
           HOOSHYAR_AGENT: kilo
           HOOSHYAR_AUTONOMOUS_ALLOW_PUSH: "1"
-          KILO_CONFIG_CONTENT: '{"model":"kilo-auto/free"}'
+          KILO_CONFIG_CONTENT: '{"model":"kilo-auto/free","agent":{"hooshyar-repair":{"model":"kilo/kilo-auto/free"}}}'
         run: node scripts/autonomous-ci-repair-runner.cjs
 
       - name: Report no repair required
