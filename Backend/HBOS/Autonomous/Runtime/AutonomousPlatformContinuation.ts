@@ -2,6 +2,7 @@ import { AutonomousProjectMission, Mission } from "./AutonomousProjectMission";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { AutonomousCapabilityDiscovery } from "./AutonomousCapabilityDiscovery";
+import { CommercialCapabilityDiscovery } from "./CommercialCapabilityDiscovery";
 
 export interface PlatformContinuationMission {
     capabilityId: "platform.continuation";
@@ -20,6 +21,7 @@ export type PlatformCapabilityMission = Omit<Mission, "evidence" | "architecture
  */
 export class AutonomousPlatformContinuation {
     private readonly discovery = new AutonomousCapabilityDiscovery();
+    private readonly commercialDiscovery = new CommercialCapabilityDiscovery();
 
     createMission(): PlatformContinuationMission {
         return {
@@ -84,6 +86,19 @@ export class AutonomousPlatformContinuation {
 
         for (const extension of extensions) {
             if (!extension.requiredPaths.every(existsSync)) return extension;
+        }
+
+        // Once the canonical file backlog is exhausted, continue from
+        // application-level commercial evidence instead of stopping merely
+        // because external payment/cloud dependencies remain unavailable.
+        const commercialGap = this.commercialDiscovery.discover(root);
+        if (commercialGap) {
+            return {
+                capabilityId: commercialGap.capabilityId,
+                capability: commercialGap.capability,
+                targetEngine: commercialGap.targetEngine,
+                dependencies: commercialGap.dependencies
+            };
         }
 
         const discovered = this.discovery.discover(root);
