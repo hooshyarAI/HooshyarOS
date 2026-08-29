@@ -1,16 +1,23 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "status": "governing-product-build-input",
   "rule": "Product capabilities extend existing Architecture Freeze V4 engine owners; do not create duplicate engine hierarchies.",
   "capabilities": [
     {
       "capabilityId": "product.financial-data-ingestion",
-      "capability": "ingest and normalize repository-supported financial/accounting data for the Financial Intelligence Engine",
-      "targetEngine": "Financial Intelligence Engine",
-      "dependencies": ["Knowledge Engine", "Financial Intelligence Engine"],
+      "capability": "implement governed multi-format financial ingestion beyond the current CSV-only browser flow (Excel/PDF/structured evidence where supported by existing architecture)",
+      "targetEngine": "Financial Data Ingestion Adapter",
+      "dependencies": ["Financial Data Ingestion Adapter", "Commercial Persistence Boundary"],
       "implementationPath": "Backend/HBOS/Product/FinancialDataIngestionAdapter.ts",
       "testPath": "Backend/HBOS/test/FinancialDataIngestionAdapter.test.ts",
-      "documentationPath": "Docs/Product/FinancialDataIngestionAdapter.md"
+      "documentationPath": "Docs/Product/FinancialDataIngestionAdapter.md",
+      "acceptanceCriteria": [
+        "CSV ingestion remains backward compatible",
+        "the implementation adds governed support for each format that the existing architecture can safely support among EXCEL, PDF and STRUCTURED evidence",
+        "focused tests prove every newly supported format and malformed/unsupported input behavior",
+        "documentation reflects the actual supported formats and evidence contract",
+        "documentation-only changes, test-only changes, or unchanged CSV-only behavior do not satisfy this capability"
+      ]
     },
     {
       "capabilityId": "product.financial-statement-analysis",
