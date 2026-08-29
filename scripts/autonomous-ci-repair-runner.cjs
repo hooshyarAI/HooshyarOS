@@ -167,7 +167,7 @@ function runKilo(handoffPath) {
     "Inspect the exact failure, make the smallest coherent repair, add one focused regression test where appropriate, and run focused verification.",
     "Do not perform unrelated cleanup. Do not rewrite passing product behavior. Stop after focused verification."
   ].join(" ");
-  const result = exec("kilo", ["run", "--auto", prompt]);
+  const result = exec("kilo", ["run", "--auto", "--agent", "hooshyar-repair", "-f", handoffPath, prompt]);
   return { code: result.status ?? 1, output: (result.stdout || "") + "\n" + (result.stderr || "") };
 }
 
