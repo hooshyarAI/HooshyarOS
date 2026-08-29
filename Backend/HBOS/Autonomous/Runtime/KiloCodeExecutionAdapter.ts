@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -77,6 +78,20 @@ export function kiloInvocation(platform: NodeJS.Platform, prompt: string): KiloC
     };
 }
 
+export function buildWindowsKiloScript(payloadPath: string): string {
+    const safePayloadPath = payloadPath.replace(/'/g, "''");
+    return [
+        "$ErrorActionPreference = 'Continue'",
+        `$payload = Get-Content -Raw -LiteralPath '${safePayloadPath}' | ConvertFrom-Json`,
+        `Write-Host ("[KILO] EXECUTION_STARTED command=" + $payload.command + " cwd=" + (Get-Location).Path)`,
+        `& $payload.command @($payload.args) 2>&1 | ForEach-Object { $line = $_.ToString(); Add-Content -LiteralPath $payload.logPath -Value $line; Write-Host ("[KILO] " + $line) }`,
+        "$code = $LASTEXITCODE",
+        "if ($null -eq $code) { $code = 0 }",
+        "Write-Host (\"[KILO] EXECUTION_FINISHED code=\" + $code)",
+        "exit [int]$code"
+    ].join("\r\n");
+}
+
 function streamWindowsKilo(invocation: KiloCommand, cwd: string, timeout: number): KiloExecutionResult {
     const started = Date.now();
     const workDir = join(tmpdir(), `hooshyar-kilo-${process.pid}-${started}`);
@@ -91,22 +106,17 @@ function streamWindowsKilo(invocation: KiloCommand, cwd: string, timeout: number
         logPath: progressLogPath
     }), "utf8");
 
-    writeFileSync(scriptPath, [
-        "$ErrorActionPreference = 'Continue'",
-        `$payload = Get-Content -Raw -LiteralPath '${payloadPath.replace(/'/g, "''")}' | ConvertFrom-Json`,
-        `& $payload.command @($payload.args) 2>&1 | Tee-Object -FilePath $payload.logPath`,
-        "$code = $LASTEXITCODE",
-        "if ($null -eq $code) { $code = 0 }",
-        "exit [int]$code"
-    ].join("\r\n"), "utf8");
+    writeFileSync(scriptPath, buildWindowsKiloScript(payloadPath), "utf8");
 
     console.log(JSON.stringify({
         type: "AUTONOMOUS_AGENT_PROGRESS",
         provider: "kilo",
         phase: "START",
         event: "EXECUTION_STARTED",
+        command: invocation.command,
         cwd,
         progressLogPath,
+        liveOutput: true,
         timestamp: new Date().toISOString()
     }));
 
@@ -135,6 +145,7 @@ function streamWindowsKilo(invocation: KiloCommand, cwd: string, timeout: number
         event: "EXECUTION_FINISHED",
         code,
         observable: true,
+        liveOutput: true,
         progressLogPath,
         elapsedMs: Date.now() - started,
         timestamp: new Date().toISOString()
