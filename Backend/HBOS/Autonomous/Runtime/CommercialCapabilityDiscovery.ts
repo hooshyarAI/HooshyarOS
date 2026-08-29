@@ -12,8 +12,9 @@ export interface CommercialCapabilityCandidate {
 /**
  * Application-level commercial gap discovery.
  *
- * This deliberately checks real user-facing/runtime evidence instead of
- * treating engine/file existence as commercial completion evidence.
+ * The durable product roadmap is authoritative for product implementation
+ * boundaries. This discovery layer may identify a gap, but it must never
+ * invent or relocate the implementation owner.
  */
 export class CommercialCapabilityDiscovery {
     discover(root: string): CommercialCapabilityCandidate | null {
@@ -33,7 +34,7 @@ export class CommercialCapabilityDiscovery {
                     p("Backend/HBOS/test/FinancialDataIngestionAdapter.test.ts"),
                     p("Docs/Product/FinancialDataIngestionAdapter.md")
                 ],
-                satisfied: /accept=\"\.csv/.test(index) === false && /Excel|PDF|document|structured/i.test(index + app)
+                satisfied: !/accept=\"\.csv/.test(index) && /Excel|PDF|structured|document/i.test(index + app)
             },
             {
                 capabilityId: "commercial.dashboard.surfaces",
