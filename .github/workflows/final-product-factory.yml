@@ -27,6 +27,12 @@ jobs:
         run: npm run product:factory
         env:
           HOOSHYAR_FACTORY_ALLOW_PUSH: "0"
+      - name: Validate factory evidence exists
+        run: |
+          if (-not (Test-Path .hooshyar/factory-success.json)) {
+            Write-Host "Missing factory evidence: .hooshyar/factory-success.json"
+            exit 1
+          }
       - name: Emit assistant repair handoff on failure
         if: steps.product-factory.outcome == 'failure'
         run: npm run product:factory:handoff
@@ -35,8 +41,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: hooshyar-final-product-factory-evidence
-          path: .hooshyar/*.json
-          if-no-files-found: warn
+          path: .hooshyar/factory-success.json
+          if-no-files-found: error
           retention-days: 14
       - name: Fail release gate on factory failure
         if: steps.product-factory.outcome == 'failure'
