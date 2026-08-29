@@ -21,41 +21,53 @@ export interface KiloCommand {
     env: NodeJS.ProcessEnv;
 }
 
-const GOVERNED_CODE_PROMPT = [
+const GOVERNED_OPERATOR_PROMPT = [
     "You are the HooshyarOS governed construction operator.",
     "The current mission prompt is the authoritative mission capsule.",
     "Work directly on the declared Required artifact paths and their direct imports only.",
-    "Read the named governance and architecture documents once, then inspect the declared canonical implementation/test/documentation paths.",
-    "Do not use the Task tool. Do not delegate to Explore, General, Plan, Debug, or any other subagent.",
-    "Do not perform repository-wide exploration, repeated broad grep/glob scans, web search, web fetches, or speculative dependency discovery.",
-    "After the canonical paths and direct dependencies are understood, decide and act: implement the genuinely missing part, complete the canonical artifact, or report the capability as already complete/idempotent.",
-    "Do not create duplicate engines, duplicate product artifact owners, or alternate paths.",
+    "Read the named governance and architecture documents once, then inspect the declared canonical implementation, test, documentation, and direct dependency paths.",
+    "Do not use the Task tool and do not delegate to any subagent.",
+    "Do not use Glob, Grep, web search, web fetch, skills, todo tools, or broad repository discovery.",
+    "Do not perform repository-wide exploration, repeated scans, or speculative dependency discovery.",
+    "Every read must answer a specific unresolved question from the mission capsule.",
+    "After the named canonical paths and direct dependencies are understood, decide and act: implement the genuinely missing part, complete the canonical artifact, or report the capability as already complete/idempotent.",
+    "Do not create duplicate engines, duplicate product artifact owners, alternate paths, or a second capability owner.",
     "For product missions, preserve the durable product roadmap and Architecture Freeze V4.",
-    "Do not change git history, commit, push, or erase unrelated user changes; the autonomous runtime owns those actions.",
-    "Do not repeat an exploration action. If evidence is insufficient, report the exact missing evidence and stop.",
+    "Do not change git history, commit, push, reset, clean, or erase unrelated changes; the autonomous runtime owns Git lifecycle.",
+    "Do not repeat an exploration action. If evidence is insufficient to make a safe decision, report the exact missing evidence and stop.",
     "A successful run ends with a concrete implementation/verification result or an explicit idempotent conclusion; exploration without a decision is not success."
 ].join("\n");
+
+const GOVERNED_AGENT = {
+    description: "HooshyarOS governed finite-step construction operator",
+    mode: "primary",
+    model: "kilo/kilo-auto/free",
+    steps: 12,
+    prompt: GOVERNED_OPERATOR_PROMPT,
+    permission: {
+        read: "allow",
+        edit: "allow",
+        glob: "deny",
+        grep: "deny",
+        task: "deny",
+        websearch: "deny",
+        webfetch: "deny",
+        skill: "deny",
+        todoread: "deny",
+        todowrite: "deny"
+    }
+};
+
+const REPAIR_AGENT = {
+    ...GOVERNED_AGENT,
+    description: "HooshyarOS governed finite-step repair operator"
+};
 
 const FREE_MODEL_CONFIG = JSON.stringify({
     model: "kilo/kilo-auto/free",
     agent: {
-        code: {
-            description: "HooshyarOS governed finite-step construction operator",
-            mode: "primary",
-            model: "kilo/kilo-auto/free",
-            steps: 30,
-            prompt: GOVERNED_CODE_PROMPT,
-            permission: {
-                task: "deny",
-                websearch: "deny",
-                webfetch: "deny",
-                skill: "deny",
-                todoread: "deny",
-                todowrite: "deny"
-            }
-        },
-        "hooshyar-construction": { model: "kilo/kilo-auto/free", steps: 30, prompt: GOVERNED_CODE_PROMPT, permission: { task: "deny" } },
-        "hooshyar-repair": { model: "kilo/kilo-auto/free", steps: 30, prompt: GOVERNED_CODE_PROMPT, permission: { task: "deny" } }
+        "hooshyar-construction": GOVERNED_AGENT,
+        "hooshyar-repair": REPAIR_AGENT
     }
 });
 
@@ -100,7 +112,7 @@ export function kiloInvocation(platform: NodeJS.Platform, prompt: string): KiloC
     const cli = resolveKiloCliPath();
     return {
         command: cli || (platform === "win32" ? "kilo.exe" : "kilo"),
-        args: ["run", "--agent", "code", "--auto", prompt],
+        args: ["run", "--agent", "hooshyar-construction", "--auto", prompt],
         shell: false,
         env: buildEnvironment()
     };
