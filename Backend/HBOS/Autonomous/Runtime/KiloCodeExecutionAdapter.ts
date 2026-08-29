@@ -18,7 +18,7 @@ export interface KiloCommand {
 }
 
 const FREE_MODEL_CONFIG = JSON.stringify({
-    model: "kilo-auto/free",
+    model: "kilo/kilo-auto/free",
     agent: {
         "hooshyar-construction": { model: "kilo/kilo-auto/free" },
         "hooshyar-repair": { model: "kilo/kilo-auto/free" }
