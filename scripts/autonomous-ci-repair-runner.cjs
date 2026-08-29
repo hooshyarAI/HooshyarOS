@@ -185,7 +185,7 @@ function gitStatus() {
 function commitPush() {
   const status = gitStatus();
   if ((status.stdout || "").trim() === "") throw new Error("KILO_PRODUCED_NO_REPOSITORY_CHANGE");
-  if ((exec("git", ["add", "--all"]).status ?? 1) !== 0) throw new Error("git add failed");
+  if ((exec("git", ["add", "--all", "--", ".", ":(exclude).kilo", ":(exclude)node_modules"]).status ?? 1) !== 0) throw new Error("git add failed");
   if ((exec("git", ["commit", "-m", "fix(autonomous): repair CI failure from feedback"]).status ?? 1) !== 0) throw new Error("git commit failed");
   if ((exec("git", ["push", "origin", "HEAD:" + branch]).status ?? 1) !== 0) throw new Error("git push failed");
   return (exec("git", ["rev-parse", "HEAD"], { stdio: ["ignore", "pipe", "pipe"] }).stdout || "").trim();
@@ -215,6 +215,9 @@ async function main() {
 
     const kilo = runKilo(handoff);
     if (kilo.code !== 0) throw new Error("KILO_REPAIR_FAILED:" + kilo.code + "\n" + kilo.output);
+
+    const evidence = exec(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "product:agent:evidence"]);
+    if ((evidence.status ?? 1) !== 0) throw new Error("AGENT_REPAIR_EVIDENCE_INVALID");
 
     const py = exec(process.env.HOOSHYAR_PYTHON || "python", ["-m", "compileall", "-q", "Backend/AI_Runtime"]);
     if ((py.status ?? 1) !== 0) throw new Error("PYTHON_SYNTAX_VERIFY_FAILED");
