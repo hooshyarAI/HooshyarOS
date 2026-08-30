@@ -4,6 +4,10 @@ Known canonical capabilities retain explicit architecture-aware generators.
 Unknown capabilities are no longer rejected: the worker derives a minimal
 engine/test/documentation scaffold from the mission contract, while keeping
 business semantics deliberately out of the generator.
+
+Python remains the canonical construction worker. A separately governed local
+operator such as Kilo Code may invoke this worker, but does not replace it or
+acquire architecture authority.
 """
 from __future__ import annotations
 
@@ -19,17 +23,22 @@ if str(ROOT) not in sys.path:
 
 from Backend.AI_Runtime.autonomous_spec import generic_artifacts, spec_from_prompt, write_missing, write_overwrite
 
-ALLOWED_AGENT = "python"
+CONSTRUCTION_WORKER = "python"
+APPROVED_EXECUTION_OPERATORS = {"python", "kilo"}
 
 
 def enforce_construction_policy() -> None:
-    """Refuse non-Python autonomous construction workers."""
-    agent = os.environ.get("HOOSHYAR_AGENT", ALLOWED_AGENT).strip().lower()
-    if agent != ALLOWED_AGENT:
+    """Validate the execution operator without changing the canonical worker."""
+    operator = os.environ.get("HOOSHYAR_EXECUTION_OPERATOR")
+    legacy_agent = os.environ.get("HOOSHYAR_AGENT")
+    selected = (operator or legacy_agent or "python").strip().lower()
+    if selected not in APPROVED_EXECUTION_OPERATORS:
         raise RuntimeError(
-            f"Unsupported autonomous construction provider: {agent or '<empty>'}; "
-            "repository-native Python is the only approved construction worker."
+            f"Unsupported autonomous execution operator: {selected or '<empty>'}; "
+            f"approved operators are {', '.join(sorted(APPROVED_EXECUTION_OPERATORS))}."
         )
+    os.environ["HOOSHYAR_EXECUTION_OPERATOR"] = selected
+    os.environ["HOOSHYAR_CONSTRUCTION_WORKER"] = CONSTRUCTION_WORKER
 
 
 PLATFORM_CAPABILITIES = {
