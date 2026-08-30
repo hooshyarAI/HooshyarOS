@@ -17,7 +17,7 @@ describe("CommercialCapabilityDiscovery", () => {
             expect(result).not.toBeNull();
             expect(result?.capabilityId).toBe("commercial.ingestion.multiformat");
             expect(result?.targetEngine).toBe("Financial Data Ingestion Adapter");
-            expect(result?.requiredPaths.map(file => relative(root, file))).toEqual([
+            expect(result?.requiredPaths.map(file => relative(root, file).replace(/\\/g, "/"))).toEqual([
                 "Backend/HBOS/Product/FinancialDataIngestionAdapter.ts",
                 "Backend/HBOS/test/FinancialDataIngestionAdapter.test.ts",
                 "Docs/Product/FinancialDataIngestionAdapter.md"
