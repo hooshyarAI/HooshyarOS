@@ -1,6 +1,6 @@
 import { AutonomousProjectMission, Mission } from "./AutonomousProjectMission";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, join } from "node:fs";
+import { join as pathJoin } from "node:path";
 import { AutonomousCapabilityDiscovery } from "./AutonomousCapabilityDiscovery";
 import { CommercialCapabilityDiscovery } from "./CommercialCapabilityDiscovery";
 
@@ -20,8 +20,10 @@ export type PlatformCapabilityMission = Omit<Mission, "evidence" | "architecture
  * concrete capability.
  */
 export class AutonomousPlatformContinuation {
-    private readonly discovery = new AutonomousCapabilityDiscovery();
-    private readonly commercialDiscovery = new CommercialCapabilityDiscovery();
+    constructor(
+        private readonly discovery = new AutonomousCapabilityDiscovery(),
+        private readonly commercialDiscovery = new CommercialCapabilityDiscovery()
+    ) {}
 
     createMission(): PlatformContinuationMission {
         return {
@@ -38,7 +40,7 @@ export class AutonomousPlatformContinuation {
         if (canonical) return canonical;
 
         const root = projectMission.snapshot().root;
-        const p = (path: string) => join(root, path);
+        const p = (path: string) => pathJoin(root, path);
         const extensions = [
             {
                 capabilityId: "platform.performance-testing",
@@ -88,9 +90,6 @@ export class AutonomousPlatformContinuation {
             if (!extension.requiredPaths.every(existsSync)) return extension;
         }
 
-        // Commercial discovery identifies real application gaps, but the
-        // durable product roadmap remains authoritative for construction IDs
-        // and artifact ownership.
         const commercialGap = this.commercialDiscovery.discover(root);
         if (commercialGap) {
             const canonicalProductCapabilityId = commercialGap.capabilityId === "commercial.ingestion.multiformat"
