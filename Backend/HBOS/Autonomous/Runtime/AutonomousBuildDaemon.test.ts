@@ -32,7 +32,7 @@ describe("AutonomousBuildDaemon", () => {
                 capability: "HooshyarOS Autonomous Assistant completion gate",
                 targetEngine: "Autonomous Operations Engine",
                 dependencies: [],
-                evidence: {} as any,
+                evidence: { clean: true, commit: "before" } as any,
                 directives: [],
                 architectureRules: []
             })),
@@ -89,7 +89,7 @@ describe("AutonomousBuildDaemon", () => {
                 capability: "HooshyarOS Autonomous Assistant completion gate",
                 targetEngine: "Autonomous Operations Engine",
                 dependencies: [],
-                evidence: {} as any,
+                evidence: { clean: true, commit: "abc123" } as any,
                 directives: [],
                 architectureRules: []
             })),
