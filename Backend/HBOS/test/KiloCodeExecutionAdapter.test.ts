@@ -15,10 +15,12 @@ describe("KiloCodeExecutionAdapter observability", () => {
     it("uses one bounded Windows monitor with live lifecycle output", () => {
         const script = buildWindowsKiloScript("C:/temp/payload.json");
         expect(script).toContain("Start-Process -FilePath $payload.command");
-        expect(script).toContain("[KILO] HEARTBEAT pid=");
-        expect(script).toContain("[KILO] PROCESS_FINISHED pid=");
+        expect(script).toContain('Emit-KiloLine ("HEARTBEAT pid=" + $child.Id');
+        expect(script).toContain('Emit-KiloLine ("PROCESS_STARTED pid=" + $child.Id');
+        expect(script).toContain('Emit-KiloLine ("EXECUTION_FINISHED code=" + $code)');
         expect(script).toContain("$code = $child.ExitCode");
         expect(script).toContain("Read-SharedText");
+        expect(script).toContain('Write-Host ("[KILO] " + $line)');
         expect(script).not.toContain("while($true)");
     });
 });
