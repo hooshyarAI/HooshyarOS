@@ -204,14 +204,41 @@ function streamWindowsKilo(invocation: KiloCommand, cwd: string, timeout: number
     );
 
     const output = existsSync(progressLogPath) ? readFileSync(progressLogPath, "utf8") : "";
-    const code = child.status ?? 1;
-    const error = child.error ? child.error.message : code === 0 ? null : `Kilo exited with code ${code}`;
+    const timedOut = String((child.error as any)?.code ?? "") === "ETIMEDOUT";
+
+    if (timedOut) {
+        const pidMatch = output.match(/PROCESS_STARTED pid=(\d+)/);
+        if (pidMatch?.[1]) {
+            try {
+                execFileSync(
+                    process.env.ComSpec || "cmd.exe",
+                    ["/d", "/s", "/c", "taskkill", "/PID", pidMatch[1], "/T", "/F"],
+                    {
+                        encoding: "utf8",
+                        windowsHide: true,
+                        stdio: ["ignore", "pipe", "ignore"]
+                    }
+                );
+            } catch {
+                // The child may have exited between timeout and cleanup.
+            }
+        }
+    }
+
+    const code = timedOut ? 124 : (child.status ?? 1);
+    const error = timedOut
+        ? "Kilo execution timed out and its process tree was terminated"
+        : child.error
+            ? child.error.message
+            : code === 0
+                ? null
+                : `Kilo exited with code ${code}`;
 
     console.log(JSON.stringify({
         type: "AUTONOMOUS_AGENT_PROGRESS",
         provider: "kilo",
         phase: "END",
-        event: "EXECUTION_FINISHED",
+        event: timedOut ? "EXECUTION_TIMEOUT" : "EXECUTION_FINISHED",
         code,
         observable: true,
         liveOutput: true,
@@ -244,6 +271,23 @@ export class KiloCodeExecutionAdapter {
     }
 
     execute(prompt: string, cwd: string, timeout = 30 * 60 * 1000): KiloExecutionResult {
+        const normalizedPrompt = prompt.toLowerCase();
+        const protectedCapabilities = [
+            "product.financial-data-ingestion",
+            "repair-product.financial-data-ingestion"
+        ];
+
+        if (protectedCapabilities.some(capability => normalizedPrompt.includes(capability))) {
+            return {
+                ok: false,
+                code: 125,
+                output: "",
+                error: "PROTECTED_CAPABILITY: Financial Data Ingestion Adapter is outside the Kilo execution scope",
+                elapsedMs: 0,
+                observable: true
+            };
+        }
+
         const invocation = kiloInvocation(process.platform, prompt);
         if (process.platform === "win32" && this.runner === execFileSync) {
             return streamWindowsKilo(invocation, cwd, timeout);
