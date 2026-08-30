@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, normalize } from "node:path";
 import { ConstructionContext, ConstructionTool } from "../../Builder/Autonomous/AutonomousConstructionEngine";
 import { KiloCodeExecutionAdapter } from "./KiloCodeExecutionAdapter";
+import type { KiloExecutionResult } from "./KiloCodeExecutionAdapter";
 import { ensurePytest } from "./PythonVerificationBootstrap";
 
 function run(command: string, args: string[], cwd: string, timeout = 15 * 60 * 1000) {
@@ -82,9 +83,14 @@ export function selectImplementationAgent(
 }
 
 export function resolveImplementationAgent(root = process.cwd()): ImplementationAgent | null {
+    // Unify selection with execution: use the SAME governed resolution path the
+    // KiloCodeExecutionAdapter uses to launch Kilo, so the selected operator and
+    // the executed binary are never divergent.
+    const kiloOperator = new KiloCodeExecutionAdapter();
+    const kiloAvailable = Boolean(kiloOperator.resolveCliPath());
     return selectImplementationAgent(
         process.env.HOOSHYAR_AGENT,
-        commandExists("kilo", root),
+        kiloAvailable,
         commandExists("python", root)
     );
 }
@@ -94,8 +100,21 @@ export function repositoryStateChanged(before: string, after: string): boolean {
 }
 
 export function buildAgentArgs(agent: ImplementationAgent, prompt: string): string[] {
-    if (agent === "kilo") return ["run", "--auto", prompt];
+    // Must match the governed KiloCodeExecutionAdapter invocation contract exactly
+    // so any caller building Kilo args resolves the same governed agent selection.
+    if (agent === "kilo") return ["run", "--agent", "hooshyar-construction", "--auto", prompt];
     return ["Backend/AI_Runtime/autonomous_builder.py", "--prompt", prompt];
+}
+
+export function emitKiloEscalation(capabilityId: string, result: KiloExecutionResult): void {
+    // Machine-readable blocker signal so the orchestration layer can route the
+    // failure to an approved execution operator or recovery path (mirrors
+    // autonomous_builder.py _emit_blocker). Kilo is never a mandatory dependency.
+    console.log("HELP_REQUIRED: kilo execution failed or was blocked");
+    console.log(`CAPABILITY: ${capabilityId}`);
+    console.log("AGENT: kilo");
+    console.log(`EVIDENCE_REQUIRED: ${result.error || "kilo execution returned a non-success result"}`);
+    console.log("ESCALATE: approved execution operator may resolve and re-verify");
 }
 
 const DEFAULT_DIRECTIVES = [
@@ -244,9 +263,13 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
 
                 for (const agent of candidates) {
                     const prompt = buildAgentPrompt(context);
-                    const result = agent === "kilo"
-                        ? kiloOperator.execute(prompt, root)
-                        : run(agent, buildAgentArgs(agent, prompt), root, 30 * 60 * 1000);
+                    const result: KiloExecutionResult | { ok: boolean; code: number; output: string; error: string | null; elapsedMs: number } =
+                        agent === "kilo"
+                            ? kiloOperator.execute(prompt, root)
+                            : run(agent, buildAgentArgs(agent, prompt), root, 30 * 60 * 1000);
+                    if (agent === "kilo" && !result.ok) {
+                        emitKiloEscalation(context.plan.capabilityId, result as KiloExecutionResult);
+                    }
                     const after = run("git", REPOSITORY_STATUS_ARGS, root);
                     const changed = after.ok && repositoryStateChanged(before.output, after.output);
                     const changedPaths = after.ok ? relativeStatusPaths(after.output, root) : [];

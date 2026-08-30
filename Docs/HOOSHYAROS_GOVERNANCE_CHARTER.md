@@ -429,3 +429,21 @@ For the autonomous Assistant itself, DONE additionally means the verified comple
 **TRUSTED CHECKPOINTING: REQUIRED**
 
 **EXTERNAL CODING PROVIDERS: NON-MANDATORY AND MUST NOT BECOME ARCHITECTURAL DEPENDENCIES**
+
+---
+
+## 14. Governance Flexibility and Safe Amendment
+
+Governance, policy, and architecture rules exist to protect the platform; they must not become unnecessary blockers to an approved build, repair, commercialization, or standardization mission.
+
+When a genuine conflict is found between an approved mission and a governing rule:
+
+1. **Identify it** — record the exact rule, the exact mission, and the exact contradiction.
+2. **Preserve evidence** — keep the conflict visible in repository state, stage evidence, or the final report.
+3. **Propose the smallest safe amendment** — change only what is necessary to resolve the conflict; do not expand the change.
+4. **Do not silently bypass rules** — every bypass must be explicit, evidence-backed, and traceable to this section.
+5. **Do not weaken security** — security controls are never the variable to remove when resolving a conflict.
+6. **Do not change Architecture Freeze V4 or mission semantics without explicit human approval** — these remain protected.
+7. **After human approval, the amendment becomes repository policy and must be testable** — add or update focused tests that prove the new policy is enforced.
+
+This section does not permit arbitrary rule relaxation. It mandates a disciplined, evidence-backed, smallest-safe-change path from conflict to approved resolution.

@@ -8,6 +8,11 @@ business semantics deliberately out of the generator.
 Python remains the canonical construction worker. A separately governed local
 operator such as Kilo Code may invoke this worker, but does not replace it or
 acquire architecture authority.
+
+Blockers produce machine-readable HELP_REQUIRED / ESCALATE output. An approved
+execution operator may resolve the blocker and return evidence via
+``--evidence-dir``; Python re-verifies the evidence before continuing. Kilo is
+never a mandatory runtime dependency.
 """
 from __future__ import annotations
 
@@ -39,6 +44,15 @@ def enforce_construction_policy() -> None:
         )
     os.environ["HOOSHYAR_EXECUTION_OPERATOR"] = selected
     os.environ["HOOSHYAR_CONSTRUCTION_WORKER"] = CONSTRUCTION_WORKER
+
+
+def _emit_blocker(capability_id: str, missing: list[str]) -> None:
+    """Emit machine-readable HELP_REQUIRED / ESCALATE output for a blocked stage."""
+    print("HELP_REQUIRED: blocked by unmet dependencies")
+    print(f"CAPABILITY: {capability_id}")
+    print(f"MISSING: {', '.join(missing)}")
+    print(f"EVIDENCE_REQUIRED: {', '.join(missing)}")
+    print("ESCALATE: approved execution operator may resolve and re-verify")
 
 
 PLATFORM_CAPABILITIES = {
@@ -391,11 +405,17 @@ def _needs_reweave(capability_id: str, artifacts) -> bool:
 
 
 def main() -> int:
+    # Kilo is an approved operator layer only; it is never imported or required here.
     enforce_construction_policy()
     parser = argparse.ArgumentParser()
     parser.add_argument("--prompt", required=True)
     parser.add_argument("--repair", action="store_true")
     parser.add_argument("--issue", default="")
+    parser.add_argument(
+        "--evidence-dir",
+        default="",
+        help="Operator evidence directory for re-verification after blocker resolution.",
+    )
     args = parser.parse_args()
     match = re.search(r"Capability ID:\s*([^\n]+)", args.prompt)
     requested_id = match.group(1).strip() if match else ""
@@ -412,9 +432,17 @@ def main() -> int:
     missing = []
     if capability_id in CAPABILITY_DEPENDENCIES:
         missing = [p for p in CAPABILITY_DEPENDENCIES[capability_id] if not (ROOT / p).exists()]
+
     if missing:
-        print(f"Blocked by unmet dependencies for {capability_id}: {', '.join(missing)}")
-        return 3
+        if args.evidence_dir:
+            evidence_path = Path(args.evidence_dir)
+            if evidence_path.exists():
+                # Re-verify after potential approved-operator intervention.
+                missing = [p for p in missing if not (ROOT / p).exists()]
+
+        if missing:
+            _emit_blocker(capability_id, missing)
+            return 3
 
     if args.repair or requested_id.startswith("repair-"):
         repaired = write_overwrite(ROOT, artifacts)

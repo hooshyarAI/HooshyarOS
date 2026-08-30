@@ -1,4 +1,4 @@
-import { repositoryStateChanged, selectImplementationAgent, buildAgentArgs } from "./LocalConstructionToolset";
+import { repositoryStateChanged, selectImplementationAgent, buildAgentArgs, emitKiloEscalation } from "./LocalConstructionToolset";
 
 describe("LocalConstructionToolset", () => {
     it("reports a real working-tree change instead of trusting process success", () => {
@@ -22,11 +22,34 @@ describe("LocalConstructionToolset", () => {
         expect(selectImplementationAgent("cline", true, true)).toBe(null);
     });
 
-    it("builds the autonomous Kilo command without changing its prompt semantics", () => {
+    it("builds the governed autonomous Kilo command with the verified agent selection", () => {
         expect(buildAgentArgs("kilo", "Implement exactly one capability")).toEqual([
             "run",
+            "--agent",
+            "hooshyar-construction",
             "--auto",
             "Implement exactly one capability"
         ]);
+    });
+
+    it("emits machine-readable HELP_REQUIRED and ESCALATE when Kilo execution fails", () => {
+        const logs: string[] = [];
+        const spy = jest.spyOn(console, "log").mockImplementation((m?: unknown) => {
+            logs.push(String(m));
+        });
+        try {
+            emitKiloEscalation(
+                "platform.user-management",
+                { ok: false, code: 124, output: "", error: "Kilo execution timed out and its process tree was terminated", elapsedMs: 0, observable: true } as never
+            );
+            const joined = logs.join("\n");
+            expect(joined).toContain("HELP_REQUIRED: kilo execution failed or was blocked");
+            expect(joined).toContain("CAPABILITY: platform.user-management");
+            expect(joined).toContain("AGENT: kilo");
+            expect(joined).toContain("EVIDENCE_REQUIRED: Kilo execution timed out and its process tree was terminated");
+            expect(joined).toContain("ESCALATE: approved execution operator may resolve and re-verify");
+        } finally {
+            spy.mockRestore();
+        }
     });
 });

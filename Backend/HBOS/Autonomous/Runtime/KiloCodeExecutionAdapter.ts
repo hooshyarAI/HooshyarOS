@@ -1,6 +1,6 @@
 /// <reference types="node" />
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -47,11 +47,24 @@ const FREE_MODEL_CONFIG = JSON.stringify({
 function candidateCliPaths(): string[] {
     const home = process.env.USERPROFILE || process.env.HOME || "";
     const extensionRoot = join(home, ".vscode", "extensions");
-    return [
-        process.env.KILO_CLI_PATH || "",
-        join(extensionRoot, "kilocode.kilo-code-7.5.6-win32-x64", "bin", "kilo.exe"),
-        join(extensionRoot, "kilocode.kilo-code-7.5.6-win32-x64", "bin", "kilo.cmd")
-    ].filter(Boolean);
+    const candidates: string[] = [];
+    if (process.env.KILO_CLI_PATH) candidates.push(process.env.KILO_CLI_PATH);
+    // Version-agnostic discovery: the Kilo Code VS Code extension version is not
+    // pinned. Any installed `kilocode.kilo-code-*` extension directory is a valid
+    // candidate so the adapter never depends on a hardcoded extension version.
+    try {
+        if (existsSync(extensionRoot)) {
+            for (const entry of readdirSync(extensionRoot)) {
+                if (/^kilocode\.kilo-code-/.test(entry)) {
+                    const dir = join(extensionRoot, entry, "bin");
+                    candidates.push(join(dir, "kilo.exe"), join(dir, "kilo.cmd"));
+                }
+            }
+        }
+    } catch {
+        // Extension root unavailable; `where.exe`/KILO_CLI_PATH remain the fallbacks.
+    }
+    return candidates.filter(Boolean);
 }
 
 function resolveKiloCliPathWithRunner(runner: typeof execFileSync): string | null {
@@ -122,21 +135,35 @@ export function buildWindowsKiloScript(payloadPath: string): string {
         "$stdoutPath = $payload.logPath + '.stdout'",
         "$stderrPath = $payload.logPath + '.stderr'",
         "Remove-Item -LiteralPath $stdoutPath,$stderrPath -Force -ErrorAction SilentlyContinue",
-        "$child = Start-Process -FilePath $payload.command -ArgumentList $payload.args -WorkingDirectory (Get-Location).Path -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath -PassThru -WindowStyle Normal",
-        "Emit-KiloLine (\"PROCESS_STARTED pid=\" + $child.Id + \" command=\" + $payload.command)",
+        "$command = $payload.command",
+        "$extension = [System.IO.Path]::GetExtension($command).ToString().ToLower()",
+        "if ($extension -eq '.cmd' -or $extension -eq '.bat') {",
+        "  $launchCommand = 'cmd.exe'",
+        "  $launchArgs = @('/c', $command) + $payload.args",
+        "} else {",
+        "  $launchCommand = $command",
+        "  $launchArgs = $payload.args",
+        "}",
+        "$child = Start-Process -FilePath $launchCommand -ArgumentList $launchArgs -WorkingDirectory (Get-Location).Path -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath -PassThru -NoNewWindow",
+        "Set-Content -LiteralPath $payload.pidPath -Value $child.Id -NoNewline",
+        "Emit-KiloLine (\"PROCESS_STARTED pid=\" + $child.Id + \" command=\" + $launchCommand)",
         "$stdoutOffset = 0",
         "$stderrOffset = 0",
         "while (-not $child.HasExited) {",
-        "  foreach ($stream in @(@($stdoutPath, 'STDOUT'), @($stderrPath, 'STDERR'))) {",
-        "    $path = $stream[0]; $label = $stream[1]",
-        "    if (Test-Path -LiteralPath $path) {",
-        "      $raw = Read-SharedText $path",
-        "      $offset = if ($label -eq 'STDOUT') { $stdoutOffset } else { $stderrOffset }",
-        "      if ($raw.Length -gt $offset) {",
-        "        $delta = $raw.Substring($offset)",
-        "        $delta -split \"`r?`n\" | ForEach-Object { if ($_) { Emit-KiloLine (\"[\" + $label + \"] \" + $_) } }",
-        "        if ($label -eq 'STDOUT') { $stdoutOffset = $raw.Length } else { $stderrOffset = $raw.Length }",
-        "      }",
+        "  if (Test-Path -LiteralPath $stdoutPath) {",
+        "    $raw = Read-SharedText $stdoutPath",
+        "    if ($raw.Length -gt $stdoutOffset) {",
+        "      $delta = $raw.Substring($stdoutOffset)",
+        "      $delta -split \"`r?`n\" | ForEach-Object { if ($_) { Emit-KiloLine (\"[STDOUT] \" + $_) } }",
+        "      $stdoutOffset = $raw.Length",
+        "    }",
+        "  }",
+        "  if (Test-Path -LiteralPath $stderrPath) {",
+        "    $raw = Read-SharedText $stderrPath",
+        "    if ($raw.Length -gt $stderrOffset) {",
+        "      $delta = $raw.Substring($stderrOffset)",
+        "      $delta -split \"`r?`n\" | ForEach-Object { if ($_) { Emit-KiloLine (\"[STDERR] \" + $_) } }",
+        "      $stderrOffset = $raw.Length",
         "    }",
         "  }",
         "  Emit-KiloLine (\"HEARTBEAT pid=\" + $child.Id + \" state=RUNNING elapsedSeconds=\" + [int]((Get-Date) - $child.StartTime).TotalSeconds)",
@@ -144,15 +171,18 @@ export function buildWindowsKiloScript(payloadPath: string): string {
         "  $child.Refresh()",
         "}",
         "$child.Refresh()",
-        "foreach ($stream in @(@($stdoutPath, 'STDOUT'), @($stderrPath, 'STDERR'))) {",
-        "  $path = $stream[0]; $label = $stream[1]",
-        "  if (Test-Path -LiteralPath $path) {",
-        "    $raw = Read-SharedText $path",
-        "    $offset = if ($label -eq 'STDOUT') { $stdoutOffset } else { $stderrOffset }",
-        "    if ($raw.Length -gt $offset) {",
-        "      $delta = $raw.Substring($offset)",
-        "      $delta -split \"`r?`n\" | ForEach-Object { if ($_) { Emit-KiloLine (\"[\" + $label + \"] \" + $_) } }",
-        "    }",
+        "if (Test-Path -LiteralPath $stdoutPath) {",
+        "  $raw = Read-SharedText $stdoutPath",
+        "  if ($raw.Length -gt $stdoutOffset) {",
+        "    $delta = $raw.Substring($stdoutOffset)",
+        "    $delta -split \"`r?`n\" | ForEach-Object { if ($_) { Emit-KiloLine (\"[STDOUT] \" + $_) } }",
+        "  }",
+        "}",
+        "if (Test-Path -LiteralPath $stderrPath) {",
+        "  $raw = Read-SharedText $stderrPath",
+        "  if ($raw.Length -gt $stderrOffset) {",
+        "    $delta = $raw.Substring($stderrOffset)",
+        "    $delta -split \"`r?`n\" | ForEach-Object { if ($_) { Emit-KiloLine (\"[STDERR] \" + $_) } }",
         "  }",
         "}",
         "$code = $child.ExitCode",
@@ -161,18 +191,56 @@ export function buildWindowsKiloScript(payloadPath: string): string {
     ].join("\r\n");
 }
 
+function processTreePidExists(pid: number): boolean {
+    try {
+        const output = execFileSync(
+            process.env.ComSpec || "cmd.exe",
+            ["/d", "/s", "/c", "tasklist", "/FI", `PID eq ${pid}`, "/FO", "CSV", "/NH"],
+            {
+                encoding: "utf8",
+                windowsHide: true,
+                stdio: ["ignore", "pipe", "ignore"]
+            }
+        );
+        return output
+            .split(/\r?\n/)
+            .some(line => line.split(",").map(cell => cell.replace(/"/g, "").trim()).includes(String(pid)));
+    } catch {
+        return false;
+    }
+}
+
+function killProcessTree(rootPid: number): void {
+    try {
+        execFileSync(
+            process.env.ComSpec || "cmd.exe",
+            ["/d", "/s", "/c", "taskkill", "/PID", String(rootPid), "/T", "/F"],
+            {
+                encoding: "utf8",
+                windowsHide: true,
+                stdio: ["ignore", "pipe", "ignore"]
+            }
+        );
+    } catch {
+        // Tree may have already exited; verification below is authoritative.
+    }
+}
+
 function streamWindowsKilo(invocation: KiloCommand, cwd: string, timeout: number): KiloExecutionResult {
     const started = Date.now();
     const workDir = join(tmpdir(), `hooshyar-kilo-${process.pid}-${started}`);
     mkdirSync(workDir, { recursive: true });
     const progressLogPath = join(workDir, "progress.log");
+    const pidPath = join(workDir, "kilo.pid");
     const payloadPath = join(workDir, "payload.json");
     const scriptPath = join(workDir, "run-kilo.ps1");
 
     writeFileSync(payloadPath, JSON.stringify({
         command: invocation.command,
         args: invocation.args,
-        logPath: progressLogPath
+        logPath: progressLogPath,
+        pidPath,
+        timeout
     }), "utf8");
     writeFileSync(scriptPath, buildWindowsKiloScript(payloadPath), "utf8");
 
@@ -207,20 +275,42 @@ function streamWindowsKilo(invocation: KiloCommand, cwd: string, timeout: number
     const timedOut = String((child.error as any)?.code ?? "") === "ETIMEDOUT";
 
     if (timedOut) {
-        const pidMatch = output.match(/PROCESS_STARTED pid=(\d+)/);
-        if (pidMatch?.[1]) {
-            try {
-                execFileSync(
-                    process.env.ComSpec || "cmd.exe",
-                    ["/d", "/s", "/c", "taskkill", "/PID", pidMatch[1], "/T", "/F"],
-                    {
-                        encoding: "utf8",
-                        windowsHide: true,
-                        stdio: ["ignore", "pipe", "ignore"]
-                    }
-                );
-            } catch {
-                // The child may have exited between timeout and cleanup.
+        const innerPidRaw = existsSync(pidPath) ? readFileSync(pidPath, "utf8").trim() : null;
+        const innerPid = innerPidRaw && /^\d+$/.test(innerPidRaw) ? parseInt(innerPidRaw, 10) : null;
+
+        if (innerPid !== null) {
+            killProcessTree(innerPid);
+        }
+        if (child.pid) {
+            killProcessTree(child.pid);
+        }
+
+        if (innerPid !== null) {
+            const deadline = Date.now() + 5000;
+            let rootGone = false;
+            while (Date.now() < deadline) {
+                if (!processTreePidExists(innerPid)) {
+                    rootGone = true;
+                    break;
+                }
+                try {
+                    execFileSync(
+                        process.env.ComSpec || "cmd.exe",
+                        ["/d", "/s", "/c", "timeout", "/t", "1", "/nobreak"],
+                        { windowsHide: true, stdio: ["ignore", "ignore", "ignore"] }
+                    );
+                } catch {
+                    break;
+                }
+            }
+            if (!rootGone && processTreePidExists(innerPid)) {
+                console.error(JSON.stringify({
+                    type: "AUTONOMOUS_TOOL_ERROR",
+                    event: "TREE_TERMINATION_INCOMPLETE",
+                    provider: "kilo",
+                    rootPid: innerPid,
+                    timestamp: new Date().toISOString()
+                }));
             }
         }
     }
