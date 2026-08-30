@@ -9,7 +9,7 @@ Kilo Code is an approved local VS Code execution/operator layer for HooshyarOS a
 
 ## Role separation
 
-**Python** is the canonical repository-native construction worker and orchestration layer. It owns deterministic discovery, generation, validation, repair orchestration, evidence preparation and re-planning.
+Python is the canonical repository-native construction worker and orchestration layer. It owns deterministic discovery, generation, validation, repair orchestration, evidence preparation and re-planning.
 
 **Kilo Code** is the bounded local execution operator. It may inspect repository state, execute authorized commands, make scoped implementation/repair edits, run focused verification and return evidence.
 
