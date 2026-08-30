@@ -93,6 +93,7 @@ describe("AutonomousBuildDaemon", () => {
                 directives: [],
                 architectureRules: []
             })),
+            nextPlatformMission: jest.fn(() => null),
         } as unknown as AutonomousProjectMission;
 
         const continuation = {
