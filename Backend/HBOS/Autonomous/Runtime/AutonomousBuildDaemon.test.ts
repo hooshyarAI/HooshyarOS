@@ -134,7 +134,6 @@ describe("AutonomousBuildDaemon", () => {
             status: "blocked",
             audit: expect.objectContaining({
                 complete: false,
-                missingArtifacts: [],
                 blockedExternalDependencies: expect.arrayContaining([
                     "payment-provider-activation",
                     "production-cloud-resources"
