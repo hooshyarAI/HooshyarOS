@@ -1,6 +1,6 @@
 import { AutonomousProjectMission, Mission } from "./AutonomousProjectMission";
-import { existsSync, join } from "node:fs";
-import { join as pathJoin } from "node:path";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { AutonomousCapabilityDiscovery } from "./AutonomousCapabilityDiscovery";
 import { CommercialCapabilityDiscovery } from "./CommercialCapabilityDiscovery";
 
@@ -40,7 +40,7 @@ export class AutonomousPlatformContinuation {
         if (canonical) return canonical;
 
         const root = projectMission.snapshot().root;
-        const p = (path: string) => pathJoin(root, path);
+        const p = (path: string) => join(root, path);
         const extensions = [
             {
                 capabilityId: "platform.performance-testing",
