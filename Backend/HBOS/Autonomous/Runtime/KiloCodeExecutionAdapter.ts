@@ -55,16 +55,18 @@ function candidateCliPaths(): string[] {
 }
 
 function resolveKiloCliPathWithRunner(runner: typeof execFileSync): string | null {
+    const locator = process.platform === "win32" ? "where.exe" : "which";
+    const executable = process.platform === "win32" ? "kilo.exe" : "kilo";
     try {
-        const locator = process.platform === "win32" ? "where.exe" : "which";
-        const executable = process.platform === "win32" ? "kilo.exe" : "kilo";
-        const output = runner(locator, [executable], {
+        const output = String(runner(locator, [executable], {
             encoding: "utf8",
             windowsHide: true,
             stdio: ["ignore", "pipe", "ignore"]
-        }).trim().split(/\r?\n/)[0];
+        })).trim().split(/\r?\n/)[0];
         if (output) return output;
-    } catch {}
+    } catch {
+        if (runner !== execFileSync) return null;
+    }
 
     for (const candidate of candidateCliPaths()) {
         if (existsSync(candidate)) return candidate;
@@ -116,12 +118,12 @@ export function buildWindowsKiloScript(payloadPath: string): string {
         "  finally { if ($reader) { $reader.Dispose() } elseif ($stream) { $stream.Dispose() } }",
         "}",
         `$payload = Get-Content -Raw -LiteralPath '${safePayloadPath}' | ConvertFrom-Json`,
-        "Emit-KiloLine '[KILO] EXECUTION_STARTED'",
+        "Emit-KiloLine 'EXECUTION_STARTED'",
         "$stdoutPath = $payload.logPath + '.stdout'",
         "$stderrPath = $payload.logPath + '.stderr'",
         "Remove-Item -LiteralPath $stdoutPath,$stderrPath -Force -ErrorAction SilentlyContinue",
         "$child = Start-Process -FilePath $payload.command -ArgumentList $payload.args -WorkingDirectory (Get-Location).Path -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath -PassThru -WindowStyle Normal",
-        "Emit-KiloLine (\"[KILO] PROCESS_STARTED pid=\" + $child.Id + \" command=\" + $payload.command)",
+        "Emit-KiloLine (\"PROCESS_STARTED pid=\" + $child.Id + \" command=\" + $payload.command)",
         "$stdoutOffset = 0",
         "$stderrOffset = 0",
         "while (-not $child.HasExited) {",
@@ -137,7 +139,7 @@ export function buildWindowsKiloScript(payloadPath: string): string {
         "      }",
         "    }",
         "  }",
-        "  Emit-KiloLine (\"[KILO] HEARTBEAT pid=\" + $child.Id + \" state=RUNNING elapsedSeconds=\" + [int]((Get-Date) - $child.StartTime).TotalSeconds)",
+        "  Emit-KiloLine (\"HEARTBEAT pid=\" + $child.Id + \" state=RUNNING elapsedSeconds=\" + [int]((Get-Date) - $child.StartTime).TotalSeconds)",
         "  Start-Sleep -Seconds 5",
         "  $child.Refresh()",
         "}",
@@ -154,7 +156,7 @@ export function buildWindowsKiloScript(payloadPath: string): string {
         "  }",
         "}",
         "$code = $child.ExitCode",
-        "Emit-KiloLine (\"[KILO] EXECUTION_FINISHED code=\" + $code)",
+        "Emit-KiloLine (\"EXECUTION_FINISHED code=\" + $code)",
         "exit [int]$code"
     ].join("\r\n");
 }
