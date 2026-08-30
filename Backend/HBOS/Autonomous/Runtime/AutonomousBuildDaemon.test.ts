@@ -81,7 +81,7 @@ describe("AutonomousBuildDaemon", () => {
         expect(developmentExecute.mock.calls[0]?.[0]).toEqual(expect.objectContaining(platformMission));
     });
 
-    it("refuses platform completion when final evidence is incomplete", () => {
+    it("blocks on terminal external dependencies after canonical completion evidence is exhausted", () => {
         const mission = {
             snapshot: jest.fn(() => ({ commit: "abc123", clean: true })),
             nextMission: jest.fn(() => ({
@@ -128,10 +128,19 @@ describe("AutonomousBuildDaemon", () => {
 
         expect(result.status).toBe("blocked");
         expect(result.history).toHaveLength(1);
-        expect(execute).toHaveBeenCalledTimes(1);
-        const executedGoal = (execute.mock.calls[0]?.[0] as any);
-        expect(executedGoal.capabilityId).toBe("assistant.completion.evidence");
-        expect(executedGoal.capability).toContain("verification");
+        expect(execute).not.toHaveBeenCalled();
+        expect(result.history[0]).toEqual(expect.objectContaining({
+            cycle: 1,
+            status: "blocked",
+            audit: expect.objectContaining({
+                complete: false,
+                missingArtifacts: [],
+                blockedExternalDependencies: expect.arrayContaining([
+                    "payment-provider-activation",
+                    "production-cloud-resources"
+                ])
+            })
+        }));
     });
 
     it("reports assistant and autonomous construction completion separately from commercial product completion", () => {
