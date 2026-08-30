@@ -40,9 +40,6 @@ const GOVERNED_OPERATOR_PROMPT = [
     "A successful run ends with concrete implementation/test/document changes or an explicit idempotent conclusion; exploration without a decision is not success."
 ].join("\n");
 
-// Kilo's repository-local agent files are the single source of truth for tool
-// permissions and step budgets. The runtime must not inject a second agent
-// definition because that can shadow the repository policy and deny valid reads.
 const FREE_MODEL_CONFIG = JSON.stringify({
     model: "kilo/kilo-auto/free"
 });
@@ -57,11 +54,11 @@ function candidateCliPaths(): string[] {
     ].filter(Boolean);
 }
 
-export function resolveKiloCliPath(): string | null {
+function resolveKiloCliPathWithRunner(runner: typeof execFileSync): string | null {
     try {
         const locator = process.platform === "win32" ? "where.exe" : "which";
         const executable = process.platform === "win32" ? "kilo.exe" : "kilo";
-        const output = execFileSync(locator, [executable], {
+        const output = runner(locator, [executable], {
             encoding: "utf8",
             windowsHide: true,
             stdio: ["ignore", "pipe", "ignore"]
@@ -74,6 +71,10 @@ export function resolveKiloCliPath(): string | null {
     }
 
     return null;
+}
+
+export function resolveKiloCliPath(): string | null {
+    return resolveKiloCliPathWithRunner(execFileSync);
 }
 
 function buildEnvironment(): NodeJS.ProcessEnv {
@@ -98,6 +99,11 @@ export function buildWindowsKiloScript(payloadPath: string): string {
     const safePayloadPath = payloadPath.replace(/'/g, "''");
     return [
         "$ErrorActionPreference = 'Continue'",
+        "function Emit-KiloLine([string]$line) {",
+        "  if (-not $line) { return }",
+        "  Add-Content -LiteralPath $payload.logPath -Value $line",
+        "  Write-Host (\"[KILO] \" + $line)",
+        "}",
         "function Read-SharedText([string]$path) {",
         "  if (-not (Test-Path -LiteralPath $path)) { return '' }",
         "  $stream = $null",
@@ -110,11 +116,12 @@ export function buildWindowsKiloScript(payloadPath: string): string {
         "  finally { if ($reader) { $reader.Dispose() } elseif ($stream) { $stream.Dispose() } }",
         "}",
         `$payload = Get-Content -Raw -LiteralPath '${safePayloadPath}' | ConvertFrom-Json`,
+        "Emit-KiloLine '[KILO] EXECUTION_STARTED'",
         "$stdoutPath = $payload.logPath + '.stdout'",
         "$stderrPath = $payload.logPath + '.stderr'",
         "Remove-Item -LiteralPath $stdoutPath,$stderrPath -Force -ErrorAction SilentlyContinue",
         "$child = Start-Process -FilePath $payload.command -ArgumentList $payload.args -WorkingDirectory (Get-Location).Path -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath -PassThru -WindowStyle Normal",
-        "Write-Host (\"[KILO] PROCESS_STARTED pid=\" + $child.Id + \" command=\" + $payload.command)",
+        "Emit-KiloLine (\"[KILO] PROCESS_STARTED pid=\" + $child.Id + \" command=\" + $payload.command)",
         "$stdoutOffset = 0",
         "$stderrOffset = 0",
         "while (-not $child.HasExited) {",
@@ -125,12 +132,12 @@ export function buildWindowsKiloScript(payloadPath: string): string {
         "      $offset = if ($label -eq 'STDOUT') { $stdoutOffset } else { $stderrOffset }",
         "      if ($raw.Length -gt $offset) {",
         "        $delta = $raw.Substring($offset)",
-        "        foreach ($line in ($delta -split \"`r?`n\")) { if ($line) { Write-Host (\"[KILO] [\" + $label + \"] \" + $line) } }",
+        "        $delta -split \"`r?`n\" | ForEach-Object { if ($_) { Emit-KiloLine (\"[\" + $label + \"] \" + $_) } }",
         "        if ($label -eq 'STDOUT') { $stdoutOffset = $raw.Length } else { $stderrOffset = $raw.Length }",
         "      }",
         "    }",
         "  }",
-        "  Write-Host (\"[KILO] HEARTBEAT pid=\" + $child.Id + \" state=RUNNING elapsedSeconds=\" + [int]((Get-Date) - $child.StartTime).TotalSeconds)",
+        "  Emit-KiloLine (\"[KILO] HEARTBEAT pid=\" + $child.Id + \" state=RUNNING elapsedSeconds=\" + [int]((Get-Date) - $child.StartTime).TotalSeconds)",
         "  Start-Sleep -Seconds 5",
         "  $child.Refresh()",
         "}",
@@ -142,12 +149,12 @@ export function buildWindowsKiloScript(payloadPath: string): string {
         "    $offset = if ($label -eq 'STDOUT') { $stdoutOffset } else { $stderrOffset }",
         "    if ($raw.Length -gt $offset) {",
         "      $delta = $raw.Substring($offset)",
-        "      foreach ($line in ($delta -split \"`r?`n\")) { if ($line) { Write-Host (\"[KILO] [\" + $label + \"] \" + $line) } }",
+        "      $delta -split \"`r?`n\" | ForEach-Object { if ($_) { Emit-KiloLine (\"[\" + $label + \"] \" + $_) } }",
         "    }",
         "  }",
         "}",
         "$code = $child.ExitCode",
-        "Write-Host (\"[KILO] PROCESS_FINISHED pid=\" + $child.Id + \" code=\" + $code)",
+        "Emit-KiloLine (\"[KILO] EXECUTION_FINISHED code=\" + $code)",
         "exit [int]$code"
     ].join("\r\n");
 }
@@ -227,7 +234,7 @@ export class KiloCodeExecutionAdapter {
     constructor(private readonly runner = execFileSync) {}
 
     resolveCliPath(): string | null {
-        return resolveKiloCliPath();
+        return resolveKiloCliPathWithRunner(this.runner);
     }
 
     isAvailable(): boolean {
