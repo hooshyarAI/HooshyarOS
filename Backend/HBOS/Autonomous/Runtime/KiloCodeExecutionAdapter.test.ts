@@ -4,7 +4,7 @@ describe("KiloCodeExecutionAdapter", () => {
     it("builds the governed autonomous CLI invocation with the verified free model", () => {
         const invocation = kiloInvocation("win32", "Implement one capability");
 
-        expect(invocation.args).toEqual(["run", "--auto", "Implement one capability"]);
+        expect(invocation.args).toEqual(["run", "--agent", "hooshyar-construction", "--auto", "Implement one capability"]);
         expect(invocation.shell).toBe(false);
         expect(invocation.env.KILO_CONFIG_CONTENT).toContain("kilo/kilo-auto/free");
         expect(invocation.env.KILO_CONFIG_CONTENT).not.toContain("gemini-3-pro-image");
@@ -21,7 +21,7 @@ describe("KiloCodeExecutionAdapter", () => {
         expect(result.observable).toBe(false);
         expect(runner).toHaveBeenCalledWith(
             expect.any(String),
-            ["run", "--auto", prompt],
+            ["run", "--agent", "hooshyar-construction", "--auto", prompt],
             expect.objectContaining({
                 shell: false,
                 cwd: process.cwd(),
@@ -39,7 +39,7 @@ describe("KiloCodeExecutionAdapter", () => {
         expect(adapter.isAvailable()).toBe(true);
         expect(runner).toHaveBeenCalledWith(
             process.platform === "win32" ? "where.exe" : "which",
-            ["kilo.exe"],
+            [process.platform === "win32" ? "kilo.exe" : "kilo"],
             expect.objectContaining({ stdio: ["ignore", "pipe", "ignore"] })
         );
     });
