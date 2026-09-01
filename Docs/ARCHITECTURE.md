@@ -1,8 +1,8 @@
 # HooshyarOS Architecture Document
 
 Version: 1.0  
-Architecture: HBOS Core Architecture  
-Status: Architecture Freeze V4
+Architecture: HBOS Core Architecture
+Status: Architecture Freeze V4.1
 
 
 # 1. Overview
@@ -30,13 +30,49 @@ HBOS provides the foundation for:
 
 The main architecture principle:
 
-Everything is an Engine.
+Every canonical product capability must have exactly one canonical owner.
 
+Canonical intelligence capabilities are implemented as canonical Engines.
+Supporting services, platform services, adapters, integrations and infrastructure components are permitted when their responsibility, ownership, interface, authority and dependency boundaries are explicit.
 
-Every capability inside HooshyarOS must be implemented as an independent Engine.
+One Capability
+=
 
+One Canonical Owner
+=
 
-Each Engine must have:
+Explicit Authority
+=
+
+Explicit Contract
+=
+
+Explicit Dependency Direction
+=
+
+Testable Evidence
+
+Canonical Intelligence Engines:
+- ReasoningEngine
+- GovernanceEngine
+- ExecutiveIntelligenceEngine
+- OrganizationalIntelligenceEngine
+- AutonomousOperationsEngine
+
+Supporting Services:
+- MemoryEngine
+- KnowledgeEngine
+- ProjectPilotEngine
+- ReactionEngine
+
+Platform Services (NOT required to implement Engine interface):
+- AssistantEngine
+
+Legacy/Transitional:
+- DecisionEngine (canonical supporting decision capability)
+- DecisionIntelligenceEngine (dormant/transitional extension)
+
+Each canonical Engine must have:
 
 
 - Identity
@@ -49,20 +85,22 @@ Each Engine must have:
 
 Architecture rule:
 
-
 One Capability
-
 =
 
-One Engine
-
+One Canonical Owner
 =
 
-One Test
-
+Explicit Authority
 =
 
-One Commit
+Explicit Contract
+=
+
+Explicit Dependency Direction
+=
+
+Testable Evidence
 
 
 
@@ -242,7 +280,7 @@ Implemented
 
 Role:
 
-Decision support system.
+Canonical supporting decision capability.
 
 
 Functions:
@@ -294,7 +332,7 @@ Implemented
 
 Role:
 
-Human interaction layer.
+Platform / interaction service.
 
 
 Functions:
@@ -390,6 +428,24 @@ Status:
 Implemented
 
 
+
+---
+
+## Decision Intelligence Engine
+
+Role:
+
+Dormant / transitional extension.
+No verified consumers.
+Not canonical.
+
+Functions:
+
+- Placeholder for future intelligence integration (not implemented)
+
+Status:
+
+Dormant
 
 ---
 

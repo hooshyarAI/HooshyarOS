@@ -2,7 +2,7 @@
 
 ## Mission
 
-Build HooshyarOS as an intelligent financial operating system.
+Build HooshyarOS as an Enterprise Intelligence Platform that helps organizations make better decisions and execute them effectively across financial, managerial, organizational and operational domains. Financial intelligence is a core domain.
 
 AI agents must follow architecture rules.
 
@@ -11,7 +11,7 @@ AI agents must follow architecture rules.
 # Development Rules
 
 ## Rule 1
-One Capability = One Module
+One Capability = One Engine = One Test = One Commit
 
 هر قابلیت باید ماژول مستقل داشته باشد.
 
@@ -24,16 +24,6 @@ Tax Engine
 
 ---
 
-## Rule 2
-One Engine =
-
-- Class
-- Interface
-- Test
-- Documentation
-
-
----
 
 ## Rule 3
 No Direct Architecture Change
