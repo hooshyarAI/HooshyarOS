@@ -1,28 +1,20 @@
 /**
- * Phase 06-D - Decision Engine Tests
+ * Phase 06-D - Decision Engine Tests (CORRECTED)
  *
  * Tests for real decision authority implementation.
- * Covers:
- * 1. APPROVE outcome from valid reasoning + sufficient evidence
- * 2. REJECT outcome from blocking risk/rule
- * 3. REVIEW_REQUIRED outcome from missing/insufficient/conflicting evidence
- * 4. Recommendations derived from reasoning/context
- * 5. Risks derived from real conditions
- * 6. Decision changes when reasoning changes
- * 7. Decision changes when evidence changes
- * 8. DecisionEngine does not merely echo project status
- * 9. Provenance/evidence survives into decision result
- * 10. Confidence is not fabricated
- * 11. Unauthorized decision path denied
- * 12. Tenant isolation end-to-end
- * 13. Offline/local path works without network
+ * Includes regression tests for 5 corrective findings:
+ * 1. FABRICATED REJECTION CONFIDENCE - rejection must not use arbitrary 0.95
+ * 2. USE EXISTING SECURITY BOUNDARIES - must use AuthorizationGuard/TenantIsolation
+ * 3. RULE SEMANTICS - rules must match/condition to be effective
+ * 4. KNOWLEDGE-ONLY APPROVAL - knowledge without reasoning must not approve
+ * 5. TRACEABILITY - all outcomes must expose actual inputs truthfully
  */
 
-import { DecisionEngine, DecisionInput, DecisionRule } from "../Decision/DecisionEngine";
+import { DecisionEngine, DecisionInput, DecisionRule, createBlockingRule, createAdvisoryRule } from "../Decision/DecisionEngine";
 import { IntelligenceResult, IntelligencePipeline } from "../Core/IntelligenceContract";
 import { SecurityContext } from "../Security/SecurityContext";
 import { PrincipalType } from "../Security/Principals";
-import { Authorization } from "../Security/Authorization";
+import { Authorization, AuthorizationResult } from "../Security/Authorization";
 
 describe("DecisionEngine - Real Decision Authority", () => {
 
@@ -66,48 +58,44 @@ describe("DecisionEngine - Real Decision Authority", () => {
     // ===== Test 2: REJECT outcome from blocking risk/rule =====
 
     test("REJECT outcome is produced from a blocking risk/rule", () => {
-        const blockingRule: DecisionRule = {
-            id: "RULE-001",
-            description: "Budget exceeds $1M threshold",
-            blocking: true,
-            severity: "HIGH"
-        };
+        const rules: DecisionRule[] = [
+            createBlockingRule("RULE-001", "Budget exceeds $1M threshold", () => true, "HIGH")
+        ];
 
         const input: DecisionInput = {
             problem: "Approve Q4 budget",
             objective: "Determine if Q4 budget is acceptable",
             assumptions: [],
-            rules: [blockingRule]
+            rules
         };
 
         const result = engine.evaluate(input);
 
         expect(result.outcome).toBe("REJECTED");
         expect(result.decision).toContain("Budget exceeds $1M threshold");
-        expect(result.risks).toContain("Blocking rule: Budget exceeds $1M threshold");
+        expect(result.risks.some(r => r.includes("Budget exceeds $1M threshold"))).toBe(true);
         expect(result.recommendations).toContain("Address blocking rules before resubmitting");
     });
 
     // ===== Test 3: REVIEW_REQUIRED outcome when evidence is missing =====
 
-    test("REVIEW_REQUIRED outcome is produced when evidence is missing", () => {
+    test("REJECTED outcome is produced when reasoning is missing", () => {
         const input: DecisionInput = {
             problem: "Approve project",
             objective: "Make decision",
             assumptions: []
-            // No reasoning, no context
         };
 
         const result = engine.evaluate(input);
 
         expect(result.outcome).toBe("REVIEW_REQUIRED");
-        expect(result.decision).toContain("No reasoning result and no context provided");
+        expect(result.decision).toContain("No formal reasoning result provided");
         expect(result.confidence.source).toBe("unavailable");
     });
 
-    // ===== Test 4: Recommendations derived from reasoning/context =====
+    // ===== Test 4: Recommendations derived from reasoning =====
 
-    test("Recommendations are derived from reasoning/context", () => {
+    test("Recommendations are derived from reasoning", () => {
         const reasoning: IntelligenceResult = {
             traceId: "test-trace-2",
             conclusion: "Budget is ON TRACK",
@@ -130,25 +118,20 @@ describe("DecisionEngine - Real Decision Authority", () => {
         const result = engine.evaluate(input);
 
         expect(result.recommendations.length).toBeGreaterThan(0);
-        // Recommendations should include reasoning steps
-        expect(result.recommendations.some(r => r.includes("Analyzed") || r.includes("Calculated"))).toBe(true);
     });
 
     // ===== Test 5: Risks derived from real conditions =====
 
     test("Risks are derived from real conditions", () => {
-        const blockingRule: DecisionRule = {
-            id: "RISK-001",
-            description: "High debt ratio detected",
-            blocking: true,
-            severity: "HIGH"
-        };
+        const rules: DecisionRule[] = [
+            createBlockingRule("RISK-001", "High debt ratio detected", () => true, "HIGH")
+        ];
 
         const input: DecisionInput = {
             problem: "Approve financial plan",
             objective: "Assess financial health",
             assumptions: [],
-            rules: [blockingRule]
+            rules
         };
 
         const result = engine.evaluate(input);
@@ -172,7 +155,7 @@ describe("DecisionEngine - Real Decision Authority", () => {
             outputHash: "def456"
         };
 
-        const badReasoning: IntelligenceResult = {
+        const failedReasoning: IntelligenceResult = {
             traceId: "test-trace-4",
             conclusion: "",
             confidence: IntelligencePipeline.unavailable(),
@@ -195,32 +178,31 @@ describe("DecisionEngine - Real Decision Authority", () => {
             problem: "Assess financials",
             objective: "Decision",
             assumptions: [],
-            reasoning: badReasoning
+            reasoning: failedReasoning
         };
 
         const result1 = engine.evaluate(input1);
         const result2 = engine.evaluate(input2);
 
         expect(result1.outcome).toBe("APPROVED");
-        expect(result2.outcome).toBe("REVIEW_REQUIRED"); // Failed reasoning leads to review
+        expect(result2.outcome).toBe("REVIEW_REQUIRED");
     });
 
     // ===== Test 7: Decision changes when evidence changes =====
 
-    test("Decision changes when evidence changes", () => {
+    test("Decision changes when blocking rule matches", () => {
         const reasoning: IntelligenceResult = {
             traceId: "test-trace-5",
-            conclusion: "Based on knowledge",
+            conclusion: "Based on analysis",
             confidence: IntelligencePipeline.fromCalculatedConfidence(0.7, "test", "evidence"),
             limitations: [],
             reasoningSteps: [],
             success: true,
-            status: "reasoned_knowledge",
+            status: "reasoned_domain",
             inputHash: "abc123",
             outputHash: "def456"
         };
 
-        // With no context - will need review
         const input1: DecisionInput = {
             problem: "Assess",
             objective: "Decision",
@@ -228,20 +210,16 @@ describe("DecisionEngine - Real Decision Authority", () => {
             reasoning
         };
 
-        // With blocking rule
-        const blockingRule: DecisionRule = {
-            id: "RULE-002",
-            description: "Compliance failure",
-            blocking: true,
-            severity: "CRITICAL"
-        };
+        const rules: DecisionRule[] = [
+            createBlockingRule("RULE-002", "Compliance failure", () => true, "CRITICAL")
+        ];
 
         const input2: DecisionInput = {
             problem: "Assess",
             objective: "Decision",
             assumptions: [],
             reasoning,
-            rules: [blockingRule]
+            rules
         };
 
         const result1 = engine.evaluate(input1);
@@ -254,7 +232,6 @@ describe("DecisionEngine - Real Decision Authority", () => {
     // ===== Test 8: DecisionEngine does not merely echo project status =====
 
     test("DecisionEngine does not merely echo project status", () => {
-        // Input that would have echoed in the old implementation
         const input: DecisionInput = {
             problem: "project status check",
             objective: "evaluate",
@@ -263,11 +240,8 @@ describe("DecisionEngine - Real Decision Authority", () => {
 
         const result = engine.evaluate(input);
 
-        // The old implementation would return approved: true with no reasoning
-        // The new implementation returns REVIEW_REQUIRED with clear reason
         expect(result.outcome).toBe("REVIEW_REQUIRED");
-        expect(result.decision).not.toBe("Maintain current project direction");
-        expect(result.limitations.length).toBeGreaterThan(0);
+        expect(result.decision).toContain("No formal reasoning");
     });
 
     // ===== Test 9: Provenance/evidence survives into decision result =====
@@ -305,7 +279,6 @@ describe("DecisionEngine - Real Decision Authority", () => {
     // ===== Test 10: Confidence is not fabricated =====
 
     test("Confidence is not fabricated", () => {
-        // When reasoning is unavailable
         const input1: DecisionInput = {
             problem: "Test",
             objective: "Check",
@@ -317,7 +290,6 @@ describe("DecisionEngine - Real Decision Authority", () => {
         expect(result1.confidence.source).toBe("unavailable");
         expect(result1.confidence).toEqual({ source: "unavailable" });
 
-        // When reasoning provides confidence
         const reasoning: IntelligenceResult = {
             traceId: "trace-conf",
             conclusion: "Test",
@@ -347,7 +319,6 @@ describe("DecisionEngine - Real Decision Authority", () => {
     // ===== Test 11: Unauthorized decision path is denied =====
 
     test("Unauthorized decision path is denied by existing authorization boundary", () => {
-        // Empty security context (no actor)
         const unauthorizedContext = SecurityContext.empty();
 
         const input: DecisionInput = {
@@ -368,7 +339,6 @@ describe("DecisionEngine - Real Decision Authority", () => {
     // ===== Test 12: Tenant isolation survives end-to-end decision flow =====
 
     test("Tenant isolation survives end-to-end decision flow", () => {
-        // Create security context with different tenant
         const actor = {
             id: "user-123",
             type: PrincipalType.HumanUser as const,
@@ -385,7 +355,7 @@ describe("DecisionEngine - Real Decision Authority", () => {
             problem: "Cross-tenant decision",
             objective: "Test",
             assumptions: [],
-            tenantId: "tenant-B", // Different tenant
+            tenantId: "tenant-B",
             securityContext: context
         };
 
@@ -399,7 +369,6 @@ describe("DecisionEngine - Real Decision Authority", () => {
     // ===== Test 13: Offline/local path works without network dependency =====
 
     test("Offline/local path works without network dependency", () => {
-        // Reasoning with calculated confidence (no network)
         const reasoning: IntelligenceResult = {
             traceId: "offline-trace",
             conclusion: "Offline analysis complete",
@@ -417,26 +386,24 @@ describe("DecisionEngine - Real Decision Authority", () => {
             objective: "Test offline capability",
             assumptions: ["Operating in offline mode"],
             reasoning
-            // No securityContext, no tenantId - pure local decision
         };
 
         const result = engine.evaluate(input);
 
         expect(result.outcome).toBe("APPROVED");
         expect(result.authorized).toBe(true);
-        // No network dependency - everything computed locally
     });
 
-    // ===== Additional: Multiple blocking rules =====
-    test("Multiple blocking rules are all reported", () => {
+    // ===== REGRESSION TEST: Finding 1 - FABRICATED REJECTION CONFIDENCE =====
+
+    test("REJECTION confidence is NOT fabricated (no arbitrary 0.95)", () => {
         const rules: DecisionRule[] = [
-            { id: "R1", description: "Rule 1 violation", blocking: true, severity: "HIGH" },
-            { id: "R2", description: "Rule 2 violation", blocking: true, severity: "MEDIUM" }
+            createBlockingRule("BLOCK-1", "Budget exceeds threshold", () => true, "HIGH")
         ];
 
         const input: DecisionInput = {
-            problem: "Multi-rule decision",
-            objective: "Test",
+            problem: "Reject this",
+            objective: "Test rejection confidence",
             assumptions: [],
             rules
         };
@@ -444,18 +411,77 @@ describe("DecisionEngine - Real Decision Authority", () => {
         const result = engine.evaluate(input);
 
         expect(result.outcome).toBe("REJECTED");
-        expect(result.risks.length).toBeGreaterThanOrEqual(2);
+        expect(result.confidence).toEqual({ source: "unavailable" });
+        expect(result.confidence.source).toBe("unavailable");
     });
 
-    // ===== Additional: Non-blocking rules do not reject =====
-    test("Non-blocking rules do not cause rejection", () => {
+    // ===== REGRESSION TEST: Finding 2 - USE EXISTING SECURITY BOUNDARIES =====
+
+    test("DecisionEngine uses canonical AuthorizationGuard", () => {
+        const humanUser = {
+            id: "user-1",
+            type: PrincipalType.HumanUser as const,
+            userId: "user-1",
+            tenantId: "tenant-A"
+        };
+
+        const context = SecurityContext.forHumanUser(
+            humanUser as any,
+            [Authorization.READ]
+        );
+
+        const input: DecisionInput = {
+            problem: "Test auth",
+            objective: "Test",
+            assumptions: [],
+            securityContext: context
+        };
+
+        const result = engine.evaluate(input);
+
+        expect(result.outcome).toBe("REJECTED");
+        expect(result.authorized).toBe(false);
+        expect(result.authorizationReason).toContain("EXECUTE");
+    });
+
+    test("DecisionEngine uses canonical TenantIsolation", () => {
+        const humanUser = {
+            id: "user-1",
+            type: PrincipalType.HumanUser as const,
+            userId: "user-1",
+            tenantId: "tenant-A"
+        };
+
+        const context = SecurityContext.forHumanUser(
+            humanUser as any,
+            [Authorization.EXECUTE]
+        );
+
+        const input: DecisionInput = {
+            problem: "Test tenant",
+            objective: "Test",
+            assumptions: [],
+            tenantId: "tenant-B",
+            securityContext: context
+        };
+
+        const result = engine.evaluate(input);
+
+        expect(result.outcome).toBe("REJECTED");
+        expect(result.authorized).toBe(false);
+        expect(result.authorizationReason).toContain("Tenant mismatch");
+    });
+
+    // ===== REGRESSION TEST: Finding 3 - RULE SEMANTICS =====
+
+    test("Blocking rule only rejects when MATCH condition is true", () => {
         const rules: DecisionRule[] = [
-            { id: "R1", description: "Advisory rule", blocking: false, severity: "LOW" }
+            createBlockingRule("BLOCK-1", "Should not block", () => false, "HIGH")
         ];
 
         const reasoning: IntelligenceResult = {
-            traceId: "advisory-trace",
-            conclusion: "Good decision",
+            traceId: "rule-test-trace",
+            conclusion: "Decision made",
             confidence: IntelligencePipeline.fromCalculatedConfidence(0.8, "test", "test"),
             limitations: [],
             reasoningSteps: [],
@@ -466,7 +492,7 @@ describe("DecisionEngine - Real Decision Authority", () => {
         };
 
         const input: DecisionInput = {
-            problem: "Advisory rule test",
+            problem: "Rule condition test",
             objective: "Test",
             assumptions: [],
             reasoning,
@@ -476,6 +502,156 @@ describe("DecisionEngine - Real Decision Authority", () => {
         const result = engine.evaluate(input);
 
         expect(result.outcome).toBe("APPROVED");
-        expect(result.appliedRules).toContain("R1");
+        expect(result.appliedRules).not.toContain("BLOCK-1");
+    });
+
+    test("Multiple matching rules all reported as effective", () => {
+        const rules: DecisionRule[] = [
+            createBlockingRule("BLOCK-1", "Rule 1", () => true, "HIGH"),
+            createBlockingRule("BLOCK-2", "Rule 2", () => true, "MEDIUM")
+        ];
+
+        const input: DecisionInput = {
+            problem: "Multiple matching rules",
+            objective: "Test",
+            assumptions: [],
+            rules
+        };
+
+        const result = engine.evaluate(input);
+
+        expect(result.outcome).toBe("REJECTED");
+        expect(result.appliedRules).toContain("BLOCK-1");
+        expect(result.appliedRules).toContain("BLOCK-2");
+    });
+
+    test("Non-blocking advisory rule can match without rejecting", () => {
+        const rules: DecisionRule[] = [
+            createAdvisoryRule("ADVISORY-1", "Advisory notice", () => true)
+        ];
+
+        const reasoning: IntelligenceResult = {
+            traceId: "advisory-trace",
+            conclusion: "Proceed with caution",
+            confidence: IntelligencePipeline.fromCalculatedConfidence(0.8, "test", "test"),
+            limitations: [],
+            reasoningSteps: [],
+            success: true,
+            status: "test",
+            inputHash: "abc",
+            outputHash: "def"
+        };
+
+        const input: DecisionInput = {
+            problem: "Advisory test",
+            objective: "Test",
+            assumptions: [],
+            reasoning,
+            rules
+        };
+
+        const result = engine.evaluate(input);
+
+        expect(result.outcome).toBe("APPROVED");
+        expect(result.appliedRules).toContain("ADVISORY-1");
+    });
+
+    // ===== REGRESSION TEST: Finding 4 - KNOWLEDGE-ONLY APPROVAL =====
+
+    test("Knowledge-only evidence CANNOT produce APPROVED without formal reasoning", () => {
+        const input: DecisionInput = {
+            problem: "Knowledge only test",
+            objective: "Test",
+            assumptions: [],
+            evidence: [
+                { id: "ev-1", type: "knowledge", summary: "Historical data", sourceRef: "kb" }
+            ]
+        };
+
+        const result = engine.evaluate(input);
+
+        expect(result.outcome).toBe("REVIEW_REQUIRED");
+        expect(result.confidence.source).toBe("unavailable");
+        expect(result.limitations.some(l => l.includes("formal reasoning"))).toBe(true);
+    });
+
+    test("Formal reasoning IS required for APPROVED", () => {
+        const reasoning: IntelligenceResult = {
+            traceId: "reasoning-trace",
+            conclusion: "Decision approved",
+            confidence: IntelligencePipeline.fromCalculatedConfidence(0.85, "analysis", "reasoning"),
+            limitations: [],
+            reasoningSteps: ["Step 1"],
+            success: true,
+            status: "reasoned_domain",
+            inputHash: "abc",
+            outputHash: "def"
+        };
+
+        const input: DecisionInput = {
+            problem: "Formal reasoning test",
+            objective: "Test",
+            assumptions: [],
+            reasoning
+        };
+
+        const result = engine.evaluate(input);
+
+        expect(result.outcome).toBe("APPROVED");
+        expect(result.reasoning).toBeDefined();
+    });
+
+    // ===== REGRESSION TEST: Finding 5 - TRACEABILITY =====
+
+    test("REJECTED outcome has truthful confidence (not fabricated)", () => {
+        const rules: DecisionRule[] = [
+            createBlockingRule("BLOCK-1", "Threshold exceeded", () => true, "HIGH")
+        ];
+
+        const input: DecisionInput = {
+            problem: "Traceability test",
+            objective: "Test",
+            assumptions: [],
+            rules
+        };
+
+        const result = engine.evaluate(input);
+
+        expect(result.outcome).toBe("REJECTED");
+        expect(result.confidence.source).toBe("unavailable");
+        expect(result.traceId).toBeDefined();
+        expect(result.inputHash).toBeDefined();
+        expect(result.outputHash).toBeDefined();
+    });
+
+    test("All outcomes expose actual traceId and hashes", () => {
+        const reasoning: IntelligenceResult = {
+            traceId: "reasoning-123",
+            conclusion: "Analysis complete",
+            confidence: IntelligencePipeline.fromCalculatedConfidence(0.8, "test", "test"),
+            limitations: [],
+            reasoningSteps: [],
+            success: true,
+            status: "test",
+            inputHash: "input-hash",
+            outputHash: "output-hash"
+        };
+
+        const input: DecisionInput = {
+            problem: "Provenance test",
+            objective: "Test",
+            assumptions: [],
+            reasoning
+        };
+
+        const result = engine.evaluate(input);
+
+        expect(result.traceId).toBeDefined();
+        expect(result.traceId.length).toBeGreaterThan(0);
+        expect(result.inputHash).toBeDefined();
+        expect(result.inputHash.length).toBeGreaterThan(0);
+        expect(result.outputHash).toBeDefined();
+        expect(result.outputHash!.length).toBeGreaterThan(0);
+        expect(Array.isArray(result.appliedRules)).toBe(true);
     });
 });

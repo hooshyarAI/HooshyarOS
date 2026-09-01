@@ -1,29 +1,31 @@
 /**
- * Phase 06-D - Real Decision Authority
+ * Phase 06-D - Real Decision Authority (CORRECTED)
  *
  * DecisionEngine is the canonical decision authority that transforms:
  * - Reasoning results (from IntelligenceEngine)
- * - Knowledge/context (from KnowledgeEngine)
+ * - Evidence
  * - Applicable rules/constraints
  * - Security context
  *
  * Into explicit decisions: APPROVE, REJECT, or REVIEW_REQUIRED
  *
  * Design principles:
- * - Decisions transform reasoning/context, not echo status
- * - No fabrication: confidence, risks, recommendations from actual inputs
- * - Authorization enforcement via existing AuthorizationGuard
- * - Tenant isolation via existing TenantIsolation
+ * - Decisions transform reasoning/evidence, not echo status
+ * - No fabrication: confidence from actual sources only
+ * - Authorization enforcement via canonical AuthorizationGuard
+ * - Tenant isolation via canonical TenantIsolation
+ * - Rules must match/condition to be effective
+ * - Knowledge informs but does not replace formal reasoning
  * - Provenance/evidence preserved through pipeline
  * - Security events logged for denials/rejections
  * - Offline-capable (no network dependency)
  */
 
 import { Authorization, AuthorizationResult } from "../Security/Authorization";
-import { AuthorizationGuard } from "../Security/AuthorizationGuard";
+import { AuthorizationGuard, AuthorizationGuardResult } from "../Security/AuthorizationGuard";
 import { PrincipalType } from "../Security/Principals";
 import { SecurityContext } from "../Security/SecurityContext";
-import { TenantIsolation } from "../Security/TenantIsolation";
+import { TenantIsolation, TenantResource } from "../Security/TenantIsolation";
 import { ProvenanceTrace } from "../Core/ProvenanceTrace";
 import { IntelligenceResult, TruthfulConfidence, IntelligencePipeline } from "../Core/IntelligenceContract";
 import { IntelligenceContext } from "../Core/IntelligenceContract";
@@ -35,17 +37,30 @@ import { SecurityEventLogger } from "../Entities/SecurityEventLogger";
 export type DecisionOutcome = "APPROVED" | "REJECTED" | "REVIEW_REQUIRED";
 
 /**
- * A decision rule or constraint
+ * Rule condition result
+ */
+export interface RuleMatchResult {
+    readonly matched: boolean;
+    readonly reason?: string;
+}
+
+/**
+ * A decision rule or constraint with explicit matching condition
  */
 export interface DecisionRule {
     readonly id: string;
     readonly description: string;
     readonly blocking: boolean; // If true, matching this rule REJECTS the decision
     readonly severity?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+    /**
+     * Evaluate if this rule applies to the given input
+     * Only rules where match() returns { matched: true } are effective
+     */
+    readonly match: (input: DecisionInput) => RuleMatchResult;
 }
 
 /**
- * Extended decision input with reasoning/context/evidence
+ * Extended decision input with reasoning/evidence
  */
 export interface DecisionInput {
     /** The decision problem/question */
@@ -56,13 +71,24 @@ export interface DecisionInput {
     readonly assumptions: readonly string[];
     /** Optional reasoning result from IntelligenceEngine */
     readonly reasoning?: IntelligenceResult;
-    /** Optional knowledge/context from KnowledgeEngine */
-    readonly context?: IntelligenceContext;
+    /** Optional evidence items (e.g., financial data, knowledge) */
+    readonly evidence?: readonly EvidenceItem[];
     /** Optional applicable rules/constraints */
     readonly rules?: readonly DecisionRule[];
     /** Optional security context for authorization */
     readonly securityContext?: SecurityContext;
     /** Tenant context for tenant-scoped decisions */
+    readonly tenantId?: string;
+}
+
+/**
+ * Evidence item for decision
+ */
+export interface EvidenceItem {
+    readonly id: string;
+    readonly type: string;
+    readonly summary: string;
+    readonly sourceRef: string;
     readonly tenantId?: string;
 }
 
@@ -103,7 +129,7 @@ export interface DecisionResult {
 /**
  * Decision engine - canonical decision authority
  *
- * Transforms reasoning/context/evidence into explicit decisions.
+ * Transforms reasoning/evidence into explicit decisions.
  * Not a placeholder - performs actual decision transformation.
  */
 export class DecisionEngine {
@@ -114,22 +140,22 @@ export class DecisionEngine {
     }
 
     /**
-     * Evaluate a decision with reasoning/context/evidence
+     * Evaluate a decision with reasoning/evidence
      *
      * Decision logic:
-     * 1. Check authorization (if securityContext provided)
-     * 2. Check tenant isolation (if tenantId provided)
-     * 3. Evaluate blocking rules
-     * 4. Evaluate reasoning quality
+     * 1. Check authorization via canonical AuthorizationGuard
+     * 2. Check tenant isolation via canonical TenantIsolation
+     * 3. Evaluate matching blocking rules
+     * 4. Evaluate reasoning quality (reasoning required, not just knowledge)
      * 5. Derive outcome, risks, recommendations
      */
     evaluate(input: DecisionInput): DecisionResult {
         const traceId = ProvenanceTrace.createTraceId();
         const inputHash = ProvenanceTrace.hashInput(input.problem);
 
-        // Step 1: Authorization check
+        // Step 1: Authorization check via canonical AuthorizationGuard
         const authResult = this.checkAuthorization(input);
-        if (!authResult.authorized) {
+        if (authResult.result !== AuthorizationResult.PERMITTED) {
             return this.buildDenyResult(
                 traceId,
                 inputHash,
@@ -139,9 +165,9 @@ export class DecisionEngine {
             );
         }
 
-        // Step 2: Tenant isolation check
+        // Step 2: Tenant isolation check via canonical TenantIsolation
         const tenantResult = this.checkTenantIsolation(input);
-        if (!tenantResult.passed) {
+        if (tenantResult.result !== AuthorizationResult.PERMITTED) {
             return this.buildDenyResult(
                 traceId,
                 inputHash,
@@ -151,7 +177,7 @@ export class DecisionEngine {
             );
         }
 
-        // Step 3: Evaluate blocking rules
+        // Step 3: Evaluate blocking rules (only matching rules are effective)
         const ruleResult = this.evaluateRules(input);
         if (ruleResult.rejected) {
             return this.buildRejectResult(
@@ -164,7 +190,7 @@ export class DecisionEngine {
             );
         }
 
-        // Step 4: Evaluate reasoning quality
+        // Step 4: Evaluate reasoning quality (FORMAL REASONING REQUIRED for APPROVED)
         const reasoningResult = this.evaluateReasoning(input);
 
         // Step 5: Derive outcome
@@ -179,7 +205,7 @@ export class DecisionEngine {
             );
         }
 
-        // Sufficient evidence and reasoning - APPROVE
+        // Sufficient evidence and formal reasoning - APPROVE
         return this.buildApproveResult(
             traceId,
             inputHash,
@@ -199,60 +225,45 @@ export class DecisionEngine {
     }
 
     /**
-     * Check authorization via existing AuthorizationGuard
+     * Check authorization via canonical AuthorizationGuard
      */
-    private checkAuthorization(input: DecisionInput): { authorized: boolean; reason?: string } {
+    private checkAuthorization(input: DecisionInput): AuthorizationGuardResult {
         if (!input.securityContext) {
             // No security context = permit (defer to caller responsibility)
-            return { authorized: true };
-        }
-
-        const ctx = input.securityContext;
-
-        // Missing actor => deny
-        if (!ctx.actor) {
-            return { authorized: false, reason: "No actor in security context" };
-        }
-
-        // Autonomous operations require EXECUTE permission
-        if (ctx.actor.type === PrincipalType.AutonomousOperation) {
-            if (!ctx.permissions.includes(Authorization.EXECUTE)) {
-                return { authorized: false, reason: "EXECUTE permission required for autonomous operations" };
-            }
-        }
-
-        // For decision approval, check APPROVE permission
-        // But DecisionEngine itself is the authority - it doesn't need APPROVE permission
-        // It just needs EXECUTE or READ to operate
-        if (!ctx.permissions.includes(Authorization.EXECUTE) && !ctx.permissions.includes(Authorization.READ)) {
-            return { authorized: false, reason: "EXECUTE or READ permission required" };
-        }
-
-        return { authorized: true };
-    }
-
-    /**
-     * Check tenant isolation via existing TenantIsolation
-     */
-    private checkTenantIsolation(input: DecisionInput): { passed: boolean; reason?: string } {
-        if (!input.tenantId || !input.securityContext) {
-            return { passed: true };
-        }
-
-        // Check if actor tenant matches decision tenant
-        if (input.securityContext.tenantId !== undefined &&
-            input.securityContext.tenantId !== input.tenantId) {
             return {
-                passed: false,
-                reason: `Tenant mismatch: actor tenant ${input.securityContext.tenantId} does not match decision tenant ${input.tenantId}`
+                result: AuthorizationResult.PERMITTED,
+                reason: "No security context provided"
             };
         }
 
-        return { passed: true };
+        // Use canonical AuthorizationGuard.check() with EXECUTE action
+        // Decision execution requires EXECUTE permission
+        return AuthorizationGuard.check(input.securityContext, Authorization.EXECUTE);
     }
 
     /**
-     * Evaluate blocking rules
+     * Check tenant isolation via canonical TenantIsolation
+     */
+    private checkTenantIsolation(input: DecisionInput): { result: AuthorizationResult; reason?: string } {
+        if (!input.tenantId || !input.securityContext) {
+            return { result: AuthorizationResult.PERMITTED };
+        }
+
+        // Create a TenantResource from the tenantId
+        const resource: TenantResource = { tenantId: input.tenantId };
+
+        // Use canonical TenantIsolation.checkAccess()
+        const result = TenantIsolation.checkAccess(
+            input.securityContext,
+            resource,
+            Authorization.EXECUTE
+        );
+
+        return result;
+    }
+
+    /**
+     * Evaluate blocking rules (only matching rules are effective)
      */
     private evaluateRules(input: DecisionInput): {
         rejected: boolean;
@@ -266,18 +277,27 @@ export class DecisionEngine {
         const appliedRules: string[] = [];
 
         for (const rule of rules) {
-            appliedRules.push(rule.id);
+            // Evaluate if rule matches/applies to this input
+            const matchResult = rule.match(input);
 
-            if (rule.blocking) {
-                blockingRules.push(rule.description);
-                risks.push(`Blocking rule: ${rule.description}`);
+            if (matchResult.matched) {
+                // Rule is effective - add to applied rules
+                appliedRules.push(rule.id);
+
+                if (rule.blocking) {
+                    blockingRules.push(rule.description);
+                    risks.push(`Blocking rule matched: ${rule.description}`);
+                    if (matchResult.reason) {
+                        risks.push(`  Reason: ${matchResult.reason}`);
+                    }
+                }
             }
         }
 
         if (blockingRules.length > 0) {
             return {
                 rejected: true,
-                reason: `Blocked by ${blockingRules.length} rule(s): ${blockingRules.join("; ")}`,
+                reason: `Blocked by ${blockingRules.length} matching rule(s): ${blockingRules.join("; ")}`,
                 risks,
                 appliedRules
             };
@@ -288,6 +308,9 @@ export class DecisionEngine {
 
     /**
      * Evaluate reasoning quality and sufficiency
+     *
+     * IMPORTANT: Formal reasoning (IntelligenceResult with success=true) is REQUIRED
+     * for APPROVED. Knowledge/evidence alone is insufficient.
      */
     private evaluateReasoning(input: DecisionInput): {
         insufficient: boolean;
@@ -299,98 +322,51 @@ export class DecisionEngine {
         limitations: string[];
     } {
         const reasoning = input.reasoning;
-        const context = input.context;
-        const risks: string[] = [];
-        const limitations: string[] = [];
-        const appliedRules: string[] = [];
 
-        // No reasoning provided
+        // Formal reasoning is REQUIRED for any decision
+        // No reasoning = insufficient
         if (!reasoning) {
-            // Check if we have context knowledge
-            if (context && context.knowledgeItems.length > 0) {
-                // Can proceed with knowledge-only reasoning
-                const conclusion = `Based on ${context.knowledgeItems.length} knowledge item(s)`;
-                return {
-                    insufficient: false,
-                    conclusion,
-                    risks: [],
-                    appliedRules,
-                    confidence: this.deriveConfidenceFromContext(context),
-                    limitations: ["Decision based on knowledge context, not formal reasoning"]
-                };
-            }
-
-            // No reasoning and no context = insufficient
             return {
                 insufficient: true,
-                reason: "No reasoning result and no context provided",
-                risks: ["Insufficient evidence for decision"],
-                appliedRules,
+                reason: "No formal reasoning result provided",
+                risks: ["Insufficient evidence: formal reasoning required"],
+                appliedRules: [],
                 confidence: IntelligencePipeline.unavailable(),
-                limitations: ["Cannot make decision without reasoning or context"]
+                limitations: ["Cannot make decision without formal reasoning from IntelligenceEngine"]
             };
         }
 
-        // Reasoning failed
+        // Reasoning failed = insufficient
         if (!reasoning.success) {
             return {
                 insufficient: true,
                 reason: `Reasoning failed: ${reasoning.status}`,
                 risks: [`Reasoning failed: ${reasoning.status}`],
-                appliedRules,
+                appliedRules: [],
                 confidence: IntelligencePipeline.unavailable(),
                 limitations: [...reasoning.limitations]
             };
         }
 
-        // Reasoning succeeded but check confidence
+        // Reasoning succeeded - evaluate confidence
         const confidenceValue = IntelligencePipeline.getConfidenceValue(reasoning.confidence);
+        const risks: string[] = [];
+        const limitations: string[] = [];
 
-        // Very low confidence = review required
+        // Very low confidence = flagged but still sufficient for decision
         if (confidenceValue !== undefined && confidenceValue < 0.3) {
             limitations.push("Very low reasoning confidence");
             risks.push("Low confidence in reasoning result");
-        }
-
-        // Stale context check
-        if (context) {
-            for (const item of context.knowledgeItems) {
-                const age = Date.now() - new Date(item.createdAt).getTime();
-                const daysOld = age / (1000 * 60 * 60 * 24);
-                if (daysOld > 30) {
-                    risks.push(`Stale knowledge item: ${item.title} (${daysOld.toFixed(0)} days old)`);
-                }
-            }
         }
 
         return {
             insufficient: false,
             conclusion: reasoning.conclusion,
             risks,
-            appliedRules,
+            appliedRules: [],
             confidence: reasoning.confidence,
-            limitations: [...reasoning.limitations, ...limitations]
+            limitations: [...reasoning.limitations]
         };
-    }
-
-    /**
-     * Derive confidence from knowledge context
-     */
-    private deriveConfidenceFromContext(context: IntelligenceContext): TruthfulConfidence {
-        const confidences = context.knowledgeItems
-            .map(k => k.confidence)
-            .filter((c): c is number => c !== undefined);
-
-        if (confidences.length === 0) {
-            return IntelligencePipeline.unavailable();
-        }
-
-        const avgConfidence = confidences.reduce((a, b) => a + b, 0) / confidences.length;
-        return IntelligencePipeline.fromCalculatedConfidence(
-            avgConfidence,
-            "average_knowledge_confidence",
-            `Average of ${confidences.length} knowledge item confidences`
-        );
     }
 
     /**
@@ -416,7 +392,7 @@ export class DecisionEngine {
             confidence,
             reasoning: input.reasoning,
             appliedRules: Object.freeze([...appliedRules]),
-            limitations: Object.freeze(["Decision based on provided reasoning and context"]),
+            limitations: Object.freeze(["Decision based on formal reasoning"]),
             tenantId: input.tenantId,
             authorized: true,
             traceId,
@@ -429,6 +405,11 @@ export class DecisionEngine {
 
     /**
      * Build REJECTED result
+     *
+     * IMPORTANT: Confidence is NOT fabricated for rejections.
+     * We use unavailable() because a blocking rule doesn't provide
+     * evidence about the correctness of the decision - it only
+     * indicates the decision cannot be made.
      */
     private buildRejectResult(
         traceId: string,
@@ -446,11 +427,8 @@ export class DecisionEngine {
             decision: reason,
             recommendations: Object.freeze(["Address blocking rules before resubmitting"]),
             risks: Object.freeze([...risks]),
-            confidence: IntelligencePipeline.fromCalculatedConfidence(
-                0.95,
-                "blocking_rule_present",
-                "Decision rejected due to blocking rule"
-            ),
+            // FINDING 1 FIX: No fabricated confidence for rejections
+            confidence: IntelligencePipeline.unavailable(),
             reasoning: input.reasoning,
             appliedRules: Object.freeze([...appliedRules]),
             limitations: Object.freeze(["Decision blocked by rule evaluation"]),
@@ -479,8 +457,8 @@ export class DecisionEngine {
             outcome: "REVIEW_REQUIRED",
             decision: reason,
             recommendations: Object.freeze([
-                "Provide reasoning result for formal decision",
-                "Ensure sufficient evidence/context is available",
+                "Provide formal reasoning result from IntelligenceEngine",
+                "Ensure reasoning has succeeded (success=true)",
                 "Consider adding applicable rules/constraints"
             ]),
             risks: Object.freeze(["Insufficient information for automated decision"]),
@@ -546,14 +524,6 @@ export class DecisionEngine {
             }
         }
 
-        // From context knowledge
-        if (input.context && input.context.knowledgeItems.length > 0) {
-            const knowledgeTitles = input.context.knowledgeItems.slice(0, 2).map(k => k.title);
-            if (knowledgeTitles.length > 0) {
-                recommendations.push(`Consider: ${knowledgeTitles.join(", ")}`);
-            }
-        }
-
         // From assumptions
         if (input.assumptions.length > 0) {
             recommendations.push(`Validate assumptions: ${input.assumptions.slice(0, 2).join(", ")}`);
@@ -565,9 +535,6 @@ export class DecisionEngine {
         }
         if (conclusion.includes("MARGINAL")) {
             recommendations.push("Monitor metrics closely; consider improvement actions");
-        }
-        if (conclusion.includes("HIGH")) {
-            recommendations.push("Implement risk mitigation immediately");
         }
 
         // Deduplicate and limit
@@ -605,4 +572,44 @@ export class DecisionEngine {
             // Don't let logging failures affect decision
         }
     }
+}
+
+/**
+ * Create a simple blocking rule with a condition function
+ */
+export function createBlockingRule(
+    id: string,
+    description: string,
+    condition: (input: DecisionInput) => boolean,
+    severity?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
+): DecisionRule {
+    return {
+        id,
+        description,
+        blocking: true,
+        severity,
+        match: (input: DecisionInput) => ({
+            matched: condition(input),
+            reason: condition(input) ? `Condition met: ${description}` : undefined
+        })
+    };
+}
+
+/**
+ * Create a non-blocking advisory rule with a condition function
+ */
+export function createAdvisoryRule(
+    id: string,
+    description: string,
+    condition: (input: DecisionInput) => boolean
+): DecisionRule {
+    return {
+        id,
+        description,
+        blocking: false,
+        match: (input: DecisionInput) => ({
+            matched: condition(input),
+            reason: condition(input) ? `Condition met: ${description}` : undefined
+        })
+    };
 }
