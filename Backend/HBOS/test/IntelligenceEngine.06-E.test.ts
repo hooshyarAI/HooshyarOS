@@ -245,7 +245,7 @@ describe("Phase 06-E - Truthful Confidence", () => {
             }
         });
 
-        test("Rule-based reasoning does not emit MODEL confidence without actual model", () => {
+        test("Rule-based reasoning returns unavailable - no defensible confidence basis", () => {
             const input: IntelligenceInput = {
                 problem: "Analyze KPI",
                 data: {}
@@ -254,12 +254,10 @@ describe("Phase 06-E - Truthful Confidence", () => {
             const context: IntelligenceContext = { knowledgeItems: [], evidenceItems: [] };
             const result = engine.reason(input, context);
 
-            // Rule-based routing should NOT claim MODEL confidence without a real model
-            if (result.confidence.source === "calculated") {
-                // Should be CALCULATED, not MODEL (since there's no actual model)
-                expect(result.confidence.source).toBe("calculated");
-                expect(result.confidence.formula).toContain("keyword_pattern_match");
-            }
+            // Rule-based routing has NO defensible confidence basis
+            // Simple keyword matching does not provide certainty
+            // Therefore confidence must be unavailable, not a fabricated 0.8
+            expect(result.confidence.source).toBe("unavailable");
         });
     });
 
@@ -389,6 +387,109 @@ describe("Phase 06-E - Truthful Confidence", () => {
                 // Confidence must NOT equal the domain value (riskScore = 0.72)
                 expect(result.confidence.value).not.toBe(riskScore);
             }
+        });
+    });
+
+    describe("6b. Domain Severity Must Not Attenuate Confidence", () => {
+
+        let engine: IntelligenceEngine;
+
+        beforeEach(() => {
+            engine = new IntelligenceEngine();
+        });
+
+        test("Financial: confidence is same for GOOD, MARGINAL, AT RISK with same data quality", () => {
+            // All three cases have complete data (dataQuality = 100%)
+            const context: IntelligenceContext = { knowledgeItems: [], evidenceItems: [] };
+
+            // Case 1: GOOD - profitMargin >= 0.1 AND debtRatio < 0.5
+            const input1: IntelligenceInput = {
+                problem: "Analyze financial health",
+                data: {
+                    revenue: 100000,
+                    expenses: 50000,  // profitMargin = 0.5
+                    assets: 200000,
+                    liabilities: 80000  // debtRatio = 0.4
+                }
+            };
+
+            // Case 2: MARGINAL - profitMargin >= 0 AND < 0.1 (not GOOD but not negative)
+            const input2: IntelligenceInput = {
+                problem: "Analyze financial health",
+                data: {
+                    revenue: 100000,
+                    expenses: 95000,  // profitMargin = 0.05 (< 0.1 but >= 0)
+                    assets: 200000,
+                    liabilities: 80000  // debtRatio = 0.4
+                }
+            };
+
+            // Case 3: AT RISK - profitMargin < 0 OR debtRatio >= 0.7
+            const input3: IntelligenceInput = {
+                problem: "Analyze financial health",
+                data: {
+                    revenue: 100000,
+                    expenses: 120000,  // profitMargin = -0.2 (< 0)
+                    assets: 200000,
+                    liabilities: 160000  // debtRatio = 0.8 (>= 0.7)
+                }
+            };
+
+            const result1 = engine.reason(input1, context);
+            const result2 = engine.reason(input2, context);
+            const result3 = engine.reason(input3, context);
+
+            // All three should have the same data quality-based confidence
+            // Domain severity must NOT reduce confidence
+            if (result1.confidence.source === "calculated" &&
+                result2.confidence.source === "calculated" &&
+                result3.confidence.source === "calculated") {
+                expect(result1.confidence.value).toBe(result2.confidence.value);
+                expect(result2.confidence.value).toBe(result3.confidence.value);
+                expect(result1.confidence.value).toBe(1.0); // 100% data quality
+            }
+
+            // But conclusions should differ based on domain severity
+            expect(result1.conclusion).toContain("GOOD");
+            expect(result2.conclusion).toContain("MARGINAL");
+            expect(result3.conclusion).toContain("AT RISK");
+        });
+
+        test("Financial: no undocumented multipliers (0.6, 0.75) in confidence calculation", () => {
+            // MARGINAL case
+            const input: IntelligenceInput = {
+                problem: "Analyze financial health",
+                data: {
+                    revenue: 100000,
+                    expenses: 90000,  // profitMargin = 0.1 → MARGINAL
+                    assets: 200000,
+                    liabilities: 90000
+                }
+            };
+
+            const context: IntelligenceContext = { knowledgeItems: [], evidenceItems: [] };
+            const result = engine.reason(input, context);
+
+            // With 100% data quality, confidence should be 1.0, not 0.6
+            if (result.confidence.source === "calculated") {
+                expect(result.confidence.value).toBe(1.0);
+                expect(result.confidence.formula).not.toContain("marginal_factor");
+                expect(result.confidence.formula).not.toContain("at_risk_factor");
+            }
+        });
+
+        test("Rule-based: returns unavailable - domain severity concept does not apply", () => {
+            const input: IntelligenceInput = {
+                problem: "Analyze KPI",
+                data: {}
+            };
+
+            const context: IntelligenceContext = { knowledgeItems: [], evidenceItems: [] };
+            const result = engine.reason(input, context);
+
+            // Rule-based has no confidence basis, returns unavailable
+            expect(result.confidence.source).toBe("unavailable");
+            expect(result.conclusion).toContain("KPI");
         });
     });
 
