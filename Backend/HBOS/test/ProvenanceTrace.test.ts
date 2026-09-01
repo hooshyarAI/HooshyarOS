@@ -1,6 +1,6 @@
 /**
  * Phase 05A - Evidence and Decision Provenance Remediation Tests
- * 
+ *
  * E1: Decision provenance traceability
  * E2: Evidence IDs
  * E3: Explainability
@@ -209,7 +209,7 @@ describe("ReasoningEngine - B2/P2 Provenance", () => {
         // Note: This test may fail if Python runtime is not available
         // In that case, we check the structure
         const result = engine.reason("test problem");
-        
+
         expect(result.provenance).toBeDefined();
         expect(result.provenance?.traceId).toMatch(/^TRACE-/);
         expect(result.provenance?.inputHash).toMatch(/^[a-f0-9]{64}$/);
@@ -219,7 +219,7 @@ describe("ReasoningEngine - B2/P2 Provenance", () => {
     it("provides provenance with pending status on failure", () => {
         const engine = new ReasoningEngine();
         const result = engine.reason(""); // Empty problem fails
-        
+
         expect(result.provenance).toBeDefined();
         expect(result.provenance?.verificationStatus).toBe("PENDING");
     });
@@ -228,10 +228,115 @@ describe("ReasoningEngine - B2/P2 Provenance", () => {
         const engine = new ReasoningEngine();
         // Invalid input should fail gracefully
         const result = engine.reason(" ");
-        
+
         expect(result.success).toBe(false);
         expect(result.provenance).toBeDefined();
         expect(result.provenance?.verificationStatus).toBe("PENDING");
+    });
+});
+
+/**
+ * Phase 05A-1 - REAL Runtime Provenance Integration Tests
+ * Verifies that ProvenanceTrace is actually integrated into the ReasoningEngine path
+ */
+describe("ReasoningEngine - REAL Runtime Provenance Integration", () => {
+    it("input hash corresponds to actual input", () => {
+        const engine = new ReasoningEngine();
+        const testInput = "What is 2+2?";
+        const result = engine.reason(testInput);
+
+        // Verify the hash matches the actual input
+        const expectedHash = ProvenanceTrace.hashInput(testInput);
+        expect(result.provenance?.inputHash).toBe(expectedHash);
+    });
+
+    it("output hash corresponds to actual answer when present", () => {
+        const engine = new ReasoningEngine();
+        // Use a problem that should succeed if Python runtime available
+        const result = engine.reason("test problem");
+
+        if (result.answer && result.provenance?.outputHash) {
+            const expectedOutputHash = ProvenanceTrace.hashInput(result.answer);
+            expect(result.provenance.outputHash).toBe(expectedOutputHash);
+        }
+    });
+
+    it("provenance status is truthful when Python runtime succeeds", () => {
+        const engine = new ReasoningEngine();
+        const result = engine.reason("test problem");
+
+        // If answer is present, status should be VERIFIED
+        if (result.answer) {
+            expect(result.provenance?.verificationStatus).toBe("VERIFIED");
+        }
+    });
+
+    it("failure path does not falsely report VERIFIED", () => {
+        const engine = new ReasoningEngine();
+        const result = engine.reason(""); // Invalid input
+
+        // Failure should never be VERIFIED
+        expect(result.provenance?.verificationStatus).not.toBe("VERIFIED");
+        expect(result.provenance?.verificationStatus).toBe("PENDING");
+    });
+
+    it("no fabricated source references", () => {
+        const engine = new ReasoningEngine();
+        const result = engine.reason("test problem");
+
+        // sourceRef should be "unavailable" not a fake ID
+        expect(result.provenance?.sourceRef).toBe("unavailable");
+    });
+
+    it("provenance survives the real reason() return path", () => {
+        const engine = new ReasoningEngine();
+        const result = engine.reason("test problem");
+
+        // Provenance should survive the return
+        expect(result.provenance).toBeDefined();
+        expect(result.provenance?.traceId).toMatch(/^TRACE-/);
+        expect(result.provenance?.inputHash).toMatch(/^[a-f0-9]{64}$/);
+
+        // Full chain fields should be present
+        expect(result.provenance?.sourceRef).toBeDefined();
+        expect(result.provenance?.transformationRef).toBe("python-ai-runtime");
+        expect(result.provenance?.reasoningSteps).toBeDefined();
+    });
+
+    it("explainability present only when output exists", () => {
+        const engine = new ReasoningEngine();
+
+        // Success case
+        const successResult = engine.reason("test problem");
+        if (successResult.answer) {
+            expect(successResult.provenance?.explainability).toBeDefined();
+            // P2: Confidence is only present when runtime provides a real value.
+            // No hard-coded 0.85.
+        }
+
+        // Failure case
+        const failResult = engine.reason("");
+        expect(failResult.provenance?.explainability).toBeUndefined();
+    });
+
+    it("P2: does not hard-code confidence to 0.85", () => {
+        const engine = new ReasoningEngine();
+        const result = engine.reason("test problem");
+
+        // If answer exists, confidence should NOT be a hard-coded 0.85
+        if (result.answer && result.provenance?.explainability) {
+            expect(result.provenance.explainability.confidence).not.toBe(0.85);
+        }
+    });
+
+    it("verification status is PENDING when no answer from Python runtime", () => {
+        const engine = new ReasoningEngine();
+        // Empty/whitespace input should fail
+        const result = engine.reason("   ");
+
+        expect(result.success).toBe(false);
+        expect(result.provenance?.verificationStatus).toBe("PENDING");
+        expect(result.provenance?.outputHash).toBeUndefined();
     });
 });
 
@@ -276,26 +381,26 @@ describe("ProvenanceTrace - Evidence Flow Integration", () => {
     it("supports complete evidence chain", () => {
         // SOURCE
         const sourceRef = "financial-statement";
-        
+
         // INPUT
         const input = "revenue:10000,expenses:6000,assets:50000,liabilities:20000";
         const inputRef = ProvenanceTrace.hashInput(input);
-        
+
         // TRANSFORMATION (if applicable)
         const transformationRef = "normalization-complete";
-        
+
         // REASONING
         const reasoningSteps = ["parse financial data", "calculate metrics", "apply thresholds"];
         const reasoningRef = ProvenanceTrace.createTraceId();
-        
+
         // DECISION
-        const decision = { 
-            action: "APPROVE_LOAN", 
-            amount: 50000, 
-            status: "READY" 
+        const decision = {
+            action: "APPROVE_LOAN",
+            amount: 50000,
+            status: "READY"
         };
         const decisionRef = ProvenanceTrace.createTraceId();
-        
+
         // Create full provenance chain
         const provenance = ProvenanceTrace.createProvenanceLink({
             sourceRef,
@@ -304,10 +409,10 @@ describe("ProvenanceTrace - Evidence Flow Integration", () => {
             reasoningRef,
             decisionRef
         });
-        
+
         // Link to decision
         const linkedDecision = ProvenanceTrace.linkToDecision(decision, provenance);
-        
+
         // Create explainability
         const explainability = ProvenanceTrace.createExplainabilityRecord({
             reasoningChain: reasoningSteps,
@@ -316,7 +421,7 @@ describe("ProvenanceTrace - Evidence Flow Integration", () => {
             confidence: 0.92,
             limitations: ["Historical performance not considered"]
         });
-        
+
         // Verify chain
         expect(linkedDecision.provenance.traceId).toMatch(/^TRACE-/);
         expect(linkedDecision.provenance.sourceRef).toBe(sourceRef);
