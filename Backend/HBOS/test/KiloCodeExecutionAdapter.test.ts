@@ -13,8 +13,8 @@ describe("KiloCodeExecutionAdapter observability", () => {
     });
 
     it("uses one bounded Windows monitor with live lifecycle output", () => {
-        const script = buildWindowsKiloScript("C:/temp/payload.json", 30_000);
-        expect(script).toContain("Start-Process -FilePath $payload.command");
+        const script = buildWindowsKiloScript("C:/temp/payload.json");
+        expect(script).toContain("Start-Process -FilePath $launchCommand");
         expect(script).toContain('Emit-KiloLine ("HEARTBEAT pid=" + $child.Id');
         expect(script).toContain('Emit-KiloLine ("PROCESS_STARTED pid=" + $child.Id');
         expect(script).toContain('Emit-KiloLine ("EXECUTION_FINISHED code=" + $code)');
@@ -25,18 +25,17 @@ describe("KiloCodeExecutionAdapter observability", () => {
     });
 
     it("writes the inner process PID to a dedicated file immediately after Start-Process", () => {
-        const script = buildWindowsKiloScript("C:/temp/payload.json", 30_000);
+        const script = buildWindowsKiloScript("C:/temp/payload.json");
         expect(script).toContain("Set-Content -LiteralPath $payload.pidPath -Value $child.Id -NoNewline");
         expect(script).toContain("$payload.pidPath");
     });
 
     it("kills the inner process tree on timeout and exits with code 124", () => {
-        const script = buildWindowsKiloScript("C:/temp/payload.json", 5_000);
-        expect(script).toContain("$timeoutMs = [long]$payload.timeout");
-        expect(script).toContain("$elapsedMs = (Get-Date) - $startTime");
-        expect(script).toContain("if ($elapsedMs.TotalMilliseconds -gt $timeoutMs) {");
+        const script = buildWindowsKiloScript("C:/temp/payload.json");
+        expect(script).toContain("$elapsedMs = ((Get-Date) - $startTime).TotalMilliseconds");
+        expect(script).toContain("if ($elapsedMs -gt $payload.timeout)");
         expect(script).toContain("Emit-KiloLine 'EXECUTION_TIMEOUT'");
-        expect(script).toContain("& taskkill /PID $child.Id /T /F 2>$null");
+        expect(script).toContain("& taskkill /PID $child.Id /T /F");
         expect(script).toContain("exit 124");
     });
 });
