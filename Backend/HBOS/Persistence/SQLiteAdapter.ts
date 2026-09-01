@@ -31,6 +31,14 @@ import {
 import { SecurityContext } from "../Security/SecurityContext";
 import { AuthorizationGuard } from "../Security/AuthorizationGuard";
 import { Authorization, AuthorizationResult } from "../Security/Authorization";
+import { 
+    EncryptionService, 
+    LocalKeyProvider, 
+    IKeyProvider,
+    EncryptedValue,
+    ENCRYPTED_FIELDS,
+    EncryptionConfig
+} from "../Security/EncryptionService";
 
 /**
  * SQLite adapter configuration
@@ -39,6 +47,7 @@ export interface SQLiteConfig {
     databasePath: string;
     enableWAL?: boolean;
     enableForeignKeys?: boolean;
+    encryption?: EncryptionConfig;
 }
 
 /**
@@ -54,18 +63,25 @@ function failure<T>(error: string): RepositoryResult<T> {
 
 /**
  * SQLite adapter implementing all repository interfaces
+ * 
+ * Phase 05C-D4: Integrated field-level encryption for CONFIDENTIAL data.
+ * Uses AES-256-GCM with per-tenant DEKs.
  */
 export class SQLiteAdapter implements ITransactionManager {
     
     private db: any; // SQLite database connection
     private config: SQLiteConfig;
     private initialized: boolean = false;
+    private encryptionService!: EncryptionService;
+    private keyProvider!: IKeyProvider;
+    private encryptionEnabled: boolean = false;
 
     constructor(config: SQLiteConfig) {
         this.config = {
             databasePath: config.databasePath || ":memory:",
             enableWAL: config.enableWAL !== false,
-            enableForeignKeys: config.enableForeignKeys !== false
+            enableForeignKeys: config.enableForeignKeys !== false,
+            encryption: config.encryption
         };
     }
 
@@ -88,7 +104,113 @@ export class SQLiteAdapter implements ITransactionManager {
 
         // Create tables
         this.createTables();
+        this.createEncryptionTables();
+
+        // Initialize encryption if configured
+        if (this.config.encryption) {
+            await this.initializeEncryption();
+        }
+
         this.initialized = true;
+    }
+
+    private async initializeEncryption(): Promise<void> {
+        try {
+            this.keyProvider = new LocalKeyProvider(this.config.encryption!);
+            this.keyProvider.setDatabase(this.db);
+            await this.keyProvider.initialize();
+            this.encryptionService = new EncryptionService(this.keyProvider);
+            this.encryptionEnabled = true;
+        } catch (error) {
+            // Fail secure - encryption was requested but failed to initialize
+            // Do not silently disable - this is a configuration error
+            throw new Error(`Encryption initialization failed: ${error}`);
+        }
+    }
+
+    private createEncryptionTables(): void {
+        // Encryption keys table - stores per-tenant DEKs wrapped by KEK
+        this.db.exec(`
+            CREATE TABLE IF NOT EXISTS encryption_keys (
+                tenant_id TEXT PRIMARY KEY,
+                encrypted_dek TEXT NOT NULL,
+                version INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                rotated_at TEXT
+            )
+        `);
+    }
+
+    // ===== Encryption Helpers =====
+
+    /**
+     * Encrypt a field value if encryption is enabled
+     */
+    private async encryptField(tenantId: string, fieldName: string, value: string | null | undefined): Promise<string | null> {
+        if (!this.encryptionEnabled || !value) {
+            return value as string | null;
+        }
+
+        // Check if this field requires encryption
+        const encryptedFieldsList = [
+            ...ENCRYPTED_FIELDS.user,
+            ...ENCRYPTED_FIELDS.decision,
+            ...ENCRYPTED_FIELDS.evidence
+        ];
+
+        if (!encryptedFieldsList.includes(fieldName as any)) {
+            return value;
+        }
+
+        const result = await this.encryptionService.encrypt(tenantId, value);
+        if (result.success && result.data) {
+            return EncryptionService.serialize(result.data);
+        }
+        
+        // Fail secure - if encryption fails, don't store the value
+        throw new Error(`ENCRYPTION_FAILED: ${fieldName}`);
+    }
+
+    /**
+     * Decrypt a field value if encryption is enabled
+     */
+    private async decryptField(tenantId: string, fieldName: string, value: string | null | undefined): Promise<string | null> {
+        if (!this.encryptionEnabled || !value) {
+            return value as string | null;
+        }
+
+        // Check if this field requires decryption
+        const encryptedFieldsList = [
+            ...ENCRYPTED_FIELDS.user,
+            ...ENCRYPTED_FIELDS.decision,
+            ...ENCRYPTED_FIELDS.evidence
+        ];
+
+        if (!encryptedFieldsList.includes(fieldName as any)) {
+            return value;
+        }
+
+        // Try to deserialize as encrypted value
+        const encrypted = EncryptionService.deserialize(value);
+        if (!encrypted) {
+            // Not encrypted, return as-is
+            return value;
+        }
+
+        const result = await this.encryptionService.decrypt(tenantId, encrypted);
+        if (result.success && result.data !== undefined) {
+            return result.data;
+        }
+
+        // Fail secure - decryption failure
+        throw new Error(`DECRYPTION_FAILED: ${fieldName}`);
+    }
+
+    /**
+     * Check if encryption is enabled
+     */
+    isEncryptionEnabled(): boolean {
+        return this.encryptionEnabled;
     }
 
     private createTables(): void {
@@ -306,10 +428,14 @@ export class SQLiteAdapter implements ITransactionManager {
         try {
             const id = crypto.randomUUID();
             const createdAt = new Date().toISOString();
+            
+            // Encrypt identity field if encryption is enabled
+            const encryptedIdentity = await this.encryptField(context.tenantId, "identity", user.identity);
+            
             this.db.prepare(`
                 INSERT INTO users (id, tenant_id, identity, status, created_at)
                 VALUES (?, ?, ?, ?, ?)
-            `).run(id, context.tenantId, user.identity, user.status, createdAt);
+            `).run(id, context.tenantId, encryptedIdentity, user.status, createdAt);
             return success({ id, tenantId: context.tenantId, ...user, createdAt });
         } catch (error) {
             return failure(String(error));
@@ -326,10 +452,14 @@ export class SQLiteAdapter implements ITransactionManager {
             const row = this.db.prepare("SELECT * FROM users WHERE id = ? AND tenant_id = ?")
                 .get(id, context.tenantId);
             if (!row) return success(null);
+            
+            // Decrypt identity field
+            const decryptedIdentity = await this.decryptField(context.tenantId, "identity", row.identity);
+            
             return success({
                 id: row.id,
                 tenantId: row.tenant_id,
-                identity: row.identity,
+                identity: decryptedIdentity || row.identity,
                 status: row.status,
                 createdAt: row.created_at
             });
@@ -347,13 +477,19 @@ export class SQLiteAdapter implements ITransactionManager {
         try {
             const rows = this.db.prepare("SELECT * FROM users WHERE tenant_id = ?")
                 .all(context.tenantId);
-            return success(rows.map(row => ({
-                id: row.id,
-                tenantId: row.tenant_id,
-                identity: row.identity,
-                status: row.status,
-                createdAt: row.created_at
-            })));
+            
+            const users = await Promise.all(rows.map(async row => {
+                const decryptedIdentity = await this.decryptField(context.tenantId, "identity", row.identity);
+                return {
+                    id: row.id,
+                    tenantId: row.tenant_id,
+                    identity: decryptedIdentity || row.identity,
+                    status: row.status,
+                    createdAt: row.created_at
+                };
+            }));
+            
+            return success(users);
         } catch (error) {
             return failure(String(error));
         }
@@ -475,15 +611,24 @@ export class SQLiteAdapter implements ITransactionManager {
         try {
             const id = crypto.randomUUID();
             const createdAt = new Date().toISOString();
+            
+            // Encrypt CONFIDENTIAL decision fields
+            const encryptedMessage = await this.encryptField(context.tenantId, "message", decision.message);
+            const encryptedExplanation = await this.encryptField(context.tenantId, "explanation", decision.explanation);
+            const encryptedLimitations = decision.limitations 
+                ? await this.encryptField(context.tenantId, "limitations", JSON.stringify(decision.limitations))
+                : null;
+            const encryptedReasoningRef = await this.encryptField(context.tenantId, "reasoningRef", decision.reasoningRef);
+            
             this.db.prepare(`
                 INSERT INTO decisions (id, tenant_id, project_id, status, message,
                     trace_id, input_hash, reasoning_ref, explanation, confidence, limitations, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `).run(
-                id, context.tenantId, decision.projectId, decision.status, decision.message,
-                decision.traceId || null, decision.inputHash || null, decision.reasoningRef || null,
-                decision.explanation || null, decision.confidence || null,
-                decision.limitations ? JSON.stringify(decision.limitations) : null, createdAt
+                id, context.tenantId, decision.projectId, decision.status, encryptedMessage,
+                decision.traceId || null, decision.inputHash || null, encryptedReasoningRef,
+                encryptedExplanation, decision.confidence || null,
+                encryptedLimitations, createdAt
             );
             return success({ id, tenantId: context.tenantId, ...decision, createdAt });
         } catch (error) {
@@ -501,7 +646,7 @@ export class SQLiteAdapter implements ITransactionManager {
             const row = this.db.prepare("SELECT * FROM decisions WHERE id = ? AND tenant_id = ?")
                 .get(id, context.tenantId);
             if (!row) return success(null);
-            return success(this.rowToDecision(row));
+            return success(await this.rowToDecision(row, context.tenantId));
         } catch (error) {
             return failure(String(error));
         }
@@ -520,7 +665,11 @@ export class SQLiteAdapter implements ITransactionManager {
             const rows = limit
                 ? this.db.prepare(sql).all(context.tenantId, limit)
                 : this.db.prepare(sql).all(context.tenantId);
-            return success(rows.map(row => this.rowToDecision(row)));
+            
+            const decisions = await Promise.all(
+                rows.map(row => this.rowToDecision(row, context.tenantId))
+            );
+            return success(decisions);
         } catch (error) {
             return failure(String(error));
         }
@@ -536,25 +685,33 @@ export class SQLiteAdapter implements ITransactionManager {
             const row = this.db.prepare("SELECT * FROM decisions WHERE trace_id = ? AND tenant_id = ?")
                 .get(traceId, context.tenantId);
             if (!row) return success(null);
-            return success(this.rowToDecision(row));
+            return success(await this.rowToDecision(row, context.tenantId));
         } catch (error) {
             return failure(String(error));
         }
     }
 
-    private rowToDecision(row: any): ProjectDecisionRecord {
+    private async rowToDecision(row: any, tenantId: string): Promise<ProjectDecisionRecord> {
+        // Decrypt CONFIDENTIAL fields
+        const decryptedMessage = await this.decryptField(tenantId, "message", row.message);
+        const decryptedExplanation = await this.decryptField(tenantId, "explanation", row.explanation);
+        const decryptedReasoningRef = await this.decryptField(tenantId, "reasoningRef", row.reasoning_ref);
+        const decryptedLimitations = row.limitations 
+            ? await this.decryptField(tenantId, "limitations", row.limitations)
+            : undefined;
+
         return {
             id: row.id,
             tenantId: row.tenant_id,
             projectId: row.project_id,
             status: row.status,
-            message: row.message,
+            message: decryptedMessage || row.message,
             traceId: row.trace_id || undefined,
             inputHash: row.input_hash || undefined,
-            reasoningRef: row.reasoning_ref || undefined,
-            explanation: row.explanation || undefined,
+            reasoningRef: decryptedReasoningRef || row.reasoning_ref || undefined,
+            explanation: decryptedExplanation || row.explanation || undefined,
             confidence: row.confidence || undefined,
-            limitations: row.limitations ? JSON.parse(row.limitations) : undefined,
+            limitations: decryptedLimitations ? JSON.parse(decryptedLimitations) : undefined,
             createdAt: row.created_at
         };
     }
@@ -576,6 +733,13 @@ export class SQLiteAdapter implements ITransactionManager {
         try {
             const id = crypto.randomUUID();
             const createdAt = new Date().toISOString();
+            
+            // Encrypt CONFIDENTIAL evidence fields
+            const encryptedExplanation = await this.encryptField(context.tenantId, "explanation", evidence.explanation);
+            const encryptedLimitations = evidence.limitations
+                ? await this.encryptField(context.tenantId, "limitations", JSON.stringify(evidence.limitations))
+                : null;
+            
             this.db.prepare(`
                 INSERT INTO evidence (id, tenant_id, trace_id, input_hash, output_hash,
                     verification_status, explanation, confidence, limitations, created_at)
@@ -583,8 +747,8 @@ export class SQLiteAdapter implements ITransactionManager {
             `).run(
                 id, context.tenantId, evidence.traceId, evidence.inputHash || null,
                 evidence.outputHash || null, evidence.verificationStatus,
-                evidence.explanation || null, evidence.confidence || null,
-                evidence.limitations ? JSON.stringify(evidence.limitations) : null, createdAt
+                encryptedExplanation, evidence.confidence || null,
+                encryptedLimitations, createdAt
             );
             return success({ id, tenantId: context.tenantId, ...evidence, createdAt });
         } catch (error) {
@@ -602,7 +766,7 @@ export class SQLiteAdapter implements ITransactionManager {
             const row = this.db.prepare("SELECT * FROM evidence WHERE id = ? AND tenant_id = ?")
                 .get(id, context.tenantId);
             if (!row) return success(null);
-            return success(this.rowToEvidence(row));
+            return success(await this.rowToEvidence(row, context.tenantId));
         } catch (error) {
             return failure(String(error));
         }
@@ -618,7 +782,7 @@ export class SQLiteAdapter implements ITransactionManager {
             const row = this.db.prepare("SELECT * FROM evidence WHERE trace_id = ? AND tenant_id = ?")
                 .get(traceId, context.tenantId);
             if (!row) return success(null);
-            return success(this.rowToEvidence(row));
+            return success(await this.rowToEvidence(row, context.tenantId));
         } catch (error) {
             return failure(String(error));
         }
@@ -637,13 +801,23 @@ export class SQLiteAdapter implements ITransactionManager {
             const rows = limit
                 ? this.db.prepare(sql).all(context.tenantId, limit)
                 : this.db.prepare(sql).all(context.tenantId);
-            return success(rows.map(row => this.rowToEvidence(row)));
+            
+            const evidence = await Promise.all(
+                rows.map(row => this.rowToEvidence(row, context.tenantId))
+            );
+            return success(evidence);
         } catch (error) {
             return failure(String(error));
         }
     }
 
-    private rowToEvidence(row: any): EvidenceRecord {
+    private async rowToEvidence(row: any, tenantId: string): Promise<EvidenceRecord> {
+        // Decrypt CONFIDENTIAL fields
+        const decryptedExplanation = await this.decryptField(tenantId, "explanation", row.explanation);
+        const decryptedLimitations = row.limitations
+            ? await this.decryptField(tenantId, "limitations", row.limitations)
+            : undefined;
+
         return {
             id: row.id,
             tenantId: row.tenant_id,
@@ -651,9 +825,9 @@ export class SQLiteAdapter implements ITransactionManager {
             inputHash: row.input_hash || undefined,
             outputHash: row.output_hash || undefined,
             verificationStatus: row.verification_status,
-            explanation: row.explanation || undefined,
+            explanation: decryptedExplanation || row.explanation || undefined,
             confidence: row.confidence || undefined,
-            limitations: row.limitations ? JSON.parse(row.limitations) : undefined,
+            limitations: decryptedLimitations ? JSON.parse(decryptedLimitations) : undefined,
             createdAt: row.created_at
         };
     }
@@ -719,6 +893,20 @@ export class SQLiteAdapter implements ITransactionManager {
         if (this.db) {
             this.db.close();
         }
+    }
+
+    /**
+     * Get the key provider for management operations
+     */
+    getKeyProvider(): IKeyProvider | undefined {
+        return this.keyProvider;
+    }
+
+    /**
+     * Check if encryption is enabled
+     */
+    hasEncryption(): boolean {
+        return this.encryptionEnabled;
     }
 }
 
