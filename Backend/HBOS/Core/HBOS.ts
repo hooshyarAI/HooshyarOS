@@ -12,6 +12,7 @@ import { ExecutiveIntelligenceEngine } from "../Engines/ExecutiveIntelligenceEng
 import { OrganizationalIntelligenceEngine } from "../Engines/OrganizationalIntelligenceEngine";
 import { AutonomousOperationsEngine } from "../Engines/AutonomousOperationsEngine";
 import { IntelligenceEngine } from "../Engines/IntelligenceEngine";
+import { MemoryEvent } from "./MemoryEvent";
 
 import { EngineDependencyManager } from "./Dependency/EngineDependencyManager";
 import { BootDependencyValidator } from "./Dependency/BootDependencyValidator";
@@ -32,6 +33,9 @@ export class HBOS {
     private bootValidator:
         BootDependencyValidator;
 
+    private memoryEngine: MemoryEngine;
+
+    private knowledgeEngine: KnowledgeEngine;
 
 
 
@@ -44,10 +48,8 @@ export class HBOS {
 
 
 
-
         this.dependencyManager =
             new EngineDependencyManager();
-
 
 
 
@@ -58,10 +60,8 @@ export class HBOS {
 
 
 
-
-        const memoryEngine =
+        this.memoryEngine =
             new MemoryEngine();
-
 
 
 
@@ -70,10 +70,8 @@ export class HBOS {
 
 
 
-
         const decisionEngine =
             new DecisionEngine();
-
 
 
 
@@ -82,16 +80,13 @@ export class HBOS {
 
 
 
-
-        const knowledgeEngine =
+        this.knowledgeEngine =
             new KnowledgeEngine();
-
 
 
 
         const assistantEngine =
             new AssistantEngine();
-
 
         const intelligenceEngine =
             new IntelligenceEngine();
@@ -123,29 +118,27 @@ export class HBOS {
 
 
 
-        memoryEngine.subscribe(
+        this.memoryEngine.subscribe(
             reactionEngine
         );
 
 
 
-        memoryEngine.addListener(
-            knowledgeEngine
+        this.memoryEngine.addListener(
+            this.knowledgeEngine
         );
 
 
 
         this.registry.register(
-            memoryEngine
+            this.memoryEngine
         );
-
 
 
 
         this.registry.register(
             reactionEngine
         );
-
 
 
 
@@ -155,18 +148,15 @@ export class HBOS {
 
 
 
-
         this.registry.register(
             projectPilotEngine
         );
 
 
 
-
         this.registry.register(
-            knowledgeEngine
+            this.knowledgeEngine
         );
-
 
 
 
@@ -179,7 +169,6 @@ export class HBOS {
         this.registry.register(
             intelligenceEngine
         );
-
 
 
 
@@ -213,11 +202,20 @@ export class HBOS {
 
 
 
-
         this.setupDependencies();
 
 
 
+    }
+
+
+
+    getMemoryEngine(): MemoryEngine {
+        return this.memoryEngine;
+    }
+
+    getKnowledgeEngine(): KnowledgeEngine {
+        return this.knowledgeEngine;
     }
 
 
@@ -243,7 +241,6 @@ export class HBOS {
                 "Memory Engine"
             ]
         );
-
 
 
 
@@ -304,6 +301,15 @@ export class HBOS {
 
         this.registry.initializeAll();
 
+
+
+        const bootEvent = new MemoryEvent(
+            "HBOS_BOOT",
+            "HBOS platform initialized",
+            "HBOS"
+        );
+
+        this.memoryEngine.store(bootEvent);
 
         return true;
 
