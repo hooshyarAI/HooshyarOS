@@ -8,7 +8,9 @@ export class Knowledge {
 
     description: string;
 
-    confidence: number;
+    confidence: number | undefined;
+
+    source: string;
 
     createdAt: Date;
 
@@ -16,7 +18,8 @@ export class Knowledge {
     constructor(
         title: string,
         description: string,
-        confidence: number
+        confidence: number | undefined,
+        source: string
     ) {
 
         this.id = randomUUID();
@@ -26,6 +29,8 @@ export class Knowledge {
         this.description = description;
 
         this.confidence = confidence;
+
+        this.source = source;
 
         this.createdAt = new Date();
 

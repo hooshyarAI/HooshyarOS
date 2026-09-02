@@ -46,6 +46,14 @@ interface DomainAlgorithmResult {
 export class IntelligenceEngine {
     name = "IntelligenceEngine";
 
+    initialize(): void {
+        console.log("Intelligence Engine Started");
+    }
+
+    health(): boolean {
+        return true;
+    }
+
     /**
      * Perform reasoning over input with context
      */

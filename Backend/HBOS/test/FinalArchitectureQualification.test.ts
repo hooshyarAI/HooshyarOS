@@ -15,6 +15,7 @@ describe("Final Architecture Qualification", () => {
       "ProjectPilotEngine",
       "KnowledgeEngine",
       "AssistantEngine",
+      "IntelligenceEngine",
       "ReasoningEngine",
       "GovernanceEngine",
       "ExecutiveIntelligenceEngine",

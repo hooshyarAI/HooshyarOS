@@ -11,12 +11,15 @@ import { GovernanceEngine } from "../Engines/GovernanceEngine";
 import { ExecutiveIntelligenceEngine } from "../Engines/ExecutiveIntelligenceEngine";
 import { OrganizationalIntelligenceEngine } from "../Engines/OrganizationalIntelligenceEngine";
 import { AutonomousOperationsEngine } from "../Engines/AutonomousOperationsEngine";
+import { IntelligenceEngine } from "../Engines/IntelligenceEngine";
 
 import { EngineDependencyManager } from "./Dependency/EngineDependencyManager";
 import { BootDependencyValidator } from "./Dependency/BootDependencyValidator";
 
 
+
 export class HBOS {
+
 
 
     private registry: EngineRegistry;
@@ -25,12 +28,15 @@ export class HBOS {
         EngineDependencyManager;
 
 
+
     private bootValidator:
         BootDependencyValidator;
 
 
 
+
     constructor() {
+
 
 
         this.registry =
@@ -38,8 +44,10 @@ export class HBOS {
 
 
 
+
         this.dependencyManager =
             new EngineDependencyManager();
+
 
 
 
@@ -50,8 +58,10 @@ export class HBOS {
 
 
 
+
         const memoryEngine =
             new MemoryEngine();
+
 
 
 
@@ -60,8 +70,10 @@ export class HBOS {
 
 
 
+
         const decisionEngine =
             new DecisionEngine();
+
 
 
 
@@ -70,8 +82,10 @@ export class HBOS {
 
 
 
+
         const knowledgeEngine =
             new KnowledgeEngine();
+
 
 
 
@@ -79,20 +93,29 @@ export class HBOS {
             new AssistantEngine();
 
 
+        const intelligenceEngine =
+            new IntelligenceEngine();
+
+
+
         const reasoningEngine =
             new ReasoningEngine();
+
 
 
         const governanceEngine =
             new GovernanceEngine();
 
 
+
         const executiveIntelligenceEngine =
             new ExecutiveIntelligenceEngine();
 
 
+
         const organizationalIntelligenceEngine =
             new OrganizationalIntelligenceEngine();
+
 
 
         const autonomousOperationsEngine =
@@ -106,9 +129,16 @@ export class HBOS {
 
 
 
+        memoryEngine.addListener(
+            knowledgeEngine
+        );
+
+
+
         this.registry.register(
             memoryEngine
         );
+
 
 
 
@@ -118,9 +148,11 @@ export class HBOS {
 
 
 
+
         this.registry.register(
             decisionEngine
         );
+
 
 
 
@@ -130,9 +162,11 @@ export class HBOS {
 
 
 
+
         this.registry.register(
             knowledgeEngine
         );
+
 
 
 
@@ -141,9 +175,18 @@ export class HBOS {
         );
 
 
+
+        this.registry.register(
+            intelligenceEngine
+        );
+
+
+
+
         this.registry.register(
             reasoningEngine
         );
+
 
 
         this.registry.register(
@@ -151,14 +194,17 @@ export class HBOS {
         );
 
 
+
         this.registry.register(
             executiveIntelligenceEngine
         );
 
 
+
         this.registry.register(
             organizationalIntelligenceEngine
         );
+
 
 
         this.registry.register(
@@ -167,7 +213,9 @@ export class HBOS {
 
 
 
+
         this.setupDependencies();
+
 
 
     }
@@ -175,6 +223,7 @@ export class HBOS {
 
 
     private setupDependencies(){
+
 
 
         this.dependencyManager.registerDependency(
@@ -186,12 +235,24 @@ export class HBOS {
         );
 
 
+
+        this.dependencyManager.registerDependency(
+            "Intelligence Engine",
+            [
+                "Knowledge Engine",
+                "Memory Engine"
+            ]
+        );
+
+
+
+
     }
 
 
 
-
     boot(): boolean {
+
 
 
         const availableEngines = [
@@ -201,9 +262,11 @@ export class HBOS {
             "Decision Engine",
             "Project Pilot Engine",
             "Knowledge Engine",
-            "Assistant Engine"
+            "Assistant Engine",
+            "Intelligence Engine"
 
         ];
+
 
 
 
@@ -223,10 +286,27 @@ export class HBOS {
 
 
 
+        const intelligenceReady =
+            this.bootValidator.canBoot(
+                "Intelligence Engine",
+                availableEngines
+            );
+
+
+
+        if(!intelligenceReady){
+
+            return false;
+
+        }
+
+
+
         this.registry.initializeAll();
 
 
         return true;
+
 
 
     }
@@ -238,6 +318,7 @@ export class HBOS {
         return this.registry.healthReport();
 
     }
+
 
 
 }

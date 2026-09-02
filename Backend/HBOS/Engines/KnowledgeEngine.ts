@@ -2,6 +2,7 @@ import { Knowledge } from "../Entities/Knowledge";
 import { KnowledgeRule } from "../Entities/KnowledgeRule";
 import { MemoryEvent } from "../Entities/MemoryEvent";
 import { EventListener } from "../Interfaces/EventListener";
+import { KnowledgeItem } from "../Core/IntelligenceContract";
 
 
 export class KnowledgeEngine implements EventListener {
@@ -74,20 +75,19 @@ export class KnowledgeEngine implements EventListener {
 
         const knowledge =
             new Knowledge(
-
                 event.type,
-
                 `${event.source}: ${event.data}`,
-
-                0.8
-
+                undefined,
+                event.source
             );
+
 
 
 
         this.knowledge.push(
             knowledge
         );
+
 
 
 
@@ -100,6 +100,21 @@ export class KnowledgeEngine implements EventListener {
     getKnowledge(): Knowledge[] {
 
         return this.knowledge;
+
+    }
+
+
+
+    toKnowledgeItems(): KnowledgeItem[] {
+
+        return this.knowledge.map(k => ({
+            id: k.id,
+            title: k.title,
+            description: k.description,
+            confidence: k.confidence,
+            source: k.source,
+            createdAt: k.createdAt.toISOString()
+        }));
 
     }
 

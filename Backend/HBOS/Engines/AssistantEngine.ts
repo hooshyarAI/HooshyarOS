@@ -3,6 +3,9 @@ import { DecisionEngine } from "./DecisionEngine";
 import { AssistantMemory } from "../Entities/AssistantMemory";
 import { AssistantResponse } from "../Entities/AssistantResponse";
 import { DecisionContext } from "../Core/DecisionContext";
+import { IntelligenceEngine } from "./IntelligenceEngine";
+import { IntelligenceInput, IntelligenceContext } from "../Core/IntelligenceContract";
+import { DecisionEngine as Phase06DecisionEngine } from "../Decision/DecisionEngine";
 
 
 export class AssistantEngine {
@@ -13,9 +16,15 @@ export class AssistantEngine {
 
     private memory: AssistantMemory;
 
+    private intelligenceEngine: IntelligenceEngine;
+
+    private phase06DecisionEngine: Phase06DecisionEngine;
+
     constructor() {
         this.decisionEngine = new DecisionEngine();
         this.memory = new AssistantMemory();
+        this.intelligenceEngine = new IntelligenceEngine();
+        this.phase06DecisionEngine = new Phase06DecisionEngine();
     }
 
     initialize(): void {
@@ -26,31 +35,20 @@ export class AssistantEngine {
         return true;
     }
 
-    /**
-     * Analyze a project and produce a response with evidence preservation.
-     *
-     * @param project - The project to analyze
-     * @param evidence - Optional reasoning evidence from DecisionContext
-     * @returns AssistantResponse with preserved evidence
-     */
     analyzeProject(
         project: Project,
         evidence?: DecisionContext
     ): AssistantResponse {
-        // Pass evidence to DecisionEngine without coupling to ReasoningEngine
         const decision = this.decisionEngine.decide(project, evidence);
 
         this.memory.store(project.name);
 
-        // Use actual confidence from evidence, undefined when unavailable
         const confidence = decision.confidence;
 
-        // Preserve evidence from decision result
         return new AssistantResponse(
             project,
             decision.message,
             confidence,
-            // Reconstruct DecisionContext from decision evidence for preservation
             DecisionContext.fromEvidence({
                 traceId: decision.traceId,
                 inputHash: decision.inputHash,
@@ -60,6 +58,25 @@ export class AssistantEngine {
                 limitations: decision.limitations
             })
         );
+    }
+
+    analyzeWithIntelligence(
+        input: IntelligenceInput,
+        context: IntelligenceContext
+    ) {
+        const reasoning = this.intelligenceEngine.reason(input, context);
+
+        const decision = this.phase06DecisionEngine.evaluate({
+            problem: input.problem,
+            objective: "Analyze and decide based on intelligence reasoning",
+            assumptions: [],
+            reasoning,
+            evidence: context.evidenceItems,
+            rules: [],
+            tenantId: input.tenantId
+        });
+
+        return { reasoning, decision };
     }
 
 }
