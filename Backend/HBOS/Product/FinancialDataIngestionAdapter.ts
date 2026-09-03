@@ -5,7 +5,7 @@ import { SQLitePersistenceStore } from "./SQLitePersistenceStore";
 
 export interface FinancialSourceEvidence {
   readonly sourceName: string;
-  readonly sourceType: "CSV";
+  readonly sourceType: "CSV" | "STRUCTURED";
   readonly sha256: string;
   readonly receivedAt: string;
 }
@@ -46,8 +46,14 @@ export class FinancialDataIngestionAdapter {
   async ingestFile(tenantId: string, sourcePath: string): Promise<FinancialIngestionResult> {
     const normalizedPath = sourcePath.trim();
     if (!normalizedPath) throw new Error("ingestion-source-path-required");
-    const csv = await readFile(normalizedPath, "utf8");
-    return this.ingestCsv(tenantId, basename(normalizedPath), csv);
+    const sourceName = basename(normalizedPath);
+    const ext = sourceName.toLowerCase().split('.').pop();
+    const content = await readFile(normalizedPath, "utf8");
+
+    if (ext === 'json') {
+      return this.ingestStructured(tenantId, sourceName, content);
+    }
+    return this.ingestCsv(tenantId, sourceName, content);
   }
 
   async ingestCsv(tenantId: string, sourceName: string, csv: string): Promise<FinancialIngestionResult> {
@@ -65,6 +71,54 @@ export class FinancialDataIngestionAdapter {
     };
 
     const transactions = this.parseAndValidate(csv);
+    const debit = this.round(transactions.reduce((sum, row) => sum + row.debit, 0));
+    const credit = this.round(transactions.reduce((sum, row) => sum + row.credit, 0));
+
+    const model: FinancialCanonicalModel = {
+      tenantId: normalizedTenant,
+      source,
+      transactions,
+      totals: { debit, credit, balance: this.round(debit - credit) },
+    };
+
+    await this.persistence.write({ tenantId: normalizedTenant }, `financial-ingestion:${source.sha256}`, model);
+    return { evidence: source, model, persisted: true };
+  }
+
+  async ingestStructured(tenantId: string, sourceName: string, json: string): Promise<FinancialIngestionResult> {
+    const normalizedTenant = tenantId.trim();
+    const normalizedSource = sourceName.trim();
+    if (!normalizedTenant) throw new Error("ingestion-tenant-required");
+    if (!normalizedSource) throw new Error("ingestion-source-required");
+    if (!json.trim()) throw new Error("ingestion-source-empty");
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(json);
+    } catch {
+      throw new Error("ingestion-json-parse-error");
+    }
+
+    if (typeof parsed !== "object" || parsed === null || !Array.isArray((parsed as Record<string, unknown>).transactions)) {
+      throw new Error("ingestion-structured-schema-invalid");
+    }
+
+    const raw = parsed as {
+      tenantId?: string;
+      transactions: unknown[];
+    };
+
+    const sha256 = createHash("sha256").update(json, "utf8").digest("hex");
+    const receivedAt = new Date().toISOString();
+
+    const source: FinancialSourceEvidence = {
+      sourceName: normalizedSource,
+      sourceType: "STRUCTURED",
+      sha256,
+      receivedAt,
+    };
+
+    const transactions = this.validateStructuredTransactions(raw.transactions, json);
     const debit = this.round(transactions.reduce((sum, row) => sum + row.debit, 0));
     const credit = this.round(transactions.reduce((sum, row) => sum + row.credit, 0));
 
@@ -132,4 +186,30 @@ export class FinancialDataIngestionAdapter {
   }
 
   private round(value: number): number { return Math.round((value + Number.EPSILON) * 100) / 100; }
+
+  private validateStructuredTransactions(txns: unknown[], rawJson: string): FinancialTransaction[] {
+    if (!Array.isArray(txns)) throw new Error("ingestion-structured-schema-invalid");
+
+    return txns.map((txn, index) => {
+      if (typeof txn !== "object" || txn === null) {
+        throw new Error(`ingestion-structured-txn-invalid:${index}`);
+      }
+      const row = txn as Record<string, unknown>;
+      const date = String(row.date ?? "");
+      const account = String(row.account ?? "");
+      const debit = typeof row.debit === "number" ? row.debit : 0;
+      const credit = typeof row.credit === "number" ? row.credit : 0;
+      const currency = String(row.currency ?? "");
+
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error(`ingestion-date-invalid:${index}`);
+      if (!account) throw new Error(`ingestion-account-invalid:${index}`);
+      if (!currency) throw new Error(`ingestion-currency-invalid:${index}`);
+      if (debit === 0 && credit === 0) throw new Error(`ingestion-zero-row:${index}`);
+      if (debit > 0 && credit > 0) throw new Error(`ingestion-double-sided-row:${index}`);
+      if (!Number.isFinite(debit) || debit < 0) throw new Error(`ingestion-amount-invalid:debit:${index}`);
+      if (!Number.isFinite(credit) || credit < 0) throw new Error(`ingestion-amount-invalid:credit:${index}`);
+
+      return { date, account, debit: this.round(debit), credit: this.round(credit), currency };
+    });
+  }
 }

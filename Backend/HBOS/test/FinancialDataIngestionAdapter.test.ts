@@ -1,4 +1,4 @@
-﻿import { createHash } from "node:crypto";
+import { createHash } from "node:crypto";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -96,6 +96,90 @@ describe("FinancialDataIngestionAdapter", () => {
             adapter.ingestCsv("tenant-a", "bad.csv", invalid),
         ).rejects.toThrow("ingestion-double-sided-row:2");
 
+        database.close();
+    });
+
+    test("ingests a valid JSON (STRUCTURED) file and persists", async () => {
+        const structuredJson = JSON.stringify({
+            transactions: [
+                { date: "2026-08-01", account: "Cash", debit: 1000, credit: 0, currency: "IRR" },
+                { date: "2026-08-01", account: "Sales", debit: 0, credit: 1000, currency: "IRR" },
+            ],
+        });
+        const database = new SQLitePersistenceStore({ databasePath: join(directory, "financial.sqlite") });
+        const adapter = new FinancialDataIngestionAdapter(database);
+
+        const result = await adapter.ingestStructured("tenant-a", "ledger.json", structuredJson);
+
+        expect(result.persisted).toBe(true);
+        expect(result.evidence.sourceType).toBe("STRUCTURED");
+        expect(result.evidence.sourceName).toBe("ledger.json");
+        expect(result.model.tenantId).toBe("tenant-a");
+        expect(result.model.transactions).toHaveLength(2);
+        expect(result.model.totals).toEqual({ debit: 1000, credit: 1000, balance: 0 });
+        database.close();
+    });
+
+    test("rejects malformed JSON before persistence", async () => {
+        const database = new SQLitePersistenceStore({ databasePath: join(directory, "financial.sqlite") });
+        const adapter = new FinancialDataIngestionAdapter(database);
+
+        await expect(adapter.ingestStructured("tenant-a", "bad.json", "{ invalid json")).rejects.toThrow("ingestion-json-parse-error");
+        database.close();
+    });
+
+    test("rejects schema-invalid structured data", async () => {
+        const database = new SQLitePersistenceStore({ databasePath: join(directory, "financial.sqlite") });
+        const adapter = new FinancialDataIngestionAdapter(database);
+
+        await expect(adapter.ingestStructured("tenant-a", "bad.json", JSON.stringify({ notTransactions: [] }))).rejects.toThrow("ingestion-structured-schema-invalid");
+        database.close();
+    });
+
+    test("rejects double-sided transaction rows in structured data", async () => {
+        const database = new SQLitePersistenceStore({ databasePath: join(directory, "financial.sqlite") });
+        const adapter = new FinancialDataIngestionAdapter(database);
+        const invalid = JSON.stringify({
+            transactions: [
+                { date: "2026-08-01", account: "Cash", debit: 100, credit: 50, currency: "IRR" },
+            ],
+        });
+
+        await expect(adapter.ingestStructured("tenant-a", "bad.json", invalid)).rejects.toThrow("ingestion-double-sided-row:0");
+        database.close();
+    });
+
+    test("dispatches .json files to ingestStructured via ingestFile", async () => {
+        const structuredJson = JSON.stringify({
+            transactions: [
+                { date: "2026-08-01", account: "Cash", debit: 500, credit: 0, currency: "IRR" },
+                { date: "2026-08-01", account: "Sales", debit: 0, credit: 500, currency: "IRR" },
+            ],
+        });
+        const sourcePath = join(directory, "ledger.json");
+        writeFileSync(sourcePath, structuredJson, "utf8");
+        const database = new SQLitePersistenceStore({ databasePath: join(directory, "financial.sqlite") });
+        const adapter = new FinancialDataIngestionAdapter(database);
+
+        const result = await adapter.ingestFile("tenant-a", sourcePath);
+
+        expect(result.evidence.sourceType).toBe("STRUCTURED");
+        expect(result.model.totals).toEqual({ debit: 500, credit: 500, balance: 0 });
+        database.close();
+    });
+
+    test("keeps structured data tenant-scoped", async () => {
+        const structuredJson = JSON.stringify({
+            transactions: [
+                { date: "2026-08-01", account: "Cash", debit: 1000, credit: 0, currency: "IRR" },
+                { date: "2026-08-01", account: "Sales", debit: 0, credit: 1000, currency: "IRR" },
+            ],
+        });
+        const database = new SQLitePersistenceStore({ databasePath: join(directory, "financial.sqlite") });
+        const adapter = new FinancialDataIngestionAdapter(database);
+        const result = await adapter.ingestStructured("tenant-a", "ledger.json", structuredJson);
+
+        await expect(database.read({ tenantId: "tenant-b" }, `financial-ingestion:${result.evidence.sha256}`)).resolves.toBeNull();
         database.close();
     });
 });
