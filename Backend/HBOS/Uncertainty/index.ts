@@ -1,12 +1,12 @@
 /**
- * Stage 07-D.A/B/C - Uncertainty Module
+ * Stage 07-D.A/B/C + 07-E - Uncertainty Module
  *
  * Exports for uncertainty contract, residual foundation,
- * empirical prediction intervals, and coverage/calibration evaluation.
+ * empirical prediction intervals, coverage/calibration evaluation,
+ * Monte Carlo simulation, and scenario risk.
  */
 
 export {
-    // Types
     UncertaintyMethod,
     UncertaintyStatus,
     PredictionInterval,
@@ -18,30 +18,19 @@ export {
     ResidualProvenance
 } from "./UncertaintyTypes";
 
-export {
-    // Residual Analyzer
-    ResidualAnalyzer
-} from "./ResidualAnalyzer";
+export { ResidualAnalyzer } from "./ResidualAnalyzer";
+
+export { EmpiricalPredictionInterval } from "./EmpiricalPredictionInterval";
 
 export {
-    // Stage 07-D.B: Empirical Prediction Intervals
-    EmpiricalPredictionInterval
-} from "./EmpiricalPredictionInterval";
-
-export {
-    // Stage 07-D.B Types
     EmpiricalIntervalInput,
     EmpiricalIntervalResult,
     QuantileProvenance
 } from "./EmpiricalPredictionInterval";
 
-export {
-    // Stage 07-D.C: Coverage & Calibration
-    CalibrationEvaluator
-} from "./CalibrationEvaluator";
+export { CalibrationEvaluator } from "./CalibrationEvaluator";
 
 export {
-    // Stage 07-D.C Types
     CalibrationStatus,
     CoverageLevelResult,
     HorizonCoverage,
@@ -50,3 +39,23 @@ export {
     MultiLevelCalibrationReport,
     CalibrationConfig
 } from "./CalibrationEvaluator";
+
+// Stage 07-E: Monte Carlo / Scenario Risk
+export { SeededRNG_create } from "./SeededRNG";
+export type { SeededRNG } from "./SeededRNG";
+
+export { simulate } from "./MonteCarloSimulator";
+
+export { runScenarios, sensitivityAnalysis } from "./ScenarioEngine";
+
+export type {
+    Scenario,
+    SimulationInput,
+    SimulationStatistics,
+    ScenarioResult,
+    SensitivityResult,
+    SimulationProvenance,
+    SimulationStatus,
+    SimulationResult,
+    ResidualSetLike
+} from "./MonteCarloTypes";
