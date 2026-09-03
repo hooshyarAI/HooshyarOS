@@ -4,6 +4,7 @@ import { basename } from "node:path";
 import ExcelJS from "exceljs-hardened";
 import { SQLitePersistenceStore } from "./SQLitePersistenceStore";
 import { decodeTextBytes } from "./TextFileDecoder";
+import { acquireImage, type ImageSource } from "./ImageAcquisition";
 
 export type TxtEncoding = "UTF-8" | "UTF-8-BOM" | "UTF-16LE" | "UTF-16BE";
 
@@ -81,7 +82,7 @@ export interface BatchIngestionResult {
  * XLS is deliberately absent â€” it is BLOCKED on dependency resolution.
  * The union is open to extension as new format routes are added.
  */
-export type FileSourceType = "CSV" | "STRUCTURED" | "XLSX";
+export type FileSourceType = "CSV" | "STRUCTURED" | "XLSX" | "IMAGE";
 
 /**
  * IANA-style media type identifiers for the supported file sources.
@@ -91,7 +92,9 @@ export type FileSourceType = "CSV" | "STRUCTURED" | "XLSX";
 export type FileSourceMediaType =
   | "text/csv"
   | "application/json"
-  | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  | "image/png"
+  | "image/jpeg";
 
 /**
  * Reference to the persisted raw bytes of a file source.
@@ -460,6 +463,15 @@ export class FinancialDataIngestionAdapter {
       return this.ingestTxt(tenantId, sourceName, normalizedPath);
     }
 
+    if (ext === 'png' || ext === 'jpg' || ext === 'jpeg') {
+      // Validate via the raw-image acquisition contract, then signal that
+      // OCR is required to produce transactions. This preserves the
+      // canonical ingestFile signature without inventing a fake model.
+      const imgRaw = await readFile(normalizedPath);
+      acquireImage({ sourceName, rawBytes: imgRaw });
+      throw new Error("ingestion-image-requires-ocr");
+    }
+
     if (ext === 'xlsx' || ext === 'xls') {
       // Read raw bytes for provenance
       const rawBytes = await readFile(normalizedPath);
@@ -619,6 +631,20 @@ export class FinancialDataIngestionAdapter {
 
     await this.persistence.write({ tenantId: normalizedTenant }, `financial-ingestion:${source.sha256}`, model);
     return { evidence: source, model, persisted: true };
+  }
+
+  /**
+   * Stage 08-IMG.1: Raw image acquisition. Validates magic bytes,
+   * size and extension for .png/.jpeg and returns an ImageSource
+   * describing the validated file. NO OCR is performed here —
+   * OCR is the job of stage 08-IMG.2/08-IMG.3.
+   */
+  async ingestImage(sourcePath: string): Promise<ImageSource> {
+    const normalizedPath = sourcePath.trim();
+    if (!normalizedPath) throw new Error("ingestion-source-path-required");
+    const sourceName = require("node:path").basename(normalizedPath);
+    const rawBytes = await readFile(normalizedPath);
+    return acquireImage({ sourceName, rawBytes });
   }
 
   /**
