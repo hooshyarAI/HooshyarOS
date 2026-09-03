@@ -1,11 +1,14 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
+import ExcelJS from "exceljs-hardened";
 import { SQLitePersistenceStore } from "./SQLitePersistenceStore";
+
+export type SourceType = "CSV" | "STRUCTURED" | "XLS" | "XLSX";
 
 export interface FinancialSourceEvidence {
   readonly sourceName: string;
-  readonly sourceType: "CSV" | "STRUCTURED";
+  readonly sourceType: SourceType;
   readonly sha256: string;
   readonly receivedAt: string;
 }
@@ -57,23 +60,295 @@ export interface BatchIngestionResult {
 }
 
 /**
+ * Configuration for spreadsheet ingestion resource controls
+ * These are initial policy values, NOT scientifically verified thresholds
+ */
+export interface SpreadsheetIngestionConfig {
+  /** Maximum file size for XLS in bytes (default: 10 MB) */
+  readonly xlsMaxSizeBytes: number;
+  /** Maximum parse time for XLS in milliseconds (default: 60 s) */
+  readonly xlsParseBudgetMs: number;
+  /** Maximum file size for XLSX in bytes (default: 5 MB) */
+  readonly xlsxMaxSizeBytes: number;
+  /** Maximum zip entry size for XLSX in bytes (default: 128 MB) */
+  readonly xlsxZipEntryLimitBytes: number;
+  /** Maximum total uncompressed size for XLSX in bytes (default: 512 MB) */
+  readonly xlsxTotalUncompressedLimitBytes: number;
+}
+
+/** Default spreadsheet ingestion configuration - INITIAL POLICY VALUES */
+export const DEFAULT_SPREADSHEET_CONFIG: SpreadsheetIngestionConfig = {
+  xlsMaxSizeBytes: 10 * 1024 * 1024, // 10 MB
+  xlsParseBudgetMs: 60 * 1000, // 60 s
+  xlsxMaxSizeBytes: 5 * 1024 * 1024, // 5 MB
+  xlsxZipEntryLimitBytes: 128 * 1024 * 1024, // 128 MB
+  xlsxTotalUncompressedLimitBytes: 512 * 1024 * 1024, // 512 MB
+};
+
+/**
+ * Magic bytes for format detection
+ */
+const XLS_MAGIC_BYTES = Buffer.from([0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]);
+const XLSX_ZIP_MAGIC_BYTES = Buffer.from([0x50, 0x4B, 0x03, 0x04]);
+
+/**
+ * Detect format from magic bytes
+ */
+function detectFormatFromMagicBytes(buffer: Buffer): SourceType | null {
+  if (buffer.length >= 8 && XLS_MAGIC_BYTES.equals(buffer.subarray(0, 8))) {
+    return "XLS";
+  }
+  if (buffer.length >= 4 && XLSX_ZIP_MAGIC_BYTES.equals(buffer.subarray(0, 4))) {
+    return "XLSX";
+  }
+  return null;
+}
+
+/**
+ * Validate extension matches detected format
+ */
+function validateExtensionMatchesFormat(sourceName: string, detectedFormat: SourceType): void {
+  const ext = sourceName.toLowerCase().split('.').pop();
+  if (ext === "xls" && detectedFormat !== "XLS") {
+    throw new Error("ingestion-format-mismatch");
+  }
+  if (ext === "xlsx" && detectedFormat !== "XLSX") {
+    throw new Error("ingestion-format-mismatch");
+  }
+  // Also reject unsupported extensions that might slip through
+  if ((ext === "xls" || ext === "xlsx") && detectedFormat !== "XLS" && detectedFormat !== "XLSX") {
+    throw new Error("ingestion-format-unsupported");
+  }
+}
+
+/**
+ * Excel serial date converter
+ * Excel dates are stored as days since 1900-01-01 (with a leap year bug)
+ * @param serial Excel serial date number
+ * @returns ISO date string (YYYY-MM-DD) in UTC
+ */
+function excelSerialToDate(serial: number): string {
+  // Excel's epoch is 1900-01-01 (serial 1)
+  // But Excel incorrectly assumes 1900 was a leap year
+  // So we subtract 1 for dates after 1900-02-28
+  const EXCEL_EPOCH = new Date(Date.UTC(1900, 0, 1));
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+  // If serial is 0 or negative, it's invalid
+  if (!Number.isFinite(serial) || serial <= 0) {
+    throw new Error("ingestion-date-invalid");
+  }
+
+  // Account for Excel's leap year bug
+  let daysToAdd = serial;
+  if (serial > 60) {
+    daysToAdd -= 1;
+  }
+
+  const date = new Date(EXCEL_EPOCH.getTime() + daysToAdd * MS_PER_DAY);
+
+  // Validate the result is a real date
+  if (!Number.isFinite(date.getTime())) {
+    throw new Error("ingestion-date-invalid");
+  }
+
+  // Return as UTC date string to avoid timezone shifts
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Parse a cell value from Excel, handling various types
+ * Returns null for empty cells, throws for invalid data
+ */
+function parseExcelCellValue(value: unknown, row: number, field: string): string | number {
+  if (value === null || value === undefined || value === "") {
+    return ""; // Empty cell
+  }
+
+  // String value
+  if (typeof value === "string") {
+    return value.trim();
+  }
+
+  // Number value (including dates stored as numbers)
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) {
+      throw new Error(`ingestion-cell-invalid:${field}:${row}`);
+    }
+    return value;
+  }
+
+  // Boolean
+  if (typeof value === "boolean") {
+    return value ? 1 : 0;
+  }
+
+  // Unsupported type
+  throw new Error(`ingestion-cell-invalid:${field}:${row}`);
+}
+
+/**
+ * Convert ExcelJS worksheet row to financial transaction
+ */
+function worksheetRowToTransaction(row: ExcelJS.Row, rowIndex: number): FinancialTransaction | null {
+  // ExcelJS uses sparse arrays - values start at index 1
+  const values = row.values as (string | number | boolean | null | undefined)[];
+
+  // Skip header row (rowIndex 1 in ExcelJS means first row)
+  if (rowIndex === 1) {
+    return null;
+  }
+
+  // Get cell values (1-indexed in ExcelJS, so values[1] is column A)
+  const dateVal = values[1];
+  const accountVal = values[2];
+  const debitVal = values[3];
+  const creditVal = values[4];
+  const currencyVal = values[5];
+
+  // Validate date - could be a number (Excel serial) or string (ISO)
+  let date: string;
+  if (dateVal === null || dateVal === undefined || dateVal === "") {
+    throw new Error(`ingestion-date-invalid:${rowIndex}`);
+  }
+
+  if (typeof dateVal === "number") {
+    date = excelSerialToDate(dateVal);
+  } else if (typeof dateVal === "string") {
+    // Validate ISO date format
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateVal.trim())) {
+      throw new Error(`ingestion-date-invalid:${rowIndex}`);
+    }
+    date = dateVal.trim();
+  } else {
+    throw new Error(`ingestion-date-invalid:${rowIndex}`);
+  }
+
+  // Validate account
+  const accountStr = String(accountVal ?? "").trim();
+  if (!accountStr) {
+    throw new Error(`ingestion-account-invalid:${rowIndex}`);
+  }
+
+  // Validate currency
+  const currencyStr = String(currencyVal ?? "").trim();
+  if (!currencyStr) {
+    throw new Error(`ingestion-currency-invalid:${rowIndex}`);
+  }
+
+  // Parse amounts - debit/credit should be numbers or empty
+  let debit: number;
+  let credit: number;
+
+  if (debitVal === null || debitVal === undefined || debitVal === "") {
+    debit = 0;
+  } else if (typeof debitVal === "number") {
+    if (!Number.isFinite(debitVal) || debitVal < 0) {
+      throw new Error(`ingestion-amount-invalid:debit:${rowIndex}`);
+    }
+    debit = debitVal;
+  } else {
+    throw new Error(`ingestion-amount-invalid:debit:${rowIndex}`);
+  }
+
+  if (creditVal === null || creditVal === undefined || creditVal === "") {
+    credit = 0;
+  } else if (typeof creditVal === "number") {
+    if (!Number.isFinite(creditVal) || creditVal < 0) {
+      throw new Error(`ingestion-amount-invalid:credit:${rowIndex}`);
+    }
+    credit = creditVal;
+  } else {
+    throw new Error(`ingestion-amount-invalid:credit:${rowIndex}`);
+  }
+
+  // Validate transaction rules
+  if (debit === 0 && credit === 0) {
+    throw new Error(`ingestion-zero-row:${rowIndex}`);
+  }
+  if (debit > 0 && credit > 0) {
+    throw new Error(`ingestion-double-sided-row:${rowIndex}`);
+  }
+
+  return {
+    date,
+    account: accountStr,
+    debit: Math.round((debit + Number.EPSILON) * 100) / 100,
+    credit: Math.round((credit + Number.EPSILON) * 100) / 100,
+    currency: currencyStr,
+  };
+}
+
+/**
  * Canonical financial-data vertical slice.
- * File source -> CSV ingestion -> validation -> canonical normalization
+ * File source -> CSV/JSON/Excel ingestion -> validation -> canonical normalization
  * -> tenant-scoped persistence -> independently calculated financial summary.
  */
 export class FinancialDataIngestionAdapter {
-  constructor(private readonly persistence: SQLitePersistenceStore) {}
+  private readonly config: SpreadsheetIngestionConfig;
+
+  constructor(
+    private readonly persistence: SQLitePersistenceStore,
+    config: Partial<SpreadsheetIngestionConfig> = {}
+  ) {
+    this.config = { ...DEFAULT_SPREADSHEET_CONFIG, ...config };
+  }
 
   async ingestFile(tenantId: string, sourcePath: string): Promise<FinancialIngestionResult> {
     const normalizedPath = sourcePath.trim();
     if (!normalizedPath) throw new Error("ingestion-source-path-required");
     const sourceName = basename(normalizedPath);
     const ext = sourceName.toLowerCase().split('.').pop();
-    const content = await readFile(normalizedPath, "utf8");
 
     if (ext === 'json') {
+      const content = await readFile(normalizedPath, "utf8");
       return this.ingestStructured(tenantId, sourceName, content);
     }
+
+    if (ext === 'xlsx' || ext === 'xls') {
+      // Read raw bytes for provenance
+      const rawBytes = await readFile(normalizedPath);
+
+      // Check file size limits
+      if (ext === 'xls' && rawBytes.length > this.config.xlsMaxSizeBytes) {
+        throw new Error("ingestion-file-too-large");
+      }
+      if (ext === 'xlsx' && rawBytes.length > this.config.xlsxMaxSizeBytes) {
+        throw new Error("ingestion-file-too-large");
+      }
+
+      // Detect format from magic bytes
+      const detectedFormat = detectFormatFromMagicBytes(rawBytes);
+      if (!detectedFormat) {
+        throw new Error("ingestion-format-unsupported");
+      }
+
+      // Validate extension matches detected format
+      validateExtensionMatchesFormat(sourceName, detectedFormat);
+
+      // Route to appropriate parser
+      if (detectedFormat === "XLSX") {
+        return this.ingestXlsx(tenantId, sourceName, rawBytes);
+      }
+      // XLS detection but wrong extension handled above
+      throw new Error("ingestion-format-unsupported");
+    }
+
+    // For other extensions (csv, txt, etc.), do magic byte check first
+    // If it looks like an Excel file but has wrong extension, reject it
+    const rawBytes = await readFile(normalizedPath);
+    const detectedFormat = detectFormatFromMagicBytes(rawBytes);
+    if (detectedFormat === "XLS" || detectedFormat === "XLSX") {
+      // Has Excel magic bytes but wrong extension - reject
+      throw new Error("ingestion-format-unsupported");
+    }
+
+    // Default: CSV
+    const content = await readFile(normalizedPath, "utf8");
     return this.ingestCsv(tenantId, sourceName, content);
   }
 
@@ -193,6 +468,141 @@ export class FinancialDataIngestionAdapter {
 
     await this.persistence.write({ tenantId: normalizedTenant }, `financial-ingestion:${source.sha256}`, model);
     return { evidence: source, model, persisted: true };
+  }
+
+  /**
+   * Ingest XLSX file using exceljs-hardened
+   * Formula evaluation is disabled - only cell values are read
+   */
+  private async ingestXlsx(tenantId: string, sourceName: string, rawBytes: Buffer): Promise<FinancialIngestionResult> {
+    const normalizedTenant = tenantId.trim();
+    const normalizedSource = sourceName.trim();
+    if (!normalizedTenant) throw new Error("ingestion-tenant-required");
+    if (!normalizedSource) throw new Error("ingestion-source-required");
+    if (rawBytes.length === 0) throw new Error("ingestion-source-empty");
+
+    const sha256 = createHash("sha256").update(rawBytes).digest("hex");
+    const receivedAt = new Date().toISOString();
+
+    const source: FinancialSourceEvidence = {
+      sourceName: normalizedSource,
+      sourceType: "XLSX",
+      sha256,
+      receivedAt,
+    };
+
+    // Parse with timeout and error handling
+    let transactions: FinancialTransaction[];
+    try {
+      const parsePromise = this.parseXlsx(rawBytes);
+
+      // Create timeout promise
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("ingestion-parse-timeout")), this.config.xlsParseBudgetMs);
+      });
+
+      transactions = await Promise.race([parsePromise, timeoutPromise]);
+    } catch (error) {
+      if (error instanceof Error) {
+        // Let validation errors propagate with their original codes
+        if (error.message.startsWith("ingestion-")) {
+          throw error;
+        }
+        // Timeout error
+        if (error.message === "ingestion-parse-timeout") {
+          throw error;
+        }
+        // Zip parse errors (corrupted zip, etc.) - convert to excel parse error
+        if (error.message.includes("Corrupted zip") ||
+            error.message.includes("can't find end of central directory") ||
+            error.message.includes("Invalid signature") ||
+            error.message.includes("End of data reached")) {
+          throw new Error("ingestion-excel-parse-error");
+        }
+      }
+      // Unknown error - convert to excel parse error
+      throw new Error("ingestion-excel-parse-error");
+    }
+
+    if (transactions.length === 0) {
+      throw new Error("ingestion-empty-workbook");
+    }
+
+    const debit = this.round(transactions.reduce((sum, row) => sum + row.debit, 0));
+    const credit = this.round(transactions.reduce((sum, row) => sum + row.credit, 0));
+
+    const model: FinancialCanonicalModel = {
+      tenantId: normalizedTenant,
+      source,
+      transactions,
+      totals: { debit, credit, balance: this.round(debit - credit) },
+    };
+
+    await this.persistence.write({ tenantId: normalizedTenant }, `financial-ingestion:${source.sha256}`, model);
+    return { evidence: source, model, persisted: true };
+  }
+
+  /**
+   * Parse XLSX content using exceljs-hardened
+   * Formulas are treated as untrusted input - only values are extracted
+   */
+  private async parseXlsx(rawBytes: Buffer): Promise<FinancialTransaction[]> {
+    const workbook = new ExcelJS.Workbook();
+
+    // Type assertion needed because Node.js Buffer and exceljs-hardened Buffer types differ
+    const buffer = rawBytes as unknown as ArrayBuffer;
+
+    // exceljs-hardened security features:
+    // - CVE fix for decompression bombs (maxEntryUncompressedSize, maxTotalUncompressedSize)
+    // - No formula evaluation by default - only cached values are read
+    await workbook.xlsx.load(buffer, {
+      // Security: Limit zip entry uncompressed size to 128MB (CWE-409)
+      maxEntryUncompressedSize: this.config.xlsxZipEntryLimitBytes,
+      // Security: Limit total uncompressed size to 512MB (CWE-409)
+      maxTotalUncompressedSize: this.config.xlsxTotalUncompressedLimitBytes,
+    });
+
+    const worksheet = workbook.getWorksheet(1);
+    if (!worksheet) {
+      throw new Error("ingestion-empty-workbook");
+    }
+
+    // Validate header row first
+    // ExcelJS uses sparse arrays - values start at index 1, index 0 is often undefined
+    const firstRow = worksheet.getRow(1);
+    const headerValues = (firstRow.values || []) as (string | number | boolean | null | undefined)[];
+
+    // Filter out undefined/null values and get actual header values
+    // Headers should be at indices 1-5 (date, account, debit, credit, currency)
+    const headers: string[] = [];
+    for (let i = 1; i <= 5; i++) {
+      const value = headerValues[i];
+      headers.push(String(value ?? "").toLowerCase().trim());
+    }
+
+    const expected = ["date", "account", "debit", "credit", "currency"];
+
+    if (headers.length !== expected.length || headers.some((value, index) => value !== expected[index])) {
+      throw new Error("ingestion-schema-invalid");
+    }
+
+    const transactions: FinancialTransaction[] = [];
+
+    worksheet.eachRow((row, rowIndex) => {
+      // Skip header row
+      if (rowIndex === 1) return;
+
+      const txn = worksheetRowToTransaction(row, rowIndex);
+      if (txn) {
+        transactions.push(txn);
+      }
+    });
+
+    if (transactions.length === 0) {
+      throw new Error("ingestion-empty-workbook");
+    }
+
+    return transactions;
   }
 
   private parseAndValidate(csv: string): FinancialTransaction[] {
