@@ -35,6 +35,7 @@
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
-    "exceljs-hardened": "5.0.0"
+    "exceljs-hardened": "5.0.0",
+    "pdf-parse": "^2.4.5"
   }
 }
