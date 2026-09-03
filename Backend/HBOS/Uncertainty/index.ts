@@ -138,3 +138,33 @@ export type {
     TreatmentType,
     VariableType
 } from "./CausalTypes";
+// Stage 07-I: NLP / Grounded LLM Intelligence
+export {
+    retrieve,
+    searchKnowledge
+} from "./EvidenceRetriever";
+
+export type {
+    EvidenceChunk,
+    RetrievalQuery,
+    RetrievalResult,
+    GroundedResponse,
+    GroundedStatus,
+    LLMProvider,
+    LLMProviderType,
+    PromptContext,
+    LLMEnrichment,
+    ResponseProvenance
+} from "./NLPTypes";
+
+export { build } from "./GroundedResponseBuilder";
+
+export {
+    NullProvider,
+    LocalStubProvider,
+    createNullProvider,
+    createLocalStubProvider,
+    enrichAnswer
+} from "./LLMProviderInterface";
+
+export { validateGroundedResponse } from "./HallucinationGuard";
