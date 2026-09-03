@@ -1,8 +1,15 @@
-import { createHash } from "node:crypto";
+﻿import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import ExcelJS from "exceljs-hardened";
 import { SQLitePersistenceStore } from "./SQLitePersistenceStore";
+import { decodeTextBytes } from "./TextFileDecoder";
+
+export type TxtEncoding = "UTF-8" | "UTF-8-BOM" | "UTF-16LE" | "UTF-16BE";
+
+export interface TxtIngestionResult extends FinancialIngestionResult {
+  readonly encoding: TxtEncoding;
+}
 
 export type SourceType = "CSV" | "STRUCTURED" | "XLS" | "XLSX";
 
@@ -64,14 +71,14 @@ export interface BatchIngestionResult {
 // Supporting contract under the existing FinancialDataIngestionAdapter.
 // Defines the canonical pre-ingestion representation that all current and
 // future acquisition routes (CSV, JSON/STRUCTURED, XLSX, and future TXT/PDF/
-// image/API/DB sources) can share. XLS is NOT included — it remains a local
+// image/API/DB sources) can share. XLS is NOT included â€” it remains a local
 // dependency blocker (see 08-S.5). This contract is intentionally minimal
 // and does not create a new Engine or duplicate ingestion ownership.
 // ============================================================================
 
 /**
  * File source types currently supported by the canonical ingestion owner.
- * XLS is deliberately absent — it is BLOCKED on dependency resolution.
+ * XLS is deliberately absent â€” it is BLOCKED on dependency resolution.
  * The union is open to extension as new format routes are added.
  */
 export type FileSourceType = "CSV" | "STRUCTURED" | "XLSX";
@@ -90,7 +97,7 @@ export type FileSourceMediaType =
  * Reference to the persisted raw bytes of a file source.
  * The raw bytes themselves are stored via the existing canonical
  * SQLitePersistenceStore boundary, tenant-scoped at the persistence layer.
- * This ref is a truthful pointer — no fake storage is claimed.
+ * This ref is a truthful pointer â€” no fake storage is claimed.
  *
  * Format: "raw-source:<sha256>"
  * The sha256 acts as both content-identity and lookup key, so duplicate
@@ -160,7 +167,7 @@ export function createRawSourceRef(content: Buffer | string): RawSourceRef {
  * - Validates required identity fields (non-empty sourceName, non-empty sha256,
  *   non-empty receivedAt, non-negative byteLength, valid sourceType/mediaType).
  * - Computes the SHA-256 from the supplied raw bytes.
- * - The rawSourceRef is constructed but NOT persisted here — persistence is
+ * - The rawSourceRef is constructed but NOT persisted here â€” persistence is
  *   the caller's responsibility (preserves the existing tenant-scoped
  *   persistence boundary).
  *
@@ -449,6 +456,10 @@ export class FinancialDataIngestionAdapter {
       return this.ingestStructured(tenantId, sourceName, content);
     }
 
+    if (ext === 'txt') {
+      return this.ingestTxt(tenantId, sourceName, normalizedPath);
+    }
+
     if (ext === 'xlsx' || ext === 'xls') {
       // Read raw bytes for provenance
       const rawBytes = await readFile(normalizedPath);
@@ -608,6 +619,24 @@ export class FinancialDataIngestionAdapter {
 
     await this.persistence.write({ tenantId: normalizedTenant }, `financial-ingestion:${source.sha256}`, model);
     return { evidence: source, model, persisted: true };
+  }
+
+  /**
+   * Stage 08-DOC.1: TXT ingestion. Decodes the bytes via the TextFileDecoder
+   * (UTF-8 / UTF-8 BOM / UTF-16 LE / UTF-16 BE) and reuses the canonical CSV
+   * pipeline. The 5-column CSV schema check in `ingestCsv` enforces the
+   * rejection rule — TXT files whose content does not match the canonical
+   * ledger schema raise the same `ingestion-schema-invalid` error.
+   */
+  async ingestTxt(tenantId: string, sourceName: string, sourcePath: string): Promise<TxtIngestionResult> {
+    const normalizedTenant = tenantId.trim();
+    const normalizedSource = sourceName.trim();
+    if (!normalizedTenant) throw new Error("ingestion-tenant-required");
+    if (!normalizedSource) throw new Error("ingestion-source-required");
+    const rawBytes = await readFile(sourcePath);
+    const decoded = decodeTextBytes(rawBytes);
+    const result = await this.ingestCsv(normalizedTenant, normalizedSource, decoded.content);
+    return { ...result, encoding: decoded.encoding };
   }
 
   /**
@@ -825,3 +854,5 @@ export class FinancialDataIngestionAdapter {
     });
   }
 }
+
+
