@@ -1,9 +1,10 @@
 ﻿/**
- * Stage 07-D.A/B/C + 07-E + 07-F - Uncertainty Module
+ * Stage 07-D.A/B/C + 07-E + 07-F + 07-G - Uncertainty Module
  *
  * Exports for uncertainty contract, residual foundation,
  * empirical prediction intervals, coverage/calibration evaluation,
- * Monte Carlo simulation, scenario risk, ML, ensemble, and anomaly.
+ * Monte Carlo simulation, scenario risk, ML, ensemble, anomaly,
+ * Bayesian / Optimization.
  */
 
 export {
@@ -81,3 +82,37 @@ export type {
 
 export type { SourcePrediction, AggregateOptions } from "./EnsembleAggregator";
 export type { AnomalyContext } from "./AnomalyDetector";
+
+// Stage 07-G: Bayesian / Optimization
+export { ConjugateBayesian } from "./ConjugateBayesian";
+export { PosteriorPredictive } from "./PosteriorPredictive";
+export { Optimizer } from "./Optimizer";
+
+export type {
+    Prior,
+    NormalPrior,
+    BetaPrior,
+    UniformPrior,
+    PointPrior,
+    Likelihood,
+    NormalLikelihood,
+    BinomialLikelihood,
+    PoissonLikelihood,
+    Posterior,
+    NormalPosterior,
+    BetaPosterior,
+    UniformPosterior,
+    PointPosterior,
+    CredibleInterval,
+    BayesianUpdate,
+    ObjectiveFunction,
+    Constraint,
+    BoundConstraint,
+    LinearConstraint,
+    OptimizationResult,
+    BayesianProvenance,
+    OptimizationStatus,
+    PriorType,
+    LikelihoodType,
+    PosteriorDistributionType
+} from "./BayesianTypes";
