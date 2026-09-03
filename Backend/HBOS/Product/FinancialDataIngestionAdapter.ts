@@ -59,6 +59,146 @@ export interface BatchIngestionResult {
   readonly results: ReadonlyArray<BatchIngestionItem>;
 }
 
+// ============================================================================
+// Universal File Source Contract (Stage 08-F.1)
+// Supporting contract under the existing FinancialDataIngestionAdapter.
+// Defines the canonical pre-ingestion representation that all current and
+// future acquisition routes (CSV, JSON/STRUCTURED, XLSX, and future TXT/PDF/
+// image/API/DB sources) can share. XLS is NOT included — it remains a local
+// dependency blocker (see 08-S.5). This contract is intentionally minimal
+// and does not create a new Engine or duplicate ingestion ownership.
+// ============================================================================
+
+/**
+ * File source types currently supported by the canonical ingestion owner.
+ * XLS is deliberately absent — it is BLOCKED on dependency resolution.
+ * The union is open to extension as new format routes are added.
+ */
+export type FileSourceType = "CSV" | "STRUCTURED" | "XLSX";
+
+/**
+ * IANA-style media type identifiers for the supported file sources.
+ * Extensible: future TXT/PDF/IMAGE/API/DB routes will add their own values
+ * without breaking existing consumers.
+ */
+export type FileSourceMediaType =
+  | "text/csv"
+  | "application/json"
+  | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+/**
+ * Reference to the persisted raw bytes of a file source.
+ * The raw bytes themselves are stored via the existing canonical
+ * SQLitePersistenceStore boundary, tenant-scoped at the persistence layer.
+ * This ref is a truthful pointer — no fake storage is claimed.
+ *
+ * Format: "raw-source:<sha256>"
+ * The sha256 acts as both content-identity and lookup key, so duplicate
+ * raw content is naturally deduplicated at the persistence layer.
+ */
+export interface RawSourceRef {
+  readonly persistenceKey: string;
+  readonly sha256: string;
+  readonly byteLength: number;
+  readonly persisted: boolean;
+}
+
+/**
+ * Universal File Source Contract.
+ *
+ * Represents a single acquired file at the boundary BEFORE it is parsed into
+ * a FinancialCanonicalModel. Future format routes (TXT, PDF, image, OCR,
+ * API, DB) will produce this same contract, allowing the downstream
+ * validation, normalization, tenant-scoping, and persistence pipeline to
+ * remain unchanged.
+ *
+ * Distinguished from FinancialSourceEvidence:
+ *   - FileSource is the PRE-ingestion, byte-grounded source-of-truth.
+ *   - FinancialSourceEvidence is the POST-ingestion, compact summary
+ *     embedded inside the canonical model.
+ * Both coexist; neither replaces the other.
+ */
+export interface FileSource {
+  readonly sourceName: string;
+  readonly sourceType: FileSourceType;
+  readonly mediaType: FileSourceMediaType;
+  readonly sha256: string;
+  readonly receivedAt: string;
+  readonly byteLength: number;
+  readonly rawSourceRef: RawSourceRef;
+}
+
+/**
+ * Compute SHA-256 of arbitrary content.
+ * Exported so future routes can share the same hashing primitive.
+ */
+export function computeSourceSha256(content: Buffer | string): string {
+  return createHash("sha256").update(content).digest("hex");
+}
+
+/**
+ * Factory: build a RawSourceRef for the given content.
+ * The reference is a truthful pointer; the actual persistence happens at
+ * the adapter layer against the canonical SQLitePersistenceStore.
+ */
+export function createRawSourceRef(content: Buffer | string): RawSourceRef {
+  const sha256 = computeSourceSha256(content);
+  const byteLength = typeof content === "string"
+    ? Buffer.byteLength(content, "utf8")
+    : content.length;
+  return {
+    persistenceKey: `raw-source:${sha256}`,
+    sha256,
+    byteLength,
+    persisted: false,
+  };
+}
+
+/**
+ * Factory: build a FileSource.
+ *
+ * - Validates required identity fields (non-empty sourceName, non-empty sha256,
+ *   non-empty receivedAt, non-negative byteLength, valid sourceType/mediaType).
+ * - Computes the SHA-256 from the supplied raw bytes.
+ * - The rawSourceRef is constructed but NOT persisted here — persistence is
+ *   the caller's responsibility (preserves the existing tenant-scoped
+ *   persistence boundary).
+ *
+ * `receivedAt` defaults to the current time as an ISO-8601 UTC string.
+ */
+export function createFileSource(params: {
+  readonly sourceName: string;
+  readonly sourceType: FileSourceType;
+  readonly mediaType: FileSourceMediaType;
+  readonly rawBytes: Buffer | string;
+  readonly receivedAt?: string;
+}): FileSource {
+  const sourceName = params.sourceName.trim();
+  if (!sourceName) {
+    throw new Error("file-source-name-required");
+  }
+
+  const rawSourceRef = createRawSourceRef(params.rawBytes);
+  if (rawSourceRef.byteLength < 0) {
+    throw new Error("file-source-byte-length-invalid");
+  }
+
+  const receivedAt = params.receivedAt ?? new Date().toISOString();
+  if (typeof receivedAt !== "string" || !receivedAt.trim()) {
+    throw new Error("file-source-received-at-required");
+  }
+
+  return {
+    sourceName,
+    sourceType: params.sourceType,
+    mediaType: params.mediaType,
+    sha256: rawSourceRef.sha256,
+    receivedAt,
+    byteLength: rawSourceRef.byteLength,
+    rawSourceRef,
+  };
+}
+
 /**
  * Configuration for spreadsheet ingestion resource controls
  * These are initial policy values, NOT scientifically verified thresholds
