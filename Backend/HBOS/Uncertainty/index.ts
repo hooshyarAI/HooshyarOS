@@ -1,10 +1,10 @@
 ﻿/**
- * Stage 07-D.A/B/C + 07-E + 07-F + 07-G - Uncertainty Module
+ * Stage 07-D.A/B/C + 07-E + 07-F + 07-G + 07-H - Uncertainty Module
  *
  * Exports for uncertainty contract, residual foundation,
  * empirical prediction intervals, coverage/calibration evaluation,
  * Monte Carlo simulation, scenario risk, ML, ensemble, anomaly,
- * Bayesian / Optimization.
+ * Bayesian / Optimization, Causal / Counterfactual.
  */
 
 export {
@@ -116,3 +116,25 @@ export type {
     LikelihoodType,
     PosteriorDistributionType
 } from "./BayesianTypes";
+
+// Stage 07-H: Causal / Counterfactual
+export { AdjustmentEstimator } from "./AdjustmentEstimator";
+export { ConfoundingDetector } from "./ConfoundingDetector";
+export { PropensityScore } from "./PropensityScore";
+export { CounterfactualEngine } from "./CounterfactualEngine";
+
+export type {
+    TreatmentVariable,
+    OutcomeVariable,
+    Covariate,
+    CausalAssumptions,
+    CausalEstimand,
+    CausalEffect,
+    CausalResult,
+    CounterfactualScenario,
+    CausalStatus,
+    CausalProvenance,
+    CounterfactualStatus,
+    TreatmentType,
+    VariableType
+} from "./CausalTypes";
