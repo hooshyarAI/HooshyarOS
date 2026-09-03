@@ -168,3 +168,38 @@ export {
 } from "./LLMProviderInterface";
 
 export { validateGroundedResponse } from "./HallucinationGuard";
+
+// Stage 07-J: Explainability / Model Evaluation
+export {
+    EvaluationRecordBuilder
+} from "./EvaluationRecordBuilder";
+
+export {
+    DriftDetector
+} from "./DriftDetector";
+
+export {
+    FeatureContributionAnalyzer
+} from "./FeatureContribution";
+
+export {
+    AssumptionValidator
+} from "./AssumptionValidator";
+
+export {
+    EvaluationRegistry
+} from "./EvaluationRegistry";
+
+export type {
+    MethodIdentifier,
+    EvaluationMetric,
+    BaselineComparison,
+    CalibrationSummary,
+    DriftIndicator,
+    FeatureContribution as FeatureContributionType,
+    ExplanationEvidence,
+    MethodAssumption,
+    MethodLimitation,
+    EvaluationProvenance,
+    EvaluationRecord
+} from "./EvaluationTypes";
