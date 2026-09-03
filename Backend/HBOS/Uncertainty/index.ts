@@ -1,9 +1,9 @@
-/**
- * Stage 07-D.A/B/C + 07-E - Uncertainty Module
+﻿/**
+ * Stage 07-D.A/B/C + 07-E + 07-F - Uncertainty Module
  *
  * Exports for uncertainty contract, residual foundation,
  * empirical prediction intervals, coverage/calibration evaluation,
- * Monte Carlo simulation, and scenario risk.
+ * Monte Carlo simulation, scenario risk, ML, ensemble, and anomaly.
  */
 
 export {
@@ -59,3 +59,25 @@ export type {
     SimulationResult,
     ResidualSetLike
 } from "./MonteCarloTypes";
+
+// Stage 07-F: ML / Ensemble / Anomaly
+export { LinearRegressionModel } from "./LinearRegressionModel";
+export { AnomalyDetector, DEFAULT_MAD_THRESHOLD, DEFAULT_ZSCORE_THRESHOLD } from "./AnomalyDetector";
+export { EnsembleAggregator } from "./EnsembleAggregator";
+export { TrainTestSplitter } from "./TrainTestSplitter";
+
+export type {
+    TrainingDataPoint,
+    FeatureSpec,
+    LinearModel,
+    ModelIdentifier,
+    ModelMetrics,
+    TrainTestSplit,
+    AnomalyScore,
+    EnsemblePrediction,
+    Provenance,
+    ModelStatus
+} from "./MLTypes";
+
+export type { SourcePrediction, AggregateOptions } from "./EnsembleAggregator";
+export type { AnomalyContext } from "./AnomalyDetector";
