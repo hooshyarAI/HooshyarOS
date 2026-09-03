@@ -36,6 +36,27 @@ export interface FinancialIngestionResult {
 }
 
 /**
+ * Result of a single file in a batch ingestion operation
+ */
+export interface BatchIngestionItem {
+  readonly sourcePath: string;
+  readonly success: boolean;
+  readonly evidence?: FinancialSourceEvidence;
+  readonly error?: string;
+}
+
+/**
+ * Result of a batch ingestion operation
+ */
+export interface BatchIngestionResult {
+  readonly tenantId: string;
+  readonly totalFiles: number;
+  readonly successfulFiles: number;
+  readonly failedFiles: number;
+  readonly results: ReadonlyArray<BatchIngestionItem>;
+}
+
+/**
  * Canonical financial-data vertical slice.
  * File source -> CSV ingestion -> validation -> canonical normalization
  * -> tenant-scoped persistence -> independently calculated financial summary.
@@ -54,6 +75,47 @@ export class FinancialDataIngestionAdapter {
       return this.ingestStructured(tenantId, sourceName, content);
     }
     return this.ingestCsv(tenantId, sourceName, content);
+  }
+
+  /**
+   * Ingest multiple files in a single batch operation.
+   * Continues processing even if individual files fail (fail-fast: false).
+   * Returns summary with per-file success/failure details.
+   */
+  async ingestBatch(tenantId: string, sourcePaths: ReadonlyArray<string>): Promise<BatchIngestionResult> {
+    const normalizedTenant = tenantId.trim();
+    if (!normalizedTenant) throw new Error("ingestion-tenant-required");
+    if (!sourcePaths || sourcePaths.length === 0) throw new Error("ingestion-batch-empty");
+
+    const results: BatchIngestionItem[] = [];
+
+    for (const sourcePath of sourcePaths) {
+      try {
+        const result = await this.ingestFile(normalizedTenant, sourcePath);
+        results.push({
+          sourcePath,
+          success: true,
+          evidence: result.evidence,
+        });
+      } catch (error) {
+        results.push({
+          sourcePath,
+          success: false,
+          error: error instanceof Error ? error.message : "ingestion-batch-item-unknown-error",
+        });
+      }
+    }
+
+    const successfulFiles = results.filter((r) => r.success).length;
+    const failedFiles = results.filter((r) => !r.success).length;
+
+    return {
+      tenantId: normalizedTenant,
+      totalFiles: sourcePaths.length,
+      successfulFiles,
+      failedFiles,
+      results,
+    };
   }
 
   async ingestCsv(tenantId: string, sourceName: string, csv: string): Promise<FinancialIngestionResult> {

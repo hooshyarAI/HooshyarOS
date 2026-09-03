@@ -182,4 +182,93 @@ describe("FinancialDataIngestionAdapter", () => {
         await expect(database.read({ tenantId: "tenant-b" }, `financial-ingestion:${result.evidence.sha256}`)).resolves.toBeNull();
         database.close();
     });
+
+    test("ingests multiple files in a batch operation", async () => {
+        const sourcePath1 = join(directory, "ledger1.csv");
+        const sourcePath2 = join(directory, "ledger2.csv");
+        const structuredJson = JSON.stringify({
+            transactions: [
+                { date: "2026-08-01", account: "Cash", debit: 500, credit: 0, currency: "IRR" },
+                { date: "2026-08-01", account: "Sales", debit: 0, credit: 500, currency: "IRR" },
+            ],
+        });
+        const sourcePath3 = join(directory, "ledger3.json");
+        writeFileSync(sourcePath1, SOURCE, "utf8");
+        writeFileSync(sourcePath2, `date,account,debit,credit,currency\n2026-08-03,Expenses,100,0,IRR\n2026-08-03,Revenue,0,100,IRR`, "utf8");
+        writeFileSync(sourcePath3, structuredJson, "utf8");
+
+        const database = new SQLitePersistenceStore({ databasePath: join(directory, "financial.sqlite") });
+        const adapter = new FinancialDataIngestionAdapter(database);
+
+        const batchResult = await adapter.ingestBatch("tenant-a", [sourcePath1, sourcePath2, sourcePath3]);
+
+        expect(batchResult.totalFiles).toBe(3);
+        expect(batchResult.successfulFiles).toBe(3);
+        expect(batchResult.failedFiles).toBe(0);
+        expect(batchResult.tenantId).toBe("tenant-a");
+        expect(batchResult.results).toHaveLength(3);
+        expect(batchResult.results[0].success).toBe(true);
+        expect(batchResult.results[1].success).toBe(true);
+        expect(batchResult.results[2].success).toBe(true);
+        expect(batchResult.results[2].evidence?.sourceType).toBe("STRUCTURED");
+        database.close();
+    });
+
+    test("batch ingestion continues on individual file failure", async () => {
+        const sourcePath1 = join(directory, "valid.csv");
+        const sourcePath2 = join(directory, "invalid.csv");
+        const sourcePath3 = join(directory, "valid2.csv");
+        writeFileSync(sourcePath1, SOURCE, "utf8");
+        writeFileSync(sourcePath2, `date,account,debit,credit,currency\n2026-08-01,Cash,100,50,IRR`, "utf8");
+        writeFileSync(sourcePath3, `date,account,debit,credit,currency\n2026-08-03,Expenses,50,0,IRR\n2026-08-03,Revenue,0,50,IRR`, "utf8");
+
+        const database = new SQLitePersistenceStore({ databasePath: join(directory, "financial.sqlite") });
+        const adapter = new FinancialDataIngestionAdapter(database);
+
+        const batchResult = await adapter.ingestBatch("tenant-a", [sourcePath1, sourcePath2, sourcePath3]);
+
+        expect(batchResult.totalFiles).toBe(3);
+        expect(batchResult.successfulFiles).toBe(2);
+        expect(batchResult.failedFiles).toBe(1);
+        expect(batchResult.results[0].success).toBe(true);
+        expect(batchResult.results[1].success).toBe(false);
+        expect(batchResult.results[1].error).toContain("ingestion-double-sided-row");
+        expect(batchResult.results[2].success).toBe(true);
+        database.close();
+    });
+
+    test("rejects batch ingestion with empty file list", async () => {
+        const database = new SQLitePersistenceStore({ databasePath: join(directory, "financial.sqlite") });
+        const adapter = new FinancialDataIngestionAdapter(database);
+
+        await expect(adapter.ingestBatch("tenant-a", [])).rejects.toThrow("ingestion-batch-empty");
+        database.close();
+    });
+
+    test("rejects batch ingestion without tenant", async () => {
+        const database = new SQLitePersistenceStore({ databasePath: join(directory, "financial.sqlite") });
+        const adapter = new FinancialDataIngestionAdapter(database);
+        const sourcePath = join(directory, "ledger.csv");
+        writeFileSync(sourcePath, SOURCE, "utf8");
+
+        await expect(adapter.ingestBatch("", [sourcePath])).rejects.toThrow("ingestion-tenant-required");
+        database.close();
+    });
+
+    test("batch ingestion keeps all data tenant-scoped", async () => {
+        const sourcePath1 = join(directory, "ledger1.csv");
+        const sourcePath2 = join(directory, "ledger2.csv");
+        writeFileSync(sourcePath1, SOURCE, "utf8");
+        writeFileSync(sourcePath2, `date,account,debit,credit,currency\n2026-08-03,Expenses,100,0,IRR\n2026-08-03,Revenue,0,100,IRR`, "utf8");
+
+        const database = new SQLitePersistenceStore({ databasePath: join(directory, "financial.sqlite") });
+        const adapter = new FinancialDataIngestionAdapter(database);
+
+        const batchResult = await adapter.ingestBatch("tenant-a", [sourcePath1, sourcePath2]);
+
+        // Verify tenant-b cannot access tenant-a's data
+        const evidence1 = batchResult.results[0].evidence!;
+        await expect(database.read({ tenantId: "tenant-b" }, `financial-ingestion:${evidence1.sha256}`)).resolves.toBeNull();
+        database.close();
+    });
 });
