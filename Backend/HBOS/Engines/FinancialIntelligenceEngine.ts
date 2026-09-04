@@ -358,4 +358,28 @@ export class FinancialIntelligenceEngine implements Engine {
         }
         const capitalCharge = input.wacc * investedCapital;
         return { nopat, investedCapital, capitalCharge, eva: nopat - capitalCharge, status: "READY" };
+    }
+    // ========================================================================
+    // Phase 09-1.4: WACC (Weighted Average Cost of Capital)
+    // ========================================================================
+
+    /**
+     * WACC = (E/V) * Re + (D/V) * Rd * (1 - t)
+     * where V = E + D, Re = cost of equity, Rd = cost of debt, t = tax rate.
+     */
+    wacc(input: { equity: number; debt: number; costOfEquity: number; costOfDebt: number; taxRate: number }): { wacc: number; equityWeight: number; debtWeight: number; afterTaxCostOfDebt: number; status: "READY" | "BLOCKED" } {
+        if (!input || ![input.equity, input.debt, input.costOfEquity, input.costOfDebt, input.taxRate].every(Number.isFinite) ||
+            input.equity < 0 || input.debt < 0 ||
+            input.costOfEquity < 0 || input.costOfDebt < 0 ||
+            input.taxRate < 0 || input.taxRate > 1) {
+            return { wacc: 0, equityWeight: 0, debtWeight: 0, afterTaxCostOfDebt: 0, status: "BLOCKED" };
+        }
+        const v = input.equity + input.debt;
+        if (v === 0) {
+            return { wacc: 0, equityWeight: 0, debtWeight: 0, afterTaxCostOfDebt: input.costOfDebt * (1 - input.taxRate), status: "BLOCKED" };
+        }
+        const ew = input.equity / v;
+        const dw = input.debt / v;
+        const afterTax = input.costOfDebt * (1 - input.taxRate);
+        return { wacc: ew * input.costOfEquity + dw * afterTax, equityWeight: ew, debtWeight: dw, afterTaxCostOfDebt: afterTax, status: "READY" };
     }}
