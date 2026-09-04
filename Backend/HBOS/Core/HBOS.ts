@@ -12,6 +12,7 @@ import { ExecutiveIntelligenceEngine } from "../Engines/ExecutiveIntelligenceEng
 import { OrganizationalIntelligenceEngine } from "../Engines/OrganizationalIntelligenceEngine";
 import { AutonomousOperationsEngine } from "../Engines/AutonomousOperationsEngine";
 import { IntelligenceEngine } from "../Engines/IntelligenceEngine";
+import { OrchestratedDecisionIntelligenceService } from "../Product/OrchestratedDecisionIntelligenceService";
 import { MemoryEvent } from "./MemoryEvent";
 
 import { EngineDependencyManager } from "./Dependency/EngineDependencyManager";
@@ -85,8 +86,15 @@ export class HBOS {
 
 
 
+        const orchestratedDecisionIntelligenceService =
+            new OrchestratedDecisionIntelligenceService();
+
+
+
         const assistantEngine =
-            new AssistantEngine();
+            new AssistantEngine({
+                orchestrated: orchestratedDecisionIntelligenceService
+            });
 
         const intelligenceEngine =
             new IntelligenceEngine();
