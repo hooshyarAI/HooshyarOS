@@ -8,6 +8,11 @@ import { KnowledgeEngine } from "./KnowledgeEngine";
 import { MemoryEngine } from "../Core/MemoryEngine";
 import { IntelligenceInput, IntelligenceContext, IntelligencePipeline } from "../Core/IntelligenceContract";
 import { DecisionEngine as Phase06DecisionEngine } from "../Decision/DecisionEngine";
+import {
+    OrchestratedDecisionIntelligenceService,
+    OrchestratedInput,
+    OrchestratedResult,
+} from "../Product/OrchestratedDecisionIntelligenceService";
 
 
 export class AssistantEngine {
@@ -26,7 +31,9 @@ export class AssistantEngine {
 
     private knowledgeEngine: KnowledgeEngine;
 
-    constructor() {
+    private orchestrated: OrchestratedDecisionIntelligenceService;
+
+    constructor(opts?: { orchestrated?: OrchestratedDecisionIntelligenceService }) {
         this.decisionEngine = new DecisionEngine();
         this.memory = new AssistantMemory();
         this.intelligenceEngine = new IntelligenceEngine();
@@ -36,6 +43,8 @@ export class AssistantEngine {
         this.knowledgeEngine = new KnowledgeEngine();
 
         this.assistantMemoryEngine.addListener(this.knowledgeEngine);
+
+        this.orchestrated = opts?.orchestrated ?? new OrchestratedDecisionIntelligenceService();
     }
 
     initialize(): void {
@@ -167,6 +176,103 @@ export class AssistantEngine {
         });
 
         return { reasoning, decision };
+    }
+
+    /**
+     * Phase 09-activation GAP 1: integrate AssistantEngine with the canonical
+     * Orchestrated Decision Intelligence service. AI/LLM remains interpretation
+     * only — all deterministic math is delegated to the service. The Assistant
+     * composes the result into an `AssistantResponse` with full provenance.
+     */
+    analyzeAcquisitionOpportunity(
+        problem: string,
+        orchestratedInput: OrchestratedInput,
+        context?: IntelligenceContext
+    ): { response: AssistantResponse; orchestrated: OrchestratedResult } {
+        if (!orchestratedInput || typeof orchestratedInput.tenantId !== "string" || !orchestratedInput.tenantId.trim()) {
+            throw new Error("assistant-orchestration-tenant-required");
+        }
+        if (!problem || !problem.trim()) {
+            throw new Error("assistant-orchestration-problem-required");
+        }
+
+        const orchestrated = this.orchestrated.orchestrate(orchestratedInput);
+
+        const confidence = orchestrated.status === "READY"
+            ? IntelligencePipeline.fromCalculatedConfidence(
+                0.5,
+                "deterministic-orchestrated-result",
+                "OrchestratedDecisionIntelligenceService returned READY for all sections",
+            )
+            : IntelligencePipeline.unavailable();
+
+        const limitations: string[] = [
+            ...(orchestrated.status === "BLOCKED" ? ["Orchestration returned BLOCKED — review per-section status"] : []),
+            ...(confidence.source === "unavailable" ? ["Confidence score not available — deterministic math returned BLOCKED"] : []),
+        ];
+
+        const summaryParts: string[] = [];
+        if (orchestrated.financial.status === "READY") {
+            summaryParts.push(
+                `Financial: profit=${orchestrated.financial.profit}, NPV=${orchestrated.financial.npv.toFixed(2)}, IRR=${orchestrated.financial.irr.toFixed(4)}, WACC=${orchestrated.financial.wacc.toFixed(4)}`,
+            );
+        } else {
+            summaryParts.push("Financial: BLOCKED");
+        }
+        if (orchestrated.risk.status === "READY") {
+            summaryParts.push(`Risk: score=${orchestrated.risk.score}`);
+        } else {
+            summaryParts.push("Risk: BLOCKED");
+        }
+        if (orchestrated.decision.status === "READY") {
+            summaryParts.push(`Decision: AHP consistent=${orchestrated.decision.ahp.consistent}, TOPSIS best=${orchestrated.decision.topsis.bestIndex}`);
+        } else {
+            summaryParts.push("Decision: BLOCKED");
+        }
+        const explanation = summaryParts.join(" | ");
+
+        // Use the existing assistant reasoning path for *interpretation* only.
+        const intelligenceInput: IntelligenceInput = {
+            problem,
+            data: { orchestratedStatus: orchestrated.status },
+            tenantId: orchestrated.tenantId,
+        };
+        const reasoningResult = context
+            ? this.intelligenceEngine.reason(intelligenceInput, context)
+            : undefined;
+        const reasoningConfidenceValue = reasoningResult
+            ? IntelligencePipeline.getConfidenceValue(reasoningResult.confidence)
+            : undefined;
+
+        const numericConfidence = confidence.source === "unavailable"
+            ? (reasoningConfidenceValue ?? 0)
+            : confidence.value;
+
+        // Minimal evidence-only Project shim for the AssistantResponse contract.
+        // The AssistantResponse is keyed on Project; the orchestrated call does
+        // not have a project entity, so we synthesize a minimal one carrying
+        // only the fields AssistantResponse inspects.
+        const syntheticProject: Project = {
+            id: `orchestration:${orchestrated.tenantId}:${Date.now()}`,
+            name: problem,
+            status: orchestrated.status,
+        } as unknown as Project;
+
+        const response = new AssistantResponse(
+            syntheticProject,
+            explanation,
+            numericConfidence,
+            DecisionContext.fromEvidence({
+                traceId: reasoningResult?.traceId ?? `orchestrated:${orchestrated.tenantId}`,
+                inputHash: reasoningResult?.inputHash ?? `tenant=${orchestrated.tenantId}`,
+                reasoningRef: reasoningResult?.traceId,
+                explanation,
+                confidence: numericConfidence,
+                limitations: [...limitations, ...(reasoningResult?.limitations ?? [])],
+            }),
+        );
+
+        return { response, orchestrated };
     }
 
 }
