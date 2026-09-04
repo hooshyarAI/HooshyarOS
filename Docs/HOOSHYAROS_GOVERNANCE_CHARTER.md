@@ -447,3 +447,88 @@ When a genuine conflict is found between an approved mission and a governing rul
 7. **After human approval, the amendment becomes repository policy and must be testable** — add or update focused tests that prove the new policy is enforced.
 
 This section does not permit arbitrary rule relaxation. It mandates a disciplined, evidence-backed, smallest-safe-change path from conflict to approved resolution.
+
+---
+
+## 15. Product-Use Completion Gate
+
+For every capability, feature, method, algorithm, service, adapter, engine extension, integration, repair or commercialization change, the governing completion criterion is **real system use**, not merely implementation existence.
+
+The mandatory lifecycle is:
+
+**DESIGN → IMPLEMENT → INTEGRATE AT THE CORRECT CANONICAL BOUNDARY → WIRE INTO THE REAL EXECUTION PATH → ACTUALLY CONSUME WITH VALID INPUT → VERIFY OUTPUT → VERIFY FAILURE/BLOCKED BEHAVIOR → VERIFY EVIDENCE/PROVENANCE → VERIFY TENANT/SECURITY BOUNDARIES → END-TO-END VERIFY → CHECKPOINT → COMPLETE**
+
+The following distinctions are mandatory and must never be collapsed:
+
+- **IMPLEMENTED** = code exists and the capability is locally executable.
+- **INTEGRATED** = the capability is connected to the correct existing architectural boundary.
+- **USED** = the real product/runtime execution path actually invokes and consumes it.
+- **VERIFIED** = focused, integration and applicable end-to-end evidence proves the behavior.
+- **COMPLETE** = all applicable gates above are satisfied and the capability is safe to build upon.
+
+### No implementation-only completion
+
+A capability MUST NOT be reported `COMPLETE` merely because:
+
+- a class or method exists;
+- an interface compiles;
+- a unit test passes;
+- a checkpoint file exists;
+- a commit was created;
+- a package was added;
+- a service is importable;
+- an isolated synthetic fixture succeeds; or
+- a product-facing display/UI was added.
+
+Unit tests prove local correctness; they do not by themselves prove product integration or real runtime use.
+
+### Canonical-owner and consumer rule
+
+Before implementing a capability, the system MUST identify:
+
+1. the canonical owner;
+2. the canonical upstream data source;
+3. the canonical downstream consumer;
+4. the real runtime execution path;
+5. the evidence/provenance boundary.
+
+If a suitable canonical owner already exists, reuse it. Do not create a parallel engine, service, adapter or workflow merely to make the capability easier to implement.
+
+### Real-input rule
+
+Where the capability depends on platform data, the verification must demonstrate that valid canonical data can reach the capability through the approved data path.
+
+For data-driven intelligence, the preferred proof is:
+
+**CANONICAL INGESTION → NORMALIZE → VALIDATE → INTELLIGENCE CAPABILITY → DECISION/OUTPUT → EVIDENCE**
+
+Synthetic fixtures may be used for deterministic tests, but they must not be presented as proof of real product integration unless the same canonical contracts and execution path are exercised.
+
+### No fabricated completion
+
+When required data, evidence, credentials, dependencies or context are unavailable, the system MUST produce an explicit `BLOCKED`, `NEEDS_DATA` or equivalent evidence-backed state instead of inventing values, silently substituting assumptions, or returning fabricated success.
+
+### Activation over presentation
+
+Product work is not considered complete merely because a capability is visible in a UI, dashboard, report or demo. Presentation is optional. **Operational use through the correct runtime path is mandatory.**
+
+### Required proof for integration-heavy work
+
+For capabilities whose purpose is integration, orchestration, intelligence, automation or decision support, completion evidence must include the strongest applicable proof of:
+
+- upstream reachability;
+- downstream consumption;
+- correct contract mapping;
+- deterministic calculation ownership;
+- evidence/provenance continuity;
+- tenant isolation;
+- failure and blocked-state behavior;
+- end-to-end runtime execution.
+
+Where any applicable proof is missing, the capability remains `PARTIAL` or `BLOCKED`; it must not be promoted to `COMPLETE` by documentation alone.
+
+### Rule applies to all construction actors
+
+This gate is binding on the autonomous construction Assistant, Kilo Code, Python workers, GitHub Actions, external coding agents and any other approved construction mechanism.
+
+No execution tool, prompt, model, memory, status screen, progress percentage or local completion signal can override this gate.
