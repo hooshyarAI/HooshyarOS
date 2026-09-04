@@ -331,7 +331,7 @@ The autonomous construction system must never:
 - replace a frozen engine boundary with a convenient alternative;
 - create duplicate engines;
 - turn the Assistant into the platform's end-user financial or managerial advisor;
-- make Codex, Copilot, Claude, Kilo Code, or another coding tool a hidden architectural dependency or mandatory runtime component;
+- make Codex, Copilot, Claude, Kilo Code, or another coding tool a hidden architectural dependency or mandatory product runtime component;
 - ask the human to perform mechanical file-by-file construction when the repository-native construction fabric can do it;
 - declare completion from file existence alone;
 - bypass tests, static validation, integration verification or architecture compliance;
@@ -532,3 +532,244 @@ Where any applicable proof is missing, the capability remains `PARTIAL` or `BLOC
 This gate is binding on the autonomous construction Assistant, Kilo Code, Python workers, GitHub Actions, external coding agents and any other approved construction mechanism.
 
 No execution tool, prompt, model, memory, status screen, progress percentage or local completion signal can override this gate.
+
+---
+
+## 16. Mandatory Consolidated Execution and Dual-Source Verification
+
+This section is permanent and binding on every autonomous phase, stage, repair cycle and completion claim.
+
+### One consolidated command per phase
+
+Whenever a project phase can be safely decomposed, the human-facing instruction MUST be one consolidated command for the whole phase.
+
+The consolidated command must instruct the execution system to autonomously:
+
+**AUDIT → BUILD DEPENDENCY GRAPH → DECOMPOSE INTO MICRO-STAGES → EXECUTE → TEST → REPAIR → VERIFY → QUALITY CONTROL → CHECKPOINT → COMMIT → PUSH → LOCAL VERIFICATION → REMOTE VERIFICATION → REASSESS → NEXT MICRO-STAGE**
+
+The human must not be required to issue separate mechanical commands for each internal Micro-Stage.
+
+Internal Micro-Stage count, ordering and repair routing are implementation details owned by the execution system, provided the repository's dependency and architecture constraints are respected.
+
+### Mandatory Micro-Stage properties
+
+Every automatically derived Micro-Stage MUST be:
+
+- independently actionable;
+- independently testable;
+- independently verifiable;
+- independently checkpointable;
+- independently committable;
+- independently recoverable.
+
+The execution system must prefer the smallest safe stage that produces a meaningful verified state without arbitrary fragmentation.
+
+### Mandatory per-stage lifecycle
+
+For every Micro-Stage:
+
+**PLAN → EXECUTE → TEST → REPAIR AS NEEDED → VERIFY → EVIDENCE → CHECKPOINT → COMMIT → PUSH → LOCAL VERIFY → REMOTE VERIFY → REASSESS → NEXT**
+
+No stage may proceed to the next stage from an unverified state unless its declared contract explicitly permits that dependency and the verification covers the risk.
+
+### Mandatory anti-stall behavior
+
+A local failure MUST remain local whenever possible.
+
+The required recovery loop is:
+
+**FAIL → CLASSIFY → PRESERVE EVIDENCE → AUTO-REPAIR → RETEST → RE-VERIFY**
+
+If a genuine external blocker prevents one Micro-Stage:
+
+**BLOCK THAT STAGE → PRESERVE VERIFIED WORK → CHECKPOINT → COMMIT/PUSH WHERE POSSIBLE → RECORD EXACT BLOCKER → CONTINUE INDEPENDENT STAGES**
+
+The system MUST NOT restart the entire phase merely because one Micro-Stage failed, timed out, or was interrupted.
+
+Completed verified stages MUST NOT be replayed unnecessarily.
+
+After interruption, resume from the latest trusted stage checkpoint.
+
+Only a proven global dependency blocker may stop the entire phase.
+
+### Mandatory real-product completion lifecycle
+
+The implementation system must enforce:
+
+**DESIGN → IMPLEMENT → INTEGRATE AT CORRECT CANONICAL BOUNDARY → WIRE INTO REAL EXECUTION PATH → CONSUME VALID CONTRACTED INPUT → VERIFY OUTPUT → VERIFY FAILURE/BLOCKED BEHAVIOR → VERIFY EVIDENCE/PROVENANCE → VERIFY TENANT/SECURITY BOUNDARY → END-TO-END VERIFY → QC → CHECKPOINT → COMPLETE**
+
+These states MUST remain distinct:
+
+**IMPLEMENTED ≠ INTEGRATED ≠ WIRED ≠ USED ≠ VERIFIED ≠ QC-PASSED ≠ COMPLETE**
+
+### Mandatory independent Quality Control
+
+Every consolidated phase command MUST contain an explicit final QC gate.
+
+The QC gate must behave as a hostile independent reviewer whose objective is to DISPROVE the completion claim.
+
+The implementation agent's own report is not sufficient evidence for QC.
+
+QC must independently inspect, as applicable:
+
+- source code;
+- canonical architecture boundaries;
+- real runtime wiring;
+- actual downstream consumption;
+- positive tests;
+- negative tests;
+- failure behavior;
+- end-to-end behavior;
+- evidence/provenance continuity;
+- tenant isolation;
+- checkpoints;
+- commit history;
+- local repository state;
+- remote repository state.
+
+If QC fails:
+
+**QC FAIL → CREATE REPAIR MICRO-STAGE → REPAIR → TEST → VERIFY → CHECKPOINT → COMMIT → PUSH → LOCAL VERIFY → REMOTE VERIFY → QC AGAIN**
+
+QC MUST NOT be bypassed because tests are green, the phase report says COMPLETE, or the checkpoint says COMPLETE.
+
+### Mandatory PowerShell/Git local verification
+
+At the end of every consolidated phase command, after implementation and QC appear complete, the execution system MUST verify the result through the actual local repository control surface, using PowerShell or the platform's equivalent shell where available.
+
+At minimum verify:
+
+- current branch;
+- working-tree state;
+- local HEAD SHA;
+- target remote-tracking SHA;
+- local/remote synchronization;
+- changed files;
+- final commit presence;
+- actual committed-tree content.
+
+Where Git is available, the canonical assertion is:
+
+`git rev-parse HEAD` == `git rev-parse origin/<target-branch>`
+
+A mismatch is a verification failure, not a warning.
+
+The system must inspect committed content, not just the working tree. Where applicable:
+
+`git show HEAD:<path>`
+
+and
+
+`git show origin/<target-branch>:<path>`
+
+must represent the intended final content.
+
+### Mandatory independent GitHub verification
+
+After local Git verification, the execution system MUST independently inspect the actual GitHub target branch whenever authorized repository access is available.
+
+The GitHub verification MUST confirm:
+
+- target branch identity;
+- final remote commit SHA;
+- required changed files exist on the target branch;
+- intended final code/content is actually present on the target branch;
+- final checkpoint exists on the target branch;
+- the remote branch is synchronized with the expected final commit.
+
+A local file, local commit, local test, local checkpoint or local report is NEVER proof that the GitHub branch contains the result.
+
+### Dual-source completion barrier
+
+A phase/capability MUST NOT be reported `COMPLETE` unless BOTH repository control surfaces agree:
+
+**LOCAL POWERSHELL/GIT VERIFICATION = PASS**
+
+AND
+
+**GITHUB REMOTE VERIFICATION = PASS**
+
+Together with all other applicable completion evidence:
+
+**REAL RUNTIME USE = PASS**
+
+**TESTS = PASS**
+
+**NEGATIVE/FAILURE VERIFICATION = PASS**
+
+**E2E VERIFICATION = PASS OR AN EXPLICIT EVIDENCE-BACKED DEFERRED/NOT-APPLICABLE STATE**
+
+**PROVENANCE/EVIDENCE = PASS**
+
+**TENANT/SECURITY BOUNDARY = PASS**
+
+**INDEPENDENT QC = PASS**
+
+Any missing mandatory verification means:
+
+**NOT COMPLETE**
+
+### No false completion from environment limitations
+
+If the execution environment cannot perform Git operations, GitHub operations, network access, authentication, credentials or another required verification mechanism, the system MUST distinguish:
+
+**IMPLEMENTATION VERIFIED LOCALLY**
+
+from
+
+**REMOTE VERIFICATION BLOCKED**
+
+It MUST NOT convert an unavailable verification into success.
+
+Environment limitation is evidence of a verification limitation, not evidence of completion.
+
+### Final report honesty
+
+Every consolidated phase report MUST separately state:
+
+- WHAT EXISTS
+- WHAT IS INTEGRATED
+- WHAT IS WIRED
+- WHAT IS ACTUALLY USED
+- WHAT IS VERIFIED
+- WHAT IS E2E VERIFIED
+- WHAT PASSED QC
+- WHAT WAS REPAIRED
+- WHAT IS BLOCKED
+- WHAT IS DEFERRED
+- LOCAL SHA
+- REMOTE SHA
+- REMOTE VERIFICATION RESULT
+
+No status may be inferred from intent, code shape, test count or an agent's assertion.
+
+### Binding rule for all future phase commands
+
+Every future phase command generated under this charter MUST be:
+
+- written in clear English for direct Kilo execution;
+- ONE consolidated user-facing command for the phase;
+- autonomously decomposed internally into Micro-Stages;
+- self-repairing and anti-stall;
+- checkpoint-driven;
+- test-driven;
+- QC-gated;
+- verified through PowerShell/Git locally;
+- independently verified against the actual GitHub branch remotely;
+- prohibited from claiming COMPLETE without all mandatory evidence.
+
+For the remaining project phases, the intended human interaction model is:
+
+**ONE PHASE → ONE CONSOLIDATED KILO COMMAND**
+
+not one command per internal Micro-Stage.
+
+### Completion authority
+
+The final authority for completion is NOT the implementation agent's report.
+
+Completion requires agreement between:
+
+**REAL PRODUCT RUNTIME EVIDENCE + INDEPENDENT QC + LOCAL POWERSHELL/GIT STATE + ACTUAL GITHUB REMOTE STATE**
+
+No prompt, model, status screen, timeout recovery, progress percentage, local success message or generated report may weaken this completion barrier.
