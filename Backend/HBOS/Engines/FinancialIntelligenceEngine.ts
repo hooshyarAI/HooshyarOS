@@ -268,4 +268,52 @@ export class FinancialIntelligenceEngine implements Engine {
         if (cumulative >= 0) fullyRecovered = true;
         return { paybackPeriod: plainPeriod, discountedPaybackPeriod: discPeriod, fullyRecovered, status: "READY" };
     }
-}
+
+    // ========================================================================
+    // Phase 09-1.2: Working Capital & Liquidity Ratios
+    // ========================================================================
+
+    workingCapital(input: {
+        revenue: number;
+        cogs: number;
+        receivables: number;
+        inventory: number;
+        payables: number;
+    }): { netWorkingCapital: number; receivablesDays: number; inventoryDays: number; payablesDays: number; cashConversionCycle: number; status: "READY" | "BLOCKED" } {
+        if (!input || !Number.isFinite(input.revenue) || !Number.isFinite(input.cogs) ||
+            !Number.isFinite(input.receivables) || !Number.isFinite(input.inventory) || !Number.isFinite(input.payables) ||
+            input.revenue < 0 || input.cogs < 0 || input.receivables < 0 || input.inventory < 0 || input.payables < 0) {
+            return { netWorkingCapital: 0, receivablesDays: 0, inventoryDays: 0, payablesDays: 0, cashConversionCycle: 0, status: "BLOCKED" };
+        }
+        const dso = input.revenue === 0 ? 0 : (input.receivables / input.revenue) * 365;
+        const dio = input.cogs === 0 ? 0 : (input.inventory / input.cogs) * 365;
+        const dpo = input.cogs === 0 ? 0 : (input.payables / input.cogs) * 365;
+        return {
+            netWorkingCapital: input.receivables + input.inventory - input.payables,
+            receivablesDays: dso,
+            inventoryDays: dio,
+            payablesDays: dpo,
+            cashConversionCycle: dso + dio - dpo,
+            status: "READY"
+        };
+    }
+
+    liquidityRatios(input: {
+        currentAssets: number;
+        inventory: number;
+        cash: number;
+        currentLiabilities: number;
+    }): { currentRatio: number; quickRatio: number; cashRatio: number; status: "READY" | "BLOCKED" } {
+        if (!input || !Number.isFinite(input.currentAssets) || !Number.isFinite(input.inventory) ||
+            !Number.isFinite(input.cash) || !Number.isFinite(input.currentLiabilities) ||
+            input.currentAssets < 0 || input.inventory < 0 || input.cash < 0 || input.currentLiabilities < 0 ||
+            input.currentLiabilities === 0) {
+            return { currentRatio: 0, quickRatio: 0, cashRatio: 0, status: "BLOCKED" };
+        }
+        return {
+            currentRatio: input.currentAssets / input.currentLiabilities,
+            quickRatio: (input.currentAssets - input.inventory) / input.currentLiabilities,
+            cashRatio: input.cash / input.currentLiabilities,
+            status: "READY"
+        };
+    }}
