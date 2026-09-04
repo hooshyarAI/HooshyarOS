@@ -179,4 +179,111 @@ export class RiskIntelligenceEngine implements Engine {
             }
         }
         return { baseOutput, entries, status: "READY" };
+    }
+    /**
+     * 09-2.1 Monte Carlo simulation.
+     *
+     * Samples `iterations` parameter sets. For each parameter, a uniform or
+     * normal distribution is specified by `min`/`max` (uniform) OR `mean`/
+     * `stdDev` (normal). A seeded PRNG (mulberry32) is used to make results
+     * deterministic for the same seed.
+     */
+    monteCarlo(input: {
+        base: Readonly<Record<string, number>>;
+        variables: ReadonlyArray<{
+            name: string;
+            distribution: "uniform" | "normal";
+            min?: number; max?: number;
+            mean?: number; stdDev?: number;
+        }>;
+        model: (params: Readonly<Record<string, number>>) => number;
+        iterations: number;
+        seed: number;
+    }): { seed: number; iterations: number; samples: number; mean: number; stdDev: number; min: number; max: number; median: number; status: "READY" | "BLOCKED" } {
+        if (!input || !input.base || !Array.isArray(input.variables) || typeof input.model !== "function" ||
+            !Number.isFinite(input.iterations) || input.iterations <= 0 || !Number.isFinite(input.seed)) {
+            return { seed: 0, iterations: 0, samples: 0, mean: 0, stdDev: 0, min: 0, max: 0, median: 0, status: "BLOCKED" };
+        }
+        for (const v of input.variables) {
+            if (!v || typeof v.name !== "string") {
+                return { seed: input.seed, iterations: input.iterations, samples: 0, mean: 0, stdDev: 0, min: 0, max: 0, median: 0, status: "BLOCKED" };
+            }
+            if (v.distribution === "uniform") {
+                if (!Number.isFinite(v.min) || !Number.isFinite(v.max) || v.min > v.max) {
+                    return { seed: input.seed, iterations: input.iterations, samples: 0, mean: 0, stdDev: 0, min: 0, max: 0, median: 0, status: "BLOCKED" };
+                }
+            } else if (v.distribution === "normal") {
+                if (!Number.isFinite(v.mean) || !Number.isFinite(v.stdDev) || v.stdDev < 0) {
+                    return { seed: input.seed, iterations: input.iterations, samples: 0, mean: 0, stdDev: 0, min: 0, max: 0, median: 0, status: "BLOCKED" };
+                }
+            } else {
+                return { seed: input.seed, iterations: input.iterations, samples: 0, mean: 0, stdDev: 0, min: 0, max: 0, median: 0, status: "BLOCKED" };
+            }
+        }
+        // mulberry32 PRNG
+        let s = (input.seed >>> 0) || 1;
+        const rand = (): number => {
+            s |= 0; s = (s + 0x6D2B79F5) | 0;
+            let t = Math.imul(s ^ (s >>> 15), 1 | s);
+            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+        // Box-Muller for normal
+        const normal = (mean: number, stdDev: number): number => {
+            const u1 = Math.max(rand(), 1e-12);
+            const u2 = rand();
+            const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+            return mean + stdDev * z;
+        };
+        const outputs: number[] = [];
+        for (let i = 0; i < input.iterations; i += 1) {
+            const params: Record<string, number> = { ...input.base };
+            for (const v of input.variables) {
+                if (v.distribution === "uniform") {
+                    params[v.name] = v.min! + rand() * (v.max! - v.min!);
+                } else {
+                    params[v.name] = normal(v.mean!, v.stdDev!);
+                }
+            }
+            const out = input.model(params);
+            if (!Number.isFinite(out)) continue;
+            outputs.push(out);
+        }
+        if (outputs.length === 0) {
+            return { seed: input.seed, iterations: input.iterations, samples: 0, mean: 0, stdDev: 0, min: 0, max: 0, median: 0, status: "BLOCKED" };
+        }
+        const mean = outputs.reduce((a, b) => a + b, 0) / outputs.length;
+        const variance = outputs.reduce((s, v) => s + (v - mean) * (v - mean), 0) / outputs.length;
+        const stdDev = Math.sqrt(variance);
+        const sorted = [...outputs].sort((a, b) => a - b);
+        const min = sorted[0];
+        const max = sorted[sorted.length - 1];
+        const median = sorted.length % 2 === 0 ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2 : sorted[(sorted.length - 1) / 2];
+        return { seed: input.seed, iterations: input.iterations, samples: outputs.length, mean, stdDev, min, max, median, status: "READY" };
+    }
+
+    /**
+     * 09-2.2 Historical simulation VaR and CVaR.
+     * VaR_alpha = -quantile(returns, 1 - alpha) of the loss distribution.
+     * CVaR_alpha = E[loss | loss >= VaR_alpha] (expected shortfall).
+     */
+    valueAtRisk(input: { returns: readonly number[]; alpha: number }): { var: number; cvar: number; alpha: number; status: "READY" | "BLOCKED" } {
+        if (!Array.isArray(input.returns) || input.returns.length === 0 ||
+            !Number.isFinite(input.alpha) || input.alpha <= 0 || input.alpha >= 1) {
+            return { var: 0, cvar: 0, alpha: 0, status: "BLOCKED" };
+        }
+        for (const r of input.returns) {
+            if (!Number.isFinite(r)) {
+                return { var: 0, cvar: 0, alpha: input.alpha, status: "BLOCKED" };
+            }
+        }
+        const sorted = [...input.returns].sort((a, b) => a - b);
+        const idx = Math.floor((1 - input.alpha) * sorted.length);
+        const varReturn = sorted[Math.min(idx, sorted.length - 1)];
+        const var95 = -varReturn;
+        // CVaR: average of returns <= varReturn
+        const tail = sorted.filter(r => r <= varReturn);
+        const cvarReturn = tail.length === 0 ? varReturn : tail.reduce((a, b) => a + b, 0) / tail.length;
+        const cvar = -cvarReturn;
+        return { var: var95, cvar, alpha: input.alpha, status: "READY" };
     }}
