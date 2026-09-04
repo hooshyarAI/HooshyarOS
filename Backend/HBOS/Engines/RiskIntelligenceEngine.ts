@@ -128,4 +128,55 @@ export class RiskIntelligenceEngine implements Engine {
         result.sort((a, b) => b.range - a.range);
         return result;
     }
-}
+
+    /**
+     * 09-1.8 Scenario analysis.
+     */
+    scenario(input: {
+        base: Readonly<Record<string, number>>;
+        scenarios: ReadonlyArray<{ name: string; params: Readonly<Record<string, number>> }>;
+        model: (params: Readonly<Record<string, number>>) => number;
+    }): { baseOutput: number; entries: { name: string; output: number; delta: number; pctChange: number; status: "READY" | "BLOCKED" }[]; status: "READY" | "BLOCKED" } {
+        if (!input || !input.base || !Array.isArray(input.scenarios) || typeof input.model !== "function") {
+            return { baseOutput: 0, entries: [], status: "BLOCKED" };
+        }
+        for (const v of Object.values(input.base)) {
+            if (!Number.isFinite(v)) {
+                return { baseOutput: 0, entries: [], status: "BLOCKED" };
+            }
+        }
+        const baseOutput = input.model(input.base);
+        if (!Number.isFinite(baseOutput)) {
+            return { baseOutput: 0, entries: [], status: "BLOCKED" };
+        }
+        const entries: { name: string; output: number; delta: number; pctChange: number; status: "READY" | "BLOCKED" }[] = [];
+        for (const sc of input.scenarios) {
+            if (!sc || typeof sc.name !== "string" || !sc.params) {
+                entries.push({ name: String(sc?.name ?? "unknown"), output: 0, delta: 0, pctChange: 0, status: "BLOCKED" });
+                continue;
+            }
+            for (const v of Object.values(sc.params)) {
+                if (!Number.isFinite(v)) {
+                    entries.push({ name: sc.name, output: 0, delta: 0, pctChange: 0, status: "BLOCKED" });
+                    continue;
+                }
+            }
+            try {
+                const out = input.model(sc.params);
+                if (!Number.isFinite(out)) {
+                    entries.push({ name: sc.name, output: 0, delta: 0, pctChange: 0, status: "BLOCKED" });
+                    continue;
+                }
+                entries.push({
+                    name: sc.name,
+                    output: out,
+                    delta: out - baseOutput,
+                    pctChange: baseOutput === 0 ? 0 : (out - baseOutput) / baseOutput,
+                    status: "READY"
+                });
+            } catch {
+                entries.push({ name: sc.name, output: 0, delta: 0, pctChange: 0, status: "BLOCKED" });
+            }
+        }
+        return { baseOutput, entries, status: "READY" };
+    }}
