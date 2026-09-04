@@ -316,4 +316,46 @@ export class FinancialIntelligenceEngine implements Engine {
             cashRatio: input.cash / input.currentLiabilities,
             status: "READY"
         };
+    }
+    // ========================================================================
+    // Phase 09-1.3: ROIC & EVA (Economic Value Added)
+    // ========================================================================
+
+    /**
+     * ROIC = NOPAT / Invested Capital.
+     * NOPAT = EBIT * (1 - taxRate).
+     * Invested Capital = equity + debt - excess cash (or, total assets - non-interest-bearing liabilities).
+     */
+    roic(input: { ebit: number; taxRate: number; equity: number; debt: number; cash: number }): { nopat: number; investedCapital: number; roic: number; status: "READY" | "BLOCKED" } {
+        if (!input || ![input.ebit, input.taxRate, input.equity, input.debt, input.cash].every(Number.isFinite) ||
+            input.taxRate < 0 || input.taxRate > 1 ||
+            input.equity < 0 || input.debt < 0 || input.cash < 0) {
+            return { nopat: 0, investedCapital: 0, roic: 0, status: "BLOCKED" };
+        }
+        const nopat = input.ebit * (1 - input.taxRate);
+        const investedCapital = input.equity + input.debt - input.cash;
+        if (investedCapital <= 0) {
+            return { nopat, investedCapital, roic: 0, status: "BLOCKED" };
+        }
+        return { nopat, investedCapital, roic: nopat / investedCapital, status: "READY" };
+    }
+
+    /**
+     * EVA = NOPAT - WACC * Invested Capital.
+     * WACC must be supplied as a decimal.
+     * Returns BLOCKED if inputs invalid or investedCapital <= 0.
+     */
+    eva(input: { ebit: number; taxRate: number; equity: number; debt: number; cash: number; wacc: number }): { nopat: number; investedCapital: number; capitalCharge: number; eva: number; status: "READY" | "BLOCKED" } {
+        if (!input || ![input.ebit, input.taxRate, input.equity, input.debt, input.cash, input.wacc].every(Number.isFinite) ||
+            input.taxRate < 0 || input.taxRate > 1 ||
+            input.equity < 0 || input.debt < 0 || input.cash < 0 || input.wacc < 0) {
+            return { nopat: 0, investedCapital: 0, capitalCharge: 0, eva: 0, status: "BLOCKED" };
+        }
+        const nopat = input.ebit * (1 - input.taxRate);
+        const investedCapital = input.equity + input.debt - input.cash;
+        if (investedCapital <= 0) {
+            return { nopat, investedCapital, capitalCharge: 0, eva: 0, status: "BLOCKED" };
+        }
+        const capitalCharge = input.wacc * investedCapital;
+        return { nopat, investedCapital, capitalCharge, eva: nopat - capitalCharge, status: "READY" };
     }}
