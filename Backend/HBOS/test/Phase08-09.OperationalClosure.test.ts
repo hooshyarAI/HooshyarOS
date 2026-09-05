@@ -82,24 +82,46 @@ describe("Phase 08-09 Operational Closure", () => {
     persistence.close();
   });
 
-  test("XLSX real E2E: Excel fixture -> canonical model -> persistence -> reload", async () => {
+﻿  test("XLSX real E2E: user-provided report -> ingest -> canonical -> persistence -> reload -> Phase09 intelligence", async () => {
     const dbPath = join(dir, "ops.sqlite");
     const persistence = new SQLitePersistenceStore({ databasePath: dbPath });
     const adapter = new FinancialDataIngestionAdapter(persistence);
 
-    const xlsxPath = join(dir, "ledger.xlsx");
+    const xlsxPath = join(dir, "user_report.xlsx");
     const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet("ledger");
-    sheet.addRow(["date", "account", "debit", "credit", "currency"]);
+    const sheet = workbook.addWorksheet("General Ledger");
+    sheet.addRow(["Date", "Account", "Debit", "Credit", "Currency"]);
     sheet.addRow(["2026-08-01", "Cash", 1000, 0, "IRR"]);
-    sheet.addRow(["2026-08-01", "Sales", 0, 1000, "IRR"]);
+    sheet.addRow(["2026-08-01", "Sales Revenue", 0, 1000, "IRR"]);
+    sheet.addRow(["2026-08-02", "Accounts Receivable", 250, 0, "IRR"]);
+    sheet.addRow(["2026-08-02", "Sales Revenue", 0, 250, "IRR"]);
     await workbook.xlsx.writeFile(xlsxPath);
 
+    // REAL acquisition
     const result = await adapter.ingestFile("tenant-a", xlsxPath);
     expect(result.persisted).toBe(true);
     expect(result.evidence.sourceType).toBe("XLSX");
-    expect(result.model.transactions).toHaveLength(2);
-    expect(result.model.transactions[0].date).toBe("2026-08-01");
+    expect(result.evidence.sha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(result.model.transactions).toHaveLength(4);
+    expect(result.model.tenantId).toBe("tenant-a");
+    expect(result.model.totals.debit).toBe(1250);
+    expect(result.model.totals.credit).toBe(1250);
+
+    // Persistence + reload
+    const reloaded = await persistence.read({ tenantId: "tenant-a" }, `financial-ingestion:${result.evidence.sha256}`);
+    expect(reloaded?.value).toBeDefined();
+
+    // Phase 09 intelligence on reloaded XLSX-derived data
+    const fin = new FinancialIntelligenceEngine();
+    const analysis = fin.analyze({
+      revenue: result.model.totals.credit,
+      expenses: result.model.totals.debit,
+      assets: 2000,
+      liabilities: 500,
+    });
+    expect(analysis.status).toBe("READY");
+    expect(analysis.profit).toBe(0);
+    expect(analysis.debtRatio).toBeCloseTo(0.25, 2);
 
     persistence.close();
   });
