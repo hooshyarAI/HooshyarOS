@@ -1,9 +1,9 @@
-﻿/**
- * Stage 08-ENT.1 — Generic API Acquisition Contract.
+/**
+ * Stage 08-ENT.1 � Generic API Acquisition Contract.
  *
  * Supporting service under the canonical FinancialDataIngestionAdapter.
  * Defines the contract for connecting to a tenant's external API,
- * applying auth (abstract — concrete impls live in tenant-specific
+ * applying auth (abstract � concrete impls live in tenant-specific
  * adapters), pagination, rate limiting, retry, response validation,
  * and mapping back to the canonical transaction model.
  *
@@ -59,6 +59,19 @@ export class TokenBucketRateLimiter implements RateLimiter {
       const wait = Math.max(1, Math.ceil(deficit / this.refillPerMs));
       await new Promise((r) => { const tm = setTimeout(r, wait); tm.unref?.(); });
     }
+  }
+  tryAcquire(): boolean {
+    const t = this.now();
+    const elapsed = t - this.lastRefill;
+    if (elapsed > 0) {
+      this.tokens = Math.min(this.capacity, this.tokens + elapsed * this.refillPerMs);
+      this.lastRefill = t;
+    }
+    if (this.tokens >= 1) {
+      this.tokens -= 1;
+      return true;
+    }
+    return false;
   }
 }
 

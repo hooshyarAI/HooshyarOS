@@ -11,6 +11,7 @@ import { FinancialStatementAnalysisService } from "../../Product/FinancialStatem
 import { SecurityEventLogger } from "../../Entities/SecurityEventLogger";
 import { ExecutiveIntelligenceWorkbench, ExecutiveIntelligenceWorkbenchInput, ExecutiveIntelligenceWorkbenchResult } from "../../Product/ExecutiveIntelligenceWorkbench";
 import { SQLitePersistenceStore } from "../../Product/SQLitePersistenceStore";
+import { TokenBucketRateLimiter } from "../../Product/GenericApiConnector";
 
 export interface CommercialRuntimeOptions {
     readonly databasePath?: string;
@@ -127,7 +128,19 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     const latestResults = new Map<string, StoredAnalysis>();
     const latestWorkbenchResults = new Map<string, ExecutiveIntelligenceWorkbenchResult>();
     const sessionTtlMs = options.sessionTtlMs ?? DEFAULT_SESSION_TTL_MS;
+    const rateLimiterMap = new Map<string, TokenBucketRateLimiter>();
+    const RATE_LIMIT_CAPACITY = 5;
+    const RATE_LIMIT_REFILL_PER_SECOND = 1;
     const now = options.now ?? (() => Date.now());
+
+    const getOrCreateRateLimiter = (token: string): TokenBucketRateLimiter => {
+        let limiter = rateLimiterMap.get(token);
+        if (!limiter) {
+            limiter = new TokenBucketRateLimiter({ capacity: RATE_LIMIT_CAPACITY, refillPerSecond: RATE_LIMIT_REFILL_PER_SECOND, now });
+            rateLimiterMap.set(token, limiter);
+        }
+        return limiter;
+    };
 
     const loadAnalysis = async (tenantId: string): Promise<StoredAnalysis | undefined> => {
         let result = latestResults.get(tenantId);
@@ -212,6 +225,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
             }
 
             if (req.method === "POST" && path === "/api/analyze") {
+                if (!session.token || !getOrCreateRateLimiter(session.token).tryAcquire()) return json(res, 429, { error: "RATE_LIMIT_EXCEEDED" });
                 const body = await readJson(req);
                 const analyzeError = validateAnalyzeBody(body);
                 if (analyzeError) return json(res, 400, { error: analyzeError });
@@ -228,6 +242,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
             }
 
             if (req.method === "POST" && path === "/api/executive/workbench") {
+                if (!session.token || !getOrCreateRateLimiter(session.token).tryAcquire()) return json(res, 429, { error: "RATE_LIMIT_EXCEEDED" });
                 const body = await readJson(req);
                 const workbenchError = validateWorkbenchBody(body);
                 if (workbenchError) return json(res, 400, { error: workbenchError });
@@ -261,6 +276,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
             }
 
             if (req.method === "POST" && path === "/api/assistant") {
+                if (!session.token || !getOrCreateRateLimiter(session.token).tryAcquire()) return json(res, 429, { error: "RATE_LIMIT_EXCEEDED" });
                 const body = await readJson(req);
                 const assistantError = validateAssistantBody(body);
                 if (assistantError) return json(res, 400, { error: assistantError });
