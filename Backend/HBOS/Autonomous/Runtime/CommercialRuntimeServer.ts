@@ -33,6 +33,8 @@ type ExecutiveTargets = ExecutiveIntelligenceWorkbenchInput["targets"];
 const send = (res: ServerResponse, status: number, contentType: string, body: string, headers: Record<string, string> = {}) => {
     res.statusCode = status;
     res.setHeader("Content-Type", contentType);
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "DENY");
     for (const [key, value] of Object.entries(headers)) res.setHeader(key, value);
     res.end(body);
 };
@@ -75,6 +77,34 @@ const parseExecutiveTargets = (value: unknown): ExecutiveTargets | null => {
         debtRatio: Number(targets.debtRatio),
     };
     return Object.values(result).every(Number.isFinite) ? result : null;
+};
+
+const validateAnalyzeBody = (body: Record<string, unknown>): string | null => {
+    const csv = String(body.csv ?? "");
+    if (!csv.trim()) return "CSV_REQUIRED";
+    const sourceName = String(body.sourceName ?? "ledger.csv");
+    if (!sourceName.trim()) return "SOURCE_NAME_REQUIRED";
+    const assets = Number(body.assets);
+    const liabilities = Number(body.liabilities);
+    if (!Number.isFinite(assets) || !Number.isFinite(liabilities)) return "BALANCE_SHEET_FIELDS_REQUIRED";
+    return null;
+};
+
+const validateWorkbenchBody = (body: Record<string, unknown>): string | null => {
+    if (!body.targets || typeof body.targets !== "object" || Array.isArray(body.targets)) return "EXECUTIVE_TARGETS_REQUIRED";
+    const targets = body.targets as Record<string, unknown>;
+    const revenue = Number(targets.revenue);
+    const profit = Number(targets.profit);
+    const profitMargin = Number(targets.profitMargin);
+    const debtRatio = Number(targets.debtRatio);
+    if (![revenue, profit, profitMargin, debtRatio].every(Number.isFinite)) return "EXECUTIVE_TARGETS_REQUIRED";
+    return null;
+};
+
+const validateAssistantBody = (body: Record<string, unknown>): string | null => {
+    const question = String(body.question ?? "").trim();
+    if (!question) return "ASSISTANT_QUESTION_REQUIRED";
+    return null;
 };
 
 const asset = async (res: ServerResponse, name: string, contentType: string) => {
@@ -183,11 +213,12 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
 
             if (req.method === "POST" && path === "/api/analyze") {
                 const body = await readJson(req);
+                const analyzeError = validateAnalyzeBody(body);
+                if (analyzeError) return json(res, 400, { error: analyzeError });
                 const csv = String(body.csv ?? "");
                 const sourceName = String(body.sourceName ?? "ledger.csv");
                 const assets = Number(body.assets);
                 const liabilities = Number(body.liabilities);
-                if (!Number.isFinite(assets) || !Number.isFinite(liabilities)) return json(res, 400, { error: "BALANCE_SHEET_FIELDS_REQUIRED" });
                 const ingested = await ingestion.ingestCsv(session.tenantId, sourceName, csv);
                 const result = analysis.execute({ tenantId: session.tenantId, revenue: ingested.model.totals.credit, expenses: ingested.model.totals.debit, assets, liabilities, source: ingested.evidence });
                 if (result.status !== "READY") return json(res, 422, result);
@@ -198,6 +229,8 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
 
             if (req.method === "POST" && path === "/api/executive/workbench") {
                 const body = await readJson(req);
+                const workbenchError = validateWorkbenchBody(body);
+                if (workbenchError) return json(res, 400, { error: workbenchError });
                 const targets = parseExecutiveTargets(body.targets);
                 if (!targets) return json(res, 400, { error: "EXECUTIVE_TARGETS_REQUIRED" });
                 const result = await loadAnalysis(session.tenantId);
@@ -229,8 +262,9 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
 
             if (req.method === "POST" && path === "/api/assistant") {
                 const body = await readJson(req);
+                const assistantError = validateAssistantBody(body);
+                if (assistantError) return json(res, 400, { error: assistantError });
                 const question = String(body.question ?? "").trim();
-                if (!question) return json(res, 400, { error: "ASSISTANT_QUESTION_REQUIRED" });
                 const result = await loadAnalysis(session.tenantId);
                 if (!result) return json(res, 422, { error: "ASSISTANT_ANALYSIS_REQUIRED" });
                 const workbench = await loadWorkbench(session.tenantId);
