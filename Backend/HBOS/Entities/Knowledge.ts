@@ -1,4 +1,4 @@
-import { randomUUID } from "crypto";
+import { randomUUID } from 'crypto';
 
 export class Knowledge {
 
@@ -14,12 +14,15 @@ export class Knowledge {
 
     createdAt: Date;
 
+    tenantId: string | undefined;
+
 
     constructor(
         title: string,
         description: string,
         confidence: number | undefined,
-        source: string
+        source: string,
+        tenantId?: string
     ) {
 
         this.id = randomUUID();
@@ -33,6 +36,8 @@ export class Knowledge {
         this.source = source;
 
         this.createdAt = new Date();
+
+        this.tenantId = tenantId;
 
     }
 

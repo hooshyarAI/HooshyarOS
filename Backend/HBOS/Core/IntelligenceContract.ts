@@ -56,6 +56,7 @@ export interface KnowledgeItem {
     readonly confidence: number | undefined;
     readonly source: string;
     readonly createdAt: string;
+    readonly tenantId?: string;
 }
 
 /**
@@ -193,3 +194,4 @@ export const IntelligencePipeline = {
         return Object.freeze(limitations);
     }
 };
+

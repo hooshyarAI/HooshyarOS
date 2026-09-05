@@ -1,14 +1,14 @@
-import { Knowledge } from "../Entities/Knowledge";
-import { KnowledgeRule } from "../Entities/KnowledgeRule";
-import { MemoryEvent } from "../Entities/MemoryEvent";
-import { EventListener } from "../Interfaces/EventListener";
-import { KnowledgeItem } from "../Core/IntelligenceContract";
+import { Knowledge } from '../Entities/Knowledge';
+import { KnowledgeRule } from '../Entities/KnowledgeRule';
+import { MemoryEvent } from '../Entities/MemoryEvent';
+import { EventListener } from '../Interfaces/EventListener';
+import { KnowledgeItem } from '../Core/IntelligenceContract';
 
 
 export class KnowledgeEngine implements EventListener {
 
 
-    name: string = "KnowledgeEngine";
+    name: string = 'KnowledgeEngine';
 
 
     private knowledge: Knowledge[] = [];
@@ -17,11 +17,10 @@ export class KnowledgeEngine implements EventListener {
     private rules: KnowledgeRule[] = [];
 
 
-
     initialize(): void {
 
         console.log(
-            "Knowledge Engine Started"
+            'Knowledge Engine Started'
         );
 
     }
@@ -69,16 +68,20 @@ export class KnowledgeEngine implements EventListener {
 
 
     learn(
-        event: MemoryEvent
+        event: MemoryEvent,
+        tenantId?: string
     ): Knowledge {
 
+
+        const resolvedTenantId = tenantId !== undefined ? tenantId : event.tenantId;
 
         const knowledge =
             new Knowledge(
                 event.type,
-                `${event.source}: ${event.data}`,
+                event.source + ': ' + event.data,
                 undefined,
-                event.source
+                event.source,
+                resolvedTenantId
             );
 
 
@@ -91,15 +94,22 @@ export class KnowledgeEngine implements EventListener {
 
 
 
+
         return knowledge;
 
     }
 
 
 
-    getKnowledge(): Knowledge[] {
+    getKnowledge(tenantId?: string): Knowledge[] {
 
-        return this.knowledge;
+        if (tenantId === undefined) {
+
+            return this.knowledge;
+
+        }
+
+        return this.knowledge.filter(k => k.tenantId === tenantId);
 
     }
 
@@ -113,7 +123,8 @@ export class KnowledgeEngine implements EventListener {
             description: k.description,
             confidence: k.confidence,
             source: k.source,
-            createdAt: k.createdAt.toISOString()
+            createdAt: k.createdAt.toISOString(),
+            tenantId: k.tenantId
         }));
 
     }

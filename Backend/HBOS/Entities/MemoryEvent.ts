@@ -10,11 +10,14 @@ export class MemoryEvent {
 
     createdAt: Date;
 
+    tenantId: string | undefined;
+
 
     constructor(
         type: string,
         data: string,
-        source: string
+        source: string,
+        tenantId?: string
     ) {
 
         this.id = crypto.randomUUID();
@@ -26,6 +29,8 @@ export class MemoryEvent {
         this.source = source;
 
         this.createdAt = new Date();
+
+        this.tenantId = tenantId;
 
     }
 
