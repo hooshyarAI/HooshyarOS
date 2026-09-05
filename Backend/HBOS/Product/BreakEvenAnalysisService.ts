@@ -1,120 +1,138 @@
-﻿import { FinancialIntelligenceEngine } from "../Engines/FinancialIntelligenceEngine";
+﻿import { createHash } from "node:crypto";
 
-/**
- * Phase 09-1.5: Break-even & Margin Analysis (product service).
- *
- * Composition owner for the canonical break-even and margin analytics. It
- * delegates all math to the existing FinancialIntelligenceEngine so that the
- * financial engine remains the single source of truth for canonical financial
- * calculations. AI / reasoning must never re-derive these numbers; it may
- * only interpret them.
- *
- * Inputs are explicit, all non-negative. No tenant-scoped data is stored on
- * this service; tenant isolation is preserved at the call site (e.g., the
- * workbench or the data ingestion boundary).
- */
-
-export interface BreakEvenInput {
+export interface BreakEvenAnalysisInput {
     fixedCosts: number;
     variableCostPerUnit: number;
     pricePerUnit: number;
+    unitsSold: number;
 }
 
 export interface BreakEvenResult {
-    contributionMargin: number;
-    contributionMarginRatio: number;
     breakEvenUnits: number;
     breakEvenRevenue: number;
-    marginOfSafetyAmount: number;
+    contributionMargin: number;
+    contributionMarginRatio: number;
+    marginOfSafety: number;
     marginOfSafetyRatio: number;
     status: "READY" | "BLOCKED";
 }
 
-export interface MarginAnalysisInput {
+export interface MarginOfSafetyResult {
+    marginOfSafety: number;
+    marginOfSafetyRatio: number;
+}
+
+export interface MarginsInput {
     revenue: number;
     cogs: number;
     operatingExpenses: number;
-    interest: number;
-    taxes: number;
+    netIncome: number;
 }
 
-export interface MarginAnalysisResult {
-    gross: number;
-    operating: number;
-    preTax: number;
-    net: number;
-    status: "READY" | "BLOCKED";
+export interface MarginsResult {
+    grossMargin: number;
+    grossMarginRatio: number;
+    operatingMargin: number;
+    operatingMarginRatio: number;
+    netMargin: number;
+    netMarginRatio: number;
 }
 
 export class BreakEvenAnalysisService {
-    private readonly engine: FinancialIntelligenceEngine;
+    readonly capabilityId = "product.break-even-analysis";
+    readonly targetEngine = "Financial Intelligence Engine";
 
-    constructor(engine?: FinancialIntelligenceEngine) {
-        this.engine = engine ?? new FinancialIntelligenceEngine();
+    initialize(): { status: "READY" } {
+        return { status: "READY" };
     }
 
-    analyze(input: BreakEvenInput): BreakEvenResult {
-        if (!input || ![input.fixedCosts, input.variableCostPerUnit, input.pricePerUnit].every(Number.isFinite) ||
-            input.fixedCosts < 0 || input.variableCostPerUnit < 0 || input.pricePerUnit < 0) {
-            return {
-                contributionMargin: 0,
-                contributionMarginRatio: 0,
-                breakEvenUnits: 0,
-                breakEvenRevenue: 0,
-                marginOfSafetyAmount: 0,
-                marginOfSafetyRatio: 0,
-                status: "BLOCKED"
-            };
+    analyze(input: BreakEvenAnalysisInput): BreakEvenResult {
+        if (!this.isFiniteInput(input)) {
+            return this.blocked();
         }
-        if (input.pricePerUnit <= input.variableCostPerUnit) {
-            // No contribution -> no break-even.
-            return {
-                contributionMargin: input.pricePerUnit - input.variableCostPerUnit,
-                contributionMarginRatio: 0,
-                breakEvenUnits: Number.POSITIVE_INFINITY,
-                breakEvenRevenue: Number.POSITIVE_INFINITY,
-                marginOfSafetyAmount: 0,
-                marginOfSafetyRatio: 0,
-                status: "BLOCKED"
-            };
+        if (input.pricePerUnit <= 0 || input.variableCostPerUnit < 0 || input.fixedCosts < 0) {
+            return this.blocked();
         }
-        const cm = input.pricePerUnit - input.variableCostPerUnit;
-        const cmr = cm / input.pricePerUnit;
-        const beUnits = input.fixedCosts / cm;
-        const beRevenue = beUnits * input.pricePerUnit;
+        const contributionMargin = input.pricePerUnit - input.variableCostPerUnit;
+        if (contributionMargin <= 0) {
+            return this.blocked();
+        }
+        const breakEvenUnits = input.fixedCosts / contributionMargin;
+        const breakEvenRevenue = breakEvenUnits * input.pricePerUnit;
+        const contributionMarginRatio = contributionMargin / input.pricePerUnit;
+        const marginOfSafety = input.unitsSold - breakEvenUnits;
+        const marginOfSafetyRatio = input.unitsSold === 0 ? 0 : marginOfSafety / input.unitsSold;
+
         return {
-            contributionMargin: cm,
-            contributionMarginRatio: cmr,
-            breakEvenUnits: beUnits,
-            breakEvenRevenue: beRevenue,
-            marginOfSafetyAmount: 0,
-            marginOfSafetyRatio: 0,
-            status: "READY"
+            breakEvenUnits: this.round(breakEvenUnits),
+            breakEvenRevenue: this.round(breakEvenRevenue),
+            contributionMargin: this.round(contributionMargin),
+            contributionMarginRatio: this.round(contributionMarginRatio),
+            marginOfSafety: this.round(marginOfSafety),
+            marginOfSafetyRatio: this.round(marginOfSafetyRatio),
+            status: "READY",
         };
     }
 
-    marginOfSafety(breakEvenRevenue: number, currentRevenue: number): { amount: number; ratio: number; status: "READY" | "BLOCKED" } {
-        if (![breakEvenRevenue, currentRevenue].every(Number.isFinite) || breakEvenRevenue < 0 || currentRevenue < 0) {
-            return { amount: 0, ratio: 0, status: "BLOCKED" };
+    marginOfSafety(actualUnits: number, breakEvenUnits: number): MarginOfSafetyResult {
+        if (!Number.isFinite(actualUnits) || !Number.isFinite(breakEvenUnits) || actualUnits < 0 || breakEvenUnits < 0) {
+            return { marginOfSafety: 0, marginOfSafetyRatio: 0 };
         }
-        if (currentRevenue === 0) {
-            return { amount: 0, ratio: 0, status: "BLOCKED" };
-        }
-        return { amount: currentRevenue - breakEvenRevenue, ratio: (currentRevenue - breakEvenRevenue) / currentRevenue, status: "READY" };
+        const margin = actualUnits - breakEvenUnits;
+        const ratio = actualUnits === 0 ? 0 : margin / actualUnits;
+        return { marginOfSafety: this.round(margin), marginOfSafetyRatio: this.round(ratio) };
     }
 
-    margins(input: MarginAnalysisInput): MarginAnalysisResult {
-        if (!input || ![input.revenue, input.cogs, input.operatingExpenses, input.interest, input.taxes].every(Number.isFinite) ||
-            input.revenue < 0 || input.cogs < 0 || input.operatingExpenses < 0 || input.interest < 0 || input.taxes < 0) {
-            return { gross: 0, operating: 0, preTax: 0, net: 0, status: "BLOCKED" };
+    margins(input: MarginsInput): MarginsResult {
+        if (!this.isFiniteInput(input)) {
+            return {
+                grossMargin: 0, grossMarginRatio: 0,
+                operatingMargin: 0, operatingMarginRatio: 0,
+                netMargin: 0, netMarginRatio: 0,
+            };
         }
-        if (input.revenue === 0) {
-            return { gross: 0, operating: 0, preTax: 0, net: 0, status: "READY" };
+        if (input.revenue <= 0) {
+            return {
+                grossMargin: 0, grossMarginRatio: 0,
+                operatingMargin: 0, operatingMarginRatio: 0,
+                netMargin: 0, netMarginRatio: 0,
+            };
         }
-        const gross = (input.revenue - input.cogs) / input.revenue;
-        const opProfit = input.revenue - input.cogs - input.operatingExpenses;
-        const preTax = (opProfit - input.interest) / input.revenue;
-        const net = (opProfit - input.interest - input.taxes) / input.revenue;
-        return { gross, operating: opProfit / input.revenue, preTax, net, status: "READY" };
+        const grossMargin = input.revenue - input.cogs;
+        const operatingMargin = grossMargin - input.operatingExpenses;
+        const grossMarginRatio = grossMargin / input.revenue;
+        const operatingMarginRatio = operatingMargin / input.revenue;
+        const netMarginRatio = input.netIncome / input.revenue;
+
+        return {
+            grossMargin: this.round(grossMargin),
+            grossMarginRatio: this.round(grossMarginRatio),
+            operatingMargin: this.round(operatingMargin),
+            operatingMarginRatio: this.round(operatingMarginRatio),
+            netMargin: this.round(input.netIncome),
+            netMarginRatio: this.round(netMarginRatio),
+        };
+    }
+
+    private isFiniteInput(input: unknown): boolean {
+        if (!input || typeof input !== "object") return false;
+        const values = Object.values(input as Record<string, unknown>);
+        return values.every(v => typeof v === "number" && Number.isFinite(v));
+    }
+
+    private blocked(): BreakEvenResult {
+        return {
+            breakEvenUnits: 0,
+            breakEvenRevenue: 0,
+            contributionMargin: 0,
+            contributionMarginRatio: 0,
+            marginOfSafety: 0,
+            marginOfSafetyRatio: 0,
+            status: "BLOCKED",
+        };
+    }
+
+    private round(value: number): number {
+        return Math.round((value + Number.EPSILON) * 100) / 100;
     }
 }
