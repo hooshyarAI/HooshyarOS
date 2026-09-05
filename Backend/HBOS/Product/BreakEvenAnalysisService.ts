@@ -1,5 +1,3 @@
-﻿import { createHash } from "node:crypto";
-
 export interface BreakEvenAnalysisInput {
     fixedCosts: number;
     variableCostPerUnit: number;
