@@ -181,6 +181,7 @@ export class GovernanceEngine implements Engine {
         // Step 1: Check authorization via canonical AuthorizationGuard
         const authResult = this.checkAuthorization(request);
         if (authResult.result !== AuthorizationResult.PERMITTED) {
+            this.logAuthDenial(request, authResult.reason);
             return this.buildDeniedResult(
                 traceId,
                 inputHash,
@@ -194,6 +195,7 @@ export class GovernanceEngine implements Engine {
         if (request.target) {
             const tenantResult = this.checkTenantIsolation(request);
             if (tenantResult.result !== AuthorizationResult.PERMITTED) {
+                this.logTenantViolationEvent(request, tenantResult.reason);
                 return this.buildDeniedResult(
                     traceId,
                     inputHash,
@@ -489,6 +491,34 @@ export class GovernanceEngine implements Engine {
      */
     setSecurityLogger(logger: SecurityEventLogger): void {
         this.securityLogger = logger;
+    }
+
+    private logAuthDenial(request: GovernanceRequest, reason: string): void {
+        if (!this.securityLogger) return;
+        this.securityLogger.logAuthorizationDenial({
+            actorId: request.securityContext.actor?.id,
+            actorType: request.securityContext.actor?.type,
+            tenantId: request.securityContext.tenantId,
+            target: request.action,
+            traceId: request.traceId,
+            reason: `Authorization check failed: ${reason}`,
+            metadata: {
+                governanceAction: request.action
+            }
+        });
+    }
+
+    private logTenantViolationEvent(request: GovernanceRequest, reason: string): void {
+        if (!this.securityLogger) return;
+        this.securityLogger.logTenantViolation({
+            actorId: request.securityContext.actor?.id,
+            actorType: request.securityContext.actor?.type,
+            tenantId: request.securityContext.tenantId,
+            requestedTenantId: request.target?.tenantId ?? "unknown",
+            target: request.action,
+            traceId: request.traceId,
+            reason: `Tenant isolation check failed: ${reason}`
+        });
     }
 }
 

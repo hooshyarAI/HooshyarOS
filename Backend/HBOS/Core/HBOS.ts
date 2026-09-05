@@ -17,6 +17,7 @@ import { MemoryEvent } from "./MemoryEvent";
 
 import { EngineDependencyManager } from "./Dependency/EngineDependencyManager";
 import { BootDependencyValidator } from "./Dependency/BootDependencyValidator";
+import { SecurityEventLogger } from "../Entities/SecurityEventLogger";
 
 
 
@@ -306,6 +307,14 @@ export class HBOS {
         }
 
 
+
+        const securityLogger = new SecurityEventLogger();
+
+        const governanceEngine = this.registry.getEngine<import("../Engines/GovernanceEngine").GovernanceEngine>("GovernanceEngine");
+        const decisionEngine = this.registry.getEngine<import("../Engines/DecisionEngine").DecisionEngine>("DecisionEngine");
+
+        governanceEngine?.setSecurityLogger(securityLogger);
+        decisionEngine?.setSecurityLogger(securityLogger);
 
         this.registry.initializeAll();
 

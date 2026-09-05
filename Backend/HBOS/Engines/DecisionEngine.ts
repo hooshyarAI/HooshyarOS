@@ -1,11 +1,14 @@
 import { ProjectDecision } from "../Entities/ProjectDecision";
 import { Project } from "../Entities/Project";
 import { DecisionContext } from "../Core/DecisionContext";
+import { SecurityEventLogger } from "../Entities/SecurityEventLogger";
 
 
 export class DecisionEngine {
 
     name: string = "DecisionEngine";
+
+    private securityLogger: SecurityEventLogger | undefined;
 
     initialize(): void {
         console.log("Decision Engine Started");
@@ -15,13 +18,10 @@ export class DecisionEngine {
         return true;
     }
 
-    /**
-     * Make a decision based on project status and optional reasoning evidence.
-     *
-     * @param project - The project to decide on
-     * @param evidence - Optional reasoning evidence from DecisionContext
-     * @returns ProjectDecision with additive evidence fields
-     */
+    setSecurityLogger(logger: SecurityEventLogger): void {
+        this.securityLogger = logger;
+    }
+
     decide(
         project: Project,
         evidence?: DecisionContext
@@ -30,6 +30,13 @@ export class DecisionEngine {
 
         if (project.status) {
             decision = `Analyze project status: ${project.status}`;
+        }
+
+        if (this.securityLogger) {
+            this.securityLogger.logAuthorizationPermission({
+                target: `project:${project.id}`,
+                reason: `Decision made: ${decision}`
+            });
         }
 
         return new ProjectDecision(

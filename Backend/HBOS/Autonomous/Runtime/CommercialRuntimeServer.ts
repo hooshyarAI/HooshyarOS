@@ -8,12 +8,14 @@ import { ReasoningEngine } from "../../Engines/ReasoningEngine";
 import { ReportsEngine } from "../../Engines/ReportsEngine";
 import { FinancialDataIngestionAdapter } from "../../Product/FinancialDataIngestionAdapter";
 import { FinancialStatementAnalysisService } from "../../Product/FinancialStatementAnalysisService";
+import { SecurityEventLogger } from "../../Entities/SecurityEventLogger";
 import { ExecutiveIntelligenceWorkbench, ExecutiveIntelligenceWorkbenchInput, ExecutiveIntelligenceWorkbenchResult } from "../../Product/ExecutiveIntelligenceWorkbench";
 import { SQLitePersistenceStore } from "../../Product/SQLitePersistenceStore";
 
 export interface CommercialRuntimeOptions {
     readonly databasePath?: string;
     readonly reasoning?: Pick<ReasoningEngine, "reason">;
+    readonly securityEventLogger?: SecurityEventLogger;
 }
 
 const WEB_ROOT = resolve(process.cwd(), "web");
@@ -155,7 +157,18 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 return json(res, 200, { authenticated: true, organization: { name: session.organization }, tenantId: session.tenantId });
             }
 
-            if (!session) return json(res, 401, { error: "AUTHENTICATION_REQUIRED" });
+            if (!session) {
+                const securityLogger = options.securityEventLogger;
+                if (securityLogger) {
+                    securityLogger.logAuthenticationFailure({
+                        actorId: undefined,
+                        target: req.url ?? "unknown",
+                        reason: "AUTHENTICATION_REQUIRED",
+                        metadata: { method: req.method, path: req.url }
+                    });
+                }
+                return json(res, 401, { error: "AUTHENTICATION_REQUIRED" });
+            }
 
             if (req.method === "POST" && path === "/api/analyze") {
                 const body = await readJson(req);
