@@ -19,6 +19,7 @@ export interface CommercialRuntimeOptions {
     readonly securityEventLogger?: SecurityEventLogger;
     readonly sessionTtlMs?: number;
     readonly now?: () => number;
+    readonly corsOrigin?: string;
 }
 
 const WEB_ROOT = resolve(process.cwd(), "web");
@@ -26,6 +27,13 @@ const MAX_BODY_BYTES = 1024 * 1024;
 const LATEST_ANALYSIS_KEY = "financial-analysis:latest";
 const LATEST_EXECUTIVE_WORKBENCH_KEY = "executive-intelligence-workbench:latest";
 const DEFAULT_SESSION_TTL_MS = 60 * 60 * 1000;
+const DEFAULT_CORS_ORIGIN = "http://localhost:3000";
+
+const corsHeaders = (origin: string): Record<string, string> => ({
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Cookie",
+});
 
 type Session = { token: string; tenantId: string; organization: string; createdAt: number; expiresAt: number };
 type StoredAnalysis = ReturnType<FinancialStatementAnalysisService["execute"]>;
@@ -132,6 +140,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     const RATE_LIMIT_CAPACITY = 5;
     const RATE_LIMIT_REFILL_PER_SECOND = 1;
     const now = options.now ?? (() => Date.now());
+    const corsOrigin = options.corsOrigin ?? DEFAULT_CORS_ORIGIN;
 
     const getOrCreateRateLimiter = (token: string): TokenBucketRateLimiter => {
         let limiter = rateLimiterMap.get(token);
@@ -174,10 +183,17 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
 
     const close = () => persistence.close();
     const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
+        const corsJson = (status: number, payload: unknown, headers: Record<string, string> = {}) =>
+            json(res, status, payload, { ...corsHeaders(corsOrigin), ...headers });
         try {
             const path = req.url?.split("?")[0] ?? "/";
-            if (req.method === "GET" && path === "/health") return json(res, 200, { status: "ok", service: "hooshyar-commercial-runtime" });
-            if (req.method === "GET" && path === "/api/ready") return json(res, 200, { status: "READY", capabilities: ["financial-ingestion", "financial-statement-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-workbench", "reports", "assistant-context"] });
+            if (req.method === "OPTIONS") {
+                res.statusCode = 204;
+                for (const [key, value] of Object.entries(corsHeaders(corsOrigin))) res.setHeader(key, value);
+                return res.end();
+            }
+            if (req.method === "GET" && path === "/health") return corsJson( 200, { status: "ok", service: "hooshyar-commercial-runtime" });
+            if (req.method === "GET" && path === "/api/ready") return corsJson( 200, { status: "READY", capabilities: ["financial-ingestion", "financial-statement-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-workbench", "reports", "assistant-context"] });
             if (req.method === "GET" && path === "/") return asset(res, "index.html", "text/html; charset=utf-8");
             if (req.method === "GET" && path === "/app.js") return asset(res, "app.js", "text/javascript; charset=utf-8");
             if (req.method === "GET" && path === "/styles.css") return asset(res, "styles.css", "text/css; charset=utf-8");
@@ -196,19 +212,19 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const body = await readJson(req);
                 const username = String(body.username ?? "").trim();
                 const organization = String(body.organization ?? "").trim();
-                if (!username || !organization) return json(res, 400, { error: "SESSION_FIELDS_REQUIRED" });
+                if (!username || !organization) return corsJson( 400, { error: "SESSION_FIELDS_REQUIRED" });
                 const token = randomBytes(24).toString("hex");
                 const createdAt = now();
                 const created: Session = { token, tenantId: stableTenantId(username, organization), organization, createdAt, expiresAt: createdAt + sessionTtlMs };
                 sessions.set(token, created);
-                return json(res, 201, { authenticated: true, organization: { name: organization }, tenantId: created.tenantId, expiresAt: new Date(created.expiresAt).toISOString() }, {
+                return corsJson( 201, { authenticated: true, organization: { name: organization }, tenantId: created.tenantId, expiresAt: new Date(created.expiresAt).toISOString() }, {
                     "Set-Cookie": `hooshyar_session=${token}; HttpOnly; SameSite=Lax; Path=/`,
                 });
             }
 
             if (req.method === "GET" && path === "/api/session") {
-                if (!session) return json(res, 401, { authenticated: false });
-                return json(res, 200, { authenticated: true, organization: { name: session.organization }, tenantId: session.tenantId, expiresAt: new Date(session.expiresAt).toISOString() });
+                if (!session) return corsJson( 401, { authenticated: false });
+                return corsJson( 200, { authenticated: true, organization: { name: session.organization }, tenantId: session.tenantId, expiresAt: new Date(session.expiresAt).toISOString() });
             }
 
             if (!session) {
@@ -221,45 +237,45 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                         metadata: { method: req.method, path: req.url }
                     });
                 }
-                return json(res, 401, { error: "AUTHENTICATION_REQUIRED" });
+                return corsJson( 401, { error: "AUTHENTICATION_REQUIRED" });
             }
 
             if (req.method === "POST" && path === "/api/analyze") {
-                if (!session.token || !getOrCreateRateLimiter(session.token).tryAcquire()) return json(res, 429, { error: "RATE_LIMIT_EXCEEDED" });
+                if (!session.token || !getOrCreateRateLimiter(session.token).tryAcquire()) return corsJson( 429, { error: "RATE_LIMIT_EXCEEDED" });
                 const body = await readJson(req);
                 const analyzeError = validateAnalyzeBody(body);
-                if (analyzeError) return json(res, 400, { error: analyzeError });
+                if (analyzeError) return corsJson( 400, { error: analyzeError });
                 const csv = String(body.csv ?? "");
                 const sourceName = String(body.sourceName ?? "ledger.csv");
                 const assets = Number(body.assets);
                 const liabilities = Number(body.liabilities);
                 const ingested = await ingestion.ingestCsv(session.tenantId, sourceName, csv);
                 const result = analysis.execute({ tenantId: session.tenantId, revenue: ingested.model.totals.credit, expenses: ingested.model.totals.debit, assets, liabilities, source: ingested.evidence });
-                if (result.status !== "READY") return json(res, 422, result);
+                if (result.status !== "READY") return corsJson( 422, result);
                 await persistence.write({ tenantId: session.tenantId }, LATEST_ANALYSIS_KEY, result);
                 latestResults.set(session.tenantId, result);
-                return json(res, 200, result);
+                return corsJson( 200, result);
             }
 
             if (req.method === "POST" && path === "/api/executive/workbench") {
-                if (!session.token || !getOrCreateRateLimiter(session.token).tryAcquire()) return json(res, 429, { error: "RATE_LIMIT_EXCEEDED" });
+                if (!session.token || !getOrCreateRateLimiter(session.token).tryAcquire()) return corsJson( 429, { error: "RATE_LIMIT_EXCEEDED" });
                 const body = await readJson(req);
                 const workbenchError = validateWorkbenchBody(body);
-                if (workbenchError) return json(res, 400, { error: workbenchError });
+                if (workbenchError) return corsJson( 400, { error: workbenchError });
                 const targets = parseExecutiveTargets(body.targets);
-                if (!targets) return json(res, 400, { error: "EXECUTIVE_TARGETS_REQUIRED" });
+                if (!targets) return corsJson( 400, { error: "EXECUTIVE_TARGETS_REQUIRED" });
                 const result = await loadAnalysis(session.tenantId);
-                if (!result) return json(res, 422, { error: "EXECUTIVE_ANALYSIS_REQUIRED" });
+                if (!result) return corsJson( 422, { error: "EXECUTIVE_ANALYSIS_REQUIRED" });
                 const workbenchResult = executiveWorkbench.execute({ tenantId: session.tenantId, metrics: result.metrics, targets });
-                if (workbenchResult.status !== "READY") return json(res, 422, workbenchResult);
+                if (workbenchResult.status !== "READY") return corsJson( 422, workbenchResult);
                 await persistence.write({ tenantId: session.tenantId }, LATEST_EXECUTIVE_WORKBENCH_KEY, workbenchResult);
                 latestWorkbenchResults.set(session.tenantId, workbenchResult);
-                return json(res, 200, workbenchResult);
+                return corsJson( 200, workbenchResult);
             }
 
             if (req.method === "GET" && path === "/api/report") {
                 const result = await loadAnalysis(session.tenantId);
-                if (!result) return json(res, 422, { error: "REPORT_ANALYSIS_REQUIRED" });
+                if (!result) return corsJson( 422, { error: "REPORT_ANALYSIS_REQUIRED" });
                 const workbench = await loadWorkbench(session.tenantId);
                 const sections = [
                     `Tenant: ${session.tenantId}`,
@@ -272,17 +288,17 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 ];
                 if (workbench) sections.push(`Recommendations: ${workbench.recommendations.map((item) => item.action).join(" | ")}`);
                 const report = reports.build("HooshyarOS Financial and Executive Report", sections);
-                return json(res, report.status === "READY" ? 200 : 422, { ...report, tenantId: session.tenantId, source: result.source });
+                return corsJson( report.status === "READY" ? 200 : 422, { ...report, tenantId: session.tenantId, source: result.source });
             }
 
             if (req.method === "POST" && path === "/api/assistant") {
-                if (!session.token || !getOrCreateRateLimiter(session.token).tryAcquire()) return json(res, 429, { error: "RATE_LIMIT_EXCEEDED" });
+                if (!session.token || !getOrCreateRateLimiter(session.token).tryAcquire()) return corsJson( 429, { error: "RATE_LIMIT_EXCEEDED" });
                 const body = await readJson(req);
                 const assistantError = validateAssistantBody(body);
-                if (assistantError) return json(res, 400, { error: assistantError });
+                if (assistantError) return corsJson( 400, { error: assistantError });
                 const question = String(body.question ?? "").trim();
                 const result = await loadAnalysis(session.tenantId);
-                if (!result) return json(res, 422, { error: "ASSISTANT_ANALYSIS_REQUIRED" });
+                if (!result) return corsJson( 422, { error: "ASSISTANT_ANALYSIS_REQUIRED" });
                 const workbench = await loadWorkbench(session.tenantId);
                 const context = [
                     `Answer using only verified persisted context for tenant ${session.tenantId}.`,
@@ -295,22 +311,22 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                     workbench ? `Recommendations=${workbench.recommendations.map((item) => item.action).join(" | ")}` : "No executive workbench result is available yet.",
                 ].join(" | ");
                 const answer = reasoning.reason(context);
-                if (!answer.success) return json(res, 503, { error: "ASSISTANT_REASONING_UNAVAILABLE" });
-                return json(res, 200, { status: "READY", tenantId: session.tenantId, question, answer: answer.answer ?? answer.status, evidence: { analysisSource: result.source, executiveWorkbench: Boolean(workbench) } });
+                if (!answer.success) return corsJson( 503, { error: "ASSISTANT_REASONING_UNAVAILABLE" });
+                return corsJson( 200, { status: "READY", tenantId: session.tenantId, question, answer: answer.answer ?? answer.status, evidence: { analysisSource: result.source, executiveWorkbench: Boolean(workbench) } });
             }
 
             if (req.method === "GET" && path === "/api/dashboard") {
                 const result = await loadAnalysis(session.tenantId);
-                if (!result) return json(res, 200, { status: "READY", tenantId: session.tenantId, metrics: { revenue: 0, profit: 0, risk: 0 }, analysisAvailable: false, executiveIntelligence: null });
+                if (!result) return corsJson( 200, { status: "READY", tenantId: session.tenantId, metrics: { revenue: 0, profit: 0, risk: 0 }, analysisAvailable: false, executiveIntelligence: null });
                 const workbench = await loadWorkbench(session.tenantId);
-                return json(res, 200, dashboardPayload(result, workbench));
+                return corsJson( 200, dashboardPayload(result, workbench));
             }
 
-            return json(res, 404, { error: "NOT_FOUND" });
+            return corsJson( 404, { error: "NOT_FOUND" });
         } catch (error) {
             const message = error instanceof Error ? error.message : "RUNTIME_ERROR";
             const status = message === "request-body-too-large" ? 413 : 400;
-            return json(res, status, { error: message });
+            return corsJson( status, { error: message });
         }
     });
     server.once("close", close);
