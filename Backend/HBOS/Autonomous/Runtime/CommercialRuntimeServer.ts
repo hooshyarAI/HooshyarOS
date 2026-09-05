@@ -16,14 +16,17 @@ export interface CommercialRuntimeOptions {
     readonly databasePath?: string;
     readonly reasoning?: Pick<ReasoningEngine, "reason">;
     readonly securityEventLogger?: SecurityEventLogger;
+    readonly sessionTtlMs?: number;
+    readonly now?: () => number;
 }
 
 const WEB_ROOT = resolve(process.cwd(), "web");
 const MAX_BODY_BYTES = 1024 * 1024;
 const LATEST_ANALYSIS_KEY = "financial-analysis:latest";
 const LATEST_EXECUTIVE_WORKBENCH_KEY = "executive-intelligence-workbench:latest";
+const DEFAULT_SESSION_TTL_MS = 60 * 60 * 1000;
 
-type Session = { token: string; tenantId: string; organization: string };
+type Session = { token: string; tenantId: string; organization: string; createdAt: number; expiresAt: number };
 type StoredAnalysis = ReturnType<FinancialStatementAnalysisService["execute"]>;
 type ExecutiveTargets = ExecutiveIntelligenceWorkbenchInput["targets"];
 
@@ -93,6 +96,8 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     const sessions = new Map<string, Session>();
     const latestResults = new Map<string, StoredAnalysis>();
     const latestWorkbenchResults = new Map<string, ExecutiveIntelligenceWorkbenchResult>();
+    const sessionTtlMs = options.sessionTtlMs ?? DEFAULT_SESSION_TTL_MS;
+    const now = options.now ?? (() => Date.now());
 
     const loadAnalysis = async (tenantId: string): Promise<StoredAnalysis | undefined> => {
         let result = latestResults.get(tenantId);
@@ -137,7 +142,12 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
             if (req.method === "GET" && path === "/sw.js") return asset(res, "sw.js", "text/javascript; charset=utf-8");
 
             const cookies = parseCookies(req.headers.cookie);
-            const session = cookies.hooshyar_session ? sessions.get(cookies.hooshyar_session) : undefined;
+            const cookieToken = cookies.hooshyar_session;
+            let session = cookieToken ? sessions.get(cookieToken) : undefined;
+            if (session && session.expiresAt <= now()) {
+                sessions.delete(session.token);
+                session = undefined;
+            }
 
             if (req.method === "POST" && path === "/api/session") {
                 const body = await readJson(req);
@@ -145,16 +155,17 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const organization = String(body.organization ?? "").trim();
                 if (!username || !organization) return json(res, 400, { error: "SESSION_FIELDS_REQUIRED" });
                 const token = randomBytes(24).toString("hex");
-                const created: Session = { token, tenantId: stableTenantId(username, organization), organization };
+                const createdAt = now();
+                const created: Session = { token, tenantId: stableTenantId(username, organization), organization, createdAt, expiresAt: createdAt + sessionTtlMs };
                 sessions.set(token, created);
-                return json(res, 201, { authenticated: true, organization: { name: organization }, tenantId: created.tenantId }, {
+                return json(res, 201, { authenticated: true, organization: { name: organization }, tenantId: created.tenantId, expiresAt: new Date(created.expiresAt).toISOString() }, {
                     "Set-Cookie": `hooshyar_session=${token}; HttpOnly; SameSite=Lax; Path=/`,
                 });
             }
 
             if (req.method === "GET" && path === "/api/session") {
                 if (!session) return json(res, 401, { authenticated: false });
-                return json(res, 200, { authenticated: true, organization: { name: session.organization }, tenantId: session.tenantId });
+                return json(res, 200, { authenticated: true, organization: { name: session.organization }, tenantId: session.tenantId, expiresAt: new Date(session.expiresAt).toISOString() });
             }
 
             if (!session) {
