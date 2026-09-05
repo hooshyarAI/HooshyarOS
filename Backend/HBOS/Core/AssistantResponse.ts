@@ -1,3 +1,5 @@
+import { TruthfulConfidence } from "./IntelligenceContract";
+
 export class AssistantResponse {
 
 
@@ -5,7 +7,7 @@ export class AssistantResponse {
 
     recommendation: string;
 
-    confidence: number;
+    confidence: TruthfulConfidence;
 
     createdAt: Date;
 
@@ -13,7 +15,7 @@ export class AssistantResponse {
     constructor(
         summary: string,
         recommendation: string,
-        confidence: number
+        confidence: TruthfulConfidence
     ) {
 
         this.summary = summary;
@@ -26,8 +28,19 @@ export class AssistantResponse {
 
     }
 
+    get numericConfidence(): number | undefined {
+        if (this.confidence.source === "unavailable") {
+            return undefined;
+        }
+        return this.confidence.value;
+    }
+
 
     toText(): string {
+
+        const confidenceDisplay = this.numericConfidence !== undefined
+            ? `${(this.numericConfidence * 100).toFixed(1)}%`
+            : "unavailable";
 
         return `
 Summary:
@@ -37,7 +50,7 @@ Recommendation:
 ${this.recommendation}
 
 Confidence:
-${this.confidence}
+${confidenceDisplay}
         `.trim();
 
     }

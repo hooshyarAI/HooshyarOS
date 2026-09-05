@@ -6,12 +6,23 @@ import { ProjectPilotEngine } from "../Engines/ProjectPilotEngine";
 import { AssistantEngine } from "../Engines/AssistantEngine";
 import { KnowledgeEngine } from "../Engines/KnowledgeEngine";
 import { ReactionEngine } from "../Engines/ReactionEngine";
+import { ReasoningEngine } from "../Engines/ReasoningEngine";
+import { GovernanceEngine } from "../Engines/GovernanceEngine";
+import { ExecutiveIntelligenceEngine } from "../Engines/ExecutiveIntelligenceEngine";
+import { OrganizationalIntelligenceEngine } from "../Engines/OrganizationalIntelligenceEngine";
+import { AutonomousOperationsEngine } from "../Engines/AutonomousOperationsEngine";
+import { IntelligenceEngine } from "../Engines/IntelligenceEngine";
+import { OrchestratedDecisionIntelligenceService } from "../Product/OrchestratedDecisionIntelligenceService";
+import { MemoryEvent } from "./MemoryEvent";
 
 import { EngineDependencyManager } from "./Dependency/EngineDependencyManager";
 import { BootDependencyValidator } from "./Dependency/BootDependencyValidator";
+import { SecurityEventLogger } from "../Entities/SecurityEventLogger";
+
 
 
 export class HBOS {
+
 
 
     private registry: EngineRegistry;
@@ -20,12 +31,18 @@ export class HBOS {
         EngineDependencyManager;
 
 
+
     private bootValidator:
         BootDependencyValidator;
+
+    private memoryEngine: MemoryEngine;
+
+    private knowledgeEngine: KnowledgeEngine;
 
 
 
     constructor() {
+
 
 
         this.registry =
@@ -45,7 +62,7 @@ export class HBOS {
 
 
 
-        const memoryEngine =
+        this.memoryEngine =
             new MemoryEngine();
 
 
@@ -65,30 +82,73 @@ export class HBOS {
 
 
 
-        const knowledgeEngine =
+        this.knowledgeEngine =
             new KnowledgeEngine();
 
 
 
+        const orchestratedDecisionIntelligenceService =
+            new OrchestratedDecisionIntelligenceService();
+
+
+
         const assistantEngine =
-            new AssistantEngine();
+            new AssistantEngine({
+                orchestrated: orchestratedDecisionIntelligenceService
+            });
+
+        const intelligenceEngine =
+            new IntelligenceEngine();
 
 
 
-        memoryEngine.subscribe(
+        const reasoningEngine =
+            new ReasoningEngine();
+
+
+
+        const governanceEngine =
+            new GovernanceEngine();
+
+
+
+        const executiveIntelligenceEngine =
+            new ExecutiveIntelligenceEngine();
+
+
+
+        const organizationalIntelligenceEngine =
+            new OrganizationalIntelligenceEngine();
+
+
+
+        const autonomousOperationsEngine =
+            new AutonomousOperationsEngine();
+
+
+
+        this.memoryEngine.subscribe(
             reactionEngine
         );
 
 
 
-        this.registry.register(
-            memoryEngine
+        this.memoryEngine.addListener(
+            this.knowledgeEngine
         );
+
+
+
+        this.registry.register(
+            this.memoryEngine
+        );
+
 
 
         this.registry.register(
             reactionEngine
         );
+
 
 
         this.registry.register(
@@ -96,14 +156,17 @@ export class HBOS {
         );
 
 
+
         this.registry.register(
             projectPilotEngine
         );
 
 
+
         this.registry.register(
-            knowledgeEngine
+            this.knowledgeEngine
         );
+
 
 
         this.registry.register(
@@ -111,14 +174,63 @@ export class HBOS {
         );
 
 
+
+        this.registry.register(
+            intelligenceEngine
+        );
+
+
+
+        this.registry.register(
+            reasoningEngine
+        );
+
+
+
+        this.registry.register(
+            governanceEngine
+        );
+
+
+
+        this.registry.register(
+            executiveIntelligenceEngine
+        );
+
+
+
+        this.registry.register(
+            organizationalIntelligenceEngine
+        );
+
+
+
+        this.registry.register(
+            autonomousOperationsEngine
+        );
+
+
+
         this.setupDependencies();
+
 
 
     }
 
 
 
+    getMemoryEngine(): MemoryEngine {
+        return this.memoryEngine;
+    }
+
+    getKnowledgeEngine(): KnowledgeEngine {
+        return this.knowledgeEngine;
+    }
+
+
+
     private setupDependencies(){
+
 
 
         this.dependencyManager.registerDependency(
@@ -130,12 +242,23 @@ export class HBOS {
         );
 
 
+
+        this.dependencyManager.registerDependency(
+            "Intelligence Engine",
+            [
+                "Knowledge Engine",
+                "Memory Engine"
+            ]
+        );
+
+
+
     }
 
 
 
-
     boot(): boolean {
+
 
 
         const availableEngines = [
@@ -145,9 +268,11 @@ export class HBOS {
             "Decision Engine",
             "Project Pilot Engine",
             "Knowledge Engine",
-            "Assistant Engine"
+            "Assistant Engine",
+            "Intelligence Engine"
 
         ];
+
 
 
 
@@ -167,14 +292,47 @@ export class HBOS {
 
 
 
+        const intelligenceReady =
+            this.bootValidator.canBoot(
+                "Intelligence Engine",
+                availableEngines
+            );
+
+
+
+        if(!intelligenceReady){
+
+            return false;
+
+        }
+
+
+
+        const securityLogger = new SecurityEventLogger();
+
+        const governanceEngine = this.registry.getEngine<import("../Engines/GovernanceEngine").GovernanceEngine>("GovernanceEngine");
+        const decisionEngine = this.registry.getEngine<import("../Engines/DecisionEngine").DecisionEngine>("DecisionEngine");
+
+        governanceEngine?.setSecurityLogger(securityLogger);
+        decisionEngine?.setSecurityLogger(securityLogger);
+
         this.registry.initializeAll();
 
+
+
+        const bootEvent = new MemoryEvent(
+            "HBOS_BOOT",
+            "HBOS platform initialized",
+            "HBOS"
+        );
+
+        this.memoryEngine.store(bootEvent);
 
         return true;
 
 
-    }
 
+    }
 
 
 
@@ -183,6 +341,7 @@ export class HBOS {
         return this.registry.healthReport();
 
     }
+
 
 
 }

@@ -23,12 +23,11 @@ UninstallDisplayName=HooshyarOS
 Source: "..\dist\productization\windows\payload\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 
 [Icons]
-Name: "{autoprograms}\HooshyarOS\HooshyarOS"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command ""Start-Process -FilePath '{app}\launch-hooshyar.cmd' -WindowStyle Hidden; Start-Sleep -Seconds 2; Start-Process 'http://127.0.0.1:4173/'"""; WorkingDir: "{app}"
-Name: "{autodesktop}\HooshyarOS"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command ""Start-Process -FilePath '{app}\launch-hooshyar.cmd' -WindowStyle Hidden; Start-Sleep -Seconds 2; Start-Process 'http://127.0.0.1:4173/'"""; WorkingDir: "{app}"
+Name: "{autoprograms}\HooshyarOS\HooshyarOS"; Filename: "wscript.exe"; Parameters: """{app}\launch-hooshyar.vbs"""; WorkingDir: "{app}"; IconFilename: "{sys}\imageres.dll"; IconIndex: 2
+Name: "{autodesktop}\HooshyarOS"; Filename: "wscript.exe"; Parameters: """{app}\launch-hooshyar.vbs"""; WorkingDir: "{app}"; IconFilename: "{sys}\imageres.dll"; IconIndex: 2
 
 [Run]
-Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\install-health.ps1"""; Flags: runhidden waituntilterminated
-Filename: "powershell.exe"; Parameters: "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command ""Start-Process -FilePath '{app}\launch-hooshyar.cmd' -WindowStyle Hidden; Start-Sleep -Seconds 2; Start-Process 'http://127.0.0.1:4173/'"""; Flags: runhidden postinstall nowait skipifsilent
+Filename: "wscript.exe"; Parameters: """{app}\launch-hooshyar.vbs"""; Flags: runhidden nowait
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}"

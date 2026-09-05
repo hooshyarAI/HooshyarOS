@@ -1,6 +1,7 @@
 import { AutonomousBuildDaemon } from "./AutonomousBuildDaemon";
 import { AutonomousDevelopmentLoop, AutonomousDevelopmentResult } from "../../Architecture/Autonomous/AutonomousDevelopmentLoop";
 import { AutonomousProjectMission } from "./AutonomousProjectMission";
+import { AutonomousKnotRecovery } from "./AutonomousKnotRecovery";
 
 describe("AutonomousBuildDaemon knot recovery", () => {
     it("repairs a failed knot from its checkpoint before allowing the run to continue", () => {
@@ -52,7 +53,39 @@ describe("AutonomousBuildDaemon knot recovery", () => {
         } as unknown as AutonomousProjectMission;
 
         const development = { execute } as unknown as AutonomousDevelopmentLoop;
-        const daemon = new AutonomousBuildDaemon({ maxCycles: 1, mission, development });
+
+        const knotRecovery = {
+            observe: jest.fn()
+                .mockReturnValueOnce({
+                    recover: true,
+                    action: "REPAIR",
+                    checkpoint: {
+                        capabilityId: "platform.user-management",
+                        commit: "HEAD"
+                    },
+                    rationale: "test recovery",
+                    repairCapabilityId: "repair-platform.user-management",
+                    stopConditions: []
+                })
+                .mockReturnValueOnce({
+                    recover: false,
+                    action: "ADVANCE",
+                    checkpoint: {
+                        capabilityId: "platform.user-management",
+                        commit: "HEAD"
+                    },
+                    rationale: "test repaired",
+                    stopConditions: []
+                }),
+            rollback: jest.fn()
+        } as unknown as AutonomousKnotRecovery;
+
+        const daemon = new AutonomousBuildDaemon({
+            maxCycles: 1,
+            mission,
+            development,
+            knotRecovery
+        });
 
         const result = daemon.run();
 

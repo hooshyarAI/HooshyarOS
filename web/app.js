@@ -5,6 +5,10 @@ async function getJson(path, options) {
   return payload;
 }
 
+function text(value) {
+  return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+}
+
 async function refreshDashboard() {
   try {
     const ready = await getJson('/api/ready');
@@ -30,7 +34,7 @@ document.querySelector('#session-form').addEventListener('submit', async event =
         organization: document.querySelector('#organization').value
       })
     });
-    result.textContent = `نشست ${payload.organization.name} با موفقیت ایجاد شد.`;
+    result.textContent = `نشست ${payload.organization.name} ایجاد شد. شناسه tenant: ${payload.tenantId}`;
     await refreshDashboard();
   } catch (error) {
     result.textContent = `ایجاد نشست ناموفق بود: ${error.message}`;
@@ -57,6 +61,59 @@ document.querySelector('#analysis-form').addEventListener('submit', async event 
     await refreshDashboard();
   } catch (error) {
     result.textContent = `تحلیل ناموفق بود: ${error.message}`;
+  }
+});
+
+document.querySelector('#executive-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const result = document.querySelector('#executive-result');
+  try {
+    const payload = await getJson('/api/executive/workbench', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        targets: {
+          revenue: Number(document.querySelector('#target-revenue').value),
+          profit: Number(document.querySelector('#target-profit').value),
+          profitMargin: Number(document.querySelector('#target-margin').value),
+          debtRatio: Number(document.querySelector('#target-debt').value)
+        }
+      })
+    });
+    result.textContent = JSON.stringify({
+      status: payload.status,
+      kpis: payload.kpis,
+      performance: payload.performance,
+      recommendations: payload.recommendations
+    }, null, 2);
+    await refreshDashboard();
+  } catch (error) {
+    result.textContent = `محاسبه مدیریتی ناموفق بود: ${error.message}`;
+  }
+});
+
+document.querySelector('#report-button').addEventListener('click', async () => {
+  const result = document.querySelector('#report-result');
+  try {
+    const payload = await getJson('/api/report');
+    result.textContent = JSON.stringify(payload, null, 2);
+  } catch (error) {
+    result.textContent = `تولید گزارش ناموفق بود: ${error.message}`;
+  }
+});
+
+document.querySelector('#assistant-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const result = document.querySelector('#assistant-result');
+  try {
+    const payload = await getJson('/api/assistant', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ question: document.querySelector('#assistant-question').value })
+    });
+    result.textContent = text(payload);
+  } catch (error) {
+    result.textContent = `دستیار در دسترس نیست: ${error.message}`;
   }
 });
 

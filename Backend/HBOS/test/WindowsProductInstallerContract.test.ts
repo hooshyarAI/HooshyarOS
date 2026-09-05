@@ -20,8 +20,9 @@ describe("Windows product installer contract", () => {
 
     it("copies the runtime dependency closure", () => {
         expect(builder).toContain("def _runtime_dependency_names");
-        expect(builder).toContain("def _copy_node_dependency");
         expect(builder).toContain("def _copy_runtime_node_modules");
+        expect(builder).toContain("for name in _runtime_dependency_names()");
+        expect(builder).toContain("shutil.copytree(src, destination / name, dirs_exist_ok=True)");
         expect(builder).toContain("tsx");
         expect(builder).toContain("typescript");
     });
@@ -47,6 +48,6 @@ describe("Windows product installer contract", () => {
         expect(builder).toContain("start-commercial-runtime.ts");
         expect(builder).toContain("product-manifest.json");
         expect(builder).toContain('web = payload / "web"');
-        expect(builder).toContain('index = web / "index.html"');
+        expect(builder).toContain('payload / "web" / "index.html"');
     });
 });

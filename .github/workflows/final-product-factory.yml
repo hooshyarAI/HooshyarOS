@@ -1,0 +1,224 @@
+name: Final Product Factory
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  windows-product-factory:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm install
+      - name: Validate canonical product assurance contract
+        run: npm run product:assurance
+      - name: Run executable Windows product factory
+        id: product-factory
+        continue-on-error: true
+        run: npm run product:factory
+        env:
+          HOOSHYAR_FACTORY_ALLOW_PUSH: "0"
+      - name: Validate factory evidence exists
+        run: |
+          if (-not (Test-Path .hooshyar/factory-success.json)) {
+            Write-Host "Missing factory evidence: .hooshyar/factory-success.json"
+            exit 1
+          }
+      - name: Emit assistant repair handoff on failure
+        if: steps.product-factory.outcome == 'failure'
+        run: npm run product:factory:handoff
+      - name: Upload product factory evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hooshyar-final-product-factory-evidence
+          path: .hooshyar/factory-success.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Fail release gate on factory failure
+        if: steps.product-factory.outcome == 'failure'
+        run: exit 1
+
+  web-product-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm install
+      - name: Validate canonical product assurance contract
+        run: npm run product:assurance
+      - name: Run executable Web product acceptance
+        run: npm run product:web:acceptance
+      - name: Upload web acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hooshyar-web-product-acceptance-evidence
+          path: .hooshyar/web-acceptance-success.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  security-tenant-acceptance:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm install
+      - name: Validate canonical product assurance contract
+        run: npm run product:assurance
+      - name: Run executable security and tenant isolation acceptance
+        run: npm run product:security:acceptance
+      - name: Upload security acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hooshyar-security-tenant-evidence
+          path: .hooshyar/security-acceptance-success.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  android-product-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm install
+      - name: Validate canonical product assurance contract
+        run: npm run product:assurance
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build debug APK
+        working-directory: android
+        run: gradle :app:assembleDebug --no-daemon
+      - name: Install and launch Android application
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_2
+          force-avd-creation: true
+          disable-animations: false
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: bash scripts/android-product-acceptance.sh
+      - name: Write Android acceptance evidence
+        shell: bash
+        run: |
+          mkdir -p .hooshyar
+          cat > .hooshyar/android-acceptance-success.json <<EOF
+          {
+            "type": "ANDROID_PRODUCT_ACCEPTANCE_SUCCESS",
+            "version": 1,
+            "status": "PASS",
+            "createdAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "commit": "$(git rev-parse HEAD)",
+            "acceptance": ["apk-build", "emulator-install", "launcher-start", "process-alive", "main-activity-visible"]
+          }
+          EOF
+      - name: Upload Android acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hooshyar-android-product-acceptance-evidence
+          path: .hooshyar/android-acceptance-success.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  full-qualification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [windows-product-factory, web-product-acceptance, security-tenant-acceptance, android-product-acceptance]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm install
+      - name: Validate canonical product assurance contract
+        run: npm run product:assurance
+      - name: Full Jest
+        run: npm test -- --runInBand
+
+  runtime-evidence-qualification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [windows-product-factory, web-product-acceptance, security-tenant-acceptance, android-product-acceptance, full-qualification]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm install
+      - name: Download Windows factory evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: hooshyar-final-product-factory-evidence
+          path: .hooshyar
+          merge-multiple: true
+      - name: Download Web acceptance evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: hooshyar-web-product-acceptance-evidence
+          path: .hooshyar
+          merge-multiple: true
+      - name: Download Android acceptance evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: hooshyar-android-product-acceptance-evidence
+          path: .hooshyar
+          merge-multiple: true
+      - name: Download security acceptance evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: hooshyar-security-tenant-evidence
+          path: .hooshyar
+          merge-multiple: true
+      - name: Run Cline runtime evidence collector
+        run: npm run product:cline:evidence
+      - name: Upload consolidated qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: hooshyar-cline-runtime-evidence
+          path: .hooshyar/cline-runtime-evidence.json
+          retention-days: 14
+
+  release-gate:
+    runs-on: ubuntu-latest
+    needs: [windows-product-factory, web-product-acceptance, security-tenant-acceptance, android-product-acceptance, full-qualification, runtime-evidence-qualification]
+    if: ${{ always() }}
+    steps:
+      - name: Require every release gate to pass
+        shell: bash
+        run: |
+          test "${{ needs.windows-product-factory.result }}" = "success"
+          test "${{ needs.web-product-acceptance.result }}" = "success"
+          test "${{ needs.security-tenant-acceptance.result }}" = "success"
+          test "${{ needs.android-product-acceptance.result }}" = "success"
+          test "${{ needs.full-qualification.result }}" = "success"
+          test "${{ needs.runtime-evidence-qualification.result }}" = "success"
+          echo "FINAL_PRODUCT_RELEASE_GATE=PASS"

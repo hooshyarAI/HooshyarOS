@@ -2,6 +2,7 @@ import { AutonomousBuildDaemon } from "./AutonomousBuildDaemon";
 import { AutonomousDevelopmentLoop, AutonomousDevelopmentResult } from "../../Architecture/Autonomous/AutonomousDevelopmentLoop";
 import { AutonomousProjectMission } from "./AutonomousProjectMission";
 import { AutonomousPlatformContinuation } from "./AutonomousPlatformContinuation";
+import { CommercialProductCompletionAudit } from "./CommercialProductCompletionAudit";
 
 describe("AutonomousBuildDaemon", () => {
     it("executes the first real platform capability at the assistant completion handoff", () => {
@@ -31,7 +32,7 @@ describe("AutonomousBuildDaemon", () => {
                 capability: "HooshyarOS Autonomous Assistant completion gate",
                 targetEngine: "Autonomous Operations Engine",
                 dependencies: [],
-                evidence: {} as any,
+                evidence: { clean: true, commit: "before" } as any,
                 directives: [],
                 architectureRules: []
             })),
@@ -80,7 +81,7 @@ describe("AutonomousBuildDaemon", () => {
         expect(developmentExecute.mock.calls[0]?.[0]).toEqual(expect.objectContaining(platformMission));
     });
 
-    it("refuses platform completion when final evidence is incomplete", () => {
+    it("blocks on terminal external dependencies after canonical completion evidence is exhausted", () => {
         const mission = {
             snapshot: jest.fn(() => ({ commit: "abc123", clean: true })),
             nextMission: jest.fn(() => ({
@@ -88,10 +89,11 @@ describe("AutonomousBuildDaemon", () => {
                 capability: "HooshyarOS Autonomous Assistant completion gate",
                 targetEngine: "Autonomous Operations Engine",
                 dependencies: [],
-                evidence: {} as any,
+                evidence: { clean: true, commit: "abc123" } as any,
                 directives: [],
                 architectureRules: []
             })),
+            nextPlatformMission: jest.fn(() => null),
         } as unknown as AutonomousProjectMission;
 
         const continuation = {
@@ -126,10 +128,18 @@ describe("AutonomousBuildDaemon", () => {
 
         expect(result.status).toBe("blocked");
         expect(result.history).toHaveLength(1);
-        expect(execute).toHaveBeenCalledTimes(1);
-        const executedGoal = (execute.mock.calls[0]?.[0] as any);
-        expect(executedGoal.capabilityId).toBe("assistant.completion.evidence");
-        expect(executedGoal.capability).toContain("verification");
+        expect(execute).not.toHaveBeenCalled();
+        expect(result.history[0]).toEqual(expect.objectContaining({
+            cycle: 1,
+            status: "blocked",
+            audit: expect.objectContaining({
+                complete: false,
+                blockedExternalDependencies: expect.arrayContaining([
+                    "payment-provider-activation",
+                    "production-cloud-resources"
+                ])
+            })
+        }));
     });
 
     it("reports assistant and autonomous construction completion separately from commercial product completion", () => {
@@ -192,5 +202,15 @@ describe("AutonomousBuildDaemon", () => {
         } finally {
             logSpy.mockRestore();
         }
+    });
+
+    it("marks commercial completion incomplete while required external activation remains blocked", () => {
+        const result = new CommercialProductCompletionAudit().audit(process.cwd());
+        expect(result.complete).toBe(false);
+        expect(result.missingLayers).toEqual([]);
+        expect(result.blockedExternalDependencies).toEqual(expect.arrayContaining([
+            "payment-provider-activation",
+            "production-cloud-resources"
+        ]));
     });
 });

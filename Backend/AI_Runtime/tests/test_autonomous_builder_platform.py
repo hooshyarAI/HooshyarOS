@@ -1,4 +1,5 @@
 from pathlib import Path
+import sys
 
 import pytest
 
@@ -113,3 +114,86 @@ def test_runtime_bridge_requires_reasoning_evidence(tmp_path: Path, monkeypatch)
 
 def test_unknown_platform_capability_is_not_invented():
     assert "platform.unknown" not in autonomous_builder.CAPABILITIES
+
+
+def test_blocked_dependency_produces_machine_readable_help_required(tmp_path: Path, monkeypatch, capsys):
+    monkeypatch.setattr(autonomous_builder, "ROOT", tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "autonomous_builder.py",
+            "--prompt",
+            "Capability ID: platform.organization-model\nCapability: implement organization model\nTarget Engine: Organization Model Engine",
+        ],
+    )
+    result = autonomous_builder.main()
+    captured = capsys.readouterr()
+    assert result == 3
+    assert "HELP_REQUIRED" in captured.out
+    assert "ESCALATE" in captured.out
+    assert "CAPABILITY: platform.organization-model" in captured.out
+    assert "EVIDENCE_REQUIRED" in captured.out
+
+
+def test_evidence_dir_allows_reverification_after_operator_intervention(tmp_path: Path, monkeypatch, capsys):
+    monkeypatch.setattr(autonomous_builder, "ROOT", tmp_path)
+    # Create the dependency that was missing.
+    dep = "Backend/HBOS/Engines/UserManagementEngine.ts"
+    (tmp_path / dep).parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / dep).write_text("export class UserManagementEngine {}", encoding="utf-8")
+    evidence_dir = tmp_path / "operator_evidence"
+    evidence_dir.mkdir()
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "autonomous_builder.py",
+            "--prompt",
+            "Capability ID: platform.organization-model\nCapability: implement organization model\nTarget Engine: Organization Model Engine",
+            "--evidence-dir",
+            str(evidence_dir),
+        ],
+    )
+    result = autonomous_builder.main()
+    captured = capsys.readouterr()
+    # After evidence, the remaining dependencies are still missing, so it should still block.
+    # But the evidence dir caused a re-verification attempt.
+    assert result == 3
+    assert "HELP_REQUIRED" in captured.out
+
+
+def test_evidence_dir_resolves_blocker_when_all_dependencies_present(tmp_path: Path, monkeypatch, capsys):
+    monkeypatch.setattr(autonomous_builder, "ROOT", tmp_path)
+    deps = [
+        "Backend/HBOS/Engines/UserManagementEngine.ts",
+        "Backend/HBOS/test/UserManagementEngine.test.ts",
+        "Docs/Engines/UserManagementEngine.md",
+    ]
+    for dep in deps:
+        (tmp_path / dep).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / dep).write_text("placeholder", encoding="utf-8")
+    evidence_dir = tmp_path / "operator_evidence"
+    evidence_dir.mkdir()
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "autonomous_builder.py",
+            "--prompt",
+            "Capability ID: platform.organization-model\nCapability: implement organization model\nTarget Engine: Organization Model Engine",
+            "--evidence-dir",
+            str(evidence_dir),
+        ],
+    )
+    result = autonomous_builder.main()
+    captured = capsys.readouterr()
+    assert result == 0
+    assert "Generated:" in captured.out
+
+
+def test_kilo_is_not_a_mandatory_runtime_dependency():
+    source = Path(autonomous_builder.__file__).read_text(encoding="utf-8")
+    assert "import kilo" not in source.lower()
+    assert "from kilo" not in source.lower()
+    assert "kilo" not in source.lower() or "approved operator" in source.lower() or "kilo code" in source.lower()

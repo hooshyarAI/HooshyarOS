@@ -128,7 +128,7 @@ export class FinancialStatementAnalysisService {
     const source = input.source;
     if (
       !source?.sourceName?.trim() ||
-      source.sourceType !== "CSV" ||
+      (source.sourceType !== "CSV" && source.sourceType !== "STRUCTURED") ||
       !/^[a-f0-9]{64}$/i.test(source.sha256) ||
       !source.receivedAt?.trim()
     ) {

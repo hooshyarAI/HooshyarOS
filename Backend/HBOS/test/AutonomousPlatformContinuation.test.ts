@@ -63,12 +63,14 @@ describe("AutonomousPlatformContinuation", () => {
         }
     });
 
-    it("returns null when the production extension chain is exhausted", () => {
+    it("returns null when both the production extension chain and commercial discovery are exhausted", () => {
         const root = mkdtempSync(join(process.cwd(), "tmp-production-complete-"));
         try {
             seedFiles(root, [...performanceFiles, ...customerFiles, ...deploymentReadinessFiles, ...deploymentContractFiles, ...cloudFiles, ...productionAcceptanceFiles]);
             const projectMission = { nextPlatformMission: () => null, snapshot: () => ({ root }) } as unknown as AutonomousProjectMission;
-            expect(new AutonomousPlatformContinuation().selectNextCapability(projectMission)).toBeNull();
+            const discovery = { discover: () => [] } as any;
+            const commercialDiscovery = { discover: () => null } as any;
+            expect(new AutonomousPlatformContinuation(discovery, commercialDiscovery).selectNextCapability(projectMission)).toBeNull();
         } finally {
             rmSync(root, { recursive: true, force: true });
         }
