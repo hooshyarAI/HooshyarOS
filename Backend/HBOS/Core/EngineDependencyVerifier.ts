@@ -66,7 +66,7 @@ export class EngineDependencyVerifier {
         }
 
         // Also match simple imports like "from "./DecisionEngine""
-        const simpleImportRegex = /from\s+["'](./[^"']+)["']/g;
+        const simpleImportRegex = /from\s+["'](\.\/[^"']+)["']/g;
         while ((match = simpleImportRegex.exec(content)) !== null) {
             const importPath = match[1];
             if (importPath.startsWith("./")) {

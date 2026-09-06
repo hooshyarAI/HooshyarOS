@@ -2,5 +2,6 @@ module.exports = {
     preset: "ts-jest",
     testEnvironment: "node",
     cache: false,
-    testPathIgnorePatterns: ["/node_modules/", "/dist/productization/"],
+    testPathIgnorePatterns: ["/node_modules/", "/dist/productization/", "/.kilo/worktrees/"],
+    modulePathIgnorePatterns: ["/.kilo/worktrees/"],
 };
