@@ -25,6 +25,34 @@ export interface AuthorizationGuardResult {
 }
 
 /**
+ * ABAC attribute
+ */
+export interface AbacAttribute {
+    readonly key: string;
+    readonly value: string | number | boolean;
+}
+
+/**
+ * ABAC rule
+ */
+export interface AbacRule {
+    readonly effect: "ALLOW" | "DENY";
+    readonly attribute: string;
+    readonly operator: "EQUALS" | "NOT_EQUALS" | "IN" | "NOT_IN" | "GREATER_THAN" | "LESS_THAN" | "CONTAINS";
+    readonly value: string | number | boolean | Array<string | number | boolean>;
+}
+
+/**
+ * ABAC policy result
+ */
+export interface AbacPolicyResult {
+    readonly result: AuthorizationResult;
+    readonly reason: string;
+    readonly matchedRule?: string;
+    readonly traceId?: string;
+}
+
+/**
  * Authorization guard - enforces security rules
  */
 export const AuthorizationGuard = {
@@ -206,5 +234,121 @@ export const AuthorizationGuard = {
             reason: "Evidence access authorized",
             traceId: context.traceId
         };
+    },
+
+    /**
+     * Evaluate ABAC policy against resource attributes
+     */
+    evaluateAbacPolicy(
+        context: SecurityContext,
+        action: Authorization,
+        resourceAttributes: AbacAttribute[],
+        rules: AbacRule[]
+    ): AbacPolicyResult {
+        // No context => reject
+        if (!context.actor) {
+            return {
+                result: AuthorizationResult.MISSING_CONTEXT,
+                reason: "No actor in security context",
+                traceId: context.traceId
+            };
+        }
+
+        const attributeMap = new Map<string, string | number | boolean>();
+        for (const attr of resourceAttributes) {
+            attributeMap.set(attr.key, attr.value);
+        }
+
+        let matchedAllowRule: string | undefined;
+        const denyReasons: string[] = [];
+
+        for (const rule of rules) {
+            const attrValue = attributeMap.get(rule.attribute);
+            if (attrValue === undefined) {
+                continue;
+            }
+
+            let matches = false;
+            switch (rule.operator) {
+                case "EQUALS":
+                    matches = attrValue === rule.value;
+                    break;
+                case "NOT_EQUALS":
+                    matches = attrValue !== rule.value;
+                    break;
+                case "IN":
+                    if (Array.isArray(rule.value)) {
+                        matches = (rule.value as Array<string | number | boolean>).includes(attrValue);
+                    }
+                    break;
+                case "NOT_IN":
+                    if (Array.isArray(rule.value)) {
+                        matches = !(rule.value as Array<string | number | boolean>).includes(attrValue);
+                    }
+                    break;
+                case "GREATER_THAN":
+                    matches = Number(attrValue) > Number(rule.value);
+                    break;
+                case "LESS_THAN":
+                    matches = Number(attrValue) < Number(rule.value);
+                    break;
+                case "CONTAINS":
+                    matches = String(attrValue).includes(String(rule.value));
+                    break;
+            }
+
+            if (!matches) {
+                continue;
+            }
+
+            if (rule.effect === "DENY") {
+                return {
+                    result: AuthorizationResult.DENIED,
+                    reason: `ABAC policy denied: rule ${rule.attribute} ${rule.operator} ${String(rule.value)}`,
+                    matchedRule: rule.attribute,
+                    traceId: context.traceId
+                };
+            }
+
+            if (rule.effect === "ALLOW") {
+                matchedAllowRule = rule.attribute;
+            }
+        }
+
+        if (matchedAllowRule) {
+            return {
+                result: AuthorizationResult.PERMITTED,
+                reason: "ABAC policy allowed",
+                matchedRule: matchedAllowRule,
+                traceId: context.traceId
+            };
+        }
+
+        return this.check(context, action);
+    },
+
+    /**
+     * ABAC check with tenant boundary enforcement
+     */
+    abacCheck(
+        context: SecurityContext,
+        action: Authorization,
+        resourceType: string,
+        resourceAttributes: AbacAttribute[],
+        rules: AbacRule[]
+    ): AbacPolicyResult {
+        // Tenant boundary check
+        if (context.tenantId) {
+            const tenantAttr = resourceAttributes.find(a => a.key === "tenantId");
+            if (tenantAttr && tenantAttr.value !== context.tenantId) {
+                return {
+                    result: AuthorizationResult.DENIED,
+                    reason: "Tenant mismatch",
+                    traceId: context.traceId
+                };
+            }
+        }
+
+        return this.evaluateAbacPolicy(context, action, resourceAttributes, rules);
     }
 };

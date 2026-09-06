@@ -5,6 +5,7 @@ import { SecurityContext } from "../Security/SecurityContext";
 import { Authorization, AuthorizationResult as SecurityAuthorizationResult } from "../Security/Authorization";
 import { AuthorizationGuard } from "../Security/AuthorizationGuard";
 import { TenantIsolation, TenantResource } from "../Security/TenantIsolation";
+import { RecordRetentionMetadata } from "../Entities/RetentionPolicy";
 
 export interface AuthorizationResult {
     subject: string;
@@ -32,6 +33,21 @@ export interface DataClassificationResult {
     readonly classified: boolean;
     readonly sensitivity: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "SENSITIVE";
     readonly reason: string;
+}
+
+export interface RetentionEnforcementResult {
+    canDelete: boolean;
+    reason: string;
+    daysUntilDeletion?: number;
+    legalHoldActive: boolean;
+    sensitivity?: string;
+}
+
+export interface RetentionClassificationResult {
+    classified: boolean;
+    sensitivity: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "SENSITIVE";
+    retentionRecommendation: string;
+    reason: string;
 }
 
 /** Canonical Phase 2 authorization boundary. */
@@ -160,6 +176,49 @@ export class SecurityLayerEngine implements Engine {
             classified: true,
             sensitivity: "INTERNAL",
             reason: "Data classified as INTERNAL — no sensitive keywords detected"
+        };
+    }
+
+    enforceRetention(recordCreatedAt: string, recordType: string, tenantId: string | undefined, store: { checkRetention: (createdAt: string, recordType: string, tenantId?: string) => { canDelete: boolean; reason: string; daysUntilDeletion?: number; legalHoldActive: boolean } }): RetentionEnforcementResult {
+        const retention = store.checkRetention(recordCreatedAt, recordType, tenantId);
+        const classification = this.classifyData(recordType);
+        return {
+            ...retention,
+            sensitivity: classification.sensitivity
+        };
+    }
+
+    classifyDataForRetention(hint: string | undefined, recordType: string): RetentionClassificationResult {
+        const classification = this.classifyData(hint);
+        const recommendations: Record<string, string> = {
+            "SENSITIVE": "Maximum retention required — minimum 365 days, legal hold recommended",
+            "CONFIDENTIAL": "Extended retention — minimum 180 days",
+            "INTERNAL": "Standard retention — minimum 90 days",
+            "PUBLIC": "Minimal retention — minimum 30 days"
+        };
+        return {
+            classified: classification.classified,
+            sensitivity: classification.sensitivity,
+            retentionRecommendation: recommendations[classification.sensitivity] ?? recommendations["PUBLIC"],
+            reason: classification.reason
+        };
+    }
+
+    buildRetentionMetadata(sensitivity: string, createdAt: string, policyId?: string): RecordRetentionMetadata {
+        const daysMap: Record<string, number> = {
+            "SENSITIVE": 365,
+            "CONFIDENTIAL": 180,
+            "INTERNAL": 90,
+            "PUBLIC": 30
+        };
+        const days = daysMap[sensitivity.toUpperCase()] ?? 30;
+        const deletableDate = new Date(createdAt);
+        deletableDate.setDate(deletableDate.getDate() + days);
+        return {
+            createdAt,
+            retentionPolicyId: policyId,
+            legalHold: false,
+            deletableAfter: deletableDate.toISOString()
         };
     }
 }

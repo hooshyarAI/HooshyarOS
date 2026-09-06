@@ -1,6 +1,10 @@
-﻿import { existsSync, readdirSync, readFileSync, Dirent } from "node:fs";
+import { existsSync, readdirSync, readFileSync, Dirent } from "node:fs";
 import { join } from "node:path";
 import { Engine } from "../Core/Engine";
+import { AuditEvent, AuditEventAction } from "../Entities/AuditEvent";
+import { AuditStore, IntegrityCheckResult } from "../Entities/AuditStore";
+import { SecurityContext } from "../Security/SecurityContext";
+import { ProvenanceTrace } from "../Core/ProvenanceTrace";
 
 export type SecurityFindingCategory =
     | "SECRET"
@@ -167,7 +171,7 @@ export class SecurityAuditEngine implements Engine {
 
                 const fullPath = join(root, dir, entryName);
                 const relativePath = this.toPosixPath(join(dir, entryName));
-                // Skip test files — they contain intentional test fixtures
+                // Skip test files � they contain intentional test fixtures
                 if (relativePath.includes("/test/") || relativePath.includes("\\test\\")) continue;
 
                 let content: string;
@@ -282,8 +286,109 @@ export class SecurityAuditEngine implements Engine {
     private toPosixPath(path: string): string {
         return path.replace(/\\/g, "/");
     }
+
+    recordAuditEvent(event: AuditEvent, auditStore: AuditStore): void {
+        auditStore.append(event);
+    }
+
+    queryAuditTrail(
+        auditStore: AuditStore,
+        options: { tenantId?: string; traceId?: string; actorId?: string; limit?: number }
+    ): AuditEvent[] {
+        const results: AuditEvent[] = [];
+        const seen = new Set<string>();
+
+        const addResults = (events: AuditEvent[]) => {
+            for (const event of events) {
+                if (!seen.has(event.id)) {
+                    seen.add(event.id);
+                    results.push(event);
+                }
+            }
+        };
+
+        if (options.tenantId) {
+            addResults(auditStore.queryByTenant(options.tenantId, options.limit ?? 100));
+        }
+        if (options.traceId) {
+            addResults(auditStore.queryByTraceId(options.traceId));
+        }
+        if (options.actorId) {
+            addResults(auditStore.queryByActor(options.actorId, options.limit ?? 100));
+        }
+
+        if (options.limit !== undefined && results.length > options.limit) {
+            return results.slice(0, options.limit);
+        }
+
+        return results;
+    }
+
+    verifyAuditIntegrity(auditStore: AuditStore): IntegrityCheckResult {
+        return auditStore.verifyChain();
+    }
+
+    logOperation(
+        context: SecurityContext,
+        action: string,
+        target: string,
+        result: "SUCCESS" | "FAILURE" | "DENIED" | "ERROR",
+        traceId?: string
+    ): AuditEvent {
+        const mappedAction = this.mapAction(action);
+
+        if (mappedAction === undefined) {
+            return Object.freeze({
+                id: ProvenanceTrace.createTraceId(),
+                actorId: context.actor?.id,
+                actorType: context.actor?.type,
+                tenantId: context.tenantId,
+                timestamp: new Date().toISOString(),
+                action: undefined,
+                target,
+                result,
+                traceId: traceId ?? context.traceId,
+                authorizationResult: undefined,
+                reason: undefined,
+                metadata: undefined
+            }) as AuditEvent;
+        }
+
+        return AuditEvent.fromSecurityContext({
+            actorId: context.actor?.id,
+            actorType: context.actor?.type,
+            tenantId: context.tenantId,
+            action: mappedAction,
+            target,
+            result,
+            traceId: traceId ?? context.traceId
+        });
+    }
+
+    private mapAction(action: string): AuditEventAction | undefined {
+        switch (action) {
+            case "READ":
+                return "READ";
+            case "WRITE":
+                return "WRITE";
+            case "EXECUTE":
+                return "EXECUTE";
+            case "CREATE":
+                return "CREATE";
+            case "DELETE":
+                return "DELETE";
+            case "ADMINISTER":
+                return "ADMINISTER";
+            case "ACCESS_EVIDENCE":
+                return "ACCESS_EVIDENCE";
+            case "APPROVE":
+                return "APPROVE";
+            case "AUDIT":
+                return "AUDIT";
+            default:
+                return undefined;
+        }
+    }
 }
-
-
 
 
