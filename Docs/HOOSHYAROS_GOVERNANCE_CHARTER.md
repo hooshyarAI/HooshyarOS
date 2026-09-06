@@ -773,3 +773,8 @@ Completion requires agreement between:
 **REAL PRODUCT RUNTIME EVIDENCE + INDEPENDENT QC + LOCAL POWERSHELL/GIT STATE + ACTUAL GITHUB REMOTE STATE**
 
 No prompt, model, status screen, timeout recovery, progress percentage, local success message or generated report may weaken this completion barrier.
+
+
+## Phase 12 Reservation — Resilience, Analytical Intelligence & Commercial Realization
+
+The Resilience, Analytical Intelligence & Commercial Realization Audit Contract V1 is reserved for Phase 12. It MUST NOT pre-empt, interrupt, or redefine Phase 11. Phase 12 may begin only after the Phase 11 completion gate is independently verified. When Phase 12 begins, the contract becomes an active mandatory audit/implementation/commercialization workstream under Architecture Freeze V4.1 and existing governance controls.
