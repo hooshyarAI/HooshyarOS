@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import path from "node:path";
 import { Engine } from "../Core/Engine";
 import { ProvenanceTrace } from "../Core/ProvenanceTrace";
 
@@ -67,7 +68,7 @@ export class ReasoningEngine implements Engine {
 
         try {
             const raw = execFileSync(python, ["-c", script, problem], {
-                cwd: process.cwd(),
+                cwd: path.join(__dirname, "..", "..", ".."),
                 encoding: "utf8",
                 windowsHide: true,
                 env: {
