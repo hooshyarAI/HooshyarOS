@@ -12,6 +12,8 @@ import { SecurityEventLogger } from "../../Entities/SecurityEventLogger";
 import { ExecutiveIntelligenceWorkbench, ExecutiveIntelligenceWorkbenchInput, ExecutiveIntelligenceWorkbenchResult } from "../../Product/ExecutiveIntelligenceWorkbench";
 import { SQLitePersistenceStore } from "../../Product/SQLitePersistenceStore";
 import { TokenBucketRateLimiter } from "../../Product/GenericApiConnector";
+import { ResilienceAnalyticsService } from "../../Product/ResilienceAnalyticsService";
+import { Scenario } from "../../Uncertainty/MonteCarloTypes";
 
 export interface CommercialRuntimeOptions {
     readonly databasePath?: string;
@@ -132,6 +134,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     const analysis = new FinancialStatementAnalysisService(new FinancialIntelligenceEngine(), reasoning);
     const executiveWorkbench = new ExecutiveIntelligenceWorkbench(new ExecutiveIntelligenceEngine());
     const reports = new ReportsEngine();
+    const resilience = new ResilienceAnalyticsService();
     const sessions = new Map<string, Session>();
     const latestResults = new Map<string, StoredAnalysis>();
     const latestWorkbenchResults = new Map<string, ExecutiveIntelligenceWorkbenchResult>();
@@ -193,7 +196,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 return res.end();
             }
             if (req.method === "GET" && path === "/health") return corsJson( 200, { status: "ok", service: "hooshyar-commercial-runtime" });
-            if (req.method === "GET" && path === "/api/ready") return corsJson( 200, { status: "READY", capabilities: ["financial-ingestion", "financial-statement-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-workbench", "reports", "assistant-context"] });
+            if (req.method === "GET" && path === "/api/ready") return corsJson( 200, { status: "READY", capabilities: ["financial-ingestion", "financial-statement-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-workbench", "reports", "assistant-context", "resilience-analytics"] });
             if (req.method === "GET" && path === "/") return asset(res, "index.html", "text/html; charset=utf-8");
             if (req.method === "GET" && path === "/app.js") return asset(res, "app.js", "text/javascript; charset=utf-8");
             if (req.method === "GET" && path === "/styles.css") return asset(res, "styles.css", "text/css; charset=utf-8");
@@ -320,6 +323,47 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 if (!result) return corsJson( 200, { status: "READY", tenantId: session.tenantId, metrics: { revenue: 0, profit: 0, risk: 0 }, analysisAvailable: false, executiveIntelligence: null });
                 const workbench = await loadWorkbench(session.tenantId);
                 return corsJson( 200, dashboardPayload(result, workbench));
+            }
+
+            if (req.method === "POST" && path === "/api/resilience/stress-test") {
+                if (!session.token || !getOrCreateRateLimiter(session.token).tryAcquire()) return corsJson( 429, { error: "RATE_LIMIT_EXCEEDED" });
+                const body = await readJson(req);
+                const scenarios = Array.isArray(body.scenarios) ? body.scenarios.filter((s: unknown): s is Scenario => !!s && typeof s === "object" && typeof (s as any).name === "string" && typeof (s as any).shockPercent === "number") : [];
+                const result = resilience.stressTest({
+                    tenantId: session.tenantId,
+                    metric: String(body.metric ?? "revenue"),
+                    baseValue: Number(body.baseValue),
+                    scenarios,
+                    simulationCount: Number(body.simulationCount),
+                    seed: Number(body.seed),
+                    residuals: Array.isArray(body.residuals) ? body.residuals.filter((r: unknown): r is { readonly residual: number } => !!r && typeof r === "object" && typeof (r as any).residual === "number") : undefined
+                });
+                return corsJson( result.status === "READY" ? 200 : 422, result);
+            }
+
+            if (req.method === "POST" && path === "/api/resilience/sensitivity") {
+                if (!session.token || !getOrCreateRateLimiter(session.token).tryAcquire()) return corsJson( 429, { error: "RATE_LIMIT_EXCEEDED" });
+                const body = await readJson(req);
+                const shockRange = Array.isArray(body.shockRange) ? body.shockRange.filter((s: unknown): s is number => typeof s === "number" && Number.isFinite(s)) : [];
+                const result = resilience.sensitivityAnalysis(session.tenantId, String(body.metric ?? "revenue"), Number(body.baseValue), shockRange);
+                if ((result as any).status === "BLOCKED") return corsJson( 422, result);
+                return corsJson( 200, result);
+            }
+
+            if (req.method === "POST" && path === "/api/resilience/optimize") {
+                if (!session.token || !getOrCreateRateLimiter(session.token).tryAcquire()) return corsJson( 429, { error: "RATE_LIMIT_EXCEEDED" });
+                const body = await readJson(req);
+                const bounds = Array.isArray(body.bounds) ? body.bounds.filter((b: unknown): b is { readonly variable: string; readonly lower: number; readonly upper: number } => !!b && typeof b === "object" && typeof (b as any).variable === "string" && typeof (b as any).lower === "number" && typeof (b as any).upper === "number") : [];
+                const result = resilience.optimize({
+                    tenantId: session.tenantId,
+                    objective: String(body.objective ?? "maximize_profit") as any,
+                    variableNames: Array.isArray(body.variableNames) ? body.variableNames.filter((v: unknown): v is string => typeof v === "string") : [],
+                    initialGuess: Array.isArray(body.initialGuess) ? body.initialGuess.filter((v: unknown): v is number => typeof v === "number" && Number.isFinite(v)) : [],
+                    bounds,
+                    linearConstraints: Array.isArray(body.linearConstraints) ? body.linearConstraints.filter((lc: unknown) => !!lc && typeof lc === "object" && Array.isArray((lc as any).coefficients) && typeof (lc as any).bound === "number" && typeof (lc as any).inequality === "string") : undefined,
+                    maxIterations: Number(body.maxIterations)
+                });
+                return corsJson( result.status === "READY" ? 200 : 422, result);
             }
 
             return corsJson( 404, { error: "NOT_FOUND" });

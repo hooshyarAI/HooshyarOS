@@ -280,7 +280,7 @@ export class ResilienceAnalyticsService {
         };
 
         const result = Optimizer.optimize(objectiveFn, [...input.initialGuess], [...boundConstraints, ...linearConstraints], {
-            maxIterations: input.maxIterations ?? 200,
+            maxIterations: Number.isFinite(input.maxIterations) ? input.maxIterations : 200,
             tolerance: 1e-6,
             tenant: tenantId
         });
