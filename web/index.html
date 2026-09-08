@@ -70,6 +70,42 @@
     </section>
 
     <section class="card onboarding">
+      <h2>تحلیل تاب‌آوری و استرس</h2>
+      <form id="resilience-form">
+        <label>شاخص<select id="resilience-metric"><option value="revenue">درآمد</option><option value="profit">سود</option><option value="cash">نقد</option></select></label>
+        <label>مقدار پایه<input id="resilience-base" type="number" value="1000" required /></label>
+        <label>تعداد شبیه‌سازی<input id="resilience-simulations" type="number" value="1000" required /></label>
+        <button class="primary" type="submit">تحلیل تاب‌آوری</button>
+      </form>
+      <pre id="resilience-result" class="result" aria-live="polite"></pre>
+    </section>
+
+    <section class="card onboarding">
+      <h2>سنجش تأثیر قبل/بعد</h2>
+      <form id="impact-form">
+        <label>درآمد پایه<input id="impact-revenue-before" type="number" value="1000" required /></label>
+        <label>درآمد بعد<input id="impact-revenue-after" type="number" value="1200" required /></label>
+        <label>سود پایه<input id="impact-profit-before" type="number" value="200" required /></label>
+        <label>سود بعد<input id="impact-profit-after" type="number" value="300" required /></label>
+        <label>هزینه عملیاتی پایه<input id="impact-cost-before" type="number" value="500" required /></label>
+        <label>هزینه عملیاتی بعد<input id="impact-cost-after" type="number" value="450" required /></label>
+        <button class="primary" type="submit">سنجش تأثیر</button>
+      </form>
+      <pre id="impact-result" class="result" aria-live="polite"></pre>
+    </section>
+
+    <section class="card onboarding">
+      <h2>یادگیری و بهبود مداوم</h2>
+      <form id="improvement-form">
+        <label>حوزه<select id="improvement-domain"><option value="financial">مالی</option><option value="operational">عملیاتی</option><option value="strategic">استراتژیک</option></select></label>
+        <label>امتیاز ریسک<input id="improvement-risk" type="number" step="0.01" value="0.2" required /></label>
+        <label>تأخیر تصمیم<input id="improvement-latency" type="number" step="0.1" value="3" required /></label>
+        <button class="primary" type="submit">تحلیل بهبود</button>
+      </form>
+      <pre id="improvement-result" class="result" aria-live="polite"></pre>
+    </section>
+
+    <section class="card onboarding">
       <h2>گزارش و دستیار هوشمند</h2>
       <div class="actions">
         <button id="report-button" class="primary" type="button">تولید گزارش</button>

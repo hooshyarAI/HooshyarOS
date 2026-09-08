@@ -117,5 +117,99 @@ document.querySelector('#assistant-form').addEventListener('submit', async event
   }
 });
 
+document.querySelector('#resilience-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const result = document.querySelector('#resilience-result');
+  try {
+    const payload = await getJson('/api/resilience/stress-test', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        metric: document.querySelector('#resilience-metric').value,
+        baseValue: Number(document.querySelector('#resilience-base').value),
+        simulationCount: Number(document.querySelector('#resilience-simulations').value),
+        scenarios: [{ name: 'base', description: 'Base', shockPercent: 0, appliedAt: 1 }]
+      })
+    });
+    result.textContent = JSON.stringify(payload, null, 2);
+  } catch (error) {
+    result.textContent = `تحلیل تاب‌آوری ناموفق بود: ${error.message}`;
+  }
+});
+
+document.querySelector('#impact-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const result = document.querySelector('#impact-result');
+  try {
+    const payload = await getJson('/api/impact/measure', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        baseline: {
+          revenue: Number(document.querySelector('#impact-revenue-before').value),
+          profit: Number(document.querySelector('#impact-profit-before').value),
+          profitMargin: 0.2,
+          debtRatio: 0.3,
+          cycleTime: 10,
+          throughput: 50,
+          errorRate: 0.05,
+          capacity: 100,
+          operatingCost: Number(document.querySelector('#impact-cost-before').value),
+          decisionLatency: 2,
+          riskScore: 0.1,
+          recordedAt: '2026-01-01T00:00:00Z'
+        },
+        post: {
+          revenue: Number(document.querySelector('#impact-revenue-after').value),
+          profit: Number(document.querySelector('#impact-profit-after').value),
+          profitMargin: 0.25,
+          debtRatio: 0.25,
+          cycleTime: 8,
+          throughput: 60,
+          errorRate: 0.03,
+          capacity: 120,
+          operatingCost: Number(document.querySelector('#impact-cost-after').value),
+          decisionLatency: 1.5,
+          riskScore: 0.08,
+          recordedAt: '2026-02-01T00:00:00Z'
+        }
+      })
+    });
+    result.textContent = JSON.stringify(payload, null, 2);
+  } catch (error) {
+    result.textContent = `سنجش تأثیر ناموفق بود: ${error.message}`;
+  }
+});
+
+document.querySelector('#improvement-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const result = document.querySelector('#improvement-result');
+  try {
+    const payload = await getJson('/api/improvement/improve', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        domain: document.querySelector('#improvement-domain').value,
+        actualImpact: {
+          timeSaved: 2,
+          operatingCostReduced: 50,
+          actualFinancialValue: 100,
+          actualROI: 0.2,
+          sustainability: 'SUSTAINABLE'
+        },
+        currentState: {
+          revenue: 5000,
+          profit: 1000,
+          riskScore: Number(document.querySelector('#improvement-risk').value),
+          decisionLatency: Number(document.querySelector('#improvement-latency').value)
+        }
+      })
+    });
+    result.textContent = JSON.stringify(payload, null, 2);
+  } catch (error) {
+    result.textContent = `تحلیل بهبود ناموفق بود: ${error.message}`;
+  }
+});
+
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => undefined);
 refreshDashboard();

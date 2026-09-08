@@ -14,6 +14,9 @@ import { SQLitePersistenceStore } from "../../Product/SQLitePersistenceStore";
 import { TokenBucketRateLimiter } from "../../Product/GenericApiConnector";
 import { ResilienceAnalyticsService } from "../../Product/ResilienceAnalyticsService";
 import { Scenario } from "../../Uncertainty/MonteCarloTypes";
+import { ImpactMeasurementService } from "../../Product/ImpactMeasurementService";
+import { ContinuousImprovementEngine } from "../../Assistant/Autonomous/ContinuousImprovementEngine";
+import type { BaselineMetrics, PostInterventionMetrics } from "../../Product/ImpactMeasurementService";
 
 export interface CommercialRuntimeOptions {
     readonly databasePath?: string;
@@ -118,6 +121,82 @@ const validateAssistantBody = (body: Record<string, unknown>): string | null => 
     return null;
 };
 
+const parseBaseline = (value: unknown, tenantId: string): BaselineMetrics | null => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const b = value as Record<string, unknown>;
+    const fields = ["revenue", "profit", "profitMargin", "debtRatio", "cycleTime", "throughput", "errorRate", "capacity", "operatingCost", "decisionLatency", "riskScore"];
+    for (const f of fields) {
+        if (!Number.isFinite((b as any)[f])) return null;
+    }
+    return {
+        tenantId,
+        revenue: Number(b.revenue),
+        profit: Number(b.profit),
+        profitMargin: Number(b.profitMargin),
+        debtRatio: Number(b.debtRatio),
+        cycleTime: Number(b.cycleTime),
+        throughput: Number(b.throughput),
+        errorRate: Number(b.errorRate),
+        capacity: Number(b.capacity),
+        operatingCost: Number(b.operatingCost),
+        decisionLatency: Number(b.decisionLatency),
+        riskScore: Number(b.riskScore),
+        recordedAt: String(b.recordedAt ?? "2026-01-01T00:00:00Z")
+    };
+};
+
+const parsePost = (value: unknown, tenantId: string): PostInterventionMetrics | null => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const p = value as Record<string, unknown>;
+    const fields = ["revenue", "profit", "profitMargin", "debtRatio", "cycleTime", "throughput", "errorRate", "capacity", "operatingCost", "decisionLatency", "riskScore"];
+    for (const f of fields) {
+        if (!Number.isFinite((p as any)[f])) return null;
+    }
+    return {
+        tenantId,
+        revenue: Number(p.revenue),
+        profit: Number(p.profit),
+        profitMargin: Number(p.profitMargin),
+        debtRatio: Number(p.debtRatio),
+        cycleTime: Number(p.cycleTime),
+        throughput: Number(p.throughput),
+        errorRate: Number(p.errorRate),
+        capacity: Number(p.capacity),
+        operatingCost: Number(p.operatingCost),
+        decisionLatency: Number(p.decisionLatency),
+        riskScore: Number(p.riskScore),
+        recordedAt: String(p.recordedAt ?? "2026-01-01T00:00:00Z")
+    };
+};
+
+const parseCurrentState = (value: unknown): { readonly revenue: number; readonly profit: number; readonly riskScore: number; readonly decisionLatency: number } | null => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const s = value as Record<string, unknown>;
+    if (!Number.isFinite(s.revenue) || !Number.isFinite(s.profit) || !Number.isFinite(s.riskScore) || !Number.isFinite(s.decisionLatency)) return null;
+    return {
+        revenue: Number(s.revenue),
+        profit: Number(s.profit),
+        riskScore: Number(s.riskScore),
+        decisionLatency: Number(s.decisionLatency)
+    };
+};
+
+const parseActualImpact = (value: unknown): { readonly timeSaved: number; readonly operatingCostReduced: number; readonly actualFinancialValue: number; readonly actualROI: number; readonly sustainability: "NOT_SUSTAINABLE" | "SUSTAINABLE" | "PARTIAL" } | null => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const a = value as Record<string, unknown>;
+    const required = ["timeSaved", "operatingCostReduced", "actualFinancialValue", "actualROI", "sustainability"];
+    for (const f of required) {
+        if (!(f in a)) return null;
+    }
+    return {
+        timeSaved: Number(a.timeSaved),
+        operatingCostReduced: Number(a.operatingCostReduced),
+        actualFinancialValue: Number(a.actualFinancialValue),
+        actualROI: Number(a.actualROI),
+        sustainability: String(a.sustainability) as "NOT_SUSTAINABLE" | "SUSTAINABLE" | "PARTIAL"
+    };
+};
+
 const asset = async (res: ServerResponse, name: string, contentType: string) => {
     try {
         const body = await readFile(resolve(WEB_ROOT, name), "utf8");
@@ -135,6 +214,8 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     const executiveWorkbench = new ExecutiveIntelligenceWorkbench(new ExecutiveIntelligenceEngine());
     const reports = new ReportsEngine();
     const resilience = new ResilienceAnalyticsService();
+    const impact = new ImpactMeasurementService();
+    const improvement = new ContinuousImprovementEngine();
     const sessions = new Map<string, Session>();
     const latestResults = new Map<string, StoredAnalysis>();
     const latestWorkbenchResults = new Map<string, ExecutiveIntelligenceWorkbenchResult>();
@@ -196,7 +277,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 return res.end();
             }
             if (req.method === "GET" && path === "/health") return corsJson( 200, { status: "ok", service: "hooshyar-commercial-runtime" });
-            if (req.method === "GET" && path === "/api/ready") return corsJson( 200, { status: "READY", capabilities: ["financial-ingestion", "financial-statement-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-workbench", "reports", "assistant-context", "resilience-analytics"] });
+            if (req.method === "GET" && path === "/api/ready") return corsJson( 200, { status: "READY", capabilities: ["financial-ingestion", "financial-statement-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-workbench", "reports", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement"] });
             if (req.method === "GET" && path === "/") return asset(res, "index.html", "text/html; charset=utf-8");
             if (req.method === "GET" && path === "/app.js") return asset(res, "app.js", "text/javascript; charset=utf-8");
             if (req.method === "GET" && path === "/styles.css") return asset(res, "styles.css", "text/css; charset=utf-8");
@@ -362,6 +443,33 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                     bounds,
                     linearConstraints: Array.isArray(body.linearConstraints) ? body.linearConstraints.filter((lc: unknown) => !!lc && typeof lc === "object" && Array.isArray((lc as any).coefficients) && typeof (lc as any).bound === "number" && typeof (lc as any).inequality === "string") : undefined,
                     maxIterations: Number(body.maxIterations)
+                });
+                return corsJson( result.status === "READY" ? 200 : 422, result);
+            }
+
+            if (req.method === "POST" && path === "/api/impact/measure") {
+                if (!session.token || !getOrCreateRateLimiter(session.token).tryAcquire()) return corsJson( 429, { error: "RATE_LIMIT_EXCEEDED" });
+                const body = await readJson(req);
+                const baseline = parseBaseline(body.baseline, session.tenantId);
+                const post = parsePost(body.post, session.tenantId);
+                if (!baseline || !post) return corsJson( 400, { error: "BASELINE_AND_POST_REQUIRED" });
+                const result = impact.measure(baseline, post, body.expectedImpact as any);
+                return corsJson( result.status === "READY" ? 200 : 422, result);
+            }
+
+            if (req.method === "POST" && path === "/api/improvement/improve") {
+                if (!session.token || !getOrCreateRateLimiter(session.token).tryAcquire()) return corsJson( 429, { error: "RATE_LIMIT_EXCEEDED" });
+                const body = await readJson(req);
+                const currentState = parseCurrentState(body.currentState);
+                if (!currentState) return corsJson( 400, { error: "CURRENT_STATE_REQUIRED" });
+                const actualImpact = parseActualImpact(body.actualImpact);
+                if (!actualImpact) return corsJson( 400, { error: "ACTUAL_IMPACT_REQUIRED" });
+                const result = improvement.improve({
+                    tenantId: session.tenantId,
+                    domain: String(body.domain ?? "financial") as any,
+                    actualImpact,
+                    expectedImpact: body.expectedImpact as any,
+                    currentState
                 });
                 return corsJson( result.status === "READY" ? 200 : 422, result);
             }
