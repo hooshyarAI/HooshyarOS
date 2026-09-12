@@ -6,7 +6,7 @@ import { FinancialIntelligenceEngine } from "../../Engines/FinancialIntelligence
 import { ExecutiveIntelligenceEngine } from "../../Engines/ExecutiveIntelligenceEngine";
 import { ReasoningEngine } from "../../Engines/ReasoningEngine";
 import { ReportsEngine } from "../../Engines/ReportsEngine";
-import { FinancialDataIngestionAdapter } from "../../Product/FinancialDataIngestionAdapter";
+import { FinancialDataIngestionAdapter, type FinancialCanonicalModel } from "../../Product/FinancialDataIngestionAdapter";
 import { FinancialIngestionService, IngestionFormat, SUPPORTED_INGESTION_FORMATS } from "../../Product/FinancialIngestionService";
 import { FinancialStatementAnalysisService } from "../../Product/FinancialStatementAnalysisService";
 import { SecurityEventLogger } from "../../Entities/SecurityEventLogger";
@@ -130,6 +130,14 @@ const validateIngestBody = (body: Record<string, unknown>): string | null => {
     } else if (typeof body.content !== "string" || !body.content.trim()) {
         return "CONTENT_REQUIRED";
     }
+    return null;
+};
+
+const validateFinancialAnalyzeBody = (body: Record<string, unknown>): string | null => {
+    const sourceSha256 = String(body.sourceSha256 ?? "").trim().toLowerCase();
+    if (!/^[a-f0-9]{64}$/.test(sourceSha256)) return "SOURCE_SHA256_REQUIRED";
+    if (!Number.isFinite(Number(body.assets))) return "BALANCE_SHEET_FIELDS_REQUIRED";
+    if (!Number.isFinite(Number(body.liabilities))) return "BALANCE_SHEET_FIELDS_REQUIRED";
     return null;
 };
 
@@ -275,6 +283,13 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
         return workbench?.tenantId === tenantId && workbench.status === "READY" ? workbench : undefined;
     };
 
+    const loadIngestedModel = async (tenantId: string, sha256: string): Promise<FinancialCanonicalModel | undefined> => {
+        const record = await persistence.read({ tenantId }, `financial-ingestion:${sha256}`);
+        const model = record?.value as FinancialCanonicalModel | undefined;
+        if (!model || model.tenantId !== tenantId || !Array.isArray(model.transactions)) return undefined;
+        return model;
+    };
+
     const dashboardPayload = (result: StoredAnalysis, workbench?: ExecutiveIntelligenceWorkbenchResult) => ({
         status: result.status,
         tenantId: result.tenantId,
@@ -306,7 +321,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 return res.end();
             }
             if (req.method === "GET" && path === "/health") return corsJson(200, { status: "ok", service: "hooshyar-commercial-runtime" });
-            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-workbench", "reports", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "rbac", "session-lifecycle"] });
+            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "ingested-source-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-workbench", "reports", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "rbac", "session-lifecycle"] });
             if (req.method === "GET" && path === "/") return asset(res, "index.html", "text/html; charset=utf-8");
             if (req.method === "GET" && path === "/app.js") return asset(res, "app.js", "text/javascript; charset=utf-8");
             if (req.method === "GET" && path === "/styles.css") return asset(res, "styles.css", "text/css; charset=utf-8");
@@ -422,12 +437,38 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const sourceName = String(body.sourceName ?? "ledger.csv");
                 const assets = Number(body.assets);
                 const liabilities = Number(body.liabilities);
-                const ingested = await ingestion.ingestCsv(session.tenantId, sourceName, csv);
-                const result = analysis.execute({ tenantId: session.tenantId, revenue: ingested.model.totals.credit, expenses: ingested.model.totals.debit, assets, liabilities, source: ingested.evidence });
+                const ingested = await ingestionService.ingest(session.tenantId, { sourceName, format: "CSV", content: csv });
+                const result = analysis.execute({ tenantId: session.tenantId, revenue: ingested.result.model.totals.credit, expenses: ingested.result.model.totals.debit, assets, liabilities, source: ingested.result.evidence });
                 if (result.status !== "READY") return corsJson(422, result);
                 await persistence.write({ tenantId: session.tenantId }, LATEST_ANALYSIS_KEY, result);
                 latestResults.set(session.tenantId, result);
                 return corsJson(200, result);
+            }
+
+            if (req.method === "POST" && path === "/api/financial/analyze") {
+                if (!getOrCreateRateLimiter(session.token).tryAcquire()) return corsJson(429, { error: "RATE_LIMIT_EXCEEDED" });
+                if (!ensurePermission("INGEST_DATA")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                const body = await readJson(req);
+                const analyzeError = validateFinancialAnalyzeBody(body);
+                if (analyzeError) return corsJson(400, { error: analyzeError });
+                const sourceSha256 = String(body.sourceSha256).trim().toLowerCase();
+                const model = await loadIngestedModel(session.tenantId, sourceSha256);
+                if (!model) return corsJson(422, { error: "INGESTED_SOURCE_REQUIRED" });
+                const result = analysis.execute({
+                    tenantId: session.tenantId,
+                    revenue: model.totals.credit,
+                    expenses: model.totals.debit,
+                    assets: Number(body.assets),
+                    liabilities: Number(body.liabilities),
+                    source: model.source
+                });
+                if (result.status !== "READY") return corsJson(422, result);
+                await persistence.write({ tenantId: session.tenantId }, LATEST_ANALYSIS_KEY, result);
+                latestResults.set(session.tenantId, result);
+                return corsJson(200, {
+                    ...result,
+                    ingestedSource: { sha256: sourceSha256, sourceName: model.source.sourceName, sourceType: model.source.sourceType, transactionCount: model.transactions.length }
+                });
             }
 
             if (req.method === "POST" && path === "/api/ingest") {

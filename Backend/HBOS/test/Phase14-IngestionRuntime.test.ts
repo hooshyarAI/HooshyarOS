@@ -238,3 +238,114 @@ describe("Phase 14-1.2 — ingestion runtime endpoints", () => {
         expect(unauthenticated.status).toBe(401);
     });
 });
+
+describe("Phase 14-1.3 — ingestion to canonical financial intelligence", () => {
+    let server: Server;
+
+    beforeEach(async () => {
+        server = createCommercialRuntimeServer({
+            databasePath: ":memory:",
+            reasoning: { reason: (problem: string) => ({ problem, status: "verified", success: true, answer: "verified" }) },
+        });
+        await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+    });
+
+    afterEach(async () => {
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+    });
+
+    const register = (username: string, organization: string) =>
+        request(server, "/api/auth/register", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ username, password: "Sup3rSecret!", organization }),
+        });
+
+    test("analyzes an ingested XLSX source through the canonical Financial Intelligence Engine", async () => {
+        const owner = await register("owner", "Acme");
+        const cookie = cookieFrom(owner);
+
+        const xlsxBytes = await createXlsxBytes();
+        const ingested = await request(server, "/api/ingest", {
+            method: "POST",
+            headers: { "content-type": "application/json", cookie },
+            body: JSON.stringify({ sourceName: "ledger.xlsx", format: "XLSX", contentBase64: xlsxBytes.toString("base64") }),
+        });
+        expect(ingested.status).toBe(201);
+        const ingestedBody = await ingested.json();
+
+        const analysis = await request(server, "/api/financial/analyze", {
+            method: "POST",
+            headers: { "content-type": "application/json", cookie },
+            body: JSON.stringify({ sourceSha256: ingestedBody.evidence.sha256, assets: 4000, liabilities: 1000 }),
+        });
+        expect(analysis.status).toBe(200);
+        const analysisBody = await analysis.json();
+        expect(analysisBody.status).toBe("READY");
+        expect(analysisBody.targetEngine).toBe("Financial Intelligence Engine");
+        expect(analysisBody.ingestedSource.sourceType).toBe("XLSX");
+        expect(analysisBody.ingestedSource.transactionCount).toBe(2);
+        expect(analysisBody.metrics.debtRatio).toBe(0.25);
+
+        // The analysis is persisted and observable through the dashboard.
+        const dashboard = await request(server, "/api/dashboard", { headers: { cookie } });
+        expect(dashboard.status).toBe(200);
+        expect((await dashboard.json()).analysisAvailable).toBe(true);
+    });
+
+    test("rejects analysis when the ingested source is missing or belongs to another tenant", async () => {
+        const owner = await register("owner", "Acme");
+        const cookie = cookieFrom(owner);
+
+        const missing = await request(server, "/api/financial/analyze", {
+            method: "POST",
+            headers: { "content-type": "application/json", cookie },
+            body: JSON.stringify({ sourceSha256: "a".repeat(64), assets: 100, liabilities: 50 }),
+        });
+        expect(missing.status).toBe(422);
+        expect((await missing.json()).error).toBe("INGESTED_SOURCE_REQUIRED");
+
+        const badSha = await request(server, "/api/financial/analyze", {
+            method: "POST",
+            headers: { "content-type": "application/json", cookie },
+            body: JSON.stringify({ sourceSha256: "not-a-hash", assets: 100, liabilities: 50 }),
+        });
+        expect(badSha.status).toBe(400);
+        expect((await badSha.json()).error).toBe("SOURCE_SHA256_REQUIRED");
+
+        const ingested = await request(server, "/api/ingest", {
+            method: "POST",
+            headers: { "content-type": "application/json", cookie },
+            body: JSON.stringify({ sourceName: "ledger.csv", format: "CSV", content: CSV }),
+        });
+        const sha = (await ingested.json()).evidence.sha256;
+
+        const other = await register("other-owner", "Other");
+        const otherCookie = cookieFrom(other);
+        const crossTenant = await request(server, "/api/financial/analyze", {
+            method: "POST",
+            headers: { "content-type": "application/json", cookie: otherCookie },
+            body: JSON.stringify({ sourceSha256: sha, assets: 100, liabilities: 50 }),
+        });
+        expect(crossTenant.status).toBe(422);
+        expect((await crossTenant.json()).error).toBe("INGESTED_SOURCE_REQUIRED");
+    });
+
+    test("legacy /api/analyze still works and now records raw evidence", async () => {
+        const owner = await register("owner", "Acme");
+        const cookie = cookieFrom(owner);
+
+        const analysis = await request(server, "/api/analyze", {
+            method: "POST",
+            headers: { "content-type": "application/json", cookie },
+            body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 4000, liabilities: 1000 }),
+        });
+        expect(analysis.status).toBe(200);
+        expect((await analysis.json()).status).toBe("READY");
+
+        const list = await request(server, "/api/sources", { headers: { cookie } });
+        expect(list.status).toBe(200);
+        expect((await list.json()).sources).toHaveLength(1);
+    });
+});
+

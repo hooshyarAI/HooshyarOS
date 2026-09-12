@@ -80,6 +80,23 @@ Permission: `READ_DASHBOARD`. Returns the caller's tenant-scoped raw sources.
 Permission: `READ_DASHBOARD`. Returns the persisted raw evidence (content encoding
 `utf8` or `base64`). Cross-tenant lookups return `404 SOURCE_NOT_FOUND`.
 
+### `POST /api/financial/analyze`
+
+Permission: `INGEST_DATA`. Consumes an already-ingested canonical model
+(identified by `sourceSha256` = the canonical `evidence.sha256` returned by
+`POST /api/ingest`) and runs the canonical `FinancialStatementAnalysisService` /
+`FinancialIntelligenceEngine`. This is the integration path that carries
+multi-format ingestion into canonical financial intelligence.
+
+```json
+{ "sourceSha256": "<64-hex>", "assets": 4000, "liabilities": 1000 }
+```
+
+- `400 SOURCE_SHA256_REQUIRED` / `BALANCE_SHEET_FIELDS_REQUIRED` — bad input.
+- `422 INGESTED_SOURCE_REQUIRED` — no such ingested source **for this tenant**.
+- The persisted analysis is then observable through `/api/dashboard`,
+  `/api/report`, `/api/executive/workbench` and `/api/assistant`.
+
 ---
 
 ## Provenance and evidence model
