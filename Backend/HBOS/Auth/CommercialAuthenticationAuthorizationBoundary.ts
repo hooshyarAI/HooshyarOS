@@ -1,5 +1,6 @@
 import {
     CommercialIdentityService,
+    CommercialLoginResult,
     CommercialPermission,
     CommercialRole,
     CommercialSession,
@@ -29,8 +30,24 @@ export class CommercialAuthenticationAuthorizationBoundary {
         return this.identity.createSession(username, organization, role);
     }
 
+    registerUser(
+        username: string,
+        password: string,
+        organization: string
+    ): CommercialLoginResult {
+        return this.identity.registerUser(username, password, organization);
+    }
+
+    login(username: string, password: string, organization: string): CommercialLoginResult {
+        return this.identity.login(username, password, organization);
+    }
+
     getSession(token: string | undefined): CommercialSession | null {
         return this.identity.getSession(token);
+    }
+
+    refreshSession(token: string | undefined): CommercialSession | null {
+        return this.identity.refreshSession(token);
     }
 
     authorize(
@@ -39,6 +56,10 @@ export class CommercialAuthenticationAuthorizationBoundary {
         permission: CommercialPermission
     ): CommercialSession {
         return this.identity.authorize(token, organization, permission);
+    }
+
+    hasPermission(token: string | undefined, organization: string, permission: CommercialPermission): boolean {
+        return this.identity.hasPermission(token, organization, permission);
     }
 
     logout(token: string | undefined): boolean {
