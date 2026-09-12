@@ -7,6 +7,7 @@ import { ExecutiveIntelligenceEngine } from "../../Engines/ExecutiveIntelligence
 import { ReasoningEngine } from "../../Engines/ReasoningEngine";
 import { ReportsEngine } from "../../Engines/ReportsEngine";
 import { FinancialDataIngestionAdapter } from "../../Product/FinancialDataIngestionAdapter";
+import { FinancialIngestionService, IngestionFormat, SUPPORTED_INGESTION_FORMATS } from "../../Product/FinancialIngestionService";
 import { FinancialStatementAnalysisService } from "../../Product/FinancialStatementAnalysisService";
 import { SecurityEventLogger } from "../../Entities/SecurityEventLogger";
 import { ExecutiveIntelligenceWorkbench, ExecutiveIntelligenceWorkbenchInput, ExecutiveIntelligenceWorkbenchResult } from "../../Product/ExecutiveIntelligenceWorkbench";
@@ -31,6 +32,7 @@ export interface CommercialRuntimeOptions {
 
 const WEB_ROOT = resolve(process.cwd(), "web");
 const MAX_BODY_BYTES = 1024 * 1024;
+const INGEST_BODY_BYTES = 8 * 1024 * 1024;
 const LATEST_ANALYSIS_KEY = "financial-analysis:latest";
 const LATEST_EXECUTIVE_WORKBENCH_KEY = "executive-intelligence-workbench:latest";
 const DEFAULT_SESSION_TTL_MS = 60 * 60 * 1000;
@@ -62,13 +64,13 @@ const parseCookies = (header: string | undefined): Record<string, string> => Obj
     (header ?? "").split(";").map((part) => part.trim().split("=")).filter(([key, value]) => key && value).map(([key, ...value]) => [key, value.join("=")])
 );
 
-const readJson = async (req: IncomingMessage): Promise<Record<string, unknown>> => {
+const readJson = async (req: IncomingMessage, maxBytes: number = MAX_BODY_BYTES): Promise<Record<string, unknown>> => {
     const chunks: Buffer[] = [];
     let size = 0;
     for await (const chunk of req) {
         const buffer = Buffer.from(chunk as Buffer);
         size += buffer.length;
-        if (size > MAX_BODY_BYTES) throw new Error("request-body-too-large");
+        if (size > maxBytes) throw new Error("request-body-too-large");
         chunks.push(buffer);
     }
     const raw = Buffer.concat(chunks).toString("utf8");
@@ -115,6 +117,19 @@ const validateWorkbenchBody = (body: Record<string, unknown>): string | null => 
 const validateAssistantBody = (body: Record<string, unknown>): string | null => {
     const question = String(body.question ?? "").trim();
     if (!question) return "ASSISTANT_QUESTION_REQUIRED";
+    return null;
+};
+
+const validateIngestBody = (body: Record<string, unknown>): string | null => {
+    const sourceName = String(body.sourceName ?? "").trim();
+    if (!sourceName) return "SOURCE_NAME_REQUIRED";
+    const format = String(body.format ?? "").trim().toUpperCase();
+    if (!SUPPORTED_INGESTION_FORMATS.includes(format as IngestionFormat)) return "INGEST_FORMAT_UNSUPPORTED";
+    if (format === "XLSX") {
+        if (typeof body.contentBase64 !== "string" || !body.contentBase64.trim()) return "CONTENT_BASE64_REQUIRED";
+    } else if (typeof body.content !== "string" || !body.content.trim()) {
+        return "CONTENT_REQUIRED";
+    }
     return null;
 };
 
@@ -206,6 +221,7 @@ const asset = async (res: ServerResponse, name: string, contentType: string) => 
 export function createCommercialRuntimeServer(options: CommercialRuntimeOptions = {}): Server {
     const persistence = new SQLitePersistenceStore({ databasePath: options.databasePath ?? process.env.HOOSHYAR_DB_PATH ?? "data/hooshyar.sqlite" });
     const ingestion = new FinancialDataIngestionAdapter(persistence);
+    const ingestionService = new FinancialIngestionService(persistence, ingestion);
     const reasoning = options.reasoning ?? new ReasoningEngine();
     const analysis = new FinancialStatementAnalysisService(new FinancialIntelligenceEngine(), reasoning);
     const executiveWorkbench = new ExecutiveIntelligenceWorkbench(new ExecutiveIntelligenceEngine());
@@ -290,7 +306,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 return res.end();
             }
             if (req.method === "GET" && path === "/health") return corsJson(200, { status: "ok", service: "hooshyar-commercial-runtime" });
-            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", capabilities: ["financial-ingestion", "financial-statement-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-workbench", "reports", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "rbac", "session-lifecycle"] });
+            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-workbench", "reports", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "rbac", "session-lifecycle"] });
             if (req.method === "GET" && path === "/") return asset(res, "index.html", "text/html; charset=utf-8");
             if (req.method === "GET" && path === "/app.js") return asset(res, "app.js", "text/javascript; charset=utf-8");
             if (req.method === "GET" && path === "/styles.css") return asset(res, "styles.css", "text/css; charset=utf-8");
@@ -412,6 +428,48 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 await persistence.write({ tenantId: session.tenantId }, LATEST_ANALYSIS_KEY, result);
                 latestResults.set(session.tenantId, result);
                 return corsJson(200, result);
+            }
+
+            if (req.method === "POST" && path === "/api/ingest") {
+                if (!getOrCreateRateLimiter(session.token).tryAcquire()) return corsJson(429, { error: "RATE_LIMIT_EXCEEDED" });
+                if (!ensurePermission("INGEST_DATA")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                const body = await readJson(req, INGEST_BODY_BYTES);
+                const ingestError = validateIngestBody(body);
+                if (ingestError) return corsJson(400, { error: ingestError });
+                try {
+                    const outcome = await ingestionService.ingest(session.tenantId, {
+                        sourceName: String(body.sourceName),
+                        format: String(body.format).trim().toUpperCase() as IngestionFormat,
+                        content: body.content === undefined ? undefined : String(body.content),
+                        contentBase64: body.contentBase64 === undefined ? undefined : String(body.contentBase64)
+                    });
+                    return corsJson(201, {
+                        status: "READY",
+                        tenantId: session.tenantId,
+                        format: outcome.requestedFormat,
+                        evidence: outcome.result.evidence,
+                        source: outcome.rawSourceRef,
+                        transactionCount: outcome.result.model.transactions.length,
+                        totals: outcome.result.model.totals
+                    });
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : "INGESTION_FAILED";
+                    return corsJson(422, { error: message });
+                }
+            }
+
+            if (req.method === "GET" && path === "/api/sources") {
+                if (!ensurePermission("READ_DASHBOARD")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                const sources = await ingestionService.listSources(session.tenantId);
+                return corsJson(200, { status: "READY", tenantId: session.tenantId, sources });
+            }
+
+            if (req.method === "GET" && path.startsWith("/api/sources/")) {
+                if (!ensurePermission("READ_DASHBOARD")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                const sha = decodeURIComponent(path.slice("/api/sources/".length));
+                const source = await ingestionService.readSource(session.tenantId, sha);
+                if (!source) return corsJson(404, { error: "SOURCE_NOT_FOUND" });
+                return corsJson(200, { status: "READY", tenantId: session.tenantId, source });
             }
 
             if (req.method === "POST" && path === "/api/executive/workbench") {

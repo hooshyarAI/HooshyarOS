@@ -655,21 +655,32 @@ export class FinancialDataIngestionAdapter {
    * ledger schema raise the same `ingestion-schema-invalid` error.
    */
   async ingestTxt(tenantId: string, sourceName: string, sourcePath: string): Promise<TxtIngestionResult> {
+    const rawBytes = await readFile(sourcePath);
+    return this.ingestTxtBytes(tenantId, sourceName, rawBytes);
+  }
+
+  /**
+   * Stage 14-1.1: byte-based TXT ingestion. Same decoding and canonical CSV
+   * pipeline as `ingestTxt`, but accepts the raw bytes directly so the
+   * commercial runtime can ingest uploads without touching the filesystem.
+   */
+  async ingestTxtBytes(tenantId: string, sourceName: string, rawBytes: Buffer): Promise<TxtIngestionResult> {
     const normalizedTenant = tenantId.trim();
     const normalizedSource = sourceName.trim();
     if (!normalizedTenant) throw new Error("ingestion-tenant-required");
     if (!normalizedSource) throw new Error("ingestion-source-required");
-    const rawBytes = await readFile(sourcePath);
     const decoded = decodeTextBytes(rawBytes);
     const result = await this.ingestCsv(normalizedTenant, normalizedSource, decoded.content);
     return { ...result, encoding: decoded.encoding };
   }
 
   /**
-   * Ingest XLSX file using exceljs-hardened
-   * Formula evaluation is disabled - only cell values are read
+   * Ingest XLSX bytes using exceljs-hardened
+   * Formula evaluation is disabled - only cell values are read.
+   * Stage 14-1.1: made public so the commercial runtime can ingest uploaded
+   * bytes through the canonical owner without writing untrusted data to disk.
    */
-  private async ingestXlsx(tenantId: string, sourceName: string, rawBytes: Buffer): Promise<FinancialIngestionResult> {
+  async ingestXlsx(tenantId: string, sourceName: string, rawBytes: Buffer): Promise<FinancialIngestionResult> {
     const normalizedTenant = tenantId.trim();
     const normalizedSource = sourceName.trim();
     if (!normalizedTenant) throw new Error("ingestion-tenant-required");
