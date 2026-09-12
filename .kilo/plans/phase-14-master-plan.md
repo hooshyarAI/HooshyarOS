@@ -1,6 +1,6 @@
 # Phase 14 — Governed Multi-Format Financial Ingestion (Product/Runtime Flow)
 
-**Status:** READY (authorized)
+**Status:** COMPLETE (VERIFIED)
 **Branch:** `fix/autonomous-product-factory`
 **Architecture Baseline:** Architecture Freeze V4.1
 **Base Commit:** `e0cc6ce0` (Phase 13 final verification)
@@ -73,6 +73,11 @@ inventing parser infrastructure or fake support.
 the contract's commercial MVP priority order after the completed runtime shell,
 persistence/tenant scope, and authentication/RBAC (Phase 12/13), and the roadmap's
 own acceptance criteria state that CSV-only behaviour does not satisfy it.
+
+## Status
+
+**COMPLETE** — all micro-stages verified. Final checkpoint:
+`.kilo/plans/phase-14-final-checkpoint.md`.
 
 ## Micro-Stage Queue (stage boundaries)
 
@@ -147,7 +152,8 @@ PLANNED → executing from 14-1.1.
 |-------|--------|----------|--------|
 | 14-1.1 + 14-1.2 | VERIFIED (delivered as one coherent ingestion transaction) | `Phase14-IngestionRuntime.test.ts` 6/6; regression 70/70 | `4ecdd61f` |
 | 14-1.3 | VERIFIED | `Phase14-IngestionRuntime.test.ts` 9/9; analysis/runtime regression 35/35 | `f7f3dc86` |
-| 14-1.4 | VERIFIED | `node scripts/web-product-acceptance.cjs` PASS (multi-format) | see `phase-14-1.4-checkpoint.md` |
+| 14-1.4 | VERIFIED | `node scripts/web-product-acceptance.cjs` PASS (multi-format) | `53161d24` |
+| 14-1.5 | VERIFIED | full regression 1843/1844; application acceptance PASS | `phase-14-final-checkpoint.md` |
 | 14-1.3 | PENDING | — | — |
 | 14-1.4 | PENDING | — | — |
 | 14-1.5 | PENDING | — | — |
