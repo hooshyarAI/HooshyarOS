@@ -70,8 +70,8 @@ No new regression. Distinguished: PASS / pre-existing / flaky-environmental (doc
 
 ## Commit / push
 
-- Commit: pending (recorded after commit).
-- Push target: `origin/fix/autonomous-product-factory`.
+- Commit: `5f5b62f1` — `feat(product): complete product.decision-workbench Expert Choice evaluation and runtime wiring`.
+- Push: `origin/fix/autonomous-product-factory` (`c769c184..5f5b62f1`).
 
 ## Current commercial layer status
 

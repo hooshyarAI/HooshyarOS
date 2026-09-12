@@ -231,8 +231,8 @@ workflow engine). Blocked on this knot only for the decision artifact it consume
 
 | Knot | Status | Evidence | Commit |
 |------|--------|----------|--------|
-| Historical reconciliation + master plan | VERIFIED | this file | pending |
-| `product.decision-workbench` | VERIFIED | `DecisionWorkbench.test.ts` 9/9, `DecisionWorkbenchRuntime.test.ts` 5/5; 160/160 decision/runtime regression; full Jest 240/253 suites, 1852/1853 tests; `web-product-acceptance` PASS; `security-tenant-acceptance` PASS | pending |
+| Historical reconciliation + master plan | VERIFIED | this file | `5f5b62f1` |
+| `product.decision-workbench` | VERIFIED | `DecisionWorkbench.test.ts` 9/9, `DecisionWorkbenchRuntime.test.ts` 5/5; 160/160 decision/runtime regression; full Jest 240/253 suites, 1852/1853 tests; `web-product-acceptance` PASS; `security-tenant-acceptance` PASS | `5f5b62f1` |
 
 ### Knot `product.decision-workbench` — delivered
 
