@@ -146,7 +146,8 @@ PLANNED → executing from 14-1.1.
 | Stage | Status | Evidence | Commit |
 |-------|--------|----------|--------|
 | 14-1.1 + 14-1.2 | VERIFIED (delivered as one coherent ingestion transaction) | `Phase14-IngestionRuntime.test.ts` 6/6; regression 70/70 | `4ecdd61f` |
-| 14-1.3 | VERIFIED | `Phase14-IngestionRuntime.test.ts` 9/9; analysis/runtime regression 35/35 | see `phase-14-1.3-checkpoint.md` |
+| 14-1.3 | VERIFIED | `Phase14-IngestionRuntime.test.ts` 9/9; analysis/runtime regression 35/35 | `f7f3dc86` |
+| 14-1.4 | VERIFIED | `node scripts/web-product-acceptance.cjs` PASS (multi-format) | see `phase-14-1.4-checkpoint.md` |
 | 14-1.3 | PENDING | — | — |
 | 14-1.4 | PENDING | — | — |
 | 14-1.5 | PENDING | — | — |

@@ -41,23 +41,50 @@ document.querySelector('#session-form').addEventListener('submit', async event =
   }
 });
 
+function fileExtension(name) {
+  const parts = String(name || '').toLowerCase().split('.');
+  return parts.length > 1 ? parts.pop() : '';
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      const comma = result.indexOf(',');
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = () => reject(new Error('FILE_READ_FAILED'));
+    reader.readAsDataURL(file);
+  });
+}
+
 document.querySelector('#analysis-form').addEventListener('submit', async event => {
   event.preventDefault();
   const result = document.querySelector('#analysis-result');
   const file = document.querySelector('#csv-file').files[0];
   if (!file) return;
   try {
-    const payload = await getJson('/api/analyze', {
+    const extension = fileExtension(file.name);
+    const format = extension === 'json' ? 'STRUCTURED' : extension === 'xlsx' ? 'XLSX' : extension === 'txt' ? 'TXT' : 'CSV';
+    const ingestBody = { sourceName: file.name, format };
+    if (format === 'XLSX') ingestBody.contentBase64 = await fileToBase64(file);
+    else ingestBody.content = await file.text();
+    const ingested = await getJson('/api/ingest', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(ingestBody)
+    });
+    const analysis = await getJson('/api/financial/analyze', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        sourceName: file.name,
-        csv: await file.text(),
+        sourceSha256: ingested.evidence.sha256,
         assets: Number(document.querySelector('#assets').value),
         liabilities: Number(document.querySelector('#liabilities').value)
       })
     });
-    result.textContent = `تحلیل موفق: سود ${Number(payload.metrics.profit).toLocaleString('fa-IR')}، نسبت بدهی ${Number(payload.metrics.debtRatio * 100).toLocaleString('fa-IR')}٪. وضعیت: ${payload.status}`;
+    result.textContent = `تحلیل موفق (${format}): سود ${Number(analysis.metrics.profit).toLocaleString('fa-IR')}، نسبت بدهی ${Number(analysis.metrics.debtRatio * 100).toLocaleString('fa-IR')}٪. وضعیت: ${analysis.status}`;
     await refreshDashboard();
   } catch (error) {
     result.textContent = `تحلیل ناموفق بود: ${error.message}`;

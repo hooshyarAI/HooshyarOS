@@ -15,6 +15,18 @@ const shell = process.platform === 'win32' ? (process.env.ComSpec || 'cmd.exe') 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 function gitCommit() { try { return cp.execFileSync(process.platform === 'win32' ? 'git.exe' : 'git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(); } catch { return 'UNKNOWN'; } }
 
+async function createXlsxBase64() {
+  const ExcelJS = require('exceljs-hardened');
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Transactions');
+  worksheet.addRow(['date', 'account', 'debit', 'credit', 'currency']);
+  worksheet.addRow(['2026-08-05', 'Cash', 500, 0, 'IRR']);
+  worksheet.addRow(['2026-08-05', 'Sales', 0, 1000, 'IRR']);
+  worksheet.addRow(['2026-08-06', 'Receivable', 0, 500, 'IRR']);
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer).toString('base64');
+}
+
 async function waitHealth(child) {
   const deadline = Date.now() + 30000;
   while (Date.now() < deadline) {
@@ -60,9 +72,28 @@ async function main() {
     if (assistant.status !== 200 || assistant.body.status !== 'READY' || typeof assistant.body.answer !== 'string' || !assistant.body.answer.includes('1000')) throw new Error(`WEB_ACCEPTANCE_ASSISTANT_FAILED:${assistant.status}`);
     const dashboard = await request('/api/dashboard', { headers: { cookie } });
     if (dashboard.status !== 200 || dashboard.body.analysisAvailable !== true || dashboard.body.metrics.profit !== 1000 || dashboard.body.executiveIntelligence?.status !== 'READY') throw new Error(`WEB_ACCEPTANCE_DASHBOARD_FAILED:${JSON.stringify(dashboard.body)}`);
-    const success = { type: 'WEB_PRODUCT_ACCEPTANCE_SUCCESS', version: 2, status: 'PASS', createdAt: new Date().toISOString(), repository: root, commit: gitCommit(), tenantId: session.body.tenantId, profit: dashboard.body.metrics.profit, acceptance: ['root','health','session','tenant','ingestion','analysis','executive-workbench','report','assistant','dashboard'] };
+
+    // Phase 14: governed multi-format ingestion through the canonical runtime path.
+    const structured = JSON.stringify({ transactions: [
+      { date: '2026-08-05', account: 'Cash', debit: 700, credit: 0, currency: 'IRR' },
+      { date: '2026-08-05', account: 'Sales', debit: 0, credit: 700, currency: 'IRR' }
+    ]});
+    const structuredIngest = await request('/api/ingest', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceName: 'web-qa.json', format: 'STRUCTURED', content: structured }) });
+    if (structuredIngest.status !== 201 || structuredIngest.body.evidence?.sourceType !== 'STRUCTURED' || structuredIngest.body.source?.persisted !== true) throw new Error(`WEB_ACCEPTANCE_STRUCTURED_INGEST_FAILED:${structuredIngest.status}`);
+    const structuredAnalysis = await request('/api/financial/analyze', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceSha256: structuredIngest.body.evidence.sha256, assets: 10000, liabilities: 4000 }) });
+    if (structuredAnalysis.status !== 200 || structuredAnalysis.body.status !== 'READY' || structuredAnalysis.body.targetEngine !== 'Financial Intelligence Engine') throw new Error(`WEB_ACCEPTANCE_STRUCTURED_ANALYSIS_FAILED:${structuredAnalysis.status}`);
+
+    const xlsxIngest = await request('/api/ingest', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceName: 'web-qa.xlsx', format: 'XLSX', contentBase64: await createXlsxBase64() }) });
+    if (xlsxIngest.status !== 201 || xlsxIngest.body.evidence?.sourceType !== 'XLSX' || xlsxIngest.body.totals?.debit !== 500 || xlsxIngest.body.totals?.credit !== 1500) throw new Error(`WEB_ACCEPTANCE_XLSX_INGEST_FAILED:${xlsxIngest.status}`);
+    const xlsxAnalysis = await request('/api/financial/analyze', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceSha256: xlsxIngest.body.evidence.sha256, assets: 10000, liabilities: 4000 }) });
+    if (xlsxAnalysis.status !== 200 || xlsxAnalysis.body.ingestedSource?.sourceType !== 'XLSX' || xlsxAnalysis.body.metrics?.profit !== 1000) throw new Error(`WEB_ACCEPTANCE_XLSX_ANALYSIS_FAILED:${xlsxAnalysis.status}`);
+
+    const sources = await request('/api/sources', { headers: { cookie } });
+    if (sources.status !== 200 || !Array.isArray(sources.body.sources) || sources.body.sources.length < 3) throw new Error(`WEB_ACCEPTANCE_SOURCES_FAILED:${sources.status}`);
+
+    const success = { type: 'WEB_PRODUCT_ACCEPTANCE_SUCCESS', version: 3, status: 'PASS', createdAt: new Date().toISOString(), repository: root, commit: gitCommit(), tenantId: session.body.tenantId, profit: dashboard.body.metrics.profit, acceptance: ['root','health','session','tenant','ingestion','analysis','executive-workbench','report','assistant','dashboard','multi-format-ingestion','structured-analysis','xlsx-analysis','raw-source-evidence'] };
     fs.writeFileSync(evidencePath, JSON.stringify(success, null, 2), 'utf8');
-    console.log(JSON.stringify({ type: 'WEB_PRODUCT_ACCEPTANCE', status: 'PASS', tenantId: session.body.tenantId, profit: dashboard.body.metrics.profit, root: true, session: true, analysis: true, executive: true, report: true, assistant: true, dashboard: true }, null, 2));
+    console.log(JSON.stringify({ type: 'WEB_PRODUCT_ACCEPTANCE', status: 'PASS', tenantId: session.body.tenantId, profit: dashboard.body.metrics.profit, root: true, session: true, analysis: true, executive: true, report: true, assistant: true, dashboard: true, multiFormat: true }, null, 2));
   } finally { await stop(); }
 }
 main().catch((error) => { try { fs.rmSync(evidencePath, { force: true }); } catch {} console.error(JSON.stringify({ type: 'WEB_PRODUCT_ACCEPTANCE', status: 'BLOCKED', error: error.message, platform: process.platform, node: process.version }, null, 2)); process.exitCode = 1; });

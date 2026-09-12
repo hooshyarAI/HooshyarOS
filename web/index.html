@@ -47,9 +47,9 @@
 
     <section class="card onboarding">
       <h2>ورود و تحلیل واقعی اطلاعات مالی</h2>
-      <p>فایل CSV با ستون‌های date, account, debit, credit, currency را بارگذاری کنید.</p>
+      <p>فایل CSV، JSON، XLSX یا TXT با ستون‌های date, account, debit, credit, currency را بارگذاری کنید.</p>
       <form id="analysis-form">
-        <label>فایل CSV<input id="csv-file" type="file" accept=".csv,text/csv" required /></label>
+        <label>فایل داده مالی<input id="csv-file" type="file" accept=".csv,.json,.xlsx,.txt,text/csv,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain" required /></label>
         <label>دارایی‌ها<input id="assets" type="number" min="0" step="0.01" value="10000" required /></label>
         <label>بدهی‌ها<input id="liabilities" type="number" min="0" step="0.01" value="2500" required /></label>
         <button class="primary" type="submit">تحلیل واقعی</button>
