@@ -91,9 +91,24 @@ async function main() {
     const sources = await request('/api/sources', { headers: { cookie } });
     if (sources.status !== 200 || !Array.isArray(sources.body.sources) || sources.body.sources.length < 3) throw new Error(`WEB_ACCEPTANCE_SOURCES_FAILED:${sources.status}`);
 
-    const success = { type: 'WEB_PRODUCT_ACCEPTANCE_SUCCESS', version: 3, status: 'PASS', createdAt: new Date().toISOString(), repository: root, commit: gitCommit(), tenantId: session.body.tenantId, profit: dashboard.body.metrics.profit, acceptance: ['root','health','session','tenant','ingestion','analysis','executive-workbench','report','assistant','dashboard','multi-format-ingestion','structured-analysis','xlsx-analysis','raw-source-evidence'] };
+    // Decision / Expert Choice: explainable multi-criteria evaluation through the real runtime.
+    const decision = await request('/api/decision/workbench', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({
+      problem: 'انتخاب طرح توسعه',
+      alternatives: ['طرح الف', 'طرح ب'],
+      criteria: [
+        { name: 'profit', weight: 0.6, direction: 'benefit' },
+        { name: 'risk', weight: 0.4, direction: 'cost' }
+      ],
+      scores: [[8, 4], [6, 3]],
+      pairwiseMatrix: [[1, 3], [1 / 3, 1]]
+    }) });
+    if (decision.status !== 200 || decision.body.status !== 'READY' || decision.body.recommendation?.alternative !== 'طرح الف' || decision.body.weightsSource !== 'AHP' || decision.body.consistency?.consistent !== true) throw new Error(`WEB_ACCEPTANCE_DECISION_FAILED:${decision.status}:${JSON.stringify(decision.body)}`);
+    const decisionLatest = await request('/api/decision/latest', { headers: { cookie } });
+    if (decisionLatest.status !== 200 || decisionLatest.body.recommendation?.alternative !== 'طرح الف') throw new Error(`WEB_ACCEPTANCE_DECISION_LATEST_FAILED:${decisionLatest.status}`);
+
+    const success = { type: 'WEB_PRODUCT_ACCEPTANCE_SUCCESS', version: 4, status: 'PASS', createdAt: new Date().toISOString(), repository: root, commit: gitCommit(), tenantId: session.body.tenantId, profit: dashboard.body.metrics.profit, acceptance: ['root','health','session','tenant','ingestion','analysis','executive-workbench','report','assistant','dashboard','multi-format-ingestion','structured-analysis','xlsx-analysis','raw-source-evidence','decision-workbench','expert-choice','decision-persistence'] };
     fs.writeFileSync(evidencePath, JSON.stringify(success, null, 2), 'utf8');
-    console.log(JSON.stringify({ type: 'WEB_PRODUCT_ACCEPTANCE', status: 'PASS', tenantId: session.body.tenantId, profit: dashboard.body.metrics.profit, root: true, session: true, analysis: true, executive: true, report: true, assistant: true, dashboard: true, multiFormat: true }, null, 2));
+    console.log(JSON.stringify({ type: 'WEB_PRODUCT_ACCEPTANCE', status: 'PASS', tenantId: session.body.tenantId, profit: dashboard.body.metrics.profit, root: true, session: true, analysis: true, executive: true, report: true, assistant: true, dashboard: true, multiFormat: true, decisionWorkbench: true }, null, 2));
   } finally { await stop(); }
 }
 main().catch((error) => { try { fs.rmSync(evidencePath, { force: true }); } catch {} console.error(JSON.stringify({ type: 'WEB_PRODUCT_ACCEPTANCE', status: 'BLOCKED', error: error.message, platform: process.platform, node: process.version }, null, 2)); process.exitCode = 1; });

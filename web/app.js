@@ -119,6 +119,45 @@ document.querySelector('#executive-form').addEventListener('submit', async event
   }
 });
 
+document.querySelector('#decision-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const result = document.querySelector('#decision-result');
+  try {
+    const alternatives = [
+      document.querySelector('#decision-alt-1').value,
+      document.querySelector('#decision-alt-2').value
+    ];
+    const rows = [...document.querySelectorAll('.decision-row')];
+    const criteria = rows.map(row => ({
+      name: row.querySelector('.criterion-name').value,
+      weight: Number(row.querySelector('.criterion-weight').value),
+      direction: row.querySelector('.criterion-direction').value
+    }));
+    const scores = alternatives.map((_, alternativeIndex) => rows.map(row =>
+      Number(row.querySelector(alternativeIndex === 0 ? '.criterion-score-1' : '.criterion-score-2').value)
+    ));
+    const payload = await getJson('/api/decision/workbench', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        problem: document.querySelector('#decision-problem').value,
+        alternatives,
+        criteria,
+        scores
+      })
+    });
+    result.textContent = JSON.stringify({
+      status: payload.status,
+      recommendation: payload.recommendation,
+      weightsSource: payload.weightsSource,
+      consistency: payload.consistency,
+      evaluations: payload.evaluations
+    }, null, 2);
+  } catch (error) {
+    result.textContent = `ارزیابی تصمیم ناموفق بود: ${error.message}`;
+  }
+});
+
 document.querySelector('#report-button').addEventListener('click', async () => {
   const result = document.querySelector('#report-result');
   try {

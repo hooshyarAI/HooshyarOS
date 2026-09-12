@@ -70,6 +70,41 @@
     </section>
 
     <section class="card onboarding">
+      <h2>کارگاه تصمیم‌گیری و انتخاب خبره</h2>
+      <p>ارزیابی چندمعیاره گزینه‌ها با AHP/TOPSIS و ارائه پیشنهاد همراه با دلیل، وزن‌ها و محدودیت‌ها.</p>
+      <form id="decision-form">
+        <label>مسئله تصمیم<input id="decision-problem" value="انتخاب طرح توسعه" required /></label>
+        <label>گزینه ۱<input id="decision-alt-1" value="طرح الف" required /></label>
+        <label>گزینه ۲<input id="decision-alt-2" value="طرح ب" required /></label>
+        <div class="decision-criteria">
+          <div class="decision-row">
+            <input class="criterion-name" value="سودآوری" aria-label="نام معیار" />
+            <input class="criterion-weight" type="number" step="0.01" min="0.01" value="0.5" aria-label="وزن معیار" />
+            <select class="criterion-direction" aria-label="جهت معیار"><option value="benefit">سود</option><option value="cost">هزینه</option></select>
+            <input class="criterion-score-1" type="number" step="0.01" value="8" aria-label="امتیاز گزینه ۱" />
+            <input class="criterion-score-2" type="number" step="0.01" value="6" aria-label="امتیاز گزینه ۲" />
+          </div>
+          <div class="decision-row">
+            <input class="criterion-name" value="ریسک" aria-label="نام معیار" />
+            <input class="criterion-weight" type="number" step="0.01" min="0.01" value="0.3" aria-label="وزن معیار" />
+            <select class="criterion-direction" aria-label="جهت معیار"><option value="benefit">سود</option><option value="cost" selected>هزینه</option></select>
+            <input class="criterion-score-1" type="number" step="0.01" value="4" aria-label="امتیاز گزینه ۱" />
+            <input class="criterion-score-2" type="number" step="0.01" value="3" aria-label="امتیاز گزینه ۲" />
+          </div>
+          <div class="decision-row">
+            <input class="criterion-name" value="سرعت اجرا" aria-label="نام معیار" />
+            <input class="criterion-weight" type="number" step="0.01" min="0.01" value="0.2" aria-label="وزن معیار" />
+            <select class="criterion-direction" aria-label="جهت معیار"><option value="benefit" selected>سود</option><option value="cost">هزینه</option></select>
+            <input class="criterion-score-1" type="number" step="0.01" value="5" aria-label="امتیاز گزینه ۱" />
+            <input class="criterion-score-2" type="number" step="0.01" value="9" aria-label="امتیاز گزینه ۲" />
+          </div>
+        </div>
+        <button class="primary" type="submit">ارزیابی و پیشنهاد</button>
+      </form>
+      <pre id="decision-result" class="result" aria-live="polite"></pre>
+    </section>
+
+    <section class="card onboarding">
       <h2>تحلیل تاب‌آوری و استرس</h2>
       <form id="resilience-form">
         <label>شاخص<select id="resilience-metric"><option value="revenue">درآمد</option><option value="profit">سود</option><option value="cash">نقد</option></select></label>

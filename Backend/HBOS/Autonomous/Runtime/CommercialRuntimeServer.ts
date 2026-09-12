@@ -11,6 +11,7 @@ import { FinancialIngestionService, IngestionFormat, SUPPORTED_INGESTION_FORMATS
 import { FinancialStatementAnalysisService } from "../../Product/FinancialStatementAnalysisService";
 import { SecurityEventLogger } from "../../Entities/SecurityEventLogger";
 import { ExecutiveIntelligenceWorkbench, ExecutiveIntelligenceWorkbenchInput, ExecutiveIntelligenceWorkbenchResult } from "../../Product/ExecutiveIntelligenceWorkbench";
+import { DecisionWorkbench, DecisionWorkbenchInput, DecisionWorkbenchResult } from "../../Product/DecisionWorkbench";
 import { SQLitePersistenceStore } from "../../Product/SQLitePersistenceStore";
 import { CommercialIdentityService, CommercialPermission, CommercialSession } from "../../Product/CommercialIdentityService";
 import { TokenBucketRateLimiter } from "../../Product/GenericApiConnector";
@@ -35,6 +36,7 @@ const MAX_BODY_BYTES = 1024 * 1024;
 const INGEST_BODY_BYTES = 8 * 1024 * 1024;
 const LATEST_ANALYSIS_KEY = "financial-analysis:latest";
 const LATEST_EXECUTIVE_WORKBENCH_KEY = "executive-intelligence-workbench:latest";
+const LATEST_DECISION_WORKBENCH_KEY = "decision-workbench:latest";
 const DEFAULT_SESSION_TTL_MS = 60 * 60 * 1000;
 const DEFAULT_CORS_ORIGIN = "http://localhost:3000";
 const SESSION_COOKIE = "hooshyar_session";
@@ -129,6 +131,32 @@ const validateIngestBody = (body: Record<string, unknown>): string | null => {
         if (typeof body.contentBase64 !== "string" || !body.contentBase64.trim()) return "CONTENT_BASE64_REQUIRED";
     } else if (typeof body.content !== "string" || !body.content.trim()) {
         return "CONTENT_REQUIRED";
+    }
+    return null;
+};
+
+const validateDecisionBody = (body: Record<string, unknown>): string | null => {
+    const problem = String(body.problem ?? "").trim();
+    if (!problem) return "DECISION_PROBLEM_REQUIRED";
+    const alternatives = body.alternatives;
+    if (!Array.isArray(alternatives) || alternatives.length < 2 || alternatives.some((a) => !String(a ?? "").trim())) {
+        return "DECISION_ALTERNATIVES_REQUIRED";
+    }
+    const criteria = body.criteria;
+    if (!Array.isArray(criteria) || criteria.length < 1 || criteria.some((c) => {
+        if (!c || typeof c !== "object" || Array.isArray(c)) return true;
+        const criterion = c as Record<string, unknown>;
+        return !String(criterion.name ?? "").trim()
+            || !Number.isFinite(Number(criterion.weight))
+            || Number(criterion.weight) <= 0
+            || (criterion.direction !== "benefit" && criterion.direction !== "cost");
+    })) {
+        return "DECISION_CRITERIA_REQUIRED";
+    }
+    const scores = body.scores;
+    if (!Array.isArray(scores) || scores.length !== alternatives.length
+        || scores.some((row) => !Array.isArray(row) || row.length !== criteria.length || row.some((v) => !Number.isFinite(Number(v))))) {
+        return "DECISION_SCORES_REQUIRED";
     }
     return null;
 };
@@ -233,12 +261,14 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     const reasoning = options.reasoning ?? new ReasoningEngine();
     const analysis = new FinancialStatementAnalysisService(new FinancialIntelligenceEngine(), reasoning);
     const executiveWorkbench = new ExecutiveIntelligenceWorkbench(new ExecutiveIntelligenceEngine());
+    const decisionWorkbench = new DecisionWorkbench();
     const reports = new ReportsEngine();
     const resilience = new ResilienceAnalyticsService();
     const impact = new ImpactMeasurementService();
     const improvement = new ContinuousImprovementEngine();
     const latestResults = new Map<string, StoredAnalysis>();
     const latestWorkbenchResults = new Map<string, ExecutiveIntelligenceWorkbenchResult>();
+    const latestDecisionResults = new Map<string, DecisionWorkbenchResult>();
     const sessionTtlMs = options.sessionTtlMs ?? DEFAULT_SESSION_TTL_MS;
     const rateLimiterMap = new Map<string, TokenBucketRateLimiter>();
     const RATE_LIMIT_CAPACITY = 5;
@@ -283,6 +313,16 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
         return workbench?.tenantId === tenantId && workbench.status === "READY" ? workbench : undefined;
     };
 
+    const loadDecision = async (tenantId: string): Promise<DecisionWorkbenchResult | undefined> => {
+        let result = latestDecisionResults.get(tenantId);
+        if (!result) {
+            const persisted = await persistence.read({ tenantId }, LATEST_DECISION_WORKBENCH_KEY);
+            result = persisted?.value as DecisionWorkbenchResult | undefined;
+            if (result?.tenantId === tenantId && result.status === "READY") latestDecisionResults.set(tenantId, result);
+        }
+        return result?.tenantId === tenantId && result.status === "READY" ? result : undefined;
+    };
+
     const loadIngestedModel = async (tenantId: string, sha256: string): Promise<FinancialCanonicalModel | undefined> => {
         const record = await persistence.read({ tenantId }, `financial-ingestion:${sha256}`);
         const model = record?.value as FinancialCanonicalModel | undefined;
@@ -321,7 +361,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 return res.end();
             }
             if (req.method === "GET" && path === "/health") return corsJson(200, { status: "ok", service: "hooshyar-commercial-runtime" });
-            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "ingested-source-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-workbench", "reports", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "rbac", "session-lifecycle"] });
+            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "ingested-source-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-workbench", "decision-workbench", "expert-choice", "reports", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "rbac", "session-lifecycle"] });
             if (req.method === "GET" && path === "/") return asset(res, "index.html", "text/html; charset=utf-8");
             if (req.method === "GET" && path === "/app.js") return asset(res, "app.js", "text/javascript; charset=utf-8");
             if (req.method === "GET" && path === "/styles.css") return asset(res, "styles.css", "text/css; charset=utf-8");
@@ -528,6 +568,33 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 await persistence.write({ tenantId: session.tenantId }, LATEST_EXECUTIVE_WORKBENCH_KEY, workbenchResult);
                 latestWorkbenchResults.set(session.tenantId, workbenchResult);
                 return corsJson(200, workbenchResult);
+            }
+
+            if (req.method === "POST" && path === "/api/decision/workbench") {
+                if (!getOrCreateRateLimiter(session.token).tryAcquire()) return corsJson(429, { error: "RATE_LIMIT_EXCEEDED" });
+                if (!ensurePermission("CREATE_DECISION")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                const body = await readJson(req);
+                const decisionError = validateDecisionBody(body);
+                if (decisionError) return corsJson(400, { error: decisionError });
+                const result = decisionWorkbench.execute({
+                    tenantId: session.tenantId,
+                    problem: String(body.problem),
+                    alternatives: (body.alternatives as unknown[]).map((value) => String(value)),
+                    criteria: body.criteria as DecisionWorkbenchInput["criteria"],
+                    scores: (body.scores as unknown[]).map((row) => (row as unknown[]).map((value) => Number(value))),
+                    pairwiseMatrix: Array.isArray(body.pairwiseMatrix) ? (body.pairwiseMatrix as number[][]) : undefined,
+                });
+                if (result.status !== "READY") return corsJson(422, result);
+                await persistence.write({ tenantId: session.tenantId }, LATEST_DECISION_WORKBENCH_KEY, result);
+                latestDecisionResults.set(session.tenantId, result);
+                return corsJson(200, result);
+            }
+
+            if (req.method === "GET" && path === "/api/decision/latest") {
+                if (!ensurePermission("READ_DASHBOARD")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                const result = await loadDecision(session.tenantId);
+                if (!result) return corsJson(404, { error: "DECISION_NOT_FOUND" });
+                return corsJson(200, result);
             }
 
             if (req.method === "GET" && path === "/api/report") {
