@@ -31,8 +31,8 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 | 3 | `security.auth-route-rate-limiting` | S2 | Apply existing limiter to `/api/session` + `/api/auth/login`; negative 429 test | `CommercialRuntimeServer` | HIGH | **COMPLETE** |
 | 4 | `product.web-password-auth` | S1 | Real register/login in web UI via existing `/api/auth/*` (no new engine) | `web/` + runtime auth | MEDIUM | **COMPLETE** |
 | 5 | `security.http-boundary-tenant-object-authz` | S5,S7 | Invoke `TenantIsolation.checkAccess()` + explicit object-owner check at HTTP boundary | `TenantIsolation`, runtime routes | MEDIUM | **COMPLETE** |
-| 6 | `observability.metrics-and-request-trace` | S6 | Additive metrics + structured request trace (no architecture change) | runtime diagnostics | MEDIUM | **EXECUTING** |
-| 7 | `standardization.pagination-and-idempotency` | S3,S4 | Bounded `limit/offset` on list routes; idempotency keys on mutating POSTs | runtime | MEDIUM | PLANNED |
+| 6 | `observability.metrics-and-request-trace` | S6 | Additive metrics + structured request trace (no architecture change) | runtime diagnostics | MEDIUM | **COMPLETE** |
+| 7 | `standardization.pagination-and-idempotency` | S3,S4 | Bounded `limit/offset` on list routes; idempotency keys on mutating POSTs | runtime | MEDIUM | **EXECUTING** |
 | 8 | `assurance.ocr-environment-gap` | E2 | Resolve only if runtime contract requires; else record explicit, non-hidden gap | `OcrAdapter` | HIGH | PLANNED |
 | 9 | `assurance.flake-containment` | F1,F2 | Analyze + contain parallel-load resource contention (timeouts/serial projects) without hiding real failures | test config + affected tests | HIGH | PLANNED |
 | 10 | `standardization.architecture-doc-registry-reconciliation` | C8 | Reconcile LifecycleManager tier drift + stale dormant labels to repository truth | docs/registry | HIGH | PLANNED |
@@ -156,6 +156,22 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 **Checkpoint:** `.kilo/plans/security-http-boundary-tenant-object-authz-checkpoint.md`
 
 **DO-NOT-REPEAT:** do not duplicate `TenantIsolation`; do not weaken the object owner/admin rule to pass tests; do not disclose cross-tenant existence.
+
+---
+
+## Stage 6 — `observability.metrics-and-request-trace`
+
+**State:** COMPLETE
+**Baseline SHA:** `06cab69faef5889a6fad541aa1e94f4e1334846e`
+**Classification:** OBSERVABILITY GAP (no request correlation or operation metrics).
+
+**Repair:** new supporting (non-Engine) `Autonomous/Runtime/RuntimeObservability.ts` with injection-safe `requestId`, bounded `normalizeRoute`, `recordRequest`, `snapshot`; runtime emits `X-Request-Id`, records every response on `res.once("finish")`, exposes privileged `GET /api/diagnostics/metrics`, and includes `requestId` in 404/error bodies.
+
+**Evidence:** focused 5/5; integration 19 suites / 122 tests; typecheck exit 0; full suite 259/260 with only the OCR env gap (1968/1968 tests). See `.kilo/plans/observability-metrics-and-request-trace-checkpoint.md` and audit §37.
+
+**Checkpoint:** `.kilo/plans/observability-metrics-and-request-trace-checkpoint.md`
+
+**DO-NOT-REPEAT:** do not create an Engine; do not store or expose credentials/cookies/tokens/content in metrics; do not reflect unsafe inbound request ids.
 
 ---
 

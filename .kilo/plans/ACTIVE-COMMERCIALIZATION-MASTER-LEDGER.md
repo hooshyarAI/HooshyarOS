@@ -12,6 +12,7 @@
 **Stage 3 status:** `security.auth-route-rate-limiting` **EXECUTED and VERIFIED** — unauthenticated auth entry points had no limiter (REAL SECURITY DEFECT). Repaired in `CommercialRuntimeServer` with per-client + per-identity token buckets; `/api/auth/login` and password `/api/session` share the identity bucket (no bypass). Focused 10/10, integration regression 16 suites/100 tests, typecheck 0, full suite 257/259. See audit §34 and `.kilo/plans/security-auth-route-rate-limiting-checkpoint.md`.
 **Stage 4 status:** `product.web-password-auth` **EXECUTED and VERIFIED** — the web entrypoint exposed only passwordless `/api/session` and could not register/login. `web/index.html` + `web/app.js` now use the canonical `/api/auth/register|login|logout` backend (no new auth architecture); real HTTP end-to-end test covers register, invalid 401, login, session, authorized vs anonymous route, logout. Focused 2/2, integration 16 suites/101 tests, typecheck 0, full suite 256/259. See audit §35 and `.kilo/plans/product-web-password-auth-checkpoint.md`.
 **Stage 5 status:** `security.http-boundary-tenant-object-authz` **EXECUTED and VERIFIED** — object routes now invoke canonical `TenantIsolation.checkAccess()` at the HTTP boundary and work-item reads enforce an explicit object owner/admin check (same-tenant non-owner → 403 audited; cross-tenant → 404). Focused 6/6, integration 18 suites/117 tests, typecheck 0, full suite 257/259. See audit §36 and `.kilo/plans/security-http-boundary-tenant-object-authz-checkpoint.md`.
+**Stage 6 status:** `observability.metrics-and-request-trace` **EXECUTED and VERIFIED** — additive `RuntimeObservability` module (not an Engine) adds `X-Request-Id` correlation, bounded per-route request/error/duration metrics, and privileged `GET /api/diagnostics/metrics`; failure responses carry the correlation id. Focused 5/5, integration 19 suites/122 tests, typecheck 0, full suite 259/260 (only OCR env gap; 1968/1968 tests). See audit §37 and `.kilo/plans/observability-metrics-and-request-trace-checkpoint.md`.
 
 ---
 
@@ -78,7 +79,7 @@ The prior audit (`platform-wide-commercialization-conformance-audit.md` §1–§
 | S3 | No pagination on list routes | **STANDARDIZATION GAP** | runtime list routes | audit R4 | Scalability | MEDIUM | ACTIVE | Add bounded `limit/offset` | runtime tests |
 | S4 | No idempotency keys on mutating POSTs | **STANDARDIZATION GAP** | runtime | audit R5 | Duplicate-execution safety | MEDIUM | ACTIVE | Add idempotency on report/execution mutations | runtime tests |
 | S5 | `TenantIsolation.checkAccess()` not invoked at HTTP layer | **DEFENSE-IN-DEPTH GAP (repaired)** | `Security/TenantIsolation.ts` integrated in `CommercialRuntimeServer` | audit R2; guard existed but unwired at HTTP | Defense-in-depth | MEDIUM | **VERIFIED COMPLETE** (Stage 5, audit §36) | `enforceTenantBoundary()` on work-item/source/report-artifact routes; fail closed + TENANT_VIOLATION audit | object-route tests incl. cross-tenant 404 |
-| S6 | No metrics/tracing export | **OBSERVABILITY GAP** | runtime diagnostics | audit §15 | Operational readiness | MEDIUM | ACTIVE | Additive metrics endpoint/structured request trace (no architecture change) | endpoint + test |
+| S6 | No metrics/tracing export | **OBSERVABILITY GAP (repaired)** | runtime diagnostics — new `Autonomous/Runtime/RuntimeObservability.ts` | audit §15; no request id/metrics existed | Operational readiness | MEDIUM | **VERIFIED COMPLETE** (Stage 6, audit §37) | Additive `X-Request-Id` + bounded per-route metrics + privileged `/api/diagnostics/metrics`; no architecture change | focused 5/5 (normalization, injection-safe ids, counting, HTTP trace, metrics authz 401/403) |
 | S7 | Object-level authorization on `GET /api/execution/work-items/:id` is tenant-scope only | **DEFENSE-IN-DEPTH GAP (repaired)** | `OrganizationalExecutionCoordinator` + route | audit R3; same-tenant member could read any item | Explicit owner check | MEDIUM | **VERIFIED COMPLETE** (Stage 5, audit §36) | `canAccessWorkItem()` (creator/approver/assignee or ADMINISTER); 403 + audited denial | owner 200 / non-owner 403 / anonymous 401 / cross-tenant 404 |
 
 ### 3.5 Capability / layer gaps
@@ -106,7 +107,7 @@ Scoring = commercial value, correctness, security, tenant isolation, runtime int
 3. ~~**S2 — rate-limit auth routes**~~ — **DONE (Stage 3, audit §34): real security defect repaired and verified.**
 4. ~~**S1 — real password auth in web UI**~~ — **DONE (Stage 4, audit §35): product gap repaired and verified.**
 5. ~~**S5/S7 — HTTP-boundary tenant/object authorization defense-in-depth**~~ — **DONE (Stage 5, audit §36).**
-6. **S6 — metrics + request tracing**. Safety: MEDIUM.
+6. ~~**S6 — metrics + request tracing**~~ — **DONE (Stage 6, audit §37).**
 7. **S3/S4 — pagination + idempotency**. Safety: MEDIUM.
 8. **E2 — OCR environment gap** (resolve only if runtime requires; else record). Safety: HIGH.
 9. **F1/F2 — flake hardening**. Safety: HIGH.
@@ -140,4 +141,6 @@ Scoring = commercial value, correctness, security, tenant isolation, runtime int
 
 **`security.http-boundary-tenant-object-authz`** — COMPLETE (Stage 5; audit §36). HTTP object routes invoke canonical `TenantIsolation.checkAccess()` and work-item reads enforce an explicit object owner/admin check.
 
-**Next selected stage: `observability.metrics-and-request-trace` (S6)** — additive request correlation/trace and operation metrics on critical runtime paths using canonical infrastructure. See the execution queue.
+**`observability.metrics-and-request-trace`** — COMPLETE (Stage 6; audit §37). Runtime now emits `X-Request-Id` correlation, bounded per-route operation metrics and a privileged diagnostics endpoint; failures carry the correlation id.
+
+**Next selected stage: `standardization.pagination-and-idempotency` (S3, S4)** — bounded `limit/offset` on list routes and idempotency keys on mutating POSTs using canonical persistence. See the execution queue.

@@ -801,3 +801,42 @@ No change to `productComplete`, `commercialProductRuntimeComplete` or `externalP
 ### 36.6 Next candidate knot (not executed)
 
 `observability.metrics-and-request-trace` — additive request correlation/trace and operation metrics on critical runtime paths.
+
+---
+
+## 37. Observability knot — `observability.metrics-and-request-trace` executed (runtime observability)
+
+**Knot:** add real request correlation and operation metrics to the commercial runtime via a bounded supporting module and an authenticated admin diagnostics endpoint; no architecture change.
+**Trusted baseline at execution:** `git rev-parse HEAD` = `06cab69faef5889a6fad541aa1e94f4e1334846e` (`fix/autonomous-product-factory`).
+**Classification:** OBSERVABILITY GAP. Architecture Freeze V4.1 preserved.
+**Checkpoint:** `.kilo/plans/observability-metrics-and-request-trace-checkpoint.md`.
+
+### 37.1 Independent confirmation of the gap
+
+No request id, no per-route metrics and no duration signal existed in `CommercialRuntimeServer`; `HealthMonitorEngine` covers engine health only. No `X-Request-Id` was emitted and the 404/error responses carried no correlation token.
+
+### 37.2 Repair
+
+- New supporting module `Autonomous/Runtime/RuntimeObservability.ts` (NOT an Engine): safe `requestId`, `normalizeRoute` (bounded cardinality, query-stripped), `recordRequest`, `snapshot`.
+- Runtime: per-request `X-Request-Id`; completion recorded on `res.once("finish")`; `GET /api/diagnostics/metrics` privileged-only (`MANAGE_USERS`/`ADMINISTER`); 404/error bodies carry `requestId`; `/api/ready` advertises `request-observability`.
+
+### 37.3 Verification evidence
+
+- Focused `RuntimeObservability.test.ts`: **5/5 tests passed** (normalization, unsafe-id rejection, counting, HTTP trace + metrics, metrics authz 401/403).
+- Integration regression: **19/19 suites, 122/122 tests passed**.
+- Changed-file typecheck `tsc --noEmit`: **exit 0**.
+- Full suite (`jest --silent`, evidence `.kilo/evidence/jest-full-stage6-observability.txt`): **259/260 suites, 1968/1968 tests passed**; only `OcrAdapter` failed to load (`tesseract.js` absent).
+
+### 37.4 Remaining failure classification (after repair)
+
+| Suite | Class |
+|---|---|
+| `OcrAdapter.test.ts` | ENVIRONMENT GAP (`tesseract.js` absent) |
+
+### 37.5 Truth boundary
+
+No change to `productComplete`, `commercialProductRuntimeComplete` or `externalProductionDependenciesComplete`. Metrics retain only method, normalized route, status and duration; no credential/cookie/token/content leakage. No assertion weakened, no test skipped or deleted.
+
+### 37.6 Next candidate knot (not executed)
+
+`standardization.pagination-and-idempotency` — bounded list pagination and idempotency keys on mutating POSTs.

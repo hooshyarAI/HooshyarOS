@@ -35,6 +35,7 @@ import { ResilienceAnalyticsService } from "../../Product/ResilienceAnalyticsSer
 import { Scenario } from "../../Uncertainty/MonteCarloTypes";
 import { ImpactMeasurementService } from "../../Product/ImpactMeasurementService";
 import { ContinuousImprovementEngine } from "../../Assistant/Autonomous/ContinuousImprovementEngine";
+import { RuntimeObservability } from "./RuntimeObservability";
 import type { BaselineMetrics, PostInterventionMetrics } from "../../Product/ImpactMeasurementService";
 
 export interface CommercialRuntimeOptions {
@@ -306,6 +307,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     const RATE_LIMIT_CAPACITY = 5;
     const RATE_LIMIT_REFILL_PER_SECOND = 1;
     const now = options.now ?? (() => Date.now());
+    const observability = new RuntimeObservability({ now });
     const corsOrigin = options.corsOrigin ?? DEFAULT_CORS_ORIGIN;
 
     const identity = new CommercialIdentityService(persistence, sessionTtlMs);
@@ -490,6 +492,12 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
 
     const close = () => persistence.close();
     const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
+        const requestId = observability.requestId(req.headers["x-request-id"]);
+        res.setHeader("X-Request-Id", requestId);
+        const requestStartedAtMs = now();
+        res.once("finish", () => {
+            observability.recordRequest(req.method ?? "GET", req.url ?? "/", res.statusCode, now() - requestStartedAtMs);
+        });
         const corsJson = (status: number, payload: unknown, headers: Record<string, string> = {}) =>
             json(res, status, payload, { ...corsHeaders(corsOrigin), ...headers });
         const executionResponse = (result: WorkItemOperationResult) =>
@@ -504,7 +512,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 return res.end();
             }
             if (req.method === "GET" && path === "/health") return corsJson(200, { status: "ok", service: "hooshyar-commercial-runtime" });
-            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "financial-analytics", "ingested-source-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-workbench", "decision-workbench", "expert-choice", "organizational-execution", "governed-approval", "work-item-lifecycle", "kpi-outcome", "reports", "reports-export", "report-artifact-download", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "auth-rate-limiting", "rbac", "session-lifecycle"] });
+            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "financial-analytics", "ingested-source-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-workbench", "decision-workbench", "expert-choice", "organizational-execution", "governed-approval", "work-item-lifecycle", "kpi-outcome", "reports", "reports-export", "report-artifact-download", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "auth-rate-limiting", "rbac", "session-lifecycle", "request-observability"] });
             if (req.method === "GET" && path === "/") return asset(res, "index.html", "text/html; charset=utf-8");
             if (req.method === "GET" && path === "/app.js") return asset(res, "app.js", "text/javascript; charset=utf-8");
             if (req.method === "GET" && path === "/styles.css") return asset(res, "styles.css", "text/css; charset=utf-8");
@@ -680,6 +688,11 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 if (item.assignment && actors.includes(item.assignment.assigneeId)) return true;
                 return false;
             };
+
+            if (req.method === "GET" && path === "/api/diagnostics/metrics") {
+                if (!ensurePermission("MANAGE_USERS")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                return corsJson(200, { status: "READY", ...observability.snapshot() });
+            }
 
             if (req.method === "POST" && path === "/api/analyze") {
                 if (!getOrCreateRateLimiter(session.token).tryAcquire()) return corsJson(429, { error: "RATE_LIMIT_EXCEEDED" });
@@ -1133,11 +1146,11 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 return corsJson(result.status === "READY" ? 200 : 422, result);
             }
 
-            return corsJson(404, { error: "NOT_FOUND" });
+            return corsJson(404, { error: "NOT_FOUND", requestId });
         } catch (error) {
             const message = error instanceof Error ? error.message : "RUNTIME_ERROR";
             const status = message === "request-body-too-large" ? 413 : 400;
-            return corsJson(status, { error: message });
+            return corsJson(status, { error: message, requestId });
         }
     });
     server.once("close", close);
