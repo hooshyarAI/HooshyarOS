@@ -178,10 +178,14 @@
 
     <section class="card onboarding">
       <h2>گزارش و دستیار هوشمند</h2>
-      <div class="actions">
-        <button id="report-button" class="primary" type="button">تولید گزارش</button>
+      <p>گزارش مالی/مدیریتی را به‌صورت فایل واقعی و قابل دانلود تولید کنید. قالب‌های پشتیبانی‌شده: Excel (XLSX)، CSV، JSON و متن.</p>
+      <div class="actions report-actions">
+        <label>قالب فایل گزارش<select id="report-format"><option value="XLSX">Excel (XLSX)</option><option value="CSV">CSV</option><option value="JSON">JSON</option><option value="TXT">متن (TXT)</option></select></label>
+        <button id="report-button" class="primary" type="button">پیش‌نمایش گزارش</button>
+        <button id="report-export-button" class="primary" type="button">تولید و دانلود فایل گزارش</button>
       </div>
       <pre id="report-result" class="result" aria-live="polite"></pre>
+      <div id="report-artifacts" class="execution-list" aria-live="polite"></div>
       <form id="assistant-form">
         <label>سؤال از هوشیار<textarea id="assistant-question" rows="3" required placeholder="مثلاً وضعیت سود و ریسک بدهی من چیست؟"></textarea></label>
         <button class="primary" type="submit">پرسش از دستیار</button>

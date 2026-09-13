@@ -98,7 +98,7 @@ executive workbench, resilience/impact/improvement, or engine math is permitted.
 | 6 | Executive/managerial | INTEGRATED | KPI history/drill-down UI limited |
 | 7 | Decision intelligence / Expert Choice | **PARTIAL / NONSTANDARD** | `DecisionWorkbench` is a stub; `DecisionIntelligenceEngine` (AHP/TOPSIS/decisionTree) + `OrchestratedDecisionIntelligenceService` disconnected; no decision endpoint/UI |
 | 8 | Organizational execution | **INTEGRATED / VERIFIED** | real decision→approval→workflow→assignment→due date→KPI/outcome→evidence→feedback path wired through `OrganizationalExecutionCoordinator` + runtime + UI; no duplicate workflow engine |
-| 9 | Dashboards and reports | INTEGRATED | no export/download; single generic dashboard |
+| 9 | Dashboards and reports | **INTEGRATED / VERIFIED (export)** | real TXT/CSV/JSON/XLSX report export + tenant-scoped persisted artifact + secure download; richer dashboard reports later |
 | 10 | Web and mobile | PARTIAL | shell-only service worker; responsive baseline |
 | 11 | Offline/online | MISSING | no local workspace/sync/conflict; `SyncStateStore` unwired |
 | 12 | Security and privacy | INTEGRATED | encryption-at-rest/backup pending human-approved 05C decisions |
@@ -146,7 +146,7 @@ ingest/analyze, executive workbench, report, assistant, dashboard, resilience, i
 |------------|-------|-------|--------|
 | `product.decision-workbench` | `Product/DecisionWorkbench.ts` | stub / disconnected engine math | **COMPLETE EXISTING OWNER (this knot)** |
 | `product.organizational-execution` | `Product/OrganizationalExecutionCoordinator.ts` | **COMPLETE EXISTING OWNER (this knot)** | governed human approval + work lifecycle + persistence + runtime + UI |
-| Reports export/download | `Engines/ReportsEngine.ts` + runtime | missing export | later knot |
+| Reports export/download | `Engines/ReportsEngine.ts` + `Product/ReportExportService.ts` + runtime | **COMPLETE EXISTING OWNER (this knot)** — real file artifacts, persistence, provenance, secure download |
 | Financial service endpoints (ratios/break-even/anomaly/cash-flow) | `Product/*Service.ts` | disconnected | **COMPLETE EXISTING OWNERS (this knot)** — compose via `FinancialAnalyticsService` + runtime + web |
 | Offline/online sync | `Product/SyncStateStore.ts` | disconnected | later phase |
 | Billing/entitlements | — | missing | later phase |
@@ -169,7 +169,7 @@ IntegrationImpact .10 + StandardizationImpact .05 + ImplementationSafety .10.
 | 1 | **`product.decision-workbench`** (Expert Choice) | core product differentiator; unblocks org-execution; wires 1 engine + 1 owner + runtime + UI | HIGH (engine math already tested) |
 | 2 | **`product.organizational-execution`** | depends on decision approval; layer 8 — DELIVERED, no new owner | **DONE / VERIFIED** |
 | 3 | **Financial service API integration (ratios/break-even/cash-flow/anomaly)** | contract layer 5; 4 realized owners disconnected; reuses tested deterministic math | **DONE / VERIFIED (this knot)** |
-| 4 | Reports export/download | contract layer 9 | HIGH (next knot) |
+| 4 | Reports export/download | contract layer 9 | **DONE / VERIFIED (this knot)** |
 | 5 | Offline/PWA + sync | layers 10/11 | MEDIUM |
 | 6 | Billing/entitlement | layer 15 | LOW (external) |
 
@@ -222,9 +222,10 @@ IntegrationImpact .10 + StandardizationImpact .05 + ImplementationSafety .10.
 
 ## 22. Next recommended knot
 
-`product.reports-export` (Layer 9) — expose the existing `ReportsEngine` build/download path through the runtime
-and browser, now enriched by the persisted financial-analytics output. The Layer-5 financial-service endpoints
-(ratios/break-even/cash-flow/anomaly) were completed in this knot via `FinancialAnalyticsService` (see below).
+`product.offline-sync` (Layers 10/11) — PWA/offline local workspace and sync/conflict handling. Layer 9
+(`product.reports-export`) is now delivered/verified (see below). The remaining genuine commercial gaps are
+offline/online sync (Layer 11), billing/entitlements (Layer 15, external-provider blocked) and external
+production deployment (Layer 14, external).
 
 ---
 
@@ -309,6 +310,7 @@ human-approved governed-execution path can exist using the existing `Authorizati
 | `product.decision-workbench` | VERIFIED | `DecisionWorkbench.test.ts` 9/9, `DecisionWorkbenchRuntime.test.ts` 5/5; 160/160 decision/runtime regression; full Jest 240/253 suites, 1852/1853 tests; `web-product-acceptance` PASS; `security-tenant-acceptance` PASS | `5f5b62f1` |
 | `product.organizational-execution` (Layer 8) | VERIFIED | `OrganizationalExecutionCoordinator.test.ts` 10/10, `OrganizationalExecutionRuntime.test.ts` 4/4; focused regression 113/113 (15 suites); full Jest 241/254 suites, 1864/1865 tests; `web-product-acceptance` PASS; `security-tenant-acceptance` PASS | `226a716a` |
 | `product.financial-analytics` (Layer 5) | VERIFIED | `FinancialAnalyticsService.test.ts` 7/7, `FinancialAnalyticsRuntime.test.ts` 5/5; owner+runtime regression 29/29 (6 suites); full Jest 244/256 suites, 1877/1877 tests; `web-product-acceptance` v6 PASS; `security-tenant-acceptance` v2 PASS; changed-file typecheck clean | `5f12a56c` |
+| `product.reports-export` (Layer 9) | VERIFIED | `ReportsEngine.test.ts` 9/9, `ReportExportService.test.ts` 6/6, `ReportsExportRuntime.test.ts` 5/5; focused regression 34/34 (5 suites); full Jest 246/258 suites, 1895/1895 tests; `web-product-acceptance` v7 PASS; `security-tenant-acceptance` v3 PASS; changed-file typecheck clean | see checkpoint |
 
 ### Knot `product.decision-workbench` — delivered
 
@@ -341,6 +343,60 @@ human-approved governed-execution path can exist using the existing `Authorizati
 - Flaky (1 test): `CommercialRuntimePersistenceRecovery` 5s timeout under parallel load; passes on isolated rerun
   (2778 ms, verified). Not caused by this knot.
 - Typecheck of changed files: clean (`GovernanceEngine.test.ts` pre-existing stale-void error only).
+- **NEW REGRESSION: none.**
+
+---
+
+## Layer 9 — Reports Export: architecture sufficiency decision
+
+**Result: ARCHITECTURE SUFFICIENT — NO ARCHITECTURE CHANGE REQUIRED.**
+
+Fresh audit at `462615e6`:
+
+- `Engines/ReportsEngine.ts` is the canonical report owner (`describeCapability().id = platform.reports`; the
+  `build(` marker is asserted by `CanonicalCapabilityAudit`/`AutonomousPlatformWeaving`). It only validated
+  title+sections and returned a structured object — **no file artifact**.
+- `GET /api/report` returned section text as JSON only: no persistence, provenance, content type, disposition,
+  artifact identity or download path.
+- **No report writer exists anywhere** in the repository. `PdfAcquisition`/`DocxAcquisition` are read-only
+  acquisitions (`pdf-parse`, `mammoth`); `exceljs-hardened` is already a canonical dependency used by the
+  ingestion adapter and acceptance tooling, and can write real XLSX.
+- `SQLitePersistenceStore` supports arbitrary tenant-scoped JSON records, so byte artifacts can be persisted
+  without a schema change; `ProvenanceTrace` is the canonical provenance owner; `CommercialIdentityService`,
+  RBAC (`READ_DASHBOARD`) and the tenant boundary already exist.
+- No duplicate report ownership and no incomplete download path existed.
+
+Therefore the correct change is to **extend the existing report owner** and add a strictly compositional product
+boundary, not new report architecture.
+
+### Knot `product.reports-export` — delivered
+
+- Canonical owner extended: `ReportsEngine` gained `render(document, format)` → real `ReportArtifact`
+  (bytes + content type + file name + SHA-256) for **TXT, CSV, JSON, XLSX**; `build(title, sections)` is
+  preserved unchanged. PDF/DOCX are deliberately not claimed (readers only).
+- New composition boundary `Product/ReportExportService.ts` (`capabilityId = product.reports-export`,
+  `targetEngine = Reports Engine`) owns persistence, canonical provenance and tenant-isolated retrieval only —
+  no report semantics, no second engine.
+- Persistence: tenant-scoped `report-artifact:<artifactId>` records + `report-artifacts:index`; opaque random
+  artifact ids; SHA-256 integrity re-check fails closed on tampering.
+- Provenance: canonical `ProvenanceTrace.createProvenanceLink` (`reports-engine:<format>`,
+  `financial-ingestion:<source sha256>`, artifact id as decision ref). No parallel audit system.
+- Runtime: `POST /api/report/export` (RBAC `READ_DASHBOARD`), `GET /api/report/artifacts`,
+  `GET /api/report/artifacts/:id/download` (real bytes, correct content type, `Content-Disposition: attachment`,
+  `Content-Length`, `X-Artifact-SHA256`). `/api/ready` advertises `reports-export`/`report-artifact-download`.
+  `/api/report` now shares one `buildReportSections` source, so JSON and exported content cannot drift.
+- Product surface: format selector + "generate and download" action and artifact list in `web/`.
+- Truthful boundary: unsupported formats fail closed (`400`); no analysis fails closed (`422`); cross-tenant and
+  unauthenticated access are denied; no fake/renamed/display-only artifact.
+
+### Regression classification (full Jest, this knot)
+
+- Passed: 246/258 suites, 1895/1895 tests.
+- Pre-existing failures (12 suites, unchanged): OcrAdapter, LocalFolderWatcher, BreakEven/CashFlow/
+  ExponentialSmoothing phase-09 contract mismatches, KiloCodeExecutionAdapterObservability,
+  EngineDependencyVerifier, GovernanceEngine, and 4 Assistant `ImprovementInput` mismatches.
+- Changed-file typecheck: clean (only the 4 pre-existing `HooshyarAutonomousAssistant`/`CapabilityMatrix`/
+  `AutonomousBuildCommand` errors remained repo-wide; none in report files).
 - **NEW REGRESSION: none.**
 
 

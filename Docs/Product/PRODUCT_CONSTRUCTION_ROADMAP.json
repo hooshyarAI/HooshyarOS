@@ -69,6 +69,22 @@
         "each section fails closed with the owning service's BLOCKED status rather than fabricating values",
         "focused unit, runtime and application acceptance evidence exists"
       ]
+    },
+    {
+      "capabilityId": "product.reports-export",
+      "capability": "generate real downloadable report file artifacts (TXT/CSV/JSON/XLSX) from verified tenant-scoped results, with persistence, provenance and secure tenant-isolated download",
+      "targetEngine": "Reports Engine",
+      "dependencies": ["Reports Engine", "Commercial Persistence Boundary", "Provenance Trace", "Commercial Identity Service"],
+      "implementationPath": "Backend/HBOS/Product/ReportExportService.ts",
+      "testPath": "Backend/HBOS/test/ReportExportService.test.ts",
+      "documentationPath": "Docs/Product/ReportExportService.md",
+      "acceptanceCriteria": [
+        "ReportsEngine remains the single report owner and renders genuine file bytes for each claimed format",
+        "artifacts are persisted tenant-scoped and retrievable with SHA-256 integrity verification",
+        "downloads are authenticated, authorized and cross-tenant denied, with correct content type and disposition",
+        "no fake/renamed/display-only artifact is produced; unsupported formats fail closed",
+        "focused unit, runtime, application and security/tenant acceptance evidence exists"
+      ]
     }
   ]
 }

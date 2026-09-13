@@ -18,6 +18,7 @@ async function refreshDashboard() {
     document.querySelector('#profit').textContent = Number(dashboard.metrics?.profit ?? 0).toLocaleString('fa-IR');
     document.querySelector('#risk').textContent = `${Number(dashboard.metrics?.risk ?? 0).toLocaleString('fa-IR')}٪`;
     await refreshAnalyticsSources();
+    await refreshReportArtifacts();
   } catch (error) {
     document.querySelector('#readiness').textContent = `برای ادامه ابتدا نشست ایجاد کنید: ${error.message}`;
   }
@@ -260,6 +261,69 @@ document.querySelector('#report-button').addEventListener('click', async () => {
     result.textContent = JSON.stringify(payload, null, 2);
   } catch (error) {
     result.textContent = `تولید گزارش ناموفق بود: ${error.message}`;
+  }
+});
+
+async function refreshReportArtifacts() {
+  const container = document.querySelector('#report-artifacts');
+  if (!container) return;
+  try {
+    const payload = await getJson('/api/report/artifacts');
+    if (!payload.artifacts.length) {
+      container.textContent = 'هنوز فایل گزارشی تولید نشده است. برای شروع دکمه «تولید و دانلود فایل گزارش» را بزنید.';
+      return;
+    }
+    container.innerHTML = '';
+    for (const artifact of payload.artifacts) {
+      const card = document.createElement('div');
+      card.className = 'execution-item';
+      const heading = document.createElement('div');
+      heading.className = 'execution-heading';
+      const title = document.createElement('strong');
+      title.textContent = artifact.fileName;
+      const format = document.createElement('span');
+      format.className = 'execution-status';
+      format.textContent = artifact.format;
+      heading.append(title, format);
+      const details = document.createElement('p');
+      details.textContent = `${Number(artifact.byteLength).toLocaleString('fa-IR')} بایت | ${artifact.generatedAt} | SHA-256 ${artifact.sha256.slice(0, 12)}…`;
+      const link = document.createElement('a');
+      link.className = 'primary';
+      link.href = `/api/report/artifacts/${encodeURIComponent(artifact.artifactId)}/download`;
+      link.textContent = 'دانلود';
+      link.setAttribute('download', artifact.fileName);
+      card.append(heading, details, link);
+      container.appendChild(card);
+    }
+  } catch (error) {
+    container.textContent = `دریافت فایل‌های گزارش ناموفق بود: ${error.message}`;
+  }
+}
+
+document.querySelector('#report-export-button').addEventListener('click', async () => {
+  const result = document.querySelector('#report-result');
+  const format = document.querySelector('#report-format').value;
+  try {
+    const payload = await getJson('/api/report/export', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ format })
+    });
+    const fileResponse = await fetch(payload.downloadUrl);
+    if (!fileResponse.ok) throw new Error(`DOWNLOAD_HTTP_${fileResponse.status}`);
+    const blob = await fileResponse.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = payload.artifact.fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    result.textContent = `گزارش ${payload.artifact.format} تولید و دانلود شد: ${payload.artifact.fileName} (${Number(payload.artifact.byteLength).toLocaleString('fa-IR')} بایت) — SHA-256: ${payload.artifact.sha256.slice(0, 16)}…`;
+    await refreshReportArtifacts();
+  } catch (error) {
+    result.textContent = `تولید فایل گزارش ناموفق بود: ${error.message}`;
   }
 });
 

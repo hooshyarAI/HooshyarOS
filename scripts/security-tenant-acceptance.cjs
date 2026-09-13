@@ -128,9 +128,31 @@ async function main() {
     const analyticsALatest = await request('/api/financial/insights/latest', { headers: { cookie: tenantA.cookie } });
     if (analyticsALatest.status !== 200 || analyticsALatest.body.tenantId !== tenantA.tenantId || analyticsALatest.body.forecast?.naive?.forecast !== 1400) throw new Error('ANALYTICS_TENANT_A_LATEST_INVALID');
 
+    // Layer 9: report artifact generation, persistence, secure download and tenant isolation.
+    const reportExportA = await request('/api/report/export', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: tenantA.cookie },
+      body: JSON.stringify({ format: 'CSV' })
+    });
+    if (reportExportA.status !== 201 || reportExportA.body.capabilityId !== 'product.reports-export' || reportExportA.body.tenantId !== tenantA.tenantId || reportExportA.body.artifact?.format !== 'CSV') throw new Error(`SECURITY_REPORT_EXPORT_A_FAILED:${reportExportA.status}`);
+
+    const reportDownloadA = await fetch(`http://127.0.0.1:${port}${reportExportA.body.downloadUrl}`, { headers: { cookie: tenantA.cookie } });
+    const reportBytesA = Buffer.from(await reportDownloadA.arrayBuffer());
+    if (!reportDownloadA.ok || reportDownloadA.headers.get('content-type') !== 'text/csv; charset=utf-8' || reportDownloadA.headers.get('x-artifact-sha256') !== reportExportA.body.artifact.sha256 || reportBytesA.length !== reportExportA.body.artifact.byteLength || reportBytesA.length === 0) throw new Error(`SECURITY_REPORT_DOWNLOAD_A_FAILED:${reportDownloadA.status}`);
+
+    const reportCrossTenant = await request(reportExportA.body.downloadUrl, { headers: { cookie: tenantB.cookie } });
+    if (reportCrossTenant.status !== 404) throw new Error(`REPORT_ARTIFACT_CROSS_TENANT_LEAK:${reportCrossTenant.status}`);
+
+    const reportListB = await request('/api/report/artifacts', { headers: { cookie: tenantB.cookie } });
+    if (reportListB.status !== 200 || !Array.isArray(reportListB.body.artifacts) || reportListB.body.artifacts.length !== 0) throw new Error('REPORT_ARTIFACT_CROSS_TENANT_INDEX_LEAK');
+
+    const unauthReportExport = await request('/api/report/export', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ format: 'CSV' }) });
+    const unauthReportDownload = await request('/api/report/artifacts/report-deadbeef/download');
+    if (unauthReportExport.status !== 401 || unauthReportDownload.status !== 401) throw new Error(`SECURITY_UNAUTHENTICATED_REPORT_ACCESS_NOT_DENIED:${unauthReportExport.status}/${unauthReportDownload.status}`);
+
     const evidence = {
       type: 'SECURITY_TENANT_ACCEPTANCE_SUCCESS',
-      version: 2,
+      version: 3,
       status: 'PASS',
       createdAt: new Date().toISOString(),
       repository: root,
@@ -141,7 +163,7 @@ async function main() {
         { tenantId: tenantA.tenantId, expectedProfit: tenantA.expectedProfit },
         { tenantId: tenantB.tenantId, expectedProfit: tenantB.expectedProfit }
       ],
-      acceptance: ['unauthenticated-dashboard-denied', 'unauthenticated-analyze-denied', 'distinct-tenant-identities', 'tenant-a-data-isolated', 'tenant-b-data-isolated', 'analytics-tenant-scoped', 'analytics-cross-tenant-read-denied']
+      acceptance: ['unauthenticated-dashboard-denied', 'unauthenticated-analyze-denied', 'distinct-tenant-identities', 'tenant-a-data-isolated', 'tenant-b-data-isolated', 'analytics-tenant-scoped', 'analytics-cross-tenant-read-denied', 'report-export-tenant-scoped', 'report-artifact-download-secure', 'report-artifact-cross-tenant-denied', 'report-artifact-index-tenant-isolated', 'unauthenticated-report-export-denied', 'unauthenticated-report-download-denied']
     };
     fs.writeFileSync(evidencePath, JSON.stringify(evidence, null, 2), 'utf8');
     console.log(JSON.stringify(evidence, null, 2));

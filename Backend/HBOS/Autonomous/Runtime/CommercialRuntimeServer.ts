@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { FinancialIntelligenceEngine } from "../../Engines/FinancialIntelligenceEngine";
 import { ExecutiveIntelligenceEngine } from "../../Engines/ExecutiveIntelligenceEngine";
 import { ReasoningEngine } from "../../Engines/ReasoningEngine";
-import { ReportsEngine } from "../../Engines/ReportsEngine";
+import { ReportsEngine, SUPPORTED_REPORT_FORMATS, type ReportFormat, type ReportSection } from "../../Engines/ReportsEngine";
 import { FinancialDataIngestionAdapter, type FinancialCanonicalModel, type FinancialSourceEvidence } from "../../Product/FinancialDataIngestionAdapter";
 import { FinancialIngestionService, IngestionFormat, SUPPORTED_INGESTION_FORMATS } from "../../Product/FinancialIngestionService";
 import { FinancialStatementAnalysisService } from "../../Product/FinancialStatementAnalysisService";
@@ -13,6 +13,7 @@ import { SecurityEventLogger } from "../../Entities/SecurityEventLogger";
 import { ExecutiveIntelligenceWorkbench, ExecutiveIntelligenceWorkbenchInput, ExecutiveIntelligenceWorkbenchResult } from "../../Product/ExecutiveIntelligenceWorkbench";
 import { DecisionWorkbench, DecisionWorkbenchInput, DecisionWorkbenchResult } from "../../Product/DecisionWorkbench";
 import { FinancialAnalyticsService, FinancialAnalyticsResult, FinancialAnalyticsInput } from "../../Product/FinancialAnalyticsService";
+import { ReportExportService } from "../../Product/ReportExportService";
 import {
     OrganizationalExecutionCoordinator,
     WorkItemOperationResult,
@@ -65,7 +66,7 @@ type StoredAnalysis = ReturnType<FinancialStatementAnalysisService["execute"]>;
 type StoredAnalytics = FinancialAnalyticsResult & { readonly source?: FinancialSourceEvidence };
 type ExecutiveTargets = ExecutiveIntelligenceWorkbenchInput["targets"];
 
-const send = (res: ServerResponse, status: number, contentType: string, body: string, headers: Record<string, string> = {}) => {
+const send = (res: ServerResponse, status: number, contentType: string, body: string | Buffer, headers: Record<string, string> = {}) => {
     res.statusCode = status;
     res.setHeader("Content-Type", contentType);
     res.setHeader("X-Content-Type-Options", "nosniff");
@@ -290,6 +291,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     const organizationalExecution = new OrganizationalExecutionCoordinator(persistence);
     if (options.securityEventLogger) organizationalExecution.setSecurityLogger(options.securityEventLogger);
     const reports = new ReportsEngine();
+    const reportExport = new ReportExportService(persistence, reports, options.now ?? (() => Date.now()));
     const resilience = new ResilienceAnalyticsService();
     const impact = new ImpactMeasurementService();
     const improvement = new ContinuousImprovementEngine();
@@ -368,6 +370,53 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
         return model;
     };
 
+    /**
+     * Single source of truth for report content. The canonical `ReportsEngine`
+     * remains the report owner; this composes the already-persisted, verified
+     * tenant-scoped results into structured sections that both the JSON report
+     * endpoint and the real file export path consume unchanged.
+     */
+    const buildReportSections = (
+        session: CommercialSession,
+        result: StoredAnalysis,
+        workbench: ExecutiveIntelligenceWorkbenchResult | undefined,
+        analytics: StoredAnalytics | undefined,
+    ): ReportSection[] => {
+        const sections: ReportSection[] = [
+            { heading: "Overview", lines: [`Tenant: ${session.tenantId}`, `Source: ${result.source.sourceName}`] },
+            {
+                heading: "Financial statement",
+                lines: [
+                    `Revenue: ${result.metrics.revenue}`,
+                    `Profit: ${result.metrics.profit}`,
+                    `Profit margin: ${result.metrics.profitMargin}`,
+                    `Debt ratio: ${result.metrics.debtRatio}`,
+                ],
+            },
+            { heading: "Observations", lines: [`Observations: ${result.observations.map((item) => item.message).join(" | ")}`] },
+        ];
+        if (workbench) {
+            sections.push({ heading: "Recommendations", lines: [`Recommendations: ${workbench.recommendations.map((item) => item.action).join(" | ")}`] });
+        }
+        if (analytics) {
+            const parts: string[] = [];
+            if (analytics.ratios?.profitability?.status === "READY") parts.push(`Net margin: ${analytics.ratios.profitability.netMargin}`);
+            if (analytics.ratios?.leverage?.status === "READY") parts.push(`Debt/equity: ${analytics.ratios.leverage.debtToEquity}`);
+            if (analytics.breakEven?.status === "READY") parts.push(`Break-even units: ${analytics.breakEven.breakEvenUnits}`);
+            if (analytics.forecast?.linearTrend.status === "READY") parts.push(`Cash-flow trend forecast: ${analytics.forecast.linearTrend.forecast}`);
+            if (analytics.anomalies) {
+                const alerts = [
+                    ...analytics.anomalies.zscore.points,
+                    ...analytics.anomalies.iqr.points,
+                    ...analytics.anomalies.modifiedZ.points
+                ].filter((point) => point.flag === "ALERT").length;
+                parts.push(`Anomaly alerts: ${alerts}`);
+            }
+            if (parts.length) sections.push({ heading: "Financial analytics", lines: [`Financial analytics: ${parts.join(" | ")}`] });
+        }
+        return sections;
+    };
+
     const dashboardPayload = (result: StoredAnalysis, workbench?: ExecutiveIntelligenceWorkbenchResult) => ({
         status: result.status,
         tenantId: result.tenantId,
@@ -426,7 +475,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 return res.end();
             }
             if (req.method === "GET" && path === "/health") return corsJson(200, { status: "ok", service: "hooshyar-commercial-runtime" });
-            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "financial-analytics", "ingested-source-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-workbench", "decision-workbench", "expert-choice", "organizational-execution", "governed-approval", "work-item-lifecycle", "kpi-outcome", "reports", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "rbac", "session-lifecycle"] });
+            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "financial-analytics", "ingested-source-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-workbench", "decision-workbench", "expert-choice", "organizational-execution", "governed-approval", "work-item-lifecycle", "kpi-outcome", "reports", "reports-export", "report-artifact-download", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "rbac", "session-lifecycle"] });
             if (req.method === "GET" && path === "/") return asset(res, "index.html", "text/html; charset=utf-8");
             if (req.method === "GET" && path === "/app.js") return asset(res, "app.js", "text/javascript; charset=utf-8");
             if (req.method === "GET" && path === "/styles.css") return asset(res, "styles.css", "text/css; charset=utf-8");
@@ -801,35 +850,66 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const result = await loadAnalysis(session.tenantId);
                 if (!result) return corsJson(422, { error: "REPORT_ANALYSIS_REQUIRED" });
                 const workbench = await loadWorkbench(session.tenantId);
-                const sections = [
-                    `Tenant: ${session.tenantId}`,
-                    `Source: ${result.source.sourceName}`,
-                    `Revenue: ${result.metrics.revenue}`,
-                    `Profit: ${result.metrics.profit}`,
-                    `Profit margin: ${result.metrics.profitMargin}`,
-                    `Debt ratio: ${result.metrics.debtRatio}`,
-                    `Observations: ${result.observations.map((item) => item.message).join(" | ")}`,
-                ];
-                if (workbench) sections.push(`Recommendations: ${workbench.recommendations.map((item) => item.action).join(" | ")}`);
                 const analytics = await loadAnalytics(session.tenantId);
-                if (analytics) {
-                    const parts: string[] = [];
-                    if (analytics.ratios?.profitability?.status === "READY") parts.push(`Net margin: ${analytics.ratios.profitability.netMargin}`);
-                    if (analytics.ratios?.leverage?.status === "READY") parts.push(`Debt/equity: ${analytics.ratios.leverage.debtToEquity}`);
-                    if (analytics.breakEven?.status === "READY") parts.push(`Break-even units: ${analytics.breakEven.breakEvenUnits}`);
-                    if (analytics.forecast?.linearTrend.status === "READY") parts.push(`Cash-flow trend forecast: ${analytics.forecast.linearTrend.forecast}`);
-                    if (analytics.anomalies) {
-                        const alerts = [
-                            ...analytics.anomalies.zscore.points,
-                            ...analytics.anomalies.iqr.points,
-                            ...analytics.anomalies.modifiedZ.points
-                        ].filter((point) => point.flag === "ALERT").length;
-                        parts.push(`Anomaly alerts: ${alerts}`);
-                    }
-                    if (parts.length) sections.push(`Financial analytics: ${parts.join(" | ")}`);
-                }
-                const report = reports.build("HooshyarOS Financial and Executive Report", sections);
+                const flatSections = buildReportSections(session, result, workbench, analytics).flatMap((section) => section.lines);
+                const report = reports.build("HooshyarOS Financial and Executive Report", flatSections);
                 return corsJson(report.status === "READY" ? 200 : 422, { ...report, tenantId: session.tenantId, source: result.source });
+            }
+
+            if (req.method === "POST" && path === "/api/report/export") {
+                if (!ensurePermission("READ_DASHBOARD")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                const body = await readJson(req);
+                const format = String(body.format ?? "TXT").trim().toUpperCase();
+                if (!SUPPORTED_REPORT_FORMATS.includes(format as ReportFormat)) {
+                    return corsJson(400, { error: "REPORT_FORMAT_UNSUPPORTED" });
+                }
+                const result = await loadAnalysis(session.tenantId);
+                if (!result) return corsJson(422, { error: "REPORT_ANALYSIS_REQUIRED" });
+                const workbench = await loadWorkbench(session.tenantId);
+                const analytics = await loadAnalytics(session.tenantId);
+                const exported = await reportExport.generate({
+                    tenantId: session.tenantId,
+                    title: "HooshyarOS Financial and Executive Report",
+                    sections: buildReportSections(session, result, workbench, analytics),
+                    format: format as ReportFormat,
+                    metadata: {
+                        "Source": result.source.sourceName,
+                        "Source type": result.source.sourceType,
+                        "Source SHA-256": result.source.sha256,
+                        "Generated by": "ReportsEngine"
+                    },
+                    sourceRef: `financial-ingestion:${result.source.sha256}`
+                });
+                if (exported.status !== "READY") return corsJson(422, { status: "BLOCKED", error: exported.reason });
+                return corsJson(201, {
+                    status: "READY",
+                    tenantId: session.tenantId,
+                    capabilityId: reportExport.capabilityId,
+                    targetEngine: reportExport.targetEngine,
+                    artifact: exported.artifact,
+                    downloadUrl: exported.downloadPath
+                });
+            }
+
+            if (req.method === "GET" && path === "/api/report/artifacts") {
+                if (!ensurePermission("READ_DASHBOARD")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                const artifacts = await reportExport.list(session.tenantId);
+                return corsJson(200, { status: "READY", tenantId: session.tenantId, artifacts });
+            }
+
+            if (req.method === "GET" && path.startsWith("/api/report/artifacts/") && path.endsWith("/download")) {
+                if (!ensurePermission("READ_DASHBOARD")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                const artifactId = decodeURIComponent(path.slice("/api/report/artifacts/".length, path.length - "/download".length));
+                const artifact = await reportExport.read(session.tenantId, artifactId);
+                if (!artifact) return corsJson(404, { error: "REPORT_ARTIFACT_NOT_FOUND" });
+                send(res, 200, artifact.metadata.contentType, artifact.content, {
+                    ...corsHeaders(corsOrigin),
+                    "Content-Disposition": `attachment; filename="${artifact.metadata.fileName}"`,
+                    "Content-Length": String(artifact.metadata.byteLength),
+                    "Cache-Control": "no-store",
+                    "X-Artifact-SHA256": artifact.metadata.sha256
+                });
+                return;
             }
 
             if (req.method === "POST" && path === "/api/assistant") {
