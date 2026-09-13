@@ -577,3 +577,48 @@ No change to `productComplete`, `commercialProductRuntimeComplete`, or `external
 ### 31.8 Next candidate knot (candidate, not executed)
 
 `assurance.stale-test-reconciliation` — align the 5 remaining stale suites with current frozen contracts by strengthening (never weakening) assertions.
+
+---
+
+## 32. Assurance knot — `assurance.stale-test-reconciliation` executed (verification-base assurance)
+
+**Knot:** reconcile the five remaining stale suites (`GovernanceEngine.test.ts`, `KiloCodeExecutionAdapterObservability.test.ts`, and the three phase-09 analytics duplicates) to current frozen contracts.
+**Trusted baseline at execution:** `git rev-parse HEAD` = `a0f0018c43f910c7dcd5e4c025bd2b2a74ec27a8` (`fix/autonomous-product-factory`).
+**Classification:** TEST RECONCILIATION. No architecture change; Architecture Freeze V4.1 preserved; no engine, interface, product capability or runtime route changed.
+**Checkpoint:** `.kilo/plans/assurance-stale-test-reconciliation-checkpoint.md`.
+
+### 32.1 Independent confirmation of the defect
+
+Fresh full-suite run at this HEAD showed the five suites failing to compile (0 tests): `GovernanceEngine.test.ts` asserted `initialize().status` against frozen `Engine.initialize(): void` (`Core/Engine.ts:6`); `KiloCodeExecutionAdapterObservability.test.ts` called `buildWindowsKiloScript` with 2 args against frozen arity 1 (`KiloCodeExecutionAdapter.ts:113`); the three phase-09 suites targeted superseded service shapes. Confirmed by direct owner inspection and the full-suite output captured at `.kilo/evidence/jest-full-stage1.txt`.
+
+### 32.2 Repair (test-only, strengthened)
+
+- `GovernanceEngine.test.ts`: void `initialize()`; `name`/`health()`; real `evaluate({action:"CREATE_RESOURCE", securityContext})` → `ALLOWED`, empty `appliedPolicies`, defined `traceId`, `confidence {source:"unavailable"}`.
+- `KiloCodeExecutionAdapterObservability.test.ts`: 1-arg builder; incremental `$stdoutOffset`/`$stderrOffset` streaming, `HEARTBEAT`/`Start-Sleep -Seconds 5`, `.cmd/.bat` → `cmd.exe`, PID-file-after-`Start-Process`, timeout→`taskkill`→`exit 124`.
+- Phase-09 `BreakEven`/`CashFlow`/`ExponentialSmoothing`: current canonical contracts (`analyze/marginOfSafety/margins`; `naive/movingAverage/linearTrend`; `ses(history,alpha)`) with strengthened fail-closed, alpha-boundary and non-finite assertions.
+
+No obsolete API restored; no assertion weakened; no test deleted.
+
+### 32.3 Verification evidence
+
+- Focused: 5 suites / **32 tests passed**.
+- Regression: 11 suites / **97 tests passed** (both GovernanceEngine companions, both Kilo adapters, 3× phase-09 + 3× non-phase analytics).
+- Changed-file typecheck `tsc --noEmit`: **exit 0**.
+- Full suite (`jest --silent`, evidence `.kilo/evidence/jest-full-stage1.txt`): **255/259 suites passed; 1943/1945 tests passed**. Exactly the five stale suites were removed from the failure set; no new failure introduced.
+
+### 32.4 Remaining failure classification (after repair)
+
+| Suite | Class |
+|---|---|
+| `LocalFolderWatcher.test.ts` | ENVIRONMENT GAP (Windows libuv `fs-event.c:72` native abort; worker retry limit) |
+| `OcrAdapter.test.ts` | ENVIRONMENT GAP (`tesseract.js` absent from the dependency graph) |
+| `CommercialRuntimePersistenceRecovery.test.ts` | TIMING/RESOURCE FLAKE (passes in isolation) |
+| `Autonomous/Runtime/KiloCodeExecutionAdapter.test.ts` | TIMING/RESOURCE FLAKE (real Windows parent+child timeout; passes in isolation) |
+
+### 32.5 Truth boundary
+
+No change to `productComplete`, `commercialProductRuntimeComplete` or `externalProductionDependenciesComplete`. No delivered commercial capability touched. No assertion weakened, no test skipped or deleted, no obsolete API restored, no fabricated tenant ID or impact evidence. `LocalFolderWatcher` and OCR work were not touched.
+
+### 32.6 Next candidate knot (not executed)
+
+`assurance.local-folder-watcher-lifecycle` — bounded, isolated diagnosis of the Windows libuv native abort so it is neither hidden nor allowed to destabilize the full suite.

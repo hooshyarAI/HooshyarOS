@@ -1,0 +1,81 @@
+# HooshyarOS — Autonomous Commercialization Execution Queue
+
+**Branch:** `fix/autonomous-product-factory`
+**Queue derived from:** `.kilo/plans/ACTIVE-COMMERCIALIZATION-MASTER-LEDGER.md` (fresh audit at `a0f0018c`)
+**Status:** ACTIVE — self-replanning after every stage
+**Rule:** Derived from the fresh audit; never invented in advance. One coherent root cause = one bounded change set = one test boundary = one commit.
+
+---
+
+## Per-stage mandatory flow
+
+```
+DISCOVER → DEFINE bounded scope → INSPECT canonical owner/architecture
+→ IMPLEMENT minimal complete repair → ADD/strengthen behavioral tests
+→ VERIFY focused → VERIFY relevant regression → VERIFY changed-file static/typechecks
+→ VERIFY runtime where applicable → CLASSIFY remaining failures
+→ WRITE CHECKPOINT → STAGE ONLY stage files → ONE COMMIT → PUSH
+→ VERIFY LOCAL == ORIGIN == LS-REMOTE → RE-AUDIT → SELECT NEXT
+```
+
+State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINTED → COMPLETE`.
+
+---
+
+## Queue (ranked)
+
+| Order | Stage ID | Source ledger | Scope (bounded) | Canonical owner | Safety | Status |
+|---|---|---|---|---|---|---|
+| 1 | `assurance.stale-test-reconciliation` | V1–V5 | Reconcile 5 stale suites to current frozen contracts (Governance Engine void-init; Kilo script 1-arg; 3× phase-09 services) | test files only; contracts already frozen | HIGH | **COMPLETE** |
+| 2 | `assurance.local-folder-watcher-lifecycle` | E1 | Diagnose + fix Windows libuv native abort (watcher lifecycle vs test teardown) or record explicit reproducible exclusion; **isolated** | LocalFolderWatcher owner + test | MEDIUM | **EXECUTING** |
+| 3 | `security.auth-route-rate-limiting` | S2 | Apply existing limiter to `/api/session` + `/api/auth/login`; negative 429 test | `CommercialRuntimeServer` | HIGH | PLANNED |
+| 4 | `product.web-password-auth` | S1 | Real register/login in web UI via existing `/api/auth/*` (no new engine) | `web/` + runtime auth | MEDIUM | PLANNED |
+| 5 | `security.http-boundary-tenant-object-authz` | S5,S7 | Invoke `TenantIsolation.checkAccess()` + explicit object-owner check at HTTP boundary | `TenantIsolation`, runtime routes | MEDIUM | PLANNED |
+| 6 | `observability.metrics-and-request-trace` | S6 | Additive metrics + structured request trace (no architecture change) | runtime diagnostics | MEDIUM | PLANNED |
+| 7 | `standardization.pagination-and-idempotency` | S3,S4 | Bounded `limit/offset` on list routes; idempotency keys on mutating POSTs | runtime | MEDIUM | PLANNED |
+| 8 | `assurance.ocr-environment-gap` | E2 | Resolve only if runtime contract requires; else record explicit, non-hidden gap | `OcrAdapter` | HIGH | PLANNED |
+| 9 | `assurance.flake-containment` | F1,F2 | Analyze + contain parallel-load resource contention (timeouts/serial projects) without hiding real failures | test config + affected tests | HIGH | PLANNED |
+| 10 | `standardization.architecture-doc-registry-reconciliation` | C8 | Reconcile LifecycleManager tier drift + stale dormant labels to repository truth | docs/registry | HIGH | PLANNED |
+| 11 | `assurance.construction-remote-attestation` | C9 | Independent GitHub-remote verification at phase end | `LocalConstructionToolset` | MEDIUM | PLANNED |
+| 12 | `product.offline-sync` | C1 | Wire existing `SyncStateStore` owner (no rebuild) | `Product/SyncStateStore.ts` | MEDIUM | PLANNED |
+| — | `security.encryption-at-rest` | C5 | BLOCKED — ARCHITECTURE CHANGE CONTROL / pending human 05C approval | 05C decisions | — | BLOCKED |
+| — | `product.billing-entitlements` | C2 | BLOCKED_EXTERNAL_DEPENDENCY (payment provider account/webhook) | — | — | BLOCKED_EXTERNAL |
+| — | `deployment.cloud-production` | C4 | BLOCKED_EXTERNAL_DEPENDENCY (cloud/DNS/TLS credentials) | — | — | BLOCKED_EXTERNAL |
+
+---
+
+## Stage 1 — `assurance.stale-test-reconciliation`
+
+**State:** COMPLETE
+**Baseline SHA:** `a0f0018c43f910c7dcd5e4c025bd2b2a74ec27a8`
+**Result:** 5 reconciled suites green (32/32 focused); 11-suite regression 97/97; changed-file typecheck exit 0; full suite **255/259 suites, 1943/1945 tests**. Remaining failures = E1, E2, F1, and the last Kilo/pid-file adapter (F2). No assertion weakened; no test deleted; no obsolete API restored.
+**Bounded scope:** exactly the 5 stale suites. No engine, product capability, runtime, or frozen interface changes.
+
+**DISCOVER / INSPECT (done):**
+- `Core/Engine.ts:6` — `initialize(): void` (frozen; do not change).
+- `GovernanceEngine.test.ts` asserts `.status` on void → compile fail. Canonical behavior already covered by `GovernanceEngine.06-F.test.ts` and `GovernanceEngine.phase-11-1.6.test.ts`.
+- `KiloCodeExecutionAdapter.ts:113` — `buildWindowsKiloScript(payloadPath: string)` (1 arg). Test passes 2 args and asserts removed `$timeoutMs`/`$startTime` text.
+- `BreakEvenAnalysisService.ts` — current contract `analyze(BreakEvenAnalysisInput)`, `marginOfSafety(actualUnits, breakEvenUnits)`, `margins(MarginsInput)`. Phase-09 test targets superseded shapes.
+- `CashFlowForecastingService.ts` — current contract `naive(history)`, `movingAverage(history, window)`, `linearTrend(history)`; no horizon/`points`.
+- `ExponentialSmoothingService.ts` — current contract `ses(history, alpha)` returning `{smoothed,status}`; blocks `alpha<=0`/`>=1`; no `fitted/points/inSampleMae`.
+- Roadmap/checkpoint evidence (`phase-09-final-checkpoint.md:74-79`) confirms the current simpler methods are the canonical contract.
+
+**Decision:** Reconcile (rewrite) the 5 suites to test the **current frozen behavior with strengthened assertions**. No obsolete API restored; no test deleted; no assertion weakened.
+
+**Prerequisites:** none.
+
+**Expected evidence after repair:**
+- Focused: 5 suites green with real assertions (all currently 0 tests).
+- Regression: governance + kilo + product-service suites green.
+- Changed-file typecheck: exit 0.
+- Full-suite failure set reduced by exactly 5 (no new failures).
+
+**Checkpoint:** `.kilo/plans/assurance-stale-test-reconciliation-checkpoint.md`
+
+**DO-NOT-REPEAT:** do not change `Core/Engine.ts`; do not re-add `unitsSold`-required/`points`/`fitted`/`inSampleMae` APIs; do not delete the phase-09 files; do not touch `LocalFolderWatcher` or OCR in this stage.
+
+---
+
+## Self-replanning rule
+
+After stage 1 verifies, re-audit the affected verification area, refresh this queue, and advance to the next highest-value **safe** stage automatically. Stop only on: all repository-local items VERIFIED COMPLETE; genuine EXTERNAL BLOCKER; required ARCHITECTURE CHANGE CONTROL; or a safety/integrity condition.
