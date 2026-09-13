@@ -17,6 +17,7 @@ async function refreshDashboard() {
     document.querySelector('#revenue').textContent = Number(dashboard.metrics?.revenue ?? 0).toLocaleString('fa-IR');
     document.querySelector('#profit').textContent = Number(dashboard.metrics?.profit ?? 0).toLocaleString('fa-IR');
     document.querySelector('#risk').textContent = `${Number(dashboard.metrics?.risk ?? 0).toLocaleString('fa-IR')}٪`;
+    await refreshAnalyticsSources();
   } catch (error) {
     document.querySelector('#readiness').textContent = `برای ادامه ابتدا نشست ایجاد کنید: ${error.message}`;
   }
@@ -85,8 +86,7 @@ document.querySelector('#analysis-form').addEventListener('submit', async event 
       })
     });
     result.textContent = `تحلیل موفق (${format}): سود ${Number(analysis.metrics.profit).toLocaleString('fa-IR')}، نسبت بدهی ${Number(analysis.metrics.debtRatio * 100).toLocaleString('fa-IR')}٪. وضعیت: ${analysis.status}`;
-    await refreshDashboard();
-  } catch (error) {
+    await refreshDashboard();  } catch (error) {
     result.textContent = `تحلیل ناموفق بود: ${error.message}`;
   }
 });
@@ -369,6 +369,78 @@ document.querySelector('#improvement-form').addEventListener('submit', async eve
     result.textContent = JSON.stringify(payload, null, 2);
   } catch (error) {
     result.textContent = `تحلیل بهبود ناموفق بود: ${error.message}`;
+  }
+});
+
+function parseNumberList(value) {
+  const parts = String(value || '').split(',').map(part => part.trim()).filter(Boolean);
+  if (!parts.length) return null;
+  const numbers = parts.map(Number);
+  return numbers.every(Number.isFinite) ? numbers : null;
+}
+
+async function refreshAnalyticsSources() {
+  const select = document.querySelector('#analytics-source');
+  if (!select) return;
+  try {
+    const payload = await getJson('/api/sources');
+    const current = select.value;
+    select.innerHTML = '<option value="">— انتخاب منبع —</option>';
+    for (const source of payload.sources || []) {
+      const option = document.createElement('option');
+      option.value = source.sha256;
+      option.textContent = `${source.sourceName} (${source.format})`;
+      select.appendChild(option);
+    }
+    if (current) select.value = current;
+  } catch {
+    select.innerHTML = '<option value="">— ابتدا نشست ایجاد کنید —</option>';
+  }
+}
+
+document.querySelector('#analytics-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const result = document.querySelector('#analytics-result');
+  try {
+    const body = {};
+    const sourceSha256 = document.querySelector('#analytics-source').value;
+    if (sourceSha256) body.sourceSha256 = sourceSha256;
+    const series = parseNumberList(document.querySelector('#analytics-series').value);
+    if (series) body.series = series;
+    const statementText = document.querySelector('#analytics-statement').value.trim();
+    if (statementText) body.statement = JSON.parse(statementText);
+    const priceField = document.querySelector('#analytics-price').value;
+    const fixed = Number(document.querySelector('#analytics-fixed').value);
+    const variable = Number(document.querySelector('#analytics-variable').value);
+    const price = Number(priceField);
+    const units = Number(document.querySelector('#analytics-units').value);
+    if (priceField !== '' && [fixed, variable, price, units].every(Number.isFinite)) {
+      body.breakEven = { fixedCosts: fixed, variableCostPerUnit: variable, pricePerUnit: price, unitsSold: units };
+    }
+    const payload = await getJson('/api/financial/insights', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const summary = { status: payload.status, source: payload.source?.sourceName, ingestedTransactions: payload.ingestedSource?.transactionCount };
+    if (payload.ratios) {
+      summary.ratios = {
+        verticalRows: payload.ratios.vertical?.rows?.length ?? 0,
+        profitability: payload.ratios.profitability,
+        leverage: payload.ratios.leverage
+      };
+    }
+    if (payload.breakEven) summary.breakEven = payload.breakEven;
+    if (payload.forecast) summary.forecast = { naive: payload.forecast.naive, movingAverage: payload.forecast.movingAverage, linearTrend: payload.forecast.linearTrend };
+    if (payload.anomalies) {
+      summary.anomalies = {
+        zscoreAlerts: payload.anomalies.zscore.points.filter(point => point.flag !== 'NORMAL').length,
+        iqrAlerts: payload.anomalies.iqr.points.filter(point => point.flag !== 'NORMAL').length
+      };
+    }
+    result.textContent = JSON.stringify(summary, null, 2);
+  } catch (error) {
+    result.textContent = `تحلیل پیشرفته ناموفق بود: ${error.message}`;
   }
 });
 

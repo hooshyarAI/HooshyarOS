@@ -108,9 +108,29 @@ async function main() {
     if (dashboardA.status !== 200 || dashboardA.body.metrics?.profit !== 400 || dashboardA.body.tenantId !== tenantA.tenantId) throw new Error('TENANT_A_DATA_INVALID');
     if (dashboardB.status !== 200 || dashboardB.body.metrics?.profit !== 850 || dashboardB.body.tenantId !== tenantB.tenantId) throw new Error('TENANT_B_DATA_INVALID');
 
+    const analyticsA = await request('/api/financial/insights', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: tenantA.cookie },
+      body: JSON.stringify({ series: [1000, 1200, 900, 1400] })
+    });
+    if (analyticsA.status !== 200 || analyticsA.body.status !== 'READY' || analyticsA.body.tenantId !== tenantA.tenantId) throw new Error('SECURITY_ANALYTICS_A_FAILED');
+
+    const analyticsBLeak = await request('/api/financial/insights/latest', { headers: { cookie: tenantB.cookie } });
+    if (analyticsBLeak.status !== 404) throw new Error('ANALYTICS_CROSS_TENANT_LEAK');
+
+    const analyticsB = await request('/api/financial/insights', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: tenantB.cookie },
+      body: JSON.stringify({ series: [500, 700, 650, 800] })
+    });
+    if (analyticsB.status !== 200 || analyticsB.body.tenantId !== tenantB.tenantId) throw new Error('SECURITY_ANALYTICS_B_FAILED');
+
+    const analyticsALatest = await request('/api/financial/insights/latest', { headers: { cookie: tenantA.cookie } });
+    if (analyticsALatest.status !== 200 || analyticsALatest.body.tenantId !== tenantA.tenantId || analyticsALatest.body.forecast?.naive?.forecast !== 1400) throw new Error('ANALYTICS_TENANT_A_LATEST_INVALID');
+
     const evidence = {
       type: 'SECURITY_TENANT_ACCEPTANCE_SUCCESS',
-      version: 1,
+      version: 2,
       status: 'PASS',
       createdAt: new Date().toISOString(),
       repository: root,
@@ -121,7 +141,7 @@ async function main() {
         { tenantId: tenantA.tenantId, expectedProfit: tenantA.expectedProfit },
         { tenantId: tenantB.tenantId, expectedProfit: tenantB.expectedProfit }
       ],
-      acceptance: ['unauthenticated-dashboard-denied', 'unauthenticated-analyze-denied', 'distinct-tenant-identities', 'tenant-a-data-isolated', 'tenant-b-data-isolated']
+      acceptance: ['unauthenticated-dashboard-denied', 'unauthenticated-analyze-denied', 'distinct-tenant-identities', 'tenant-a-data-isolated', 'tenant-b-data-isolated', 'analytics-tenant-scoped', 'analytics-cross-tenant-read-denied']
     };
     fs.writeFileSync(evidencePath, JSON.stringify(evidence, null, 2), 'utf8');
     console.log(JSON.stringify(evidence, null, 2));

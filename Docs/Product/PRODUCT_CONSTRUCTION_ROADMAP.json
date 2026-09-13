@@ -54,6 +54,21 @@
       "implementationPath": "Backend/HBOS/Product/OrganizationalExecutionCoordinator.ts",
       "testPath": "Backend/HBOS/test/OrganizationalExecutionCoordinator.test.ts",
       "documentationPath": "Docs/Product/OrganizationalExecutionCoordinator.md"
+    },
+    {
+      "capabilityId": "product.financial-analytics",
+      "capability": "expose explainable financial analytics (ratios, break-even, cash-flow forecasting and anomaly detection) over the canonical ingested source and structured statement inputs",
+      "targetEngine": "Financial Intelligence Engine",
+      "dependencies": ["Financial Intelligence Engine", "Ratio Analysis Service", "Break Even Analysis Service", "Cash Flow Forecasting Service", "Anomaly Detection Service"],
+      "implementationPath": "Backend/HBOS/Product/FinancialAnalyticsService.ts",
+      "testPath": "Backend/HBOS/test/FinancialAnalyticsService.test.ts",
+      "documentationPath": "Docs/Product/FinancialAnalyticsService.md",
+      "acceptanceCriteria": [
+        "composes the existing realized analytics services without reimplementing financial mathematics",
+        "exposes the analytics through the tenant-scoped, RBAC-guarded runtime and browser surface",
+        "each section fails closed with the owning service's BLOCKED status rather than fabricating values",
+        "focused unit, runtime and application acceptance evidence exists"
+      ]
     }
   ]
 }

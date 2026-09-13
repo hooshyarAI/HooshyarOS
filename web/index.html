@@ -105,6 +105,22 @@
     </section>
 
     <section class="card onboarding">
+      <h2>تحلیل مالی پیشرفته</h2>
+      <p>نسبت‌ها، سربه‌سر، پیش‌بینی جریان نقدی و ناهنجاری از منبع داده معتبر یا ورودی ساخت‌یافته. بخش بدون داده کافی به‌صورت BLOCKED بسته می‌شود.</p>
+      <form id="analytics-form">
+        <label>منبع داده<select id="analytics-source"><option value="">— انتخاب منبع —</option></select></label>
+        <label>سری زمانی (اختیاری)<input id="analytics-series" placeholder="1000, 1200, 950, 1400" /></label>
+        <label>هزینه ثابت<input id="analytics-fixed" type="number" step="0.01" /></label>
+        <label>هزینه متغیر هر واحد<input id="analytics-variable" type="number" step="0.01" /></label>
+        <label>قیمت هر واحد<input id="analytics-price" type="number" step="0.01" /></label>
+        <label>تعداد فروش<input id="analytics-units" type="number" step="0.01" /></label>
+        <label class="analytics-wide">صورت مالی ساخت‌یافته (اختیاری، JSON)<textarea id="analytics-statement" rows="4" placeholder='{"revenue":1000,"cogs":600,"grossProfit":400,"operatingExpenses":200,"operatingIncome":200,"interest":20,"preTaxIncome":180,"taxes":30,"netIncome":150,"cash":100,"receivables":200,"inventory":150,"currentAssets":450,"ppe":550,"totalAssets":1000,"payables":120,"shortTermDebt":80,"currentLiabilities":200,"longTermDebt":200,"totalLiabilities":400,"equity":600}'></textarea></label>
+        <button class="primary" type="submit">تحلیل پیشرفته</button>
+      </form>
+      <pre id="analytics-result" class="result" aria-live="polite"></pre>
+    </section>
+
+    <section class="card onboarding">
       <h2>اجرای سازمانی و گردش کار حاکمیتی</h2>
       <p>تصمیم تأییدشده را به کار واگذارشده با مسئول، موعد، KPI، شواهد و بازخورد تبدیل کنید. تأیید انسانی و مرز tenant الزامی است.</p>
       <form id="execution-form">

@@ -33,3 +33,5 @@ select { width: 100%; padding: 12px 13px; border: 1px solid #cbd5e1; border-radi
 .execution-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .execution-actions button { border: 1px solid #cbd5e1; border-radius: 10px; padding: 8px 12px; background: white; font: inherit; cursor: pointer; }
 @media (max-width: 760px) { .execution-controls { grid-template-columns: 1fr; } }
+.analytics-wide { grid-column: 1 / -1; }
+.analytics-wide textarea { width: 100%; padding: 12px 13px; border: 1px solid #cbd5e1; border-radius: 10px; font: inherit; resize: vertical; }

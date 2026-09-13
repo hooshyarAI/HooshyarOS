@@ -2,7 +2,7 @@
 
 **Status:** ACTIVE
 **Branch:** `fix/autonomous-product-factory`
-**HEAD at audit:** `fea1b22d` (decision-workbench checkpoint; Layer 8 base)
+**HEAD at audit:** `68ddc9c1` (organizational-execution checkpoint; Layer 8 complete)
 **Architecture baseline:** Architecture Freeze V4.1
 **Rule:** One canonical plan file for this mission. Do not create one plan per micro-variation.
 
@@ -30,7 +30,7 @@
 
 - Working tree: clean apart from pre-existing unrelated modifications (`.kilo/agents/hooshyar-construction.md`,
   `package-lock.json`) and untracked scratch/backup files. These are **not** touched.
-- Local HEAD == `origin/fix/autonomous-product-factory` == `c769c184`.
+- Local HEAD == `origin/fix/autonomous-product-factory` == `68ddc9c1` after Layer 8 (`226a716a` capability + `68ddc9c1` checkpoint doc). Both Layer-8 commits are pushed.
 - Runnable runtime: `npm run start:commercial` → `Backend/HBOS/Autonomous/Runtime/start-commercial-runtime.ts`
   on `HOOSHYAR_PORT` (default 4173).
 - Canonical product layer lives in `Backend/HBOS/Product/`; engines in `Backend/HBOS/Engines/`; runtime in
@@ -94,7 +94,7 @@ executive workbench, resilience/impact/improvement, or engine math is permitted.
 | 2 | Identity/users/orgs | VERIFIED COMPLETE | password recovery/SSO not in MVP scope |
 | 3 | Multi-tenancy/authorization | VERIFIED COMPLETE | fine-grained resource policies beyond 4 permissions later |
 | 4 | Data ingestion/canonical data | INTEGRATED | enterprise connectors/PDF unwired (deliberate) |
-| 5 | Financial intelligence | INTEGRATED | ratio/break-even/anomaly services not exposed via runtime |
+| 5 | Financial intelligence | **PARTIAL / DISCONNECTED SERVICES** | `financial/analyze` exposes only 4 metrics; `RatioAnalysisService`, `BreakEvenAnalysisService`, `CashFlowForecastingService`, `AnomalyDetectionService` implemented + unit-tested but unreachable from runtime (this knot) |
 | 6 | Executive/managerial | INTEGRATED | KPI history/drill-down UI limited |
 | 7 | Decision intelligence / Expert Choice | **PARTIAL / NONSTANDARD** | `DecisionWorkbench` is a stub; `DecisionIntelligenceEngine` (AHP/TOPSIS/decisionTree) + `OrchestratedDecisionIntelligenceService` disconnected; no decision endpoint/UI |
 | 8 | Organizational execution | **INTEGRATED / VERIFIED** | real decision→approval→workflow→assignment→due date→KPI/outcome→evidence→feedback path wired through `OrganizationalExecutionCoordinator` + runtime + UI; no duplicate workflow engine |
@@ -147,7 +147,7 @@ ingest/analyze, executive workbench, report, assistant, dashboard, resilience, i
 | `product.decision-workbench` | `Product/DecisionWorkbench.ts` | stub / disconnected engine math | **COMPLETE EXISTING OWNER (this knot)** |
 | `product.organizational-execution` | `Product/OrganizationalExecutionCoordinator.ts` | **COMPLETE EXISTING OWNER (this knot)** | governed human approval + work lifecycle + persistence + runtime + UI |
 | Reports export/download | `Engines/ReportsEngine.ts` + runtime | missing export | later knot |
-| Financial service endpoints (ratios/break-even/anomaly) | `Product/*Service.ts` | disconnected | later knot (contract layer 5) |
+| Financial service endpoints (ratios/break-even/anomaly/cash-flow) | `Product/*Service.ts` | disconnected | **COMPLETE EXISTING OWNERS (this knot)** — compose via `FinancialAnalyticsService` + runtime + web |
 | Offline/online sync | `Product/SyncStateStore.ts` | disconnected | later phase |
 | Billing/entitlements | — | missing | later phase |
 
@@ -168,8 +168,8 @@ IntegrationImpact .10 + StandardizationImpact .05 + ImplementationSafety .10.
 |------|------|-----------------|--------|
 | 1 | **`product.decision-workbench`** (Expert Choice) | core product differentiator; unblocks org-execution; wires 1 engine + 1 owner + runtime + UI | HIGH (engine math already tested) |
 | 2 | **`product.organizational-execution`** | depends on decision approval; layer 8 — DELIVERED, no new owner | **DONE / VERIFIED** |
-| 3 | Financial service API integration (ratios/break-even/anomaly) | contract layer 5 | HIGH |
-| 4 | Reports export/download | contract layer 9 | HIGH |
+| 3 | **Financial service API integration (ratios/break-even/cash-flow/anomaly)** | contract layer 5; 4 realized owners disconnected; reuses tested deterministic math | **DONE / VERIFIED (this knot)** |
+| 4 | Reports export/download | contract layer 9 | HIGH (next knot) |
 | 5 | Offline/PWA + sync | layers 10/11 | MEDIUM |
 | 6 | Billing/entitlement | layer 15 | LOW (external) |
 
@@ -223,8 +223,40 @@ IntegrationImpact .10 + StandardizationImpact .05 + ImplementationSafety .10.
 ## 22. Next recommended knot
 
 `product.reports-export` (Layer 9) — expose the existing `ReportsEngine` build/download path through the runtime
-and browser, following the same owner-composition pattern. Alternatively Layer 5 financial-service endpoints
-(ratios/break-even/anomaly) remain disconnected. Both are independent of Layer 8.
+and browser, now enriched by the persisted financial-analytics output. The Layer-5 financial-service endpoints
+(ratios/break-even/cash-flow/anomaly) were completed in this knot via `FinancialAnalyticsService` (see below).
+
+---
+
+## Layer 5 — Financial Analytics: architecture sufficiency decision
+
+**Result: ARCHITECTURE SUFFICIENT — NO ARCHITECTURE CHANGE REQUIRED.**
+
+Evidence (fresh audit at `68ddc9c1`):
+
+- `RatioAnalysisService`, `BreakEvenAnalysisService`, `CashFlowForecastingService`, `AnomalyDetectionService` are
+  fully implemented, deterministic and unit-tested (Phase 09 tests) but referenced **only by their own tests** —
+  genuinely disconnected from the runtime.
+- `FinancialIntelligenceEngine` already owns `analyze`, `npv`, `irr`, `payback`, `workingCapital`, `liquidityRatios`,
+  `roic`, `eva`, `wacc`. It does **not** own vertical/horizontal/profitability/leverage ratios, margins, break-even,
+  statistical cash-flow forecasting or anomaly detection — so the four services are distinct realized owners and no
+  math is duplicated by composing them.
+- `FinancialStatementAnalysisService` is the canonical statement→metrics product boundary; it does not own these
+  analytics. A composition owner (like `OrchestratedDecisionIntelligenceService` / `FinancialIngestionService`) is
+  the correct extension point. No new engine and no duplicated service.
+- RBAC (`INGEST_DATA`/`READ_DASHBOARD`), tenant isolation (`TenantIsolation` + repository boundary),
+  `SQLitePersistenceStore` and canonical source provenance (`financial-ingestion:<sha256>`) already exist.
+
+### Knot `product.financial-analytics` — delivered
+
+- Canonical owner completed (composed, not duplicated): `Backend/HBOS/Product/FinancialAnalyticsService.ts`
+  composes the four existing realized services into one explainable tenant-scoped result. It contains no new math.
+- Runtime: `POST /api/financial/insights` (RBAC `INGEST_DATA`, rate-limited, fail-closed) and
+  `GET /api/financial/insights/latest` (RBAC `READ_DASHBOARD`), tenant-scoped persistence, canonical-source
+  provenance when `sourceSha256` is supplied (series derived from canonical net cash movement).
+- Product surface: advanced financial-analytics card in `web/index.html` + `web/app.js`.
+- Truthful boundary: analytics are deterministic and evidence-based; they are not AI-generated and do not invent
+  thresholds. Sections without sufficient input fail closed (BLOCKED) rather than fabricate values.
 
 ---
 
@@ -276,6 +308,7 @@ human-approved governed-execution path can exist using the existing `Authorizati
 | Historical reconciliation + master plan | VERIFIED | this file | `5f5b62f1` |
 | `product.decision-workbench` | VERIFIED | `DecisionWorkbench.test.ts` 9/9, `DecisionWorkbenchRuntime.test.ts` 5/5; 160/160 decision/runtime regression; full Jest 240/253 suites, 1852/1853 tests; `web-product-acceptance` PASS; `security-tenant-acceptance` PASS | `5f5b62f1` |
 | `product.organizational-execution` (Layer 8) | VERIFIED | `OrganizationalExecutionCoordinator.test.ts` 10/10, `OrganizationalExecutionRuntime.test.ts` 4/4; focused regression 113/113 (15 suites); full Jest 241/254 suites, 1864/1865 tests; `web-product-acceptance` PASS; `security-tenant-acceptance` PASS | `226a716a` |
+| `product.financial-analytics` (Layer 5) | VERIFIED | `FinancialAnalyticsService.test.ts` 7/7, `FinancialAnalyticsRuntime.test.ts` 5/5; owner+runtime regression 29/29 (6 suites); full Jest 244/256 suites, 1877/1877 tests; `web-product-acceptance` v6 PASS; `security-tenant-acceptance` v2 PASS; changed-file typecheck clean | `PENDING` |
 
 ### Knot `product.decision-workbench` — delivered
 

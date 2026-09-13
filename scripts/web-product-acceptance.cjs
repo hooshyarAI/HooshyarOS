@@ -91,6 +91,15 @@ async function main() {
     const sources = await request('/api/sources', { headers: { cookie } });
     if (sources.status !== 200 || !Array.isArray(sources.body.sources) || sources.body.sources.length < 3) throw new Error(`WEB_ACCEPTANCE_SOURCES_FAILED:${sources.status}`);
 
+    // Layer 5: financial analytics composition over the canonical ingested source.
+    await sleep(1100);
+    const analytics = await request('/api/financial/insights', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceSha256: structuredIngest.body.evidence.sha256, breakEven: { fixedCosts: 1000, variableCostPerUnit: 5, pricePerUnit: 10, unitsSold: 300 } }) });
+    if (analytics.status !== 200 || analytics.body.status !== 'READY' || analytics.body.capabilityId !== 'product.financial-analytics' || analytics.body.targetEngine !== 'Financial Intelligence Engine' || analytics.body.breakEven?.breakEvenUnits !== 200 || !Array.isArray(analytics.body.anomalies?.zscore?.points) || analytics.body.source?.sha256 !== structuredIngest.body.evidence.sha256) throw new Error(`WEB_ACCEPTANCE_ANALYTICS_FAILED:${analytics.status}:${JSON.stringify(analytics.body)}`);
+    const analyticsLatest = await request('/api/financial/insights/latest', { headers: { cookie } });
+    if (analyticsLatest.status !== 200 || analyticsLatest.body.capabilityId !== 'product.financial-analytics' || analyticsLatest.body.tenantId !== session.body.tenantId) throw new Error(`WEB_ACCEPTANCE_ANALYTICS_LATEST_FAILED:${analyticsLatest.status}`);
+    const enrichedReport = await request('/api/report', { headers: { cookie } });
+    if (enrichedReport.status !== 200 || !enrichedReport.body.sections.some(section => section.includes('Financial analytics:'))) throw new Error(`WEB_ACCEPTANCE_ANALYTICS_REPORT_FAILED:${enrichedReport.status}`);
+
     // Decision / Expert Choice: explainable multi-criteria evaluation through the real runtime.
     const decision = await request('/api/decision/workbench', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({
       problem: 'انتخاب طرح توسعه',
@@ -135,9 +144,9 @@ async function main() {
     const executionList = await request('/api/execution/work-items', { headers: { cookie } });
     if (executionList.status !== 200 || !Array.isArray(executionList.body.workItems) || !executionList.body.workItems.some(item => item.workItemId === workItemId)) throw new Error(`WEB_ACCEPTANCE_EXECUTION_LIST_FAILED:${executionList.status}`);
 
-    const success = { type: 'WEB_PRODUCT_ACCEPTANCE_SUCCESS', version: 5, status: 'PASS', createdAt: new Date().toISOString(), repository: root, commit: gitCommit(), tenantId: session.body.tenantId, profit: dashboard.body.metrics.profit, acceptance: ['root','health','session','tenant','ingestion','analysis','executive-workbench','report','assistant','dashboard','multi-format-ingestion','structured-analysis','xlsx-analysis','raw-source-evidence','decision-workbench','expert-choice','decision-persistence','organizational-execution','governed-approval','work-item-lifecycle','kpi-outcome','execution-evidence','execution-feedback'] };
+    const success = { type: 'WEB_PRODUCT_ACCEPTANCE_SUCCESS', version: 6, status: 'PASS', createdAt: new Date().toISOString(), repository: root, commit: gitCommit(), tenantId: session.body.tenantId, profit: dashboard.body.metrics.profit, acceptance: ['root','health','session','tenant','ingestion','analysis','executive-workbench','report','assistant','dashboard','multi-format-ingestion','structured-analysis','xlsx-analysis','raw-source-evidence','financial-analytics','financial-analytics-persistence','financial-analytics-report-integration','decision-workbench','expert-choice','decision-persistence','organizational-execution','governed-approval','work-item-lifecycle','kpi-outcome','execution-evidence','execution-feedback'] };
     fs.writeFileSync(evidencePath, JSON.stringify(success, null, 2), 'utf8');
-    console.log(JSON.stringify({ type: 'WEB_PRODUCT_ACCEPTANCE', status: 'PASS', tenantId: session.body.tenantId, profit: dashboard.body.metrics.profit, root: true, session: true, analysis: true, executive: true, report: true, assistant: true, dashboard: true, multiFormat: true, decisionWorkbench: true, organizationalExecution: true }, null, 2));
+    console.log(JSON.stringify({ type: 'WEB_PRODUCT_ACCEPTANCE', status: 'PASS', tenantId: session.body.tenantId, profit: dashboard.body.metrics.profit, root: true, session: true, analysis: true, executive: true, report: true, assistant: true, dashboard: true, multiFormat: true, financialAnalytics: true, decisionWorkbench: true, organizationalExecution: true }, null, 2));
   } finally { await stop(); }
 }
 main().catch((error) => { try { fs.rmSync(evidencePath, { force: true }); } catch {} console.error(JSON.stringify({ type: 'WEB_PRODUCT_ACCEPTANCE', status: 'BLOCKED', error: error.message, platform: process.platform, node: process.version }, null, 2)); process.exitCode = 1; });
