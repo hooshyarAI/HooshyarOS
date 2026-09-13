@@ -11,6 +11,7 @@
 **Stage 2 status:** `assurance.local-folder-watcher-lifecycle` **EXECUTED and VERIFIED** — the abort is a **REAL PRODUCT DEFECT**, not a flake: watching an 8.3 short path (`os.tmpdir()`) aborts libuv (`fs-event.c:72`, `0xC0000409`). Repaired in `LocalFolderWatcher.start()` by canonicalizing with `fs.realpath` before `fs.watch`. Focused 9/9 ×4, regression 37/37, typecheck exit 0, full suite 255/259 suites / 1951/1954 tests with `LocalFolderWatcher` now **PASS**. See audit §33 and `.kilo/plans/assurance-local-folder-watcher-lifecycle-checkpoint.md`.
 **Stage 3 status:** `security.auth-route-rate-limiting` **EXECUTED and VERIFIED** — unauthenticated auth entry points had no limiter (REAL SECURITY DEFECT). Repaired in `CommercialRuntimeServer` with per-client + per-identity token buckets; `/api/auth/login` and password `/api/session` share the identity bucket (no bypass). Focused 10/10, integration regression 16 suites/100 tests, typecheck 0, full suite 257/259. See audit §34 and `.kilo/plans/security-auth-route-rate-limiting-checkpoint.md`.
 **Stage 4 status:** `product.web-password-auth` **EXECUTED and VERIFIED** — the web entrypoint exposed only passwordless `/api/session` and could not register/login. `web/index.html` + `web/app.js` now use the canonical `/api/auth/register|login|logout` backend (no new auth architecture); real HTTP end-to-end test covers register, invalid 401, login, session, authorized vs anonymous route, logout. Focused 2/2, integration 16 suites/101 tests, typecheck 0, full suite 256/259. See audit §35 and `.kilo/plans/product-web-password-auth-checkpoint.md`.
+**Stage 5 status:** `security.http-boundary-tenant-object-authz` **EXECUTED and VERIFIED** — object routes now invoke canonical `TenantIsolation.checkAccess()` at the HTTP boundary and work-item reads enforce an explicit object owner/admin check (same-tenant non-owner → 403 audited; cross-tenant → 404). Focused 6/6, integration 18 suites/117 tests, typecheck 0, full suite 257/259. See audit §36 and `.kilo/plans/security-http-boundary-tenant-object-authz-checkpoint.md`.
 
 ---
 
@@ -76,9 +77,9 @@ The prior audit (`platform-wide-commercialization-conformance-audit.md` §1–§
 | S2 | `/api/session` + `/api/auth/login` not rate-limited | **REAL SECURITY DEFECT (repaired)** | `CommercialRuntimeServer.ts` existing limiter | audit R6; route ordering proves auth handlers run before the session gate | Brute-force/takeover resistance | HIGH security, LOW impl | **VERIFIED COMPLETE** (Stage 3, audit §34) | Per-client + per-identity token buckets; identity bucket shared across `/api/auth/login` and password `/api/session`; fail-closed 429 + Retry-After + security event | focused 10/10 (incl. no-bypass, reset, cross-identity, audit event); regression 16 suites/100 tests |
 | S3 | No pagination on list routes | **STANDARDIZATION GAP** | runtime list routes | audit R4 | Scalability | MEDIUM | ACTIVE | Add bounded `limit/offset` | runtime tests |
 | S4 | No idempotency keys on mutating POSTs | **STANDARDIZATION GAP** | runtime | audit R5 | Duplicate-execution safety | MEDIUM | ACTIVE | Add idempotency on report/execution mutations | runtime tests |
-| S5 | `TenantIsolation.checkAccess()` not invoked at HTTP layer | **DEFENSE-IN-DEPTH GAP** | `Security/TenantIsolation.ts` | audit R2 | Defense-in-depth | MEDIUM | ACTIVE | Wire boundary check where resource ids cross HTTP | runtime tests |
+| S5 | `TenantIsolation.checkAccess()` not invoked at HTTP layer | **DEFENSE-IN-DEPTH GAP (repaired)** | `Security/TenantIsolation.ts` integrated in `CommercialRuntimeServer` | audit R2; guard existed but unwired at HTTP | Defense-in-depth | MEDIUM | **VERIFIED COMPLETE** (Stage 5, audit §36) | `enforceTenantBoundary()` on work-item/source/report-artifact routes; fail closed + TENANT_VIOLATION audit | object-route tests incl. cross-tenant 404 |
 | S6 | No metrics/tracing export | **OBSERVABILITY GAP** | runtime diagnostics | audit §15 | Operational readiness | MEDIUM | ACTIVE | Additive metrics endpoint/structured request trace (no architecture change) | endpoint + test |
-| S7 | Object-level authorization on `GET /api/execution/work-items/:id` is tenant-scope only | **STANDARDIZATION GAP** | `OrganizationalExecutionCoordinator` + route | audit R3 | Explicit owner check | MEDIUM | ACTIVE | Explicit per-object check | negative test |
+| S7 | Object-level authorization on `GET /api/execution/work-items/:id` is tenant-scope only | **DEFENSE-IN-DEPTH GAP (repaired)** | `OrganizationalExecutionCoordinator` + route | audit R3; same-tenant member could read any item | Explicit owner check | MEDIUM | **VERIFIED COMPLETE** (Stage 5, audit §36) | `canAccessWorkItem()` (creator/approver/assignee or ADMINISTER); 403 + audited denial | owner 200 / non-owner 403 / anonymous 401 / cross-tenant 404 |
 
 ### 3.5 Capability / layer gaps
 
@@ -104,7 +105,7 @@ Scoring = commercial value, correctness, security, tenant isolation, runtime int
 2. ~~**E1 — LocalFolderWatcher native abort**~~ — **DONE (Stage 2, audit §33): REAL PRODUCT DEFECT, repaired and verified.**
 3. ~~**S2 — rate-limit auth routes**~~ — **DONE (Stage 3, audit §34): real security defect repaired and verified.**
 4. ~~**S1 — real password auth in web UI**~~ — **DONE (Stage 4, audit §35): product gap repaired and verified.**
-5. **S5/S7 — HTTP-boundary tenant/object authorization defense-in-depth**. Safety: MEDIUM.
+5. ~~**S5/S7 — HTTP-boundary tenant/object authorization defense-in-depth**~~ — **DONE (Stage 5, audit §36).**
 6. **S6 — metrics + request tracing**. Safety: MEDIUM.
 7. **S3/S4 — pagination + idempotency**. Safety: MEDIUM.
 8. **E2 — OCR environment gap** (resolve only if runtime requires; else record). Safety: HIGH.
@@ -137,4 +138,6 @@ Scoring = commercial value, correctness, security, tenant isolation, runtime int
 
 **`product.web-password-auth`** — COMPLETE (Stage 4; audit §35). Web entrypoint now performs real password register/login/logout through the canonical `/api/auth/*` backend; verified HTTP end-to-end including authorization integration.
 
-**Next selected stage: `security.http-boundary-tenant-object-authz` (S5, S7)** — invoke `TenantIsolation.checkAccess()` plus explicit object-owner checks at the HTTP boundary; verify cross-tenant/wrong-owner denial. See the execution queue.
+**`security.http-boundary-tenant-object-authz`** — COMPLETE (Stage 5; audit §36). HTTP object routes invoke canonical `TenantIsolation.checkAccess()` and work-item reads enforce an explicit object owner/admin check.
+
+**Next selected stage: `observability.metrics-and-request-trace` (S6)** — additive request correlation/trace and operation metrics on critical runtime paths using canonical infrastructure. See the execution queue.

@@ -26,6 +26,8 @@ import {
 } from "../../Product/OrganizationalExecutionCoordinator";
 import { SecurityContext } from "../../Security/SecurityContext";
 import { Principal } from "../../Security/Principals";
+import { TenantIsolation } from "../../Security/TenantIsolation";
+import { Authorization, AuthorizationResult } from "../../Security/Authorization";
 import { SQLitePersistenceStore } from "../../Product/SQLitePersistenceStore";
 import { CommercialIdentityService, CommercialPermission, CommercialSession } from "../../Product/CommercialIdentityService";
 import { TokenBucketRateLimiter } from "../../Product/GenericApiConnector";
@@ -636,6 +638,49 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 return false;
             };
 
+            /**
+             * Defense-in-depth tenant boundary check at the HTTP layer using the
+             * canonical TenantIsolation guard. Services already scope reads by
+             * tenant; this re-verifies the returned object's tenant before it
+             * leaves the boundary, so an object that ever escapes service scoping
+             * is denied (and audited as a TENANT_VIOLATION) instead of leaked.
+             */
+            const enforceTenantBoundary = (resource: { readonly tenantId?: string }, action: Authorization): boolean => {
+                const context = executionContext(session);
+                const check = TenantIsolation.checkAccess(context, resource, action);
+                if (check.result === AuthorizationResult.PERMITTED) return true;
+                options.securityEventLogger?.logTenantViolation({
+                    actorId: session.username,
+                    actorType: context.actor?.type,
+                    tenantId: session.tenantId,
+                    requestedTenantId: resource.tenantId ?? "global",
+                    target: req.url ?? "unknown",
+                    reason: check.reason,
+                    traceId: check.traceId,
+                });
+                return false;
+            };
+
+            /**
+             * Object-level authorization for a work item. Privileged roles
+             * (OWNER/ADMIN, i.e. holders of ADMINISTER authority) may read any
+             * item in their tenant; everyone else may read only objects they
+             * created, approved, or were assigned. Cross-tenant objects never
+             * reach here (the service returns null).
+             */
+            const canAccessWorkItem = (item: {
+                readonly createdBy: string;
+                readonly approval?: { readonly approvedBy: string } | null;
+                readonly assignment?: { readonly assigneeId: string } | null;
+            }): boolean => {
+                if (identity.authorizationsFor(session.role).includes(Authorization.ADMINISTER)) return true;
+                const actors = [session.userId, session.username];
+                if (actors.includes(item.createdBy)) return true;
+                if (item.approval && actors.includes(item.approval.approvedBy)) return true;
+                if (item.assignment && actors.includes(item.assignment.assigneeId)) return true;
+                return false;
+            };
+
             if (req.method === "POST" && path === "/api/analyze") {
                 if (!getOrCreateRateLimiter(session.token).tryAcquire()) return corsJson(429, { error: "RATE_LIMIT_EXCEEDED" });
                 if (!ensurePermission("INGEST_DATA")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
@@ -719,6 +764,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const sha = decodeURIComponent(path.slice("/api/sources/".length));
                 const source = await ingestionService.readSource(session.tenantId, sha);
                 if (!source) return corsJson(404, { error: "SOURCE_NOT_FOUND" });
+                if (!enforceTenantBoundary(source, Authorization.READ)) return corsJson(404, { error: "SOURCE_NOT_FOUND" });
                 return corsJson(200, { status: "READY", tenantId: session.tenantId, source });
             }
 
@@ -846,6 +892,19 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                     if (!ensurePermission("READ_DASHBOARD")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
                     const workItem = await organizationalExecution.getWorkItem(context, workItemId);
                     if (!workItem) return corsJson(404, { error: "WORK_ITEM_NOT_FOUND" });
+                    // Defense-in-depth tenant boundary + explicit object-level
+                    // owner/admin check (beyond tenant scope alone).
+                    if (!enforceTenantBoundary(workItem, Authorization.READ)) return corsJson(404, { error: "WORK_ITEM_NOT_FOUND" });
+                    if (!canAccessWorkItem(workItem)) {
+                        options.securityEventLogger?.logAuthorizationDenial({
+                            actorId: session.username,
+                            tenantId: session.tenantId,
+                            target: req.url ?? "unknown",
+                            reason: "WORK_ITEM_OBJECT_FORBIDDEN",
+                            metadata: { workItemId, method: req.method, path: req.url }
+                        });
+                        return corsJson(403, { error: "WORK_ITEM_FORBIDDEN" });
+                    }
                     return corsJson(200, workItem);
                 }
 
@@ -957,6 +1016,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const artifactId = decodeURIComponent(path.slice("/api/report/artifacts/".length, path.length - "/download".length));
                 const artifact = await reportExport.read(session.tenantId, artifactId);
                 if (!artifact) return corsJson(404, { error: "REPORT_ARTIFACT_NOT_FOUND" });
+                if (!enforceTenantBoundary(artifact.metadata, Authorization.READ)) return corsJson(404, { error: "REPORT_ARTIFACT_NOT_FOUND" });
                 send(res, 200, artifact.metadata.contentType, artifact.content, {
                     ...corsHeaders(corsOrigin),
                     "Content-Disposition": `attachment; filename="${artifact.metadata.fileName}"`,

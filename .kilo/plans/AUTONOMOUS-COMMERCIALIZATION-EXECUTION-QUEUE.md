@@ -30,8 +30,8 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 | 2 | `assurance.local-folder-watcher-lifecycle` | E1 | Diagnose + fix Windows libuv native abort (watcher lifecycle vs test teardown) or record explicit reproducible exclusion; **isolated** | LocalFolderWatcher owner + test | MEDIUM | **COMPLETE** |
 | 3 | `security.auth-route-rate-limiting` | S2 | Apply existing limiter to `/api/session` + `/api/auth/login`; negative 429 test | `CommercialRuntimeServer` | HIGH | **COMPLETE** |
 | 4 | `product.web-password-auth` | S1 | Real register/login in web UI via existing `/api/auth/*` (no new engine) | `web/` + runtime auth | MEDIUM | **COMPLETE** |
-| 5 | `security.http-boundary-tenant-object-authz` | S5,S7 | Invoke `TenantIsolation.checkAccess()` + explicit object-owner check at HTTP boundary | `TenantIsolation`, runtime routes | MEDIUM | **EXECUTING** |
-| 6 | `observability.metrics-and-request-trace` | S6 | Additive metrics + structured request trace (no architecture change) | runtime diagnostics | MEDIUM | PLANNED |
+| 5 | `security.http-boundary-tenant-object-authz` | S5,S7 | Invoke `TenantIsolation.checkAccess()` + explicit object-owner check at HTTP boundary | `TenantIsolation`, runtime routes | MEDIUM | **COMPLETE** |
+| 6 | `observability.metrics-and-request-trace` | S6 | Additive metrics + structured request trace (no architecture change) | runtime diagnostics | MEDIUM | **EXECUTING** |
 | 7 | `standardization.pagination-and-idempotency` | S3,S4 | Bounded `limit/offset` on list routes; idempotency keys on mutating POSTs | runtime | MEDIUM | PLANNED |
 | 8 | `assurance.ocr-environment-gap` | E2 | Resolve only if runtime contract requires; else record explicit, non-hidden gap | `OcrAdapter` | HIGH | PLANNED |
 | 9 | `assurance.flake-containment` | F1,F2 | Analyze + contain parallel-load resource contention (timeouts/serial projects) without hiding real failures | test config + affected tests | HIGH | PLANNED |
@@ -136,6 +136,26 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 **Checkpoint:** `.kilo/plans/product-web-password-auth-checkpoint.md`
 
 **DO-NOT-REPEAT:** do not build a parallel auth backend; do not remove the passwordless bootstrap decision gate; do not store or log plaintext credentials client-side.
+
+---
+
+## Stage 5 — `security.http-boundary-tenant-object-authz`
+
+**State:** COMPLETE
+**Baseline SHA:** `1f01178dd3cadf54ec140d593aa76f8cfa1c00a1`
+**Classification:** DEFENSE-IN-DEPTH SECURITY GAP (canonical `TenantIsolation` unwired at HTTP; no object-level owner check on work-item reads).
+
+**DISCOVER / INSPECT (done):**
+- Object routes depended only on service-level tenant scoping; `Security/TenantIsolation.checkAccess()` was never called by the runtime.
+- `GET /api/execution/work-items/:id` returned any same-tenant item to any authenticated member.
+
+**Repair:** `enforceTenantBoundary()` invoking `TenantIsolation.checkAccess(executionContext(session), …)` on work-item, source, and report-artifact routes (fail closed 404 + `TENANT_VIOLATION` audit); `canAccessWorkItem()` enforcing creator/approver/assignee or `ADMINISTER` authority, else `403 WORK_ITEM_FORBIDDEN` + audited denial.
+
+**Evidence:** focused execution suite 6/6; integration 18 suites / 117 tests; typecheck exit 0; full suite 257/259. See `.kilo/plans/security-http-boundary-tenant-object-authz-checkpoint.md` and audit §36.
+
+**Checkpoint:** `.kilo/plans/security-http-boundary-tenant-object-authz-checkpoint.md`
+
+**DO-NOT-REPEAT:** do not duplicate `TenantIsolation`; do not weaken the object owner/admin rule to pass tests; do not disclose cross-tenant existence.
 
 ---
 

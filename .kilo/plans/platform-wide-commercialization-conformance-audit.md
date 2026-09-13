@@ -760,3 +760,44 @@ No change to `productComplete`, `commercialProductRuntimeComplete` or `externalP
 ### 35.6 Next candidate knot (not executed)
 
 `security.http-boundary-tenant-object-authz` — invoke `TenantIsolation.checkAccess()` plus explicit object-owner checks at the HTTP boundary.
+
+---
+
+## 36. Security knot — `security.http-boundary-tenant-object-authz` executed (boundary authorization)
+
+**Knot:** integrate the canonical `TenantIsolation` guard at the HTTP boundary for object-returning routes and add explicit object-level owner/admin authorization for work-item reads.
+**Trusted baseline at execution:** `git rev-parse HEAD` = `1f01178dd3cadf54ec140d593aa76f8cfa1c00a1` (`fix/autonomous-product-factory`).
+**Classification:** DEFENSE-IN-DEPTH SECURITY GAP. No architecture change; Architecture Freeze V4.1 preserved.
+**Checkpoint:** `.kilo/plans/security-http-boundary-tenant-object-authz-checkpoint.md`.
+
+### 36.1 Independent confirmation of the defect
+
+- Object routes (`GET /api/execution/work-items/:id`, `GET /api/sources/:sha`, `GET /api/report/artifacts/:id/download`) relied on service-level tenant scoping; `Security/TenantIsolation.checkAccess()` was never invoked by the runtime.
+- `GET /api/execution/work-items/:id` returned any tenant work item to any same-tenant member (no object-level owner check).
+
+### 36.2 Repair
+
+- `enforceTenantBoundary(resource, action)` using `TenantIsolation.checkAccess(executionContext(session), …)`; on denial logs a `TENANT_VIOLATION` and fails closed (404, no existence disclosure) on work-item, source, and report-artifact routes.
+- `canAccessWorkItem(item)`: privileged roles (holder of `Authorization.ADMINISTER`) may read any tenant item; otherwise creator/approver/assignee only. Same-tenant non-owner → `403 WORK_ITEM_FORBIDDEN` + audited `AUTHORIZATION_DENIAL`.
+
+### 36.3 Verification evidence
+
+- Focused `OrganizationalExecutionRuntime.test.ts`: **6/6 tests passed** (owner 200 / viewer 403 / viewer list 200 / anonymous 401 / cross-tenant 404 / audited denial).
+- Integration regression: **18/18 suites, 117/117 tests passed**.
+- Changed-file typecheck `tsc --noEmit`: **exit 0**.
+- Full suite (`jest --silent`, evidence `.kilo/evidence/jest-full-stage5-http-boundary-tenant-object-authz.txt`): **257/259 suites, 1962/1963 tests**.
+
+### 36.4 Remaining failure classification (after repair)
+
+| Suite | Class |
+|---|---|
+| `CommercialRuntimePersistenceRecovery.test.ts` | TIMING/RESOURCE FLAKE (passes in isolation) |
+| `OcrAdapter.test.ts` | ENVIRONMENT GAP (`tesseract.js` absent) |
+
+### 36.5 Truth boundary
+
+No change to `productComplete`, `commercialProductRuntimeComplete` or `externalProductionDependenciesComplete`. No assertion weakened, no test skipped or deleted. Cross-tenant probes return not-found; same-tenant wrong-owner denials are explicit and audited.
+
+### 36.6 Next candidate knot (not executed)
+
+`observability.metrics-and-request-trace` — additive request correlation/trace and operation metrics on critical runtime paths.

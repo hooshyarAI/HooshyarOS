@@ -1,5 +1,10 @@
 import { Server } from "node:http";
 import { createCommercialRuntimeServer } from "../Autonomous/Runtime/CommercialRuntimeServer";
+import { SecurityEventLogger } from "../Entities/SecurityEventLogger";
+import { DatabaseSync } from "node:sqlite";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const DECISION_BODY = {
     problem: "choose expansion plan",
@@ -233,4 +238,80 @@ describe("product.organizational-execution — commercial runtime path", () => {
         expect(badDueDate.status).toBe(400);
         expect((await badDueDate.json()).error).toBe("VALIDATION");
     });
+
+    test("enforces object-level authorization on work-item reads (owner/admin vs same-tenant non-owner)", async () => {
+        const owner = await register("owner", "Acme");
+        const cookie = cookieFrom(owner);
+        const viewer = await register("viewer", "Acme");
+        const viewerCookie = cookieFrom(viewer);
+
+        await createDecision(cookie);
+        const proposed = await (await propose(cookie)).json();
+        const id = encodeURIComponent(proposed.workItemId as string);
+
+        // Valid same-tenant owner/admin access (OWNER holds ADMINISTER).
+        const ownerGet = await request(server, `/api/execution/work-items/${id}`, { headers: { cookie } });
+        expect(ownerGet.status).toBe(200);
+
+        // Same-tenant non-owner (VIEWER, not creator/assignee/approver) is denied.
+        const viewerGet = await request(server, `/api/execution/work-items/${id}`, { headers: { cookie: viewerCookie } });
+        expect(viewerGet.status).toBe(403);
+        expect((await viewerGet.json()).error).toBe("WORK_ITEM_FORBIDDEN");
+
+        // The viewer may still list the tenant's work items.
+        const viewerList = await request(server, "/api/execution/work-items", { headers: { cookie: viewerCookie } });
+        expect(viewerList.status).toBe(200);
+
+        // Unauthenticated access is rejected.
+        const anonymous = await request(server, `/api/execution/work-items/${id}`);
+        expect(anonymous.status).toBe(401);
+
+        // Cross-tenant access is not disclosed (service scoping yields not found).
+        const other = await register("other", "Other");
+        const otherCookie = cookieFrom(other);
+        const crossTenant = await request(server, `/api/execution/work-items/${id}`, { headers: { cookie: otherCookie } });
+        expect(crossTenant.status).toBe(404);
+        expect((await crossTenant.json()).error).toBe("WORK_ITEM_NOT_FOUND");
+    }, 20_000);
+
+    test("audits the object-level authorization denial for a same-tenant non-owner read", async () => {
+        const directory = mkdtempSync(join(tmpdir(), "hooshyar-objauthz-"));
+        const dbPath = join(directory, "security.sqlite");
+        const logger = new SecurityEventLogger(dbPath);
+        const auditServer = createCommercialRuntimeServer({
+            databasePath: ":memory:",
+            now: () => clock,
+            reasoning: { reason: (problem: string) => ({ problem, status: "verified", success: true, answer: "verified" }) },
+            securityEventLogger: logger,
+        });
+        await new Promise<void>((resolve) => auditServer.listen(0, "127.0.0.1", () => resolve()));
+        try {
+            const post = (path: string, cookie: string | undefined, body: unknown) => request(auditServer, path, {
+                method: "POST",
+                headers: cookie ? { "content-type": "application/json", cookie } : { "content-type": "application/json" },
+                body: JSON.stringify(body),
+            });
+            const registerOn = (username: string, organization: string) => post("/api/auth/register", undefined, { username, password: "Sup3rSecret!", organization });
+            const owner = await registerOn("owner", "Acme");
+            const ownerCookie = cookieFrom(owner);
+            const viewer = await registerOn("viewer", "Acme");
+            const viewerCookie = cookieFrom(viewer);
+
+            await post("/api/decision/workbench", ownerCookie, DECISION_BODY);
+            const proposed = await (await post("/api/execution/work-items", ownerCookie, { title: "audited item" })).json();
+            const id = encodeURIComponent(proposed.workItemId as string);
+
+            const denied = await request(auditServer, `/api/execution/work-items/${id}`, { headers: { cookie: viewerCookie } });
+            expect(denied.status).toBe(403);
+
+            const db = new DatabaseSync(dbPath);
+            const events = db.prepare("SELECT reason FROM audit_events ORDER BY sequence ASC").all() as { reason: string }[];
+            db.close();
+            expect(events.some((event) => event.reason?.includes("WORK_ITEM_OBJECT_FORBIDDEN"))).toBe(true);
+        } finally {
+            await new Promise<void>((resolve) => auditServer.close(() => resolve()));
+            logger.close();
+            rmSync(directory, { recursive: true, force: true });
+        }
+    }, 20_000);
 });
