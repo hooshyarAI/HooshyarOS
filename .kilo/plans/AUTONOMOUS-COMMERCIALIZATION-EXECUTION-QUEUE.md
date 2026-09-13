@@ -29,8 +29,8 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 | 1 | `assurance.stale-test-reconciliation` | V1–V5 | Reconcile 5 stale suites to current frozen contracts (Governance Engine void-init; Kilo script 1-arg; 3× phase-09 services) | test files only; contracts already frozen | HIGH | **COMPLETE** |
 | 2 | `assurance.local-folder-watcher-lifecycle` | E1 | Diagnose + fix Windows libuv native abort (watcher lifecycle vs test teardown) or record explicit reproducible exclusion; **isolated** | LocalFolderWatcher owner + test | MEDIUM | **COMPLETE** |
 | 3 | `security.auth-route-rate-limiting` | S2 | Apply existing limiter to `/api/session` + `/api/auth/login`; negative 429 test | `CommercialRuntimeServer` | HIGH | **COMPLETE** |
-| 4 | `product.web-password-auth` | S1 | Real register/login in web UI via existing `/api/auth/*` (no new engine) | `web/` + runtime auth | MEDIUM | **EXECUTING** |
-| 5 | `security.http-boundary-tenant-object-authz` | S5,S7 | Invoke `TenantIsolation.checkAccess()` + explicit object-owner check at HTTP boundary | `TenantIsolation`, runtime routes | MEDIUM | PLANNED |
+| 4 | `product.web-password-auth` | S1 | Real register/login in web UI via existing `/api/auth/*` (no new engine) | `web/` + runtime auth | MEDIUM | **COMPLETE** |
+| 5 | `security.http-boundary-tenant-object-authz` | S5,S7 | Invoke `TenantIsolation.checkAccess()` + explicit object-owner check at HTTP boundary | `TenantIsolation`, runtime routes | MEDIUM | **EXECUTING** |
 | 6 | `observability.metrics-and-request-trace` | S6 | Additive metrics + structured request trace (no architecture change) | runtime diagnostics | MEDIUM | PLANNED |
 | 7 | `standardization.pagination-and-idempotency` | S3,S4 | Bounded `limit/offset` on list routes; idempotency keys on mutating POSTs | runtime | MEDIUM | PLANNED |
 | 8 | `assurance.ocr-environment-gap` | E2 | Resolve only if runtime contract requires; else record explicit, non-hidden gap | `OcrAdapter` | HIGH | PLANNED |
@@ -116,6 +116,26 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 **Checkpoint:** `.kilo/plans/security-auth-route-rate-limiting-checkpoint.md`
 
 **DO-NOT-REPEAT:** do not create a second limiter or a parallel auth architecture; reuse `TokenBucketRateLimiter` and `CommercialIdentityService`; do not weaken the passwordless bootstrap decision gate; do not lower limits to make tests pass.
+
+---
+
+## Stage 4 — `product.web-password-auth`
+
+**State:** COMPLETE
+**Baseline SHA:** `0235f6cc8a96ddc7eca627666a3faff30ac29438`
+**Classification:** REAL PRODUCT/USABILITY GAP (web UI exposed only passwordless bootstrap; unreachable password auth after identity hardening).
+
+**DISCOVER / INSPECT (done):**
+- `web/index.html`/`web/app.js` had a single passwordless `POST /api/session` form and no register/login/logout.
+- Canonical backend `/api/auth/register|login|logout` + `CommercialIdentityService` already existed and was verified; no backend change needed.
+
+**Repair:** real register/login forms + logout button in `web/index.html`; `refreshSessionState`/`wireAuthForm`/logout in `web/app.js` calling `GET /api/session` and `POST /api/auth/register|login|logout`; password inputs `type=password`; errors surfaced; password cleared on success.
+
+**Evidence:** focused web suite 2/2 (register → invalid 401 → login → session → authorized `/api/sources` 200 / anonymous 401 → logout → post-logout 401); integration 16 suites / 101 tests; typecheck exit 0; full suite 256/259 (known flakes only). See `.kilo/plans/product-web-password-auth-checkpoint.md` and audit §35.
+
+**Checkpoint:** `.kilo/plans/product-web-password-auth-checkpoint.md`
+
+**DO-NOT-REPEAT:** do not build a parallel auth backend; do not remove the passwordless bootstrap decision gate; do not store or log plaintext credentials client-side.
 
 ---
 

@@ -718,3 +718,45 @@ No change to `productComplete`, `commercialProductRuntimeComplete` or `externalP
 ### 34.6 Next candidate knot (not executed)
 
 `product.web-password-auth` — real password register/login in the web entrypoint via the existing `/api/auth/*` routes.
+
+---
+
+## 35. Product knot — `product.web-password-auth` executed (web password authentication)
+
+**Knot:** expose the real password register/login/logout path in the web entrypoint using the canonical `/api/auth/*` backend; no new authentication architecture.
+**Trusted baseline at execution:** `git rev-parse HEAD` = `0235f6cc8a96ddc7eca627666a3faff30ac29438` (`fix/autonomous-product-factory`).
+**Classification:** REAL PRODUCT/USABILITY GAP (web UI only exposed passwordless bootstrap, which is denied for established organizations after identity hardening). Architecture Freeze V4.1 preserved.
+**Checkpoint:** `.kilo/plans/product-web-password-auth-checkpoint.md`.
+
+### 35.1 Independent confirmation of the defect
+
+`web/index.html` and `web/app.js` contained only a passwordless `POST /api/session` form; no register/login/logout controls and no calls to `/api/auth/register`, `/api/auth/login`, or `/api/auth/logout`. The real password backend (`CommercialIdentityService.registerUser/login`, guarded by `passwordlessBootstrapDecision` for the bootstrap path) was unreachable from the shipped UI.
+
+### 35.2 Repair
+
+- `web/index.html`: real `#register-form` (username/organization/new password), `#login-form` (username/organization/password), and `#logout-button`; password inputs are `type="password"` with correct `autocomplete` hints.
+- `web/app.js`: `refreshSessionState()` via `GET /api/session`, `wireAuthForm(...)` for register/login, logout handler; server error codes surfaced; password field cleared on success.
+- No backend change; `CommercialIdentityService` remains sole auth owner.
+
+### 35.3 Verification evidence
+
+- Focused `CommercialWebEntrypoint.test.ts`: **2/2 tests passed**, including the HTTP end-to-end register → invalid-credential 401 → login 200 → session 200 → authorized `/api/sources` 200 / anonymous 401 → logout 200 → post-logout 401.
+- Integration regression: **16/16 suites, 101/101 tests passed**.
+- Changed-file typecheck `tsc --noEmit`: **exit 0**.
+- Full suite (`jest --silent`, evidence `.kilo/evidence/jest-full-stage4-web-password-auth.txt`): **256/259 suites, 1959/1961 tests**; web entrypoint green under full load.
+
+### 35.4 Remaining failure classification (after repair)
+
+| Suite | Class |
+|---|---|
+| `CommercialRuntimePersistenceRecovery.test.ts` | TIMING/RESOURCE FLAKE (passes in isolation) |
+| `Autonomous/Runtime/KiloCodeExecutionAdapter.test.ts` | TIMING/RESOURCE FLAKE (passes in isolation) |
+| `OcrAdapter.test.ts` | ENVIRONMENT GAP (`tesseract.js` absent) |
+
+### 35.5 Truth boundary
+
+No change to `productComplete`, `commercialProductRuntimeComplete` or `externalProductionDependenciesComplete`. No assertion weakened, no test skipped or deleted. No credentials logged. TLS transport remains an external production dependency.
+
+### 35.6 Next candidate knot (not executed)
+
+`security.http-boundary-tenant-object-authz` — invoke `TenantIsolation.checkAccess()` plus explicit object-owner checks at the HTTP boundary.

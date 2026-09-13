@@ -35,13 +35,24 @@
       </article>
     </section>
 
-    <section class="card onboarding">
-      <h2>ایجاد نشست</h2>
-      <form id="session-form">
-        <label>نام کاربری<input id="username" value="مدیرعامل" required /></label>
-        <label>سازمان<input id="organization" value="سازمان من" required /></label>
-        <button class="primary" type="submit">ورود و ایجاد نشست</button>
+    <section class="card onboarding auth">
+      <h2>ورود / ثبت‌نام</h2>
+      <p>با گذرواژه وارد شوید یا سازمان جدید را ثبت کنید. ثبت‌نام نخستین کاربر، مالک سازمان می‌شود.</p>
+      <form id="register-form">
+        <label>نام کاربری<input id="register-username" value="مدیرعامل" autocomplete="username" required /></label>
+        <label>سازمان<input id="register-organization" value="سازمان من" autocomplete="organization" required /></label>
+        <label>گذرواژه جدید<input id="register-password" type="password" autocomplete="new-password" minlength="8" required /></label>
+        <button class="primary" type="submit">ثبت‌نام و ورود</button>
       </form>
+      <form id="login-form">
+        <label>نام کاربری<input id="login-username" value="مدیرعامل" autocomplete="username" required /></label>
+        <label>سازمان<input id="login-organization" value="سازمان من" autocomplete="organization" required /></label>
+        <label>گذرواژه<input id="login-password" type="password" autocomplete="current-password" required /></label>
+        <button class="primary" type="submit">ورود با گذرواژه</button>
+      </form>
+      <div class="actions">
+        <button id="logout-button" class="primary" type="button">خروج از نشست</button>
+      </div>
       <p id="session-result" class="result" aria-live="polite"></p>
     </section>
 

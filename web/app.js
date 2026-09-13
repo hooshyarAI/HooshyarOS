@@ -24,22 +24,52 @@ async function refreshDashboard() {
   }
 }
 
-document.querySelector('#session-form').addEventListener('submit', async event => {
-  event.preventDefault();
+async function refreshSessionState() {
   const result = document.querySelector('#session-result');
   try {
-    const payload = await getJson('/api/session', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        username: document.querySelector('#username').value,
-        organization: document.querySelector('#organization').value
-      })
-    });
-    result.textContent = `نشست ${payload.organization.name} ایجاد شد. شناسه tenant: ${payload.tenantId}`;
+    const session = await getJson('/api/session');
+    result.textContent = `نشست فعال: ${session.username} — سازمان ${session.organization.name} (نقش ${session.role}).`;
+    return session;
+  } catch {
+    result.textContent = 'نشست فعالی وجود ندارد. ثبت‌نام کنید یا با گذرواژه وارد شوید.';
+    return null;
+  }
+}
+
+function wireAuthForm({ formSelector, path, usernameSelector, organizationSelector, passwordSelector, successLabel }) {
+  document.querySelector(formSelector).addEventListener('submit', async event => {
+    event.preventDefault();
+    const result = document.querySelector('#session-result');
+    try {
+      const payload = await getJson(path, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          username: document.querySelector(usernameSelector).value,
+          organization: document.querySelector(organizationSelector).value,
+          password: document.querySelector(passwordSelector).value
+        })
+      });
+      document.querySelector(passwordSelector).value = '';
+      result.textContent = `${successLabel} ${payload.username} — سازمان ${payload.organization.name} (نقش ${payload.role}).`;
+      await refreshDashboard();
+    } catch (error) {
+      result.textContent = `ناموفق بود: ${error.message}`;
+    }
+  });
+}
+
+wireAuthForm({ formSelector: '#register-form', path: '/api/auth/register', usernameSelector: '#register-username', organizationSelector: '#register-organization', passwordSelector: '#register-password', successLabel: 'ثبت‌نام انجام شد:' });
+wireAuthForm({ formSelector: '#login-form', path: '/api/auth/login', usernameSelector: '#login-username', organizationSelector: '#login-organization', passwordSelector: '#login-password', successLabel: 'ورود انجام شد:' });
+
+document.querySelector('#logout-button').addEventListener('click', async () => {
+  const result = document.querySelector('#session-result');
+  try {
+    await getJson('/api/auth/logout', { method: 'POST' });
+    result.textContent = 'از نشست خارج شدید.';
     await refreshDashboard();
   } catch (error) {
-    result.textContent = `ایجاد نشست ناموفق بود: ${error.message}`;
+    result.textContent = `خروج ناموفق بود: ${error.message}`;
   }
 });
 
@@ -509,4 +539,5 @@ document.querySelector('#analytics-form').addEventListener('submit', async event
 });
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => undefined);
+refreshSessionState();
 refreshDashboard();

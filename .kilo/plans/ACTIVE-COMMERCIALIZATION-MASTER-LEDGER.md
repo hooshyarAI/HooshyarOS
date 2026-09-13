@@ -10,6 +10,7 @@
 **Stage 1 status:** `assurance.stale-test-reconciliation` **EXECUTED and VERIFIED** — V1–V5 reconciled; full suite 255/259 suites, 1943/1945 tests (remaining 4 failures are E1, E2, F1, the last Kilo/pid-file adapter). See audit §32 and `.kilo/plans/assurance-stale-test-reconciliation-checkpoint.md`.
 **Stage 2 status:** `assurance.local-folder-watcher-lifecycle` **EXECUTED and VERIFIED** — the abort is a **REAL PRODUCT DEFECT**, not a flake: watching an 8.3 short path (`os.tmpdir()`) aborts libuv (`fs-event.c:72`, `0xC0000409`). Repaired in `LocalFolderWatcher.start()` by canonicalizing with `fs.realpath` before `fs.watch`. Focused 9/9 ×4, regression 37/37, typecheck exit 0, full suite 255/259 suites / 1951/1954 tests with `LocalFolderWatcher` now **PASS**. See audit §33 and `.kilo/plans/assurance-local-folder-watcher-lifecycle-checkpoint.md`.
 **Stage 3 status:** `security.auth-route-rate-limiting` **EXECUTED and VERIFIED** — unauthenticated auth entry points had no limiter (REAL SECURITY DEFECT). Repaired in `CommercialRuntimeServer` with per-client + per-identity token buckets; `/api/auth/login` and password `/api/session` share the identity bucket (no bypass). Focused 10/10, integration regression 16 suites/100 tests, typecheck 0, full suite 257/259. See audit §34 and `.kilo/plans/security-auth-route-rate-limiting-checkpoint.md`.
+**Stage 4 status:** `product.web-password-auth` **EXECUTED and VERIFIED** — the web entrypoint exposed only passwordless `/api/session` and could not register/login. `web/index.html` + `web/app.js` now use the canonical `/api/auth/register|login|logout` backend (no new auth architecture); real HTTP end-to-end test covers register, invalid 401, login, session, authorized vs anonymous route, logout. Focused 2/2, integration 16 suites/101 tests, typecheck 0, full suite 256/259. See audit §35 and `.kilo/plans/product-web-password-auth-checkpoint.md`.
 
 ---
 
@@ -71,7 +72,7 @@ The prior audit (`platform-wide-commercialization-conformance-audit.md` §1–§
 
 | ID | Item | Class | Canonical owner | Evidence | Value | Risk | State | Bounded repair | Expected evidence |
 |---|---|---|---|---|---|---|---|---|---|
-| S1 | Web UI exposes only passwordless `/api/session`; no register/login UI | **INTEGRATION/USABILITY GAP** | `web/index.html` + `web/app.js` + `CommercialRuntimeServer` auth routes | audit §19; `CommercialWebEntrypoint.test.ts:47` asserts `/api/session` | Real authentication UX; removes reliance on legacy bootstrap | MEDIUM | ACTIVE | Add password register/login to web using existing `/api/auth/register`/`login` (no new engine) | web acceptance + runtime test green |
+| S1 | Web UI exposes only passwordless `/api/session`; no register/login UI | **REAL PRODUCT/USABILITY GAP (repaired)** | `web/index.html` + `web/app.js` + `CommercialRuntimeServer` auth routes | audit §19; `web` only had a passwordless session form | Real authentication UX; removes reliance on legacy bootstrap | MEDIUM | **VERIFIED COMPLETE** (Stage 4, audit §35) | Register/login/logout/password fields wired to canonical `/api/auth/*`; no new engine | web HTTP end-to-end (register → invalid 401 → login → session → authz → logout) |
 | S2 | `/api/session` + `/api/auth/login` not rate-limited | **REAL SECURITY DEFECT (repaired)** | `CommercialRuntimeServer.ts` existing limiter | audit R6; route ordering proves auth handlers run before the session gate | Brute-force/takeover resistance | HIGH security, LOW impl | **VERIFIED COMPLETE** (Stage 3, audit §34) | Per-client + per-identity token buckets; identity bucket shared across `/api/auth/login` and password `/api/session`; fail-closed 429 + Retry-After + security event | focused 10/10 (incl. no-bypass, reset, cross-identity, audit event); regression 16 suites/100 tests |
 | S3 | No pagination on list routes | **STANDARDIZATION GAP** | runtime list routes | audit R4 | Scalability | MEDIUM | ACTIVE | Add bounded `limit/offset` | runtime tests |
 | S4 | No idempotency keys on mutating POSTs | **STANDARDIZATION GAP** | runtime | audit R5 | Duplicate-execution safety | MEDIUM | ACTIVE | Add idempotency on report/execution mutations | runtime tests |
@@ -102,7 +103,7 @@ Scoring = commercial value, correctness, security, tenant isolation, runtime int
 1. **V1–V5 — restore the verification base** (correctness + standardization; unblocks trusting every later stage). Safety: HIGH. *Selected stage 1.*
 2. ~~**E1 — LocalFolderWatcher native abort**~~ — **DONE (Stage 2, audit §33): REAL PRODUCT DEFECT, repaired and verified.**
 3. ~~**S2 — rate-limit auth routes**~~ — **DONE (Stage 3, audit §34): real security defect repaired and verified.**
-4. **S1 — real password auth in web UI** (usability + security). Safety: MEDIUM.
+4. ~~**S1 — real password auth in web UI**~~ — **DONE (Stage 4, audit §35): product gap repaired and verified.**
 5. **S5/S7 — HTTP-boundary tenant/object authorization defense-in-depth**. Safety: MEDIUM.
 6. **S6 — metrics + request tracing**. Safety: MEDIUM.
 7. **S3/S4 — pagination + idempotency**. Safety: MEDIUM.
@@ -134,4 +135,6 @@ Scoring = commercial value, correctness, security, tenant isolation, runtime int
 
 **`security.auth-route-rate-limiting`** — COMPLETE (Stage 3; audit §34). Auth entry points now enforce per-client and per-identity token buckets, fail closed with 429, and emit security events; no route bypass.
 
-**Next selected stage: `product.web-password-auth` (S1)** — real password register/login in the web entrypoint using the existing `/api/auth/*` routes (no new engine). See the execution queue.
+**`product.web-password-auth`** — COMPLETE (Stage 4; audit §35). Web entrypoint now performs real password register/login/logout through the canonical `/api/auth/*` backend; verified HTTP end-to-end including authorization integration.
+
+**Next selected stage: `security.http-boundary-tenant-object-authz` (S5, S7)** — invoke `TenantIsolation.checkAccess()` plus explicit object-owner checks at the HTTP boundary; verify cross-tenant/wrong-owner denial. See the execution queue.
