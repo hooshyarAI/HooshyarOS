@@ -8,6 +8,7 @@
 **Audit method:** fresh repository-wide re-audit from current HEAD; executed evidence over prior classifications; prior audit §30/§31 re-verified, not copied.
 **Companion queue:** `.kilo/plans/AUTONOMOUS-COMMERCIALIZATION-EXECUTION-QUEUE.md`
 **Stage 1 status:** `assurance.stale-test-reconciliation` **EXECUTED and VERIFIED** — V1–V5 reconciled; full suite 255/259 suites, 1943/1945 tests (remaining 4 failures are E1, E2, F1, the last Kilo/pid-file adapter). See audit §32 and `.kilo/plans/assurance-stale-test-reconciliation-checkpoint.md`.
+**Stage 2 status:** `assurance.local-folder-watcher-lifecycle` **EXECUTED and VERIFIED** — the abort is a **REAL PRODUCT DEFECT**, not a flake: watching an 8.3 short path (`os.tmpdir()`) aborts libuv (`fs-event.c:72`, `0xC0000409`). Repaired in `LocalFolderWatcher.start()` by canonicalizing with `fs.realpath` before `fs.watch`. Focused 9/9 ×4, regression 37/37, typecheck exit 0, full suite 255/259 suites / 1951/1954 tests with `LocalFolderWatcher` now **PASS**. See audit §33 and `.kilo/plans/assurance-local-folder-watcher-lifecycle-checkpoint.md`.
 
 ---
 
@@ -54,7 +55,7 @@ The prior audit (`platform-wide-commercialization-conformance-audit.md` §1–§
 
 | ID | Item | Class | Canonical owner | Evidence | Value | Risk | State | Bounded repair | Expected evidence |
 |---|---|---|---|---|---|---|---|---|---|
-| E1 | `LocalFolderWatcher.test.ts` aborts Node (`fs-event.c:72`, exit 0xC0000409) | **ENVIRONMENT GAP (Windows native / test-lifecycle)** | `Backend/HBOS/.../LocalFolderWatcher*` + its test | isolated run reproduced abort | Test-harness integrity; cannot run full suite safely | MEDIUM (native, not wired to runtime) | ACTIVE — **must be its own stage; not mixed** | Analyze test teardown vs native watcher lifecycle; fix lifecycle (close watcher before dir removal) or quarantine with explicit recorded reason; never hide a product defect | isolated suite exits 0 OR explicit recorded exclusion with reproduced native evidence |
+| E1 | `LocalFolderWatcher.test.ts` aborts Node (`fs-event.c:72`, exit 0xC0000409) | **REAL PRODUCT DEFECT (repaired)** — was mis-classified as environment/test-lifecycle | `Backend/HBOS/Product/LocalFolderWatcher.ts` + its test | Two-process inline proof: short path aborts, long path works | Watch short/`%TEMP%` path crashed the whole process | MEDIUM (fail-open availability hazard) | **VERIFIED COMPLETE** (Stage 2, audit §33) | `start()` canonicalizes folder via `fs.realpath` before `fs.watch`; test asserts canonical `sourcePath` | focused 9/9 ×4, regression 37/37, typecheck 0, full suite `LocalFolderWatcher` PASS |
 | E2 | `OcrAdapter.test.ts` imports `tesseract.js` (not a dependency) | **ENVIRONMENT GAP** | `Backend/HBOS/Product/OcrAdapter.ts` | jest: `TS2307` | OCR is deliberately unsupported/not in runtime contract | LOW | ACTIVE | Resolve only if genuinely required by supported runtime; otherwise keep explicit recorded gap. No fake runtime dependency. | classified, not hidden |
 
 ### 3.3 Flakes (analyzed, not dismissed)
@@ -63,6 +64,7 @@ The prior audit (`platform-wide-commercialization-conformance-audit.md` §1–§
 |---|---|---|---|---|
 | F1 | `CommercialRuntimePersistenceRecovery.test.ts` | **TIMING/RESOURCE FLAKE** | isolated 25.2 s PASS; fails only under full parallel load | Real test-budget/resource contention under parallel workers; product recovery path proven. Candidate hardening: raise per-test timeout / reduce parallel contention. Not a product defect. |
 | F2 | `Autonomous/Runtime/KiloCodeExecutionAdapter.test.ts` | **TIMING/RESOURCE FLAKE** | isolated 5/5 PASS (23.2 s, real Windows parent+child timeout) | Real Windows process-lifecycle test; contention under parallel load. Candidate hardening: dedicated serial project/timeout. Not a product defect. |
+| F3 | `test/FinancialDataIngestionAdapter.test.ts` (XLSX duplicate-detection SHA-256) | **TIMING/RESOURCE FLAKE (newly observed)** | isolated 100% PASS (Stage 2 regression, 37/37); fails only under full parallel load (expected vs received different SHA-256) | Not caused by Stage 2 (watcher does not import the adapter). Candidate hardening: deterministic XLSX fixture/temp isolation + serial project. `FinancialDataIngestionAdapter.ts`/tests are protected — do not modify without authorization. |
 
 ### 3.4 Security / platform (repository-local actionable)
 
@@ -97,7 +99,7 @@ The prior audit (`platform-wide-commercialization-conformance-audit.md` §1–§
 Scoring = commercial value, correctness, security, tenant isolation, runtime integrity, integration completeness, persistence/provenance, observability, deployment readiness, usability, architectural risk.
 
 1. **V1–V5 — restore the verification base** (correctness + standardization; unblocks trusting every later stage). Safety: HIGH. *Selected stage 1.*
-2. **E1 — LocalFolderWatcher native abort** (test-harness integrity; isolated stage). Safety: MEDIUM.
+2. ~~**E1 — LocalFolderWatcher native abort**~~ — **DONE (Stage 2, audit §33): REAL PRODUCT DEFECT, repaired and verified.**
 3. **S2 — rate-limit auth routes** (security). Safety: HIGH.
 4. **S1 — real password auth in web UI** (usability + security). Safety: MEDIUM.
 5. **S5/S7 — HTTP-boundary tenant/object authorization defense-in-depth**. Safety: MEDIUM.
@@ -117,7 +119,7 @@ Scoring = commercial value, correctness, security, tenant isolation, runtime int
 
 - No completion flag (`productComplete`, `commercialProductRuntimeComplete`, `externalProductionDependenciesComplete`) is changed by this ledger or by verification-base repair.
 - External production dependencies remain **BLOCKED_EXTERNAL_DEPENDENCY** with reproducible evidence; not faked.
-- `LocalFolderWatcher` native abort is a **test-harness** hazard, not a claimed product defect; it is isolated from unrelated stages.
+- `LocalFolderWatcher` short-path abort was a **REAL PRODUCT DEFECT** (fail-open availability hazard), not a test-harness quirk; it is repaired in the canonical owner (audit §33). It was **not** permanently excluded.
 - OCR remains an explicit environment gap; OCR ingestion is not claimed.
 - This ledger is an index/decision record; the authoritative chronological audit remains `.kilo/plans/platform-wide-commercialization-conformance-audit.md`.
 
@@ -127,4 +129,6 @@ Scoring = commercial value, correctness, security, tenant isolation, runtime int
 
 **`assurance.stale-test-reconciliation`** — COMPLETE (Stage 1; audit §32). V1–V5 reconciled; verification base restored to 255/259 suites.
 
-**Next selected stage: `assurance.local-folder-watcher-lifecycle` (E1)** — bounded, isolated diagnosis/repair of the Windows libuv native abort. Must remain separately bounded and must not be permanently excluded to hide it. See the execution queue.
+**`assurance.local-folder-watcher-lifecycle`** — COMPLETE (Stage 2; audit §33). Short-path libuv abort is a real product defect; repaired via folder canonicalization; watcher suite passes in the full run.
+
+**Next selected stage: `security.auth-route-rate-limiting` (S2)** — apply the existing rate limiter to `/api/session` and `/api/auth/login` with negative 429 coverage; high-value security hardening. See the execution queue.

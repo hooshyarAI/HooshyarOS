@@ -1,7 +1,7 @@
 ﻿/**
  * Stage 08-AUTO.1 — Local Folder Watcher tests.
  */
-import { mkdtempSync, rmSync, writeFileSync, utimesSync } from "node:fs";
+import { promises as fsp, mkdtempSync, rmSync, writeFileSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SQLitePersistenceStore } from "../Product/SQLitePersistenceStore";
@@ -90,10 +90,10 @@ describe("LocalFolderWatcher (Stage 08-AUTO.1)", () => {
   });
 
   test("emits add for new files and change for existing", async () => {
-    const events: Array<{ name: string; kind: string }> = [];
+    const events: Array<{ name: string; kind: string; path: string }> = [];
     const w = new LocalFolderWatcher({
       tenantId: "t", folder: directory, adapter,
-      handler: (e) => { events.push({ name: e.sourceName, kind: e.event }); },
+      handler: (e) => { events.push({ name: e.sourceName, kind: e.event, path: e.sourcePath }); },
       options: { debounceMs: 25, scanIntervalMs: 60_000 },
     });
     await w.start();
@@ -110,6 +110,12 @@ describe("LocalFolderWatcher (Stage 08-AUTO.1)", () => {
     const ledgerEvents = events.filter((e) => e.name === "ledger.csv");
     expect(ledgerEvents.length).toBeGreaterThanOrEqual(1);
     expect(ledgerEvents[0].kind).toBe("add");
+    // The watcher must canonicalize the folder before watching. Watching an
+    // 8.3 short path (e.g. os.tmpdir() on Windows) aborts the Node process
+    // inside libuv's fs-event handler, so the emitted source path must be
+    // rooted at the canonical (long) form of the watched folder.
+    const canonicalDir = await fsp.realpath(directory);
+    expect(ledgerEvents[0].path).toBe(join(canonicalDir, "ledger.csv"));
   });
 
   test("ingest() routes through the adapter (CSV path)", async () => {

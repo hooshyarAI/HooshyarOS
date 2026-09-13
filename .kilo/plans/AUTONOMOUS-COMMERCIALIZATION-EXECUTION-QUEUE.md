@@ -27,8 +27,8 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 | Order | Stage ID | Source ledger | Scope (bounded) | Canonical owner | Safety | Status |
 |---|---|---|---|---|---|---|
 | 1 | `assurance.stale-test-reconciliation` | V1–V5 | Reconcile 5 stale suites to current frozen contracts (Governance Engine void-init; Kilo script 1-arg; 3× phase-09 services) | test files only; contracts already frozen | HIGH | **COMPLETE** |
-| 2 | `assurance.local-folder-watcher-lifecycle` | E1 | Diagnose + fix Windows libuv native abort (watcher lifecycle vs test teardown) or record explicit reproducible exclusion; **isolated** | LocalFolderWatcher owner + test | MEDIUM | **EXECUTING** |
-| 3 | `security.auth-route-rate-limiting` | S2 | Apply existing limiter to `/api/session` + `/api/auth/login`; negative 429 test | `CommercialRuntimeServer` | HIGH | PLANNED |
+| 2 | `assurance.local-folder-watcher-lifecycle` | E1 | Diagnose + fix Windows libuv native abort (watcher lifecycle vs test teardown) or record explicit reproducible exclusion; **isolated** | LocalFolderWatcher owner + test | MEDIUM | **COMPLETE** |
+| 3 | `security.auth-route-rate-limiting` | S2 | Apply existing limiter to `/api/session` + `/api/auth/login`; negative 429 test | `CommercialRuntimeServer` | HIGH | **EXECUTING** |
 | 4 | `product.web-password-auth` | S1 | Real register/login in web UI via existing `/api/auth/*` (no new engine) | `web/` + runtime auth | MEDIUM | PLANNED |
 | 5 | `security.http-boundary-tenant-object-authz` | S5,S7 | Invoke `TenantIsolation.checkAccess()` + explicit object-owner check at HTTP boundary | `TenantIsolation`, runtime routes | MEDIUM | PLANNED |
 | 6 | `observability.metrics-and-request-trace` | S6 | Additive metrics + structured request trace (no architecture change) | runtime diagnostics | MEDIUM | PLANNED |
@@ -73,6 +73,28 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 **Checkpoint:** `.kilo/plans/assurance-stale-test-reconciliation-checkpoint.md`
 
 **DO-NOT-REPEAT:** do not change `Core/Engine.ts`; do not re-add `unitsSold`-required/`points`/`fitted`/`inSampleMae` APIs; do not delete the phase-09 files; do not touch `LocalFolderWatcher` or OCR in this stage.
+
+---
+
+## Stage 2 — `assurance.local-folder-watcher-lifecycle`
+
+**State:** COMPLETE
+**Baseline SHA:** `077dc2d0741f96374cf2959c1ce06eef0f65691b`
+**Classification:** REAL PRODUCT DEFECT (process-level abort), repaired in the canonical owner — not a flake, not excluded.
+
+**DISCOVER / INSPECT (done):**
+- Isolated suite reproduced the abort deterministically: `Assertion failed: !_wcsnicmp(filename, dir, dirlen), file src\win\fs-event.c, line 72`, exit `0xC0000409`.
+- Two-process inline proof: watching short `os.tmpdir()` path `C:\Users\AVALIP~1\...` **aborts**; watching the long `realpath` form `C:\Users\avalipour\...` **works (exit 0)**.
+- Cause: libuv resolves event names to long form via `GetLongPathNameW` while the registered watch prefix stays short → `uv__relative_path` prefix assertion fails → `abort()`.
+- `LocalFolderWatcher.start()` passed the caller's possibly-short path directly to `fs.watch`.
+
+**Repair:** `Backend/HBOS/Product/LocalFolderWatcher.ts` — `start()` canonicalizes with `await fs.realpath(this.folder)` before `stat`/`readdir`/`watch`. Test strengthened to assert canonical `sourcePath`.
+
+**Evidence:** focused 9/9 ×4 runs; regression 37/37; typecheck exit 0; full suite 255/259 suites / 1951/1954 tests with `LocalFolderWatcher` **PASS**. See `.kilo/plans/assurance-local-folder-watcher-lifecycle-checkpoint.md` and audit §33.
+
+**Checkpoint:** `.kilo/plans/assurance-local-folder-watcher-lifecycle-checkpoint.md`
+
+**DO-NOT-REPEAT:** do not permanently exclude `LocalFolderWatcher`; do not modify the protected `FinancialDataIngestionAdapter.ts`; do not change the watcher's public contract beyond canonicalization.
 
 ---
 

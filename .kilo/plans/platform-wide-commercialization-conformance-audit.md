@@ -622,3 +622,55 @@ No change to `productComplete`, `commercialProductRuntimeComplete` or `externalP
 ### 32.6 Next candidate knot (not executed)
 
 `assurance.local-folder-watcher-lifecycle` — bounded, isolated diagnosis of the Windows libuv native abort so it is neither hidden nor allowed to destabilize the full suite.
+
+---
+
+## 33. Product defect knot — `assurance.local-folder-watcher-lifecycle` executed (real Windows/libuv abort repaired)
+
+**Knot:** diagnose and repair the deterministic Node process abort (`src\win\fs-event.c:72`, exit `0xC0000409`) reproduced when `LocalFolderWatcher` watches a folder and receives file events.
+**Trusted baseline at execution:** `git rev-parse HEAD` = `077dc2d0741f96374cf2959c1ce06eef0f65691b` (`fix/autonomous-product-factory`).
+**Classification:** **REAL PRODUCT DEFECT** (process-level abort / fail-open availability hazard), repaired in the canonical owner. Not a test flake; not permanently excluded.
+**Checkpoint:** `.kilo/plans/assurance-local-folder-watcher-lifecycle-checkpoint.md`.
+
+### 33.1 Independent confirmation of the root cause
+
+Two isolated inline Node runs at this environment (Node `24.18.1`, libuv `1.52.1`, Windows x64) proved the trigger:
+
+| Watched path | Result |
+|---|---|
+| `os.tmpdir()` short form `C:\Users\AVALIP~1\AppData\Local\Temp\hw-short-*` | **Abort** `Assertion failed: !_wcsnicmp(filename, dir, dirlen), file src\win\fs-event.c, line 72`, exit `-1073740791` (`0xC0000409`) |
+| `fs.realpathSync.native(...)` long form `C:\Users\avalipour\AppData\Local\Temp\hw-long-*` | Events emitted, **exit 0** |
+
+`os.tmpdir()` returns the 8.3 short path on this host. libuv's Windows fs-event handler resolves the changed file name to its long form via `GetLongPathNameW`, but the registered directory prefix (`handle->dirw`) remains the short form, so the `uv__relative_path` prefix assertion fails and `abort()`s the whole Node process. The abort is environment-triggered but the product exposed it: `LocalFolderWatcher` passed the caller-supplied (possibly short) path straight to `fs.watch`, so a real user watching a `%TEMP%`-derived or otherwise short path would crash the entire process.
+
+### 33.2 Repair (canonical owner, no architecture change)
+
+`Backend/HBOS/Product/LocalFolderWatcher.ts`: `start()` now canonicalizes the watched folder with `await fs.realpath(this.folder)` before `stat`/`readdir`/`watch`. The canonical (long) path keeps the libuv watch prefix consistent with the resolved event names, eliminating the native abort while preserving the existing watcher contract. `folder` became mutable (removed `readonly`).
+
+### 33.3 Behavioral test strengthening
+
+`Backend/HBOS/test/LocalFolderWatcher.test.ts`: the "emits add for new files and change for existing" test now also asserts the emitted `sourcePath` equals `join(await fsp.realpath(directory), "ledger.csv")`, locking in canonicalization (removing the fix fails the assertion instead of only aborting).
+
+### 33.4 Verification evidence
+
+- Focused: `LocalFolderWatcher.test.ts` — **9/9 tests passed, exit 0**, repeated **4/4 runs** (none abort).
+- Regression: `FinancialDataIngestionAdapter.test.ts` + `Phase14-IngestionRuntime.test.ts` — **2/2 suites, 37/37 tests passed**.
+- Changed-file typecheck `tsc --noEmit` (both changed files): **exit 0**.
+- Full suite (`jest --silent`, evidence `.kilo/evidence/jest-full-stage2-localfolderwatcher-fix.txt`): **255/259 suites passed; 1951/1954 tests passed**. `LocalFolderWatcher.test.ts` now **PASSES** in the full suite. No new failure class introduced.
+
+### 33.5 Remaining failure classification (after repair)
+
+| Suite | Class |
+|---|---|
+| `FinancialDataIngestionAdapter.test.ts` (XLSX SHA-256 duplicate-detection) | TIMING/RESOURCE FLAKE (passes in isolation; fails only under full parallel load) |
+| `OcrAdapter.test.ts` | ENVIRONMENT GAP (`tesseract.js` absent) |
+| `CommercialRuntimePersistenceRecovery.test.ts` | TIMING/RESOURCE FLAKE (5 s test timeout exceeded under load) |
+| `Autonomous/Runtime/KiloCodeExecutionAdapter.test.ts` | TIMING/RESOURCE FLAKE (real Windows parent+child timeout; passes in isolation) |
+
+### 33.6 Truth boundary
+
+No change to `productComplete`, `commercialProductRuntimeComplete` or `externalProductionDependenciesComplete`. No delivered commercial capability touched. The watcher was **not** permanently excluded to make Jest green; its real coverage is preserved and strengthened. No assertion weakened, no test skipped or deleted.
+
+### 33.7 Next candidate knot (not executed)
+
+`security.auth-route-rate-limiting` — apply the existing rate limiter to `/api/session` and `/api/auth/login` with negative 429 coverage.

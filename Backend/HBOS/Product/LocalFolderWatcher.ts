@@ -52,7 +52,7 @@ function isTransient(sourceName: string): boolean {
 
 export class LocalFolderWatcher {
   private readonly tenantId: string;
-  private readonly folder: string;
+  private folder: string;
   private readonly adapter: FinancialDataIngestionAdapter;
   private readonly debounceMs: number;
   private readonly scanIntervalMs: number;
@@ -87,6 +87,18 @@ export class LocalFolderWatcher {
 
   async start(): Promise<void> {
     if (this.running) throw new Error(WATCHER_ERROR_CODES.ALREADY_RUNNING);
+
+    // Canonicalize the folder to its long/canonical form before watching.
+    // On Windows, watching an 8.3 short path (for example
+    // `os.tmpdir() === "C:\\Users\\XXXXXX~1\\AppData\\Local\\Temp"`) makes
+    // libuv resolve event file names to their long form while the registered
+    // watch prefix stays short. libuv's Windows fs-event handler then trips a
+    // native assertion (`src\win\fs-event.c`) that aborts the entire Node
+    // process (exit 0xC0000409) instead of surfacing a JS error. Resolving to
+    // the canonical path keeps the watch prefix and the resolved event names
+    // consistent and prevents that process-level abort.
+    this.folder = await fs.realpath(this.folder);
+
     const stat = await fs.stat(this.folder);
     if (!stat.isDirectory()) throw new Error("ingestion-watcher-not-a-directory");
 
