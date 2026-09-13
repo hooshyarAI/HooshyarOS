@@ -3,7 +3,7 @@
 **Status:** VERIFIED
 **Branch:** `fix/autonomous-product-factory`
 **Trusted baseline:** `462615e6685f02301e0f4a25b22eff9934a3bb53` (Layer 5 financial-analytics complete)
-**Knot commit:** recorded in the follow-up checkpoint/SHA-record commit
+**Knot commit:** `5a21cec3b1dd9e645e3918bcfb45ec2baa523cc1`
 **Architecture baseline:** Architecture Freeze V4.1 (unchanged)
 
 ## 1. Mission
