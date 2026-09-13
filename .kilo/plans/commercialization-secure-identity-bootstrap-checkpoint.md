@@ -1,6 +1,7 @@
 # Commercialization Checkpoint — `product.secure-identity-bootstrap`
 
 **Status:** VERIFIED
+**Commit:** `c7bd874f426e5a1440695c13ba5a33103be772f5` (pushed to `origin/fix/autonomous-product-factory`)
 **Branch:** `fix/autonomous-product-factory`
 **Capability:** `product.secure-identity-bootstrap` (security hardening of the existing identity owner — NOT a new capability owner)
 **Canonical owner:** `Backend/HBOS/Product/CommercialIdentityService.ts`

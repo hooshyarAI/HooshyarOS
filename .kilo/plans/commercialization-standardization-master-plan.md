@@ -320,8 +320,8 @@ human-approved governed-execution path can exist using the existing `Authorizati
 | `product.organizational-execution` (Layer 8) | VERIFIED | `OrganizationalExecutionCoordinator.test.ts` 10/10, `OrganizationalExecutionRuntime.test.ts` 4/4; focused regression 113/113 (15 suites); full Jest 241/254 suites, 1864/1865 tests; `web-product-acceptance` PASS; `security-tenant-acceptance` PASS | `226a716a` |
 | `product.financial-analytics` (Layer 5) | VERIFIED | `FinancialAnalyticsService.test.ts` 7/7, `FinancialAnalyticsRuntime.test.ts` 5/5; owner+runtime regression 29/29 (6 suites); full Jest 244/256 suites, 1877/1877 tests; `web-product-acceptance` v6 PASS; `security-tenant-acceptance` v2 PASS; changed-file typecheck clean | `5f12a56c` |
 | `product.reports-export` (Layer 9) | VERIFIED | `ReportsEngine.test.ts` 9/9, `ReportExportService.test.ts` 6/6, `ReportsExportRuntime.test.ts` 5/5; focused regression 34/34 (5 suites); full Jest 246/258 suites, 1895/1895 tests; `web-product-acceptance` v7 PASS; `security-tenant-acceptance` v3 PASS; changed-file typecheck clean | `5a21cec3` |
-| Platform-wide conformance audit (Layers 1–16) | VERIFIED | `.kilo/plans/platform-wide-commercialization-conformance-audit.md`; no architecture change accepted | (this transaction) |
-| `product.secure-identity-bootstrap` (Layer 3 hardening) | VERIFIED | `CommercialSessionBootstrapSecurity.test.ts` 4/4; 18-suite / 94-test session regression PASS; `security-tenant-acceptance` v4 PASS (bootstrapHardening); `web-product-acceptance` PASS; changed-file typecheck clean | (this transaction) |
+| Platform-wide conformance audit (Layers 1–16) | VERIFIED | `.kilo/plans/platform-wide-commercialization-conformance-audit.md`; no architecture change accepted | `c7bd874f` |
+| `product.secure-identity-bootstrap` (Layer 3 hardening) | VERIFIED | `CommercialSessionBootstrapSecurity.test.ts` 4/4; 18-suite / 94-test session regression PASS; `security-tenant-acceptance` v4 PASS (bootstrapHardening); `web-product-acceptance` PASS; changed-file typecheck clean | `c7bd874f` |
 
 ### Knot `product.decision-workbench` — delivered
 
