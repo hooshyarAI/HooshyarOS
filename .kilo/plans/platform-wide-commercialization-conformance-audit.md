@@ -259,7 +259,7 @@ Canonical path `Source → Connector → Raw Evidence → Validation → Normali
 | Suite | Failure | Classification |
 |---|---|---|
 | `GovernanceEngine.test.ts` | `TS2339: Property 'status' does not exist on type 'void'` — asserts `initialize().status` but frozen `Engine.initialize()` returns `void` | **STALE TEST (guaranteed fail)** |
-| `EngineDependencyVerifier.test.ts` | `TS2307: Cannot find module './EngineDependencyVerifier'` (import path wrong) | **STALE TEST / broken import** |
+| `EngineDependencyVerifier.test.ts` | `TS2307: Cannot find module './EngineDependencyVerifier'` (import should be `../Core/EngineDependencyVerifier`). **Deeper bug:** the verifier resolves `ENGINES_DIR` to `Core/Engines` (does not exist), so `analyzeDependencies()` returns `[]` — the Phase 03 dependency verifier currently analyzes nothing | **STALE TEST + REAL CODE DEFECT** |
 | `BreakEvenAnalysisService.phase-09-1-5.test.ts` | `TS2345/TS2339` — targets superseded `unitsSold`/`status`/`amount` API | **STALE DUPLICATE (superseded by current service + non-phase test)** |
 | `CashFlowForecastingService.phase-09-1-6.test.ts` | `TS2554/TS2339` — targets superseded 2-arg API | **STALE DUPLICATE** |
 | `ExponentialSmoothingService.phase-09-1-9.test.ts` | `TS2554/TS2339` — targets superseded 3-arg API | **STALE DUPLICATE** |
@@ -343,7 +343,7 @@ No third architecture was invented.
 ## 23. Duplicates / dead / stale / misowned
 
 - **Duplicates:** none in product layer. `HealthMonitorEngine` may exist in two locations — needs confirmation before any action (do not delete).
-- **Stale tests:** 6 suites (GovernanceEngine, EngineDependencyVerifier, KiloCodeExecutionAdapterObservability, 3× Phase-09 analytics).
+- **Stale tests:** 6 suites (GovernanceEngine, EngineDependencyVerifier, KiloCodeExecutionAdapterObservability, 3× Phase-09 analytics) + `EngineDependencyVerifier` also has a real path bug (`Core/EngineDependencyVerifier.ts:8` resolves `Core/Engines`, which does not exist, so it analyzes nothing — see §16).
 - **Broken code/tests:** `HooshyarAutonomousAssistant` improvement integration (2 suites).
 - **Environment:** `OcrAdapter` missing `tesseract.js`.
 - **Disconnected (valid, unwired):** `SyncStateStore`, `ConnectorRegistry`, `Generic*Connector`, `KpiIntelligenceService`, PDF/DOCX/OCR helpers, several platform engines.
