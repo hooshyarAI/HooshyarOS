@@ -158,8 +158,103 @@ document.querySelector('#decision-form').addEventListener('submit', async event 
   }
 });
 
-document.querySelector('#report-button').addEventListener('click', async () => {
-  const result = document.querySelector('#report-result');
+async function refreshExecution() {
+  const container = document.querySelector('#execution-list');
+  try {
+    const payload = await getJson('/api/execution/work-items');
+    if (!payload.workItems.length) {
+      container.textContent = 'هنوز کار اجرایی ثبت نشده است. ابتدا تصمیم بسازید و سپس کار ایجاد کنید.';
+      return;
+    }
+    container.innerHTML = '';
+    for (const item of payload.workItems) {
+      const card = document.createElement('div');
+      card.className = 'execution-item';
+      const heading = document.createElement('div');
+      heading.className = 'execution-heading';
+      const title = document.createElement('strong');
+      title.textContent = item.title;
+      const status = document.createElement('span');
+      status.className = 'execution-status';
+      status.textContent = item.status;
+      heading.append(title, status);
+      const details = document.createElement('p');
+      details.textContent = `پیشنهاد تصمیم: ${item.decision?.recommendation ?? '—'} | مسئول: ${item.assignment?.assigneeId ?? '—'} | موعد: ${item.dueDate ?? '—'}`;
+      card.append(heading, details);
+      if (item.kpi) {
+        const kpi = document.createElement('p');
+        kpi.textContent = `KPI ${item.kpi.metric}: ${item.kpi.actual}/${item.kpi.target} (${item.kpi.status})`;
+        card.appendChild(kpi);
+      }
+      const actions = document.createElement('div');
+      actions.className = 'execution-actions';
+      for (const [action, label] of [['approve', 'تأیید'], ['reject', 'رد'], ['assign', 'واگذاری'], ['start', 'شروع'], ['complete', 'تکمیل']]) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = label;
+        button.addEventListener('click', () => runExecutionAction(item.workItemId, action));
+        actions.appendChild(button);
+      }
+      card.appendChild(actions);
+      container.appendChild(card);
+    }
+  } catch (error) {
+    container.textContent = `دریافت کارهای اجرایی ناموفق بود: ${error.message}`;
+  }
+}
+
+async function runExecutionAction(workItemId, action) {
+  const result = document.querySelector('#execution-result');
+  try {
+    const body = {};
+    if (action === 'assign') {
+      body.assigneeId = document.querySelector('#execution-assignee').value;
+      const due = document.querySelector('#execution-due').value;
+      if (due) body.dueDate = new Date(due).toISOString();
+    }
+    if (action === 'complete') {
+      body.kpi = {
+        metric: document.querySelector('#execution-kpi-metric').value,
+        target: Number(document.querySelector('#execution-kpi-target').value),
+        actual: Number(document.querySelector('#execution-kpi-actual').value)
+      };
+      body.feedback = { result: 'DELIVERED', notes: 'ثبت از رابط کاربری' };
+    }
+    if (action === 'reject') body.reason = 'رد از رابط کاربری';
+    const payload = await getJson(`/api/execution/work-items/${encodeURIComponent(workItemId)}/${action}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    result.textContent = `عملیات ${action} انجام شد. وضعیت جدید: ${payload.status}`;
+    await refreshExecution();
+  } catch (error) {
+    result.textContent = `عملیات اجرایی ناموفق بود: ${error.message}`;
+  }
+}
+
+document.querySelector('#execution-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const result = document.querySelector('#execution-result');
+  try {
+    const payload = await getJson('/api/execution/work-items', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        title: document.querySelector('#execution-title').value,
+        priority: document.querySelector('#execution-priority').value
+      })
+    });
+    result.textContent = `کار اجرایی ${payload.workItemId} در وضعیت ${payload.status} ایجاد شد.`;
+    await refreshExecution();
+  } catch (error) {
+    result.textContent = `ایجاد کار اجرایی ناموفق بود: ${error.message}`;
+  }
+});
+
+document.querySelector('#execution-refresh').addEventListener('click', refreshExecution);
+
+document.querySelector('#report-button').addEventListener('click', async () => {  const result = document.querySelector('#report-result');
   try {
     const payload = await getJson('/api/report');
     result.textContent = JSON.stringify(payload, null, 2);

@@ -106,9 +106,38 @@ async function main() {
     const decisionLatest = await request('/api/decision/latest', { headers: { cookie } });
     if (decisionLatest.status !== 200 || decisionLatest.body.recommendation?.alternative !== 'طرح الف') throw new Error(`WEB_ACCEPTANCE_DECISION_LATEST_FAILED:${decisionLatest.status}`);
 
-    const success = { type: 'WEB_PRODUCT_ACCEPTANCE_SUCCESS', version: 4, status: 'PASS', createdAt: new Date().toISOString(), repository: root, commit: gitCommit(), tenantId: session.body.tenantId, profit: dashboard.body.metrics.profit, acceptance: ['root','health','session','tenant','ingestion','analysis','executive-workbench','report','assistant','dashboard','multi-format-ingestion','structured-analysis','xlsx-analysis','raw-source-evidence','decision-workbench','expert-choice','decision-persistence'] };
+    // Layer 8: governed organizational execution through the real runtime.
+    // Spacing mutations lets the production token bucket refill naturally.
+    const executionMutation = async (pathname, body) => { await sleep(1100); return request(pathname, { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify(body) }); };
+    const proposed = await executionMutation('/api/execution/work-items', { title: 'اجرای طرح توسعه', description: 'work from approved decision', priority: 'HIGH' });
+    if (proposed.status !== 200 || proposed.body.status !== 'AWAITING_APPROVAL' || proposed.body.decision?.recommendation !== 'طرح الف' || proposed.body.approval !== null) throw new Error(`WEB_ACCEPTANCE_EXECUTION_PROPOSE_FAILED:${proposed.status}:${JSON.stringify(proposed.body)}`);
+    const workItemId = proposed.body.workItemId;
+    const approveUrl = `/api/execution/work-items/${encodeURIComponent(workItemId)}/approve`;
+    const approved = await executionMutation(approveUrl, { comments: 'تأیید انسانی برای اجرا' });
+    if (approved.status !== 200 || approved.body.status !== 'APPROVED' || approved.body.approval?.authority !== 'APPROVE' || approved.body.approval?.tenantId !== session.body.tenantId || approved.body.approval?.decisionArtifactKey !== 'decision-workbench:latest' || approved.body.workflow?.status !== 'READY') throw new Error(`WEB_ACCEPTANCE_EXECUTION_APPROVE_FAILED:${approved.status}:${JSON.stringify(approved.body)}`);
+    const assigned = await executionMutation(`/api/execution/work-items/${encodeURIComponent(workItemId)}/assign`, { assigneeId: 'qa-ops-lead', dueDate: '2026-12-01T00:00:00.000Z' });
+    if (assigned.status !== 200 || assigned.body.status !== 'ASSIGNED' || assigned.body.assignment?.assigneeId !== 'qa-ops-lead' || assigned.body.dueDate !== '2026-12-01T00:00:00.000Z') throw new Error(`WEB_ACCEPTANCE_EXECUTION_ASSIGN_FAILED:${assigned.status}`);
+    const started = await executionMutation(`/api/execution/work-items/${encodeURIComponent(workItemId)}/start`, {});
+    if (started.status !== 200 || started.body.status !== 'IN_PROGRESS') throw new Error(`WEB_ACCEPTANCE_EXECUTION_START_FAILED:${started.status}`);
+    const completed = await executionMutation(`/api/execution/work-items/${encodeURIComponent(workItemId)}/complete`, {
+      kpi: { metric: 'revenue', target: 1000, actual: 1150, unit: 'IRR', series: [800, 950, 1150] },
+      evidence: [{ id: 'EV-ACCEPT', type: 'EXECUTION_MEMO', description: 'acceptance evidence', sha256: 'c'.repeat(64) }],
+      feedback: {
+        result: 'DELIVERED',
+        notes: 'acceptance feedback',
+        metrics: {
+          before: { cycleTime: 10, throughput: 50, errorRate: 0.1, capacity: 100, cost: 500 },
+          after: { cycleTime: 8, throughput: 62, errorRate: 0.05, capacity: 120, cost: 450 }
+        }
+      }
+    });
+    if (completed.status !== 200 || completed.body.status !== 'COMPLETED' || completed.body.kpi?.status !== 'ABOVE_TARGET' || completed.body.evidence?.length !== 1 || completed.body.feedback?.learning?.provenance?.verificationStatus !== 'VERIFIED' || completed.body.history?.length !== 5) throw new Error(`WEB_ACCEPTANCE_EXECUTION_COMPLETE_FAILED:${completed.status}:${JSON.stringify(completed.body)}`);
+    const executionList = await request('/api/execution/work-items', { headers: { cookie } });
+    if (executionList.status !== 200 || !Array.isArray(executionList.body.workItems) || !executionList.body.workItems.some(item => item.workItemId === workItemId)) throw new Error(`WEB_ACCEPTANCE_EXECUTION_LIST_FAILED:${executionList.status}`);
+
+    const success = { type: 'WEB_PRODUCT_ACCEPTANCE_SUCCESS', version: 5, status: 'PASS', createdAt: new Date().toISOString(), repository: root, commit: gitCommit(), tenantId: session.body.tenantId, profit: dashboard.body.metrics.profit, acceptance: ['root','health','session','tenant','ingestion','analysis','executive-workbench','report','assistant','dashboard','multi-format-ingestion','structured-analysis','xlsx-analysis','raw-source-evidence','decision-workbench','expert-choice','decision-persistence','organizational-execution','governed-approval','work-item-lifecycle','kpi-outcome','execution-evidence','execution-feedback'] };
     fs.writeFileSync(evidencePath, JSON.stringify(success, null, 2), 'utf8');
-    console.log(JSON.stringify({ type: 'WEB_PRODUCT_ACCEPTANCE', status: 'PASS', tenantId: session.body.tenantId, profit: dashboard.body.metrics.profit, root: true, session: true, analysis: true, executive: true, report: true, assistant: true, dashboard: true, multiFormat: true, decisionWorkbench: true }, null, 2));
+    console.log(JSON.stringify({ type: 'WEB_PRODUCT_ACCEPTANCE', status: 'PASS', tenantId: session.body.tenantId, profit: dashboard.body.metrics.profit, root: true, session: true, analysis: true, executive: true, report: true, assistant: true, dashboard: true, multiFormat: true, decisionWorkbench: true, organizationalExecution: true }, null, 2));
   } finally { await stop(); }
 }
 main().catch((error) => { try { fs.rmSync(evidencePath, { force: true }); } catch {} console.error(JSON.stringify({ type: 'WEB_PRODUCT_ACCEPTANCE', status: 'BLOCKED', error: error.message, platform: process.platform, node: process.version }, null, 2)); process.exitCode = 1; });

@@ -24,3 +24,12 @@ input { width: 100%; padding: 12px 13px; border: 1px solid #cbd5e1; border-radiu
 .decision-row { display: grid; grid-template-columns: 1.4fr .8fr .8fr .8fr .8fr; gap: 8px; }
 select { width: 100%; padding: 12px 13px; border: 1px solid #cbd5e1; border-radius: 10px; font: inherit; background: white; }
 @media (max-width: 760px) { .hero { flex-direction: column; align-items: stretch; } .grid { grid-template-columns: 1fr; } .metrics { grid-template-columns: 1fr; } form { grid-template-columns: 1fr; } .decision-row { grid-template-columns: 1fr 1fr; } }
+.execution-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 16px; align-items: end; }
+.execution-list { display: grid; gap: 12px; margin-top: 16px; }
+.execution-item { border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px; background: #f8fafc; }
+.execution-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.execution-status { font-size: .8rem; font-weight: 700; color: #166534; background: #dcfce7; border-radius: 999px; padding: 4px 10px; }
+.execution-item p { margin: 8px 0 0; color: #475569; }
+.execution-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.execution-actions button { border: 1px solid #cbd5e1; border-radius: 10px; padding: 8px 12px; background: white; font: inherit; cursor: pointer; }
+@media (max-width: 760px) { .execution-controls { grid-template-columns: 1fr; } }

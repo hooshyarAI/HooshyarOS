@@ -12,6 +12,18 @@ import { FinancialStatementAnalysisService } from "../../Product/FinancialStatem
 import { SecurityEventLogger } from "../../Entities/SecurityEventLogger";
 import { ExecutiveIntelligenceWorkbench, ExecutiveIntelligenceWorkbenchInput, ExecutiveIntelligenceWorkbenchResult } from "../../Product/ExecutiveIntelligenceWorkbench";
 import { DecisionWorkbench, DecisionWorkbenchInput, DecisionWorkbenchResult } from "../../Product/DecisionWorkbench";
+import {
+    OrganizationalExecutionCoordinator,
+    WorkItemOperationResult,
+    WorkItemPriority,
+    WorkItemAssigneeType,
+    KpiOutcomeInput,
+    WorkItemEvidence,
+    WorkItemFeedbackInput,
+    CompleteWorkItemInput
+} from "../../Product/OrganizationalExecutionCoordinator";
+import { SecurityContext } from "../../Security/SecurityContext";
+import { Principal } from "../../Security/Principals";
 import { SQLitePersistenceStore } from "../../Product/SQLitePersistenceStore";
 import { CommercialIdentityService, CommercialPermission, CommercialSession } from "../../Product/CommercialIdentityService";
 import { TokenBucketRateLimiter } from "../../Product/GenericApiConnector";
@@ -262,6 +274,8 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     const analysis = new FinancialStatementAnalysisService(new FinancialIntelligenceEngine(), reasoning);
     const executiveWorkbench = new ExecutiveIntelligenceWorkbench(new ExecutiveIntelligenceEngine());
     const decisionWorkbench = new DecisionWorkbench();
+    const organizationalExecution = new OrganizationalExecutionCoordinator(persistence);
+    if (options.securityEventLogger) organizationalExecution.setSecurityLogger(options.securityEventLogger);
     const reports = new ReportsEngine();
     const resilience = new ResilienceAnalyticsService();
     const impact = new ImpactMeasurementService();
@@ -349,10 +363,37 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
         expiresAt: session.expiresAt
     });
 
+    /**
+     * Build the real frozen SecurityContext for a commercial session. The role
+     * -> Authorization grants come from the canonical identity owner; this is
+     * what lets GovernanceEngine and AuthorizationGuard enforce the human
+     * APPROVE/EXECUTE authority on the governed-execution boundary.
+     */
+    const executionContext = (session: CommercialSession): SecurityContext =>
+        SecurityContext.forHumanUser(
+            Principal.humanUser(session.userId, session.tenantId),
+            identity.authorizationsFor(session.role),
+            `session:${session.token}`
+        );
+
+    const executionErrorStatus = (code: WorkItemOperationResult["code"]): number => {
+        switch (code) {
+            case "VALIDATION": return 400;
+            case "FORBIDDEN": return 403;
+            case "NOT_FOUND": return 404;
+            case "INVALID_TRANSITION": return 409;
+            default: return 422;
+        }
+    };
+
     const close = () => persistence.close();
     const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
         const corsJson = (status: number, payload: unknown, headers: Record<string, string> = {}) =>
             json(res, status, payload, { ...corsHeaders(corsOrigin), ...headers });
+        const executionResponse = (result: WorkItemOperationResult) =>
+            result.status === "READY"
+                ? corsJson(200, result.workItem)
+                : corsJson(executionErrorStatus(result.code), { error: result.code ?? "EXECUTION_BLOCKED", reason: result.reason });
         try {
             const path = req.url?.split("?")[0] ?? "/";
             if (req.method === "OPTIONS") {
@@ -361,7 +402,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 return res.end();
             }
             if (req.method === "GET" && path === "/health") return corsJson(200, { status: "ok", service: "hooshyar-commercial-runtime" });
-            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "ingested-source-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-workbench", "decision-workbench", "expert-choice", "reports", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "rbac", "session-lifecycle"] });
+            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "ingested-source-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-workbench", "decision-workbench", "expert-choice", "organizational-execution", "governed-approval", "work-item-lifecycle", "kpi-outcome", "reports", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "rbac", "session-lifecycle"] });
             if (req.method === "GET" && path === "/") return asset(res, "index.html", "text/html; charset=utf-8");
             if (req.method === "GET" && path === "/app.js") return asset(res, "app.js", "text/javascript; charset=utf-8");
             if (req.method === "GET" && path === "/styles.css") return asset(res, "styles.css", "text/css; charset=utf-8");
@@ -595,6 +636,91 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const result = await loadDecision(session.tenantId);
                 if (!result) return corsJson(404, { error: "DECISION_NOT_FOUND" });
                 return corsJson(200, result);
+            }
+
+            if (path === "/api/execution/work-items" && req.method === "POST") {
+                if (!getOrCreateRateLimiter(session.token).tryAcquire()) return corsJson(429, { error: "RATE_LIMIT_EXCEEDED" });
+                if (!ensurePermission("CREATE_DECISION")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                const body = await readJson(req);
+                const title = String(body.title ?? "").trim();
+                if (!title) return corsJson(400, { error: "WORK_ITEM_TITLE_REQUIRED" });
+                const result = await organizationalExecution.propose(executionContext(session), {
+                    title,
+                    description: body.description === undefined ? undefined : String(body.description),
+                    priority: body.priority === undefined ? undefined : String(body.priority) as WorkItemPriority,
+                    decisionArtifactKey: body.decisionArtifactKey === undefined ? undefined : String(body.decisionArtifactKey)
+                });
+                return executionResponse(result);
+            }
+
+            if (path === "/api/execution/work-items" && req.method === "GET") {
+                if (!ensurePermission("READ_DASHBOARD")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                const workItems = await organizationalExecution.listWorkItems(executionContext(session));
+                return corsJson(200, { status: "READY", tenantId: session.tenantId, workItems });
+            }
+
+            if (path.startsWith("/api/execution/work-items/")) {
+                const parts = path.slice("/api/execution/work-items/".length).split("/").filter(Boolean);
+                const workItemId = parts[0] ? decodeURIComponent(parts[0]) : "";
+                const action = parts[1];
+                const context = executionContext(session);
+
+                if (req.method === "GET" && !action) {
+                    if (!ensurePermission("READ_DASHBOARD")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                    const workItem = await organizationalExecution.getWorkItem(context, workItemId);
+                    if (!workItem) return corsJson(404, { error: "WORK_ITEM_NOT_FOUND" });
+                    return corsJson(200, workItem);
+                }
+
+                if (req.method === "POST" && action) {
+                    if (!getOrCreateRateLimiter(session.token).tryAcquire()) return corsJson(429, { error: "RATE_LIMIT_EXCEEDED" });
+                    const approvalAction = action === "approve" || action === "reject";
+                    if (!ensurePermission(approvalAction ? "APPROVE_DECISION" : "CREATE_DECISION")) {
+                        return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                    }
+                    const body = action === "start" ? {} : await readJson(req);
+                    let result: WorkItemOperationResult;
+                    switch (action) {
+                        case "approve":
+                            result = await organizationalExecution.approve(context, workItemId, {
+                                comments: body.comments === undefined ? undefined : String(body.comments),
+                                requiredApprovals: Array.isArray(body.requiredApprovals) ? body.requiredApprovals.map((value) => String(value)) : undefined,
+                                maxDurationMs: body.maxDurationMs === undefined ? undefined : Number(body.maxDurationMs),
+                                maxBudget: body.maxBudget === undefined ? undefined : Number(body.maxBudget)
+                            });
+                            break;
+                        case "reject":
+                            result = await organizationalExecution.reject(context, workItemId, { reason: String(body.reason ?? "") });
+                            break;
+                        case "assign":
+                            result = await organizationalExecution.assign(context, workItemId, {
+                                assigneeId: String(body.assigneeId ?? ""),
+                                assigneeType: body.assigneeType === undefined ? undefined : String(body.assigneeType) as WorkItemAssigneeType,
+                                dueDate: body.dueDate === undefined ? undefined : String(body.dueDate)
+                            });
+                            break;
+                        case "start":
+                            result = await organizationalExecution.start(context, workItemId);
+                            break;
+                        case "block":
+                            result = await organizationalExecution.block(context, workItemId, { reason: String(body.reason ?? "") });
+                            break;
+                        case "complete":
+                            result = await organizationalExecution.complete(context, workItemId, {
+                                kpi: body.kpi as KpiOutcomeInput | undefined,
+                                evidence: Array.isArray(body.evidence) ? body.evidence as WorkItemEvidence[] : undefined,
+                                feedback: body.feedback as WorkItemFeedbackInput | undefined,
+                                metrics: body.metrics as CompleteWorkItemInput["metrics"]
+                            });
+                            break;
+                        case "cancel":
+                            result = await organizationalExecution.cancel(context, workItemId, { reason: body.reason === undefined ? undefined : String(body.reason) });
+                            break;
+                        default:
+                            return corsJson(404, { error: "NOT_FOUND" });
+                    }
+                    return executionResponse(result);
+                }
             }
 
             if (req.method === "GET" && path === "/api/report") {

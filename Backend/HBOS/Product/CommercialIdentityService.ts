@@ -16,7 +16,7 @@ import { Authorization, AuthorizationResult } from "../Security/Authorization";
  */
 
 export type CommercialRole = UserRole;
-export type CommercialPermission = "READ_DASHBOARD" | "INGEST_DATA" | "CREATE_DECISION" | "MANAGE_USERS";
+export type CommercialPermission = "READ_DASHBOARD" | "INGEST_DATA" | "CREATE_DECISION" | "APPROVE_DECISION" | "MANAGE_USERS";
 
 export interface CommercialSession {
     token: string;
@@ -55,9 +55,9 @@ export interface CommercialLoginResult {
 const DEFAULT_SESSION_TTL_MS = 60 * 60 * 1000;
 
 const permissions: Record<CommercialRole, ReadonlySet<CommercialPermission>> = {
-    OWNER: new Set(["READ_DASHBOARD", "INGEST_DATA", "CREATE_DECISION", "MANAGE_USERS"]),
-    ADMIN: new Set(["READ_DASHBOARD", "INGEST_DATA", "CREATE_DECISION", "MANAGE_USERS"]),
-    MANAGER: new Set(["READ_DASHBOARD", "INGEST_DATA", "CREATE_DECISION"]),
+    OWNER: new Set(["READ_DASHBOARD", "INGEST_DATA", "CREATE_DECISION", "APPROVE_DECISION", "MANAGE_USERS"]),
+    ADMIN: new Set(["READ_DASHBOARD", "INGEST_DATA", "CREATE_DECISION", "APPROVE_DECISION", "MANAGE_USERS"]),
+    MANAGER: new Set(["READ_DASHBOARD", "INGEST_DATA", "CREATE_DECISION", "APPROVE_DECISION"]),
     ANALYST: new Set(["READ_DASHBOARD", "INGEST_DATA"]),
     VIEWER: new Set(["READ_DASHBOARD"])
 };
@@ -72,6 +72,7 @@ const PERMISSION_ACTION: Record<CommercialPermission, Authorization> = {
     READ_DASHBOARD: Authorization.READ,
     INGEST_DATA: Authorization.WRITE,
     CREATE_DECISION: Authorization.EXECUTE,
+    APPROVE_DECISION: Authorization.APPROVE,
     MANAGE_USERS: Authorization.ADMINISTER
 };
 
@@ -312,6 +313,17 @@ export class CommercialIdentityService {
 
     permissionsFor(role: CommercialRole): CommercialPermission[] {
         return [...permissions[role]];
+    }
+
+    /**
+     * Expose the frozen Security/Authorization grants for a commercial role so
+     * runtime/application layers can build a real SecurityContext for the
+     * canonical authorization and governance boundaries. This is an accessor,
+     * not a second permission model: the authoritative mapping remains
+     * ROLE_AUTHORIZATIONS above.
+     */
+    authorizationsFor(role: CommercialRole): Authorization[] {
+        return [...(ROLE_AUTHORIZATIONS[role] ?? [])];
     }
 
     logout(token: string | undefined): boolean {

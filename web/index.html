@@ -105,6 +105,26 @@
     </section>
 
     <section class="card onboarding">
+      <h2>اجرای سازمانی و گردش کار حاکمیتی</h2>
+      <p>تصمیم تأییدشده را به کار واگذارشده با مسئول، موعد، KPI، شواهد و بازخورد تبدیل کنید. تأیید انسانی و مرز tenant الزامی است.</p>
+      <form id="execution-form">
+        <label>عنوان کار<input id="execution-title" value="اجرای طرح توسعه" required /></label>
+        <label>اولویت<select id="execution-priority"><option value="MEDIUM">متوسط</option><option value="HIGH">بالا</option><option value="CRITICAL">بحرانی</option><option value="LOW">پایین</option></select></label>
+        <button class="primary" type="submit">ایجاد کار از تصمیم</button>
+      </form>
+      <div class="execution-controls">
+        <label>مسئول اجرا<input id="execution-assignee" value="مدیر عملیات" /></label>
+        <label>موعد<input id="execution-due" type="date" /></label>
+        <label>شاخص KPI<input id="execution-kpi-metric" value="revenue" /></label>
+        <label>هدف<input id="execution-kpi-target" type="number" value="1000" /></label>
+        <label>مقدار واقعی<input id="execution-kpi-actual" type="number" value="1100" /></label>
+        <button id="execution-refresh" class="primary" type="button">به‌روزرسانی کارها</button>
+      </div>
+      <div id="execution-list" class="execution-list"></div>
+      <pre id="execution-result" class="result" aria-live="polite"></pre>
+    </section>
+
+    <section class="card onboarding">
       <h2>تحلیل تاب‌آوری و استرس</h2>
       <form id="resilience-form">
         <label>شاخص<select id="resilience-metric"><option value="revenue">درآمد</option><option value="profit">سود</option><option value="cash">نقد</option></select></label>

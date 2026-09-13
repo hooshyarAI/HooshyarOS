@@ -2,7 +2,7 @@
 
 **Status:** ACTIVE
 **Branch:** `fix/autonomous-product-factory`
-**HEAD at audit:** `c769c184` (Phase 14-1.5 final checkpoint)
+**HEAD at audit:** `fea1b22d` (decision-workbench checkpoint; Layer 8 base)
 **Architecture baseline:** Architecture Freeze V4.1
 **Rule:** One canonical plan file for this mission. Do not create one plan per micro-variation.
 
@@ -97,7 +97,7 @@ executive workbench, resilience/impact/improvement, or engine math is permitted.
 | 5 | Financial intelligence | INTEGRATED | ratio/break-even/anomaly services not exposed via runtime |
 | 6 | Executive/managerial | INTEGRATED | KPI history/drill-down UI limited |
 | 7 | Decision intelligence / Expert Choice | **PARTIAL / NONSTANDARD** | `DecisionWorkbench` is a stub; `DecisionIntelligenceEngine` (AHP/TOPSIS/decisionTree) + `OrchestratedDecisionIntelligenceService` disconnected; no decision endpoint/UI |
-| 8 | Organizational execution | **NONSTANDARD** | `OrganizationalExecutionCoordinator` is a 14-line stub; no decision→approval→workflow→outcome path |
+| 8 | Organizational execution | **INTEGRATED / VERIFIED** | real decision→approval→workflow→assignment→due date→KPI/outcome→evidence→feedback path wired through `OrganizationalExecutionCoordinator` + runtime + UI; no duplicate workflow engine |
 | 9 | Dashboards and reports | INTEGRATED | no export/download; single generic dashboard |
 | 10 | Web and mobile | PARTIAL | shell-only service worker; responsive baseline |
 | 11 | Offline/online | MISSING | no local workspace/sync/conflict; `SyncStateStore` unwired |
@@ -128,7 +128,7 @@ session cookie → `CommercialIdentityService.hasPermission` → service → can
 → tenant-scoped record → JSON result. Endpoints: health/ready, auth (register/login/logout/refresh/session),
 ingest/analyze, executive workbench, report, assistant, dashboard, resilience, impact, improvement.
 
-**Broken/incomplete commercial paths:** decision evaluation (no endpoint), organizational execution (no endpoint).
+**Broken/incomplete commercial paths:** none of the decision/execution paths remain unwired; the decision evaluation path and the governed organizational-execution path are both live. Remaining commercial gaps are the later knots (reports export, financial service endpoints, offline sync, billing).
 
 ## 10. Duplicate / dead / stale implementation audit
 
@@ -145,7 +145,7 @@ ingest/analyze, executive workbench, report, assistant, dashboard, resilience, i
 | Capability | Owner | State | Action |
 |------------|-------|-------|--------|
 | `product.decision-workbench` | `Product/DecisionWorkbench.ts` | stub / disconnected engine math | **COMPLETE EXISTING OWNER (this knot)** |
-| `product.organizational-execution` | `Product/OrganizationalExecutionCoordinator.ts` | stub | next knot after decision |
+| `product.organizational-execution` | `Product/OrganizationalExecutionCoordinator.ts` | **COMPLETE EXISTING OWNER (this knot)** | governed human approval + work lifecycle + persistence + runtime + UI |
 | Reports export/download | `Engines/ReportsEngine.ts` + runtime | missing export | later knot |
 | Financial service endpoints (ratios/break-even/anomaly) | `Product/*Service.ts` | disconnected | later knot (contract layer 5) |
 | Offline/online sync | `Product/SyncStateStore.ts` | disconnected | later phase |
@@ -167,7 +167,7 @@ IntegrationImpact .10 + StandardizationImpact .05 + ImplementationSafety .10.
 | Rank | Knot | Score rationale | Safety |
 |------|------|-----------------|--------|
 | 1 | **`product.decision-workbench`** (Expert Choice) | core product differentiator; unblocks org-execution; wires 1 engine + 1 owner + runtime + UI | HIGH (engine math already tested) |
-| 2 | `product.organizational-execution` | depends on decision approval; layer 8 | MEDIUM |
+| 2 | **`product.organizational-execution`** | depends on decision approval; layer 8 — DELIVERED, no new owner | **DONE / VERIFIED** |
 | 3 | Financial service API integration (ratios/break-even/anomaly) | contract layer 5 | HIGH |
 | 4 | Reports export/download | contract layer 9 | HIGH |
 | 5 | Offline/PWA + sync | layers 10/11 | MEDIUM |
@@ -213,17 +213,59 @@ IntegrationImpact .10 + StandardizationImpact .05 + ImplementationSafety .10.
 
 ## 21. Remaining risks and debt
 
-- Layer 7 approval/execution remains for the organizational-execution knot (this knot delivers evaluation +
-  explainability only, and must not be reported as executing decisions).
-- Stub `OrganizationalExecutionCoordinator` remains.
 - Encryption-at-rest/backup remain pending human approval of 05C decisions.
 - Repo-root scratch files remain (unrelated, untouched).
+- Layer 8 governed execution is repository-native and local-runtime only; external enterprise-system execution
+  and scheduled/background workers remain future scope and are not claimed.
+- `GovernanceEngine.test.ts` remains a pre-existing stale test (asserts `initialize()` returns `{status}` while the
+  frozen `Engine` interface returns `void`); unrelated to Layer 8 and deliberately not rebuilt.
 
 ## 22. Next recommended knot
 
-`product.organizational-execution` — turn approved decision recommendations into governed work with assignment,
-due date, KPI/outcome and evidence, reusing `OrganizationalIntelligenceEngine` and `GovernanceEngine` (no new
-workflow engine). Blocked on this knot only for the decision artifact it consumes.
+`product.reports-export` (Layer 9) — expose the existing `ReportsEngine` build/download path through the runtime
+and browser, following the same owner-composition pattern. Alternatively Layer 5 financial-service endpoints
+(ratios/break-even/anomaly) remain disconnected. Both are independent of Layer 8.
+
+---
+
+## Layer 8 — Organizational Execution: architecture sufficiency decision
+
+**Result: ARCHITECTURE SUFFICIENT — NO ARCHITECTURE CHANGE REQUIRED.**
+
+Evidence (current branch, `fea1b22d`):
+
+- Canonical owner already exists and is named by the roadmap: `Product/OrganizationalExecutionCoordinator.ts`
+  (`capabilityId = product.organizational-execution`, `targetEngine = Organizational Intelligence Engine`). It was a
+  14-line stub; the knot is completing an existing owner, not creating a new engine.
+- Human approval authority already exists: `Authorization.APPROVE`, `AuthorizationGuard.check` Rule 5, and
+  `CommercialIdentityService.ROLE_AUTHORIZATIONS` (OWNER/ADMIN/MANAGER already hold `APPROVE`).
+- Governance gate already exists: `GovernanceEngine.evaluate()` performs real authorization + `TenantIsolation` +
+  policy evaluation and can express `REVIEW_REQUIRED`/`requiresHumanApproval`. No new authority boundary needed;
+  `APPROVE_DECISION` is an additive action mapping to the existing `APPROVE` authority.
+- Tenant/persistence/audit already exist: `TenantIsolation`, `SQLitePersistenceStore` (tenant-scoped), `ProvenanceTrace`.
+- KPI/outcome and feedback already exist: `KpiIntelligenceService`, `OrganizationalIntelligenceEngine.learnFromExecution`.
+- The autonomous execution guard is intentional and isolated: `AuthorizationGuard.checkAutonomousExecute` requires an
+  `AutonomousOperation` principal and rejects human users. It therefore does **not** block the governed human path,
+  which uses `APPROVE`/human principals. The two authorities remain separate and are never collapsed.
+
+**Critical authority answer:** the guard is intentional only for autonomous execution (case A). A separate
+human-approved governed-execution path can exist using the existing `Authorization.APPROVE` authority — proven by the
+`APPROVE` grant set, the `GovernanceEngine` action→authority mapping, and the new approval-path tests.
+
+### Knot `product.organizational-execution` — delivered
+
+- Canonical owner completed (not duplicated): `OrganizationalExecutionCoordinator` now composes `GovernanceEngine`,
+  `AutonomousOperationsEngine` (planning only), `OrganizationalIntelligenceEngine`, `KpiIntelligenceService` and
+  `SQLitePersistenceStore` to implement `Decision → Approval → Workflow → Assignment → Due date → KPI/outcome →
+  Evidence → Feedback → Audit`.
+- Authority safety: approval requires `APPROVE` through the governance gate; autonomous principals are rejected;
+  tenant isolation and deny-by-default authorization are enforced on every transition; invalid transitions fail closed.
+- Persistence: tenant-scoped durable work items + index; `history` is the durable audit trail; provenance hash per transition.
+- Runtime: `POST/GET /api/execution/work-items`, `GET /api/execution/work-items/:id`, and
+  `POST .../:id/approve|reject|assign|start|block|complete|cancel`; `/api/ready` advertises the capability.
+- Product surface: governed-execution card in `web/index.html` + `web/app.js` + `web/styles.css`.
+- Truthful boundary: the coordinator records governed human work and its outcome/evidence/feedback. It does not
+  claim autonomous or external-system execution.
 
 ---
 
@@ -233,6 +275,7 @@ workflow engine). Blocked on this knot only for the decision artifact it consume
 |------|--------|----------|--------|
 | Historical reconciliation + master plan | VERIFIED | this file | `5f5b62f1` |
 | `product.decision-workbench` | VERIFIED | `DecisionWorkbench.test.ts` 9/9, `DecisionWorkbenchRuntime.test.ts` 5/5; 160/160 decision/runtime regression; full Jest 240/253 suites, 1852/1853 tests; `web-product-acceptance` PASS; `security-tenant-acceptance` PASS | `5f5b62f1` |
+| `product.organizational-execution` (Layer 8) | VERIFIED | `OrganizationalExecutionCoordinator.test.ts` 10/10, `OrganizationalExecutionRuntime.test.ts` 4/4; focused regression 113/113 (15 suites); full Jest 241/254 suites, 1864/1865 tests; `web-product-acceptance` PASS; `security-tenant-acceptance` PASS | (this commit) |
 
 ### Knot `product.decision-workbench` — delivered
 
@@ -243,16 +286,28 @@ workflow engine). Blocked on this knot only for the decision artifact it consume
   `GET /api/decision/latest` (RBAC `READ_DASHBOARD`), tenant-scoped persistence at `decision-workbench:latest`.
 - Product surface: decision/Expert-Choice card in `web/index.html` + `web/app.js` + `web/styles.css`.
 - Truthful boundary: the workbench ranks and explains; it does not execute decisions. Approval/execution is the
-  next knot (`product.organizational-execution`). Layer 7 = INTEGRATED (evaluation); execution remains PARTIAL.
+  next knot (`product.organizational-execution`). Layer 7 = INTEGRATED (evaluation); execution was PARTIAL.
 
-### Regression classification (full Jest, worker-isolated)
+### Knot `product.organizational-execution` — delivered
 
-- Passed: 240/253 suites, 1852/1853 tests.
-- Pre-existing failures (12 suites, unchanged): OcrAdapter (tesseract.js absent), LocalFolderWatcher (Windows
-  `fs-event.c` native assert), BreakEven/CashFlow/ExponentialSmoothing Phase 09 contract mismatches,
-  KiloCodeExecutionAdapterObservability, EngineDependencyVerifier, GovernanceEngine, and 4 Assistant
-  `ImprovementInput` mismatches.
-- Flaky (1 test): `CommercialRuntimePersistenceRecovery` 5s process-restart timeout under parallel load; passes
-  in isolation (verified). Not caused by this knot.
+- Existing owner completed: `Backend/HBOS/Product/OrganizationalExecutionCoordinator.ts` (stub → full governed
+  lifecycle). No new engine, no duplicate workflow engine. `execute(string)` readiness contract preserved.
+- Additive contract extensions: `GovernanceEngine` gained `APPROVE_DECISION` (→ `Authorization.APPROVE`);
+  `CommercialIdentityService` gained `APPROVE_DECISION` (granted to OWNER/ADMIN/MANAGER only) and the
+  `authorizationsFor(role)` accessor used to build real `SecurityContext`s.
+- Runtime + browser + acceptance + docs wired. `Docs/Product/OrganizationalExecutionCoordinator.md` documents the
+  authority model and lifecycle.
+
+### Regression classification (full Jest)
+
+- Passed: 241/254 suites, 1864/1865 tests.
+- Pre-existing failures (13 suites, unchanged): OcrAdapter (tesseract.js absent), LocalFolderWatcher (Windows
+  `fs-event.c` native assert / worker exceptions), BreakEven/CashFlow/ExponentialSmoothing Phase 09 contract
+  mismatches, KiloCodeExecutionAdapterObservability, EngineDependencyVerifier, GovernanceEngine, and 4 Assistant
+  `ImprovementInput`/`improved` mismatches.
+- Flaky (1 test): `CommercialRuntimePersistenceRecovery` 5s timeout under parallel load; passes on isolated rerun
+  (2778 ms, verified). Not caused by this knot.
+- Typecheck of changed files: clean (`GovernanceEngine.test.ts` pre-existing stale-void error only).
 - **NEW REGRESSION: none.**
+
 

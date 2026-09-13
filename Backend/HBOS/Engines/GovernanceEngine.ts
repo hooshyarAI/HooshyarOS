@@ -94,6 +94,7 @@ export type GovernanceAction =
     | "ACCESS_SENSITIVE_DATA"
     | "CROSS_TENANT_OPERATION"
     | "OVERRIDE_DECISION"
+    | "APPROVE_DECISION"
     | "APPROVE_SPENDING"
     | "DEPLOY_TO_PRODUCTION";
 
@@ -269,6 +270,7 @@ export class GovernanceEngine implements Engine {
             case "CROSS_TENANT_OPERATION":
                 return Authorization.WRITE;
             case "OVERRIDE_DECISION":
+            case "APPROVE_DECISION":
             case "APPROVE_SPENDING":
                 return Authorization.APPROVE;
             case "DEPLOY_TO_PRODUCTION":
