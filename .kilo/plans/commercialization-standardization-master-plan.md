@@ -92,7 +92,7 @@ executive workbench, resilience/impact/improvement, or engine math is permitted.
 |---|-------|----------------|-------------|
 | 1 | Product runtime | INTEGRATED | local-only; no production process/TLS termination contract |
 | 2 | Identity/users/orgs | VERIFIED COMPLETE | password recovery/SSO not in MVP scope |
-| 3 | Multi-tenancy/authorization | VERIFIED COMPLETE | fine-grained resource policies beyond 4 permissions later |
+| 3 | Multi-tenancy/authorization | **VERIFIED COMPLETE + HARDENED** | passwordless OWNER/tenant takeover closed (`product.secure-identity-bootstrap`); fine-grained resource policies beyond 4 permissions later |
 | 4 | Data ingestion/canonical data | INTEGRATED | enterprise connectors/PDF unwired (deliberate) |
 | 5 | Financial intelligence | **PARTIAL / DISCONNECTED SERVICES** | `financial/analyze` exposes only 4 metrics; `RatioAnalysisService`, `BreakEvenAnalysisService`, `CashFlowForecastingService`, `AnomalyDetectionService` implemented + unit-tested but unreachable from runtime (this knot) |
 | 6 | Executive/managerial | INTEGRATED | KPI history/drill-down UI limited |
@@ -115,8 +115,10 @@ executive workbench, resilience/impact/improvement, or engine math is permitted.
   1. `DecisionWorkbench.describeCapability()` returns a *repair marker* id while the roadmap capability id is
      `product.decision-workbench` — a real owner with no capability implementation (this plan's knot).
   2. `OrganizationalExecutionCoordinator.execute(input: string)` is a placeholder contract.
-  3. Legacy `/api/session` passwordless bootstrap coexists with `/api/auth/*`; documented as backward-compatible —
-     retained deliberately, no change.
+  3. Legacy `/api/session` passwordless bootstrap coexists with `/api/auth/*`. **Superseded by the
+     `product.secure-identity-bootstrap` hardening**: unauthenticated owner/tenant takeover is now denied;
+     passwordless bootstrap is limited to the first owner of an unclaimed organization or resume of an
+     existing not-yet-activated account. Established organizations require `/api/auth/login`.
   4. Untracked scratch files at repo root (`tmp_*.js`, `test-sqlite-error*.js`) — repository hygiene only; not
      deleted (user work) but excluded from any commit.
 - **Decision:** only standardization with real product value is performed (fixing the stub owner). No cosmetic refactor.
@@ -222,10 +224,17 @@ IntegrationImpact .10 + StandardizationImpact .05 + ImplementationSafety .10.
 
 ## 22. Next recommended knot
 
-`product.offline-sync` (Layers 10/11) — PWA/offline local workspace and sync/conflict handling. Layer 9
-(`product.reports-export`) is now delivered/verified (see below). The remaining genuine commercial gaps are
-offline/online sync (Layer 11), billing/entitlements (Layer 15, external-provider blocked) and external
-production deployment (Layer 14, external).
+The platform-wide audit is complete (`.kilo/plans/platform-wide-commercialization-conformance-audit.md`).
+Layer 3 identity bootstrap is now hardened (`product.secure-identity-bootstrap`). The next highest-value
+safe knots are, in order:
+
+1. **Repair the degraded test-evidence base** — 9 compile-failing suites (stale GovernanceEngine /
+   EngineDependencyVerifier / KiloCodeExecutionAdapterObservability / 3× Phase-09 analytics; Assistant
+   improvement mismatch) and the `LocalFolderWatcher` Windows process-abort, without weakening assertions.
+2. **Wire real password register/login into the web UI** — `web/index.html`/`app.js` still use the
+   passwordless bootstrap only; the commercial login path is not exposed in the product.
+3. **Rate-limit `/api/auth/*`** and add pagination/idempotency to list/mutating routes.
+4. Layer 11 offline sync (`SyncStateStore`) and Layer 15 billing/entitlements (external-provider blocked).
 
 ---
 
@@ -311,6 +320,8 @@ human-approved governed-execution path can exist using the existing `Authorizati
 | `product.organizational-execution` (Layer 8) | VERIFIED | `OrganizationalExecutionCoordinator.test.ts` 10/10, `OrganizationalExecutionRuntime.test.ts` 4/4; focused regression 113/113 (15 suites); full Jest 241/254 suites, 1864/1865 tests; `web-product-acceptance` PASS; `security-tenant-acceptance` PASS | `226a716a` |
 | `product.financial-analytics` (Layer 5) | VERIFIED | `FinancialAnalyticsService.test.ts` 7/7, `FinancialAnalyticsRuntime.test.ts` 5/5; owner+runtime regression 29/29 (6 suites); full Jest 244/256 suites, 1877/1877 tests; `web-product-acceptance` v6 PASS; `security-tenant-acceptance` v2 PASS; changed-file typecheck clean | `5f12a56c` |
 | `product.reports-export` (Layer 9) | VERIFIED | `ReportsEngine.test.ts` 9/9, `ReportExportService.test.ts` 6/6, `ReportsExportRuntime.test.ts` 5/5; focused regression 34/34 (5 suites); full Jest 246/258 suites, 1895/1895 tests; `web-product-acceptance` v7 PASS; `security-tenant-acceptance` v3 PASS; changed-file typecheck clean | `5a21cec3` |
+| Platform-wide conformance audit (Layers 1–16) | VERIFIED | `.kilo/plans/platform-wide-commercialization-conformance-audit.md`; no architecture change accepted | (this transaction) |
+| `product.secure-identity-bootstrap` (Layer 3 hardening) | VERIFIED | `CommercialSessionBootstrapSecurity.test.ts` 4/4; 18-suite / 94-test session regression PASS; `security-tenant-acceptance` v4 PASS (bootstrapHardening); `web-product-acceptance` PASS; changed-file typecheck clean | (this transaction) |
 
 ### Knot `product.decision-workbench` — delivered
 
@@ -397,6 +408,41 @@ boundary, not new report architecture.
   EngineDependencyVerifier, GovernanceEngine, and 4 Assistant `ImprovementInput` mismatches.
 - Changed-file typecheck: clean (only the 4 pre-existing `HooshyarAutonomousAssistant`/`CapabilityMatrix`/
   `AutonomousBuildCommand` errors remained repo-wide; none in report files).
+- **NEW REGRESSION: none.**
+
+---
+
+## Platform-wide conformance audit + Layer 3 hardening (this transaction)
+
+**Result: AUDIT COMPLETE; ARCHITECTURE SUFFICIENT — NO ARCHITECTURE CHANGE REQUIRED.**
+
+Authoritative artifact: `.kilo/plans/platform-wide-commercialization-conformance-audit.md` (29 sections).
+Key verified findings: five canonical engines present and coherent; four delivered product capabilities
+re-validated as PRESERVE; provenance/audit genuinely integrated (subagent "dead provenance" claim
+corrected); `.github/workflows` present (subagent "missing CI" claim corrected); test evidence base
+degraded by 9 compile-failing suites + 1 process-aborting suite; one **CRITICAL** identity/bootstrap
+tenant breach selected as the highest-value safe remediation.
+
+### Knot `product.secure-identity-bootstrap` — delivered
+
+- Existing owner hardened: `CommercialIdentityService.passwordlessBootstrapDecision()` gates the
+  runtime's `POST /api/session`. No new engine, no duplicate identity owner.
+- Policy: passwordless bootstrap = first owner of an *unclaimed* organization, or resume of an existing
+  not-yet-activated bootstrap account. Established organizations require `/api/auth/register` + `/login`;
+  active accounts and new owners in established organizations are denied `403`.
+- Runtime: `POST /api/session` returns `403 ORGANIZATION_ALREADY_ESTABLISHED` or
+  `403 PASSWORD_AUTHENTICATION_REQUIRED` instead of minting an OWNER session.
+- Evidence: `CommercialSessionBootstrapSecurity.test.ts` 4/4; 18-suite session regression PASS;
+  `security-tenant-acceptance` v4 PASS; `web-product-acceptance` PASS; changed-file typecheck clean.
+- Truthful boundary: does not add encryption-at-rest, SSO, or password recovery; first-owner onboarding
+  remains passwordless. Residual pending-account claim risk documented, not hidden.
+
+### Regression classification (this knot)
+
+- Passed: 18 targeted suites (94 tests) covering every `/api/session` consumer + 2 application acceptances.
+- One setup adjustment (NOT a weakened assertion): `CommercialRuntimeServer.rateLimiting.test.ts` now
+  uses distinct organizations (`org-a`/`org-b`) for its two sessions; rate-limit assertions unchanged, 4/4.
+- Pre-existing failures unchanged: 9 compile-failing suites + `LocalFolderWatcher` native crash (§16 of the audit).
 - **NEW REGRESSION: none.**
 
 

@@ -209,9 +209,40 @@ export class CommercialIdentityService {
     }
 
     /**
+     * Security gate for the legacy passwordless `/api/session` bootstrap path.
+     *
+     * Passwordless bootstrap may only provision the FIRST owner of an unclaimed
+     * organization, or resume an existing not-yet-activated bootstrap account.
+     * It must never mint a new owner inside an established organization and must
+     * never seize an already-activated (password-bearing) account. Without this
+     * gate an unauthenticated caller could name any organization and receive an
+     * OWNER session for it, breaking the tenant boundary.
+     */
+    passwordlessBootstrapDecision(username: string, organization: string): { allowed: boolean; reason?: string } {
+        const normalizedUser = username?.trim() ?? "";
+        const normalizedOrganization = organization?.trim() ?? "";
+        if (!normalizedUser || !normalizedOrganization) {
+            return { allowed: false, reason: "SESSION_FIELDS_REQUIRED" };
+        }
+
+        const tenantId = OrganizationModelEngine.tenantIdForOrganization(normalizedOrganization);
+        const existingUser = this.users.getUserByUsername(normalizedUser, tenantId);
+        if (existingUser) {
+            if (existingUser.status === "BLOCKED") return { allowed: false, reason: "ACCOUNT_BLOCKED" };
+            if (existingUser.status === "ACTIVE") return { allowed: false, reason: "PASSWORD_AUTHENTICATION_REQUIRED" };
+            return { allowed: true };
+        }
+
+        const members = this.organizations.listMembers(tenantId);
+        if (members.length > 0) return { allowed: false, reason: "ORGANIZATION_ALREADY_ESTABLISHED" };
+        return { allowed: true };
+    }
+
+    /**
      * Legacy `/api/session` onboarding path: provisions the organization owner
      * without a password. The account cannot authenticate until a password is
-     * set. Kept for backward-compatible single-tenant onboarding.
+     * set. Kept for backward-compatible single-tenant onboarding. The HTTP layer
+     * must validate `passwordlessBootstrapDecision` before calling this.
      */
     createSession(username: string, organization: string, role: CommercialRole = "OWNER"): CommercialSession {
         const normalizedUser = username?.trim() ?? "";

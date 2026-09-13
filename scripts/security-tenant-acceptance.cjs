@@ -150,20 +150,41 @@ async function main() {
     const unauthReportDownload = await request('/api/report/artifacts/report-deadbeef/download');
     if (unauthReportExport.status !== 401 || unauthReportDownload.status !== 401) throw new Error(`SECURITY_UNAUTHENTICATED_REPORT_ACCESS_NOT_DENIED:${unauthReportExport.status}/${unauthReportDownload.status}`);
 
+    // Identity bootstrap hardening: passwordless session creation must not seize an established organization.
+    const establishedRegister = await request('/api/auth/register', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username: 'established-owner', organization: 'Org Established', password: 'correct-horse-battery' })
+    });
+    if (establishedRegister.status !== 201) throw new Error(`SECURITY_ESTABLISHED_OWNER_REGISTER_FAILED:${establishedRegister.status}`);
+    const bootstrapTakeover = await request('/api/session', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username: 'attacker', organization: 'Org Established' })
+    });
+    if (bootstrapTakeover.status !== 403 || bootstrapTakeover.body.error !== 'ORGANIZATION_ALREADY_ESTABLISHED') throw new Error(`SECURITY_BOOTSTRAP_TAKEOVER_NOT_DENIED:${bootstrapTakeover.status}:${bootstrapTakeover.body.error}`);
+    const bootstrapSeizure = await request('/api/session', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username: 'established-owner', organization: 'Org Established' })
+    });
+    if (bootstrapSeizure.status !== 403 || bootstrapSeizure.body.error !== 'PASSWORD_AUTHENTICATION_REQUIRED') throw new Error(`SECURITY_BOOTSTRAP_SEIZURE_NOT_DENIED:${bootstrapSeizure.status}:${bootstrapSeizure.body.error}`);
+
     const evidence = {
       type: 'SECURITY_TENANT_ACCEPTANCE_SUCCESS',
-      version: 3,
+      version: 4,
       status: 'PASS',
       createdAt: new Date().toISOString(),
       repository: root,
       commit: gitCommit(),
       unauthenticatedApiDenied: true,
       tenantIsolation: true,
+      bootstrapHardening: true,
       tenants: [
         { tenantId: tenantA.tenantId, expectedProfit: tenantA.expectedProfit },
         { tenantId: tenantB.tenantId, expectedProfit: tenantB.expectedProfit }
       ],
-      acceptance: ['unauthenticated-dashboard-denied', 'unauthenticated-analyze-denied', 'distinct-tenant-identities', 'tenant-a-data-isolated', 'tenant-b-data-isolated', 'analytics-tenant-scoped', 'analytics-cross-tenant-read-denied', 'report-export-tenant-scoped', 'report-artifact-download-secure', 'report-artifact-cross-tenant-denied', 'report-artifact-index-tenant-isolated', 'unauthenticated-report-export-denied', 'unauthenticated-report-download-denied']
+      acceptance: ['unauthenticated-dashboard-denied', 'unauthenticated-analyze-denied', 'distinct-tenant-identities', 'tenant-a-data-isolated', 'tenant-b-data-isolated', 'analytics-tenant-scoped', 'analytics-cross-tenant-read-denied', 'report-export-tenant-scoped', 'report-artifact-download-secure', 'report-artifact-cross-tenant-denied', 'report-artifact-index-tenant-isolated', 'unauthenticated-report-export-denied', 'unauthenticated-report-download-denied', 'passwordless-bootstrap-takeover-denied', 'passwordless-bootstrap-active-account-seizure-denied']
     };
     fs.writeFileSync(evidencePath, JSON.stringify(evidence, null, 2), 'utf8');
     console.log(JSON.stringify(evidence, null, 2));

@@ -132,14 +132,14 @@ describe("CommercialRuntimeServer rate limiting", () => {
     const sessionA = await request(server, "/api/session", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ username: "qa", organization: "org" }),
+      body: JSON.stringify({ username: "qa", organization: "org-a" }),
     });
     const cookieA = cookieFrom(sessionA);
 
     const sessionB = await request(server, "/api/session", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ username: "qb", organization: "org" }),
+      body: JSON.stringify({ username: "qb", organization: "org-b" }),
     });
     const cookieB = cookieFrom(sessionB);
 

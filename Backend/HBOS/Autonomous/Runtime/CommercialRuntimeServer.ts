@@ -546,6 +546,14 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const password = body.password === undefined ? undefined : String(body.password);
                 if (!username || !organization) return corsJson(400, { error: "SESSION_FIELDS_REQUIRED" });
 
+                if (password === undefined) {
+                    const decision = identity.passwordlessBootstrapDecision(username, organization);
+                    if (!decision.allowed) {
+                        logAuthFailure(decision.reason ?? "PASSWORDLESS_BOOTSTRAP_DENIED");
+                        return corsJson(403, { error: decision.reason ?? "PASSWORDLESS_BOOTSTRAP_DENIED" });
+                    }
+                }
+
                 const created = password === undefined
                     ? { success: true as const, session: identity.createSession(username, organization, "OWNER") }
                     : identity.login(username, password, organization);
