@@ -12,6 +12,7 @@ import { createLocalConstructionTools } from "./LocalConstructionToolset";
 import { AutonomousPerformanceBudget } from "./AutonomousPerformanceBudget";
 
 export interface DaemonOptions {
+    knotRecovery?: AutonomousKnotRecovery;
     root?: string;
     maxCycles?: number;
     reportEvery?: number;
@@ -27,6 +28,22 @@ type MissionDecision =
     | { kind: "platform-complete"; mission: Mission; assistantGatePassed: true; continuation: PlatformContinuationMission; canonicalAudit: ReturnType<CanonicalCapabilityAudit["audit"]>; commercialAudit: ReturnType<CommercialProductCompletionAudit["audit"]> }
     | { kind: "platform-audit-blocked"; mission: Mission; assistantGatePassed: true; continuation: PlatformContinuationMission; reason: string; details: unknown };
 
+/**
+ * Workspace cleanliness is a construction precondition, not a planner failure.
+ * Once a mission has been selected from a dirty workspace, convert that state
+ * into an explicit repair knot before any new platform capability can be
+ * handed to the weaving planner.
+ */
+export function createWorkspaceRepairMission(selected: Mission): Mission {
+    return {
+        ...selected,
+        capabilityId: `repair-${selected.evidence.commit || "workspace"}`,
+        capability: `repair and verify the current working tree before continuing ${selected.capabilityId}`,
+        targetEngine: "Autonomous Operations Engine",
+        dependencies: []
+    };
+}
+
 export class AutonomousBuildDaemon {
     private readonly root: string;
     private readonly mission: AutonomousProjectMission;
@@ -36,7 +53,7 @@ export class AutonomousBuildDaemon {
     private readonly canonicalAudit = new CanonicalCapabilityAudit();
     private readonly commercialAudit = new CommercialProductCompletionAudit();
     private readonly weavingPlanner = new AutonomousWeavingPlanner();
-    private readonly knotRecovery = new AutonomousKnotRecovery();
+    private readonly knotRecovery: AutonomousKnotRecovery;
     private readonly maxCycles: number;
     private readonly reportEvery: number;
     private readonly performanceBudget: AutonomousPerformanceBudget;
@@ -46,6 +63,7 @@ export class AutonomousBuildDaemon {
         this.mission = options.mission ?? new AutonomousProjectMission(this.root);
         this.continuation = options.continuation ?? new AutonomousPlatformContinuation();
         this.development = options.development ?? new AutonomousDevelopmentLoop(createLocalConstructionTools(this.root));
+        this.knotRecovery = options.knotRecovery ?? new AutonomousKnotRecovery();
         this.maxCycles = options.maxCycles ?? 1000;
         this.reportEvery = options.reportEvery ?? 1;
         this.performanceBudget = options.performanceBudget ?? new AutonomousPerformanceBudget({
@@ -86,12 +104,23 @@ export class AutonomousBuildDaemon {
         const documentation = documentationPaths.every(exists);
         const dependenciesSatisfied = dependencyPaths.every(exists);
         const verified = test && selected.evidence.clean && selected.evidence.commit.length > 0;
-
         return this.evidenceAudit.evaluate({ implementation, test, documentation, dependenciesSatisfied, verified });
     }
 
     private selectMission(): MissionDecision {
         const selected = this.mission.nextMission();
+
+        // The Assistant completion gate is allowed to hand off to platform
+        // construction only from a clean checkpoint. A dirty workspace is an
+        // explicit repair mission, never a reason to block the next capability.
+        if (!selected.evidence.clean && !selected.capabilityId.startsWith("repair-")) {
+            return {
+                kind: "mission",
+                mission: createWorkspaceRepairMission(selected),
+                assistantGatePassed: false
+            };
+        }
+
         if (selected.capabilityId !== "assistant.completion.gate") return { kind: "mission", mission: selected, assistantGatePassed: false };
 
         const continuation = this.continuation.createMission();
@@ -120,7 +149,7 @@ export class AutonomousBuildDaemon {
         }
 
         const commercialAudit = this.commercialAudit.audit(this.root);
-        if (!commercialAudit.complete) {
+        if (commercialAudit.missingLayers.length > 0) {
             return {
                 kind: "platform-audit-blocked",
                 mission: selected,
@@ -128,6 +157,17 @@ export class AutonomousBuildDaemon {
                 continuation,
                 reason: "COMMERCIAL_PRODUCT_AUDIT_MISSING_LAYERS",
                 details: commercialAudit
+            };
+        }
+
+        if (commercialAudit.blockedExternalDependencies.length > 0) {
+            return {
+                kind: "platform-audit-blocked",
+                mission: selected,
+                assistantGatePassed: true,
+                continuation,
+                reason: "BLOCKED_EXTERNAL_DEPENDENCY",
+                details: { ...commercialAudit, terminal: true }
             };
         }
 
@@ -151,7 +191,7 @@ export class AutonomousBuildDaemon {
             const decision = this.selectMission();
             if (decision.kind === "platform-complete") {
                 budgetSnapshot = this.performanceBudget.completeCycle(cycleStartedAt);
-                const productComplete = decision.canonicalAudit.complete && decision.commercialAudit.complete;
+                const productComplete = decision.canonicalAudit.complete && decision.commercialAudit.complete && decision.commercialAudit.blockedExternalDependencies.length === 0;
                 console.log(JSON.stringify({ type: "AUTONOMOUS_PLATFORM_CONSTRUCTION_COMPLETE", cycle, status: "completed", assistantComplete: true, autonomousConstructionComplete: true, canonicalPlatformConstructionComplete: decision.canonicalAudit.complete, commercialProductRuntimeComplete: decision.commercialAudit.complete, externalProductionDependenciesComplete: decision.commercialAudit.blockedExternalDependencies.length === 0, productComplete, backlogExhausted: decision.canonicalAudit.backlogExhausted, nonAutonomousProductionItems: decision.canonicalAudit.nonAutonomousProductionItems, commercialMissingLayers: decision.commercialAudit.missingLayers, blockedExternalDependencies: decision.commercialAudit.blockedExternalDependencies, continuation: decision.continuation, performance: budgetSnapshot, message: "Assistant and canonical construction are complete; commercial product completion is derived from independent application-level evidence." }));
                 return { status: "completed", cycles: cycle, history };
             }

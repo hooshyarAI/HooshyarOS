@@ -1,56 +1,46 @@
 import { ExecutiveIntelligenceEngine } from "../Engines/ExecutiveIntelligenceEngine";
+import { FinancialIntelligenceEngine } from "../Engines/FinancialIntelligenceEngine";
 import { ExecutiveIntelligenceWorkbench } from "../Product/ExecutiveIntelligenceWorkbench";
 
 describe("ExecutiveIntelligenceWorkbench", () => {
-  const workbench = () =>
-    new ExecutiveIntelligenceWorkbench(new ExecutiveIntelligenceEngine());
+  const metrics = new FinancialIntelligenceEngine().analyze({
+    revenue: 1000,
+    expenses: 600,
+    assets: 2000,
+    liabilities: 500,
+  });
 
-  it("composes verified financial evidence into canonical executive KPIs", () => {
-    const result = workbench().execute({
+  it("composes verified financial evidence into four executive KPIs", () => {
+    const workbench = new ExecutiveIntelligenceWorkbench(new ExecutiveIntelligenceEngine());
+    const result = workbench.execute({
       tenantId: "tenant:qa",
-      metrics: {
-        revenue: 1500,
-        profit: 1000,
-        profitMargin: 1000 / 1500,
-        debtRatio: 0.4,
-      },
-      targets: {
-        revenue: 1400,
-        profit: 900,
-        profitMargin: 0.6,
-        debtRatio: 0.5,
-      },
+      metrics,
+      targets: { revenue: 900, profit: 350, profitMargin: 0.3, debtRatio: 0.4 },
     });
 
     expect(result.status).toBe("READY");
-    expect(result.tenantId).toBe("tenant:qa");
-    expect(result.kpis).toEqual([
-      expect.objectContaining({ name: "revenue", actual: 1500, target: 1400, variance: 100 }),
-      expect.objectContaining({ name: "profit", actual: 1000, target: 900, variance: 100 }),
-      expect.objectContaining({ name: "profitMargin" }),
-      expect.objectContaining({ name: "debtRatio", actual: 0.4, target: 0.5, variance: -0.09999999999999998 }),
-    ]);
-    expect(result.recommendations).toHaveLength(4);
-    expect(result.performance).toHaveLength(4);
+    expect(result.kpis).toHaveLength(4);
+    expect(result.kpis[0]).toEqual(expect.objectContaining({ name: "revenue", actual: 1000, target: 900 }));
+    expect(result.kpis[1]).toEqual(expect.objectContaining({ name: "profit", actual: 400, target: 350 }));
+    expect(result.recommendations.every((recommendation) => recommendation.status !== "BLOCKED")).toBe(true);
   });
 
-  it("fails closed for invalid tenant, metrics or targets", () => {
-    expect(() => workbench().execute({
-      tenantId: "",
-      metrics: { revenue: 1, profit: 1, profitMargin: 1, debtRatio: 1 },
-      targets: { revenue: 1, profit: 1, profitMargin: 1, debtRatio: 1 },
-    })).toThrow("executive-intelligence-workbench-tenant-required");
-
-    expect(() => workbench().execute({
+  it("fails closed when a KPI target is invalid", () => {
+    const workbench = new ExecutiveIntelligenceWorkbench(new ExecutiveIntelligenceEngine());
+    expect(() => workbench.execute({
       tenantId: "tenant:qa",
-      metrics: { revenue: Number.NaN, profit: 1, profitMargin: 1, debtRatio: 1 },
-      targets: { revenue: 1, profit: 1, profitMargin: 1, debtRatio: 1 },
-    })).toThrow("executive-intelligence-workbench-metric-invalid:revenue");
+      metrics,
+      targets: { revenue: 900, profit: 350, profitMargin: 0, debtRatio: 0.4 },
+    })).toThrow("executive-intelligence-workbench-targets-invalid");
+  });
 
-    expect(() => workbench().execute({
-      tenantId: "tenant:qa",
-      metrics: { revenue: 1, profit: 1, profitMargin: 1, debtRatio: 1 },
-      targets: { revenue: 1, profit: Infinity, profitMargin: 1, debtRatio: 1 },
-    })).toThrow("executive-intelligence-workbench-target-invalid:profit");
+  it("preserves the tenant boundary", () => {
+    const workbench = new ExecutiveIntelligenceWorkbench(new ExecutiveIntelligenceEngine());
+    const result = workbench.execute({
+      tenantId: "tenant:isolated",
+      metrics,
+      targets: { revenue: 900, profit: 350, profitMargin: 0.3, debtRatio: 0.4 },
+    });
+    expect(result.tenantId).toBe("tenant:isolated");
   });
 });

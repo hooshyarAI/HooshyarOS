@@ -156,6 +156,37 @@ The next capability is the first genuinely missing capability whose dependencies
 
 The Assistant must never stop simply because its own construction layer is complete.
 
+### 6.1 Autonomous Platform Self-Management Law — PERMANENT
+
+The platform's construction fabric is required to autonomously plan and execute the complete engineering lifecycle for platform construction, repair, standardization, commercialization, qualification and continuation. The human owner is not the mechanical lifecycle driver.
+
+The canonical lifecycle is:
+
+**READ → AUDIT → DISCOVER → PRIORITIZE → PLAN → DEPENDENCY CHECK → CHECKPOINT → IMPLEMENT → FOCUSED TEST → INTEGRATE → RUNTIME/APPLICATION ACCEPTANCE → VERIFY → REPAIR IF NEEDED → STANDARDIZE → COMMERCIALIZE → QUALIFY → EVIDENCE → COMMIT/PUSH → CI FEEDBACK → RE-PLAN**
+
+The Assistant, Autonomous Operations Engine and approved construction fabric must choose and execute this lifecycle automatically from repository state. A human shell command may bootstrap or intentionally approve a governed action, but routine mechanical advancement must not require a human to manually choose the next stage, invoke a repair handoff, or stitch together separate commands.
+
+A factory failure, CI failure or acceptance failure must automatically enter the governed failure path and produce or invoke the canonical repair contract (`ASSISTANT_REPAIR_MISSION`) without synthetic success and without repeated blind retries.
+
+### 6.2 Canonical Reuse Law — PERMANENT
+
+Before creating any new Agent, Engine, Tool, Service, orchestration layer or alternative implementation path, autonomous planning must inventory the existing canonical architecture and registry and select reusable components wherever they satisfy the required contract.
+
+The platform must preferentially reuse existing:
+
+- Engines and Engine Registry entries;
+- Assistants and Assistant capabilities;
+- Builder, Planner, Orchestrator, Memory, Knowledge and Reasoning components;
+- autonomous construction and self-repair runners;
+- Product runtime, persistence, security and acceptance services;
+- repository-native Python and TypeScript workers;
+- tests, contracts and evidence collectors;
+- existing GitHub/CI workflows and release tooling.
+
+Creating a parallel Agent, duplicate Engine, duplicate business semantic, duplicate orchestration hierarchy or provider-specific construction path is prohibited unless an explicit architecture decision establishes a genuine missing capability or contradiction.
+
+The construction fabric must not depend on an external coding agent. Existing product provider integrations may exist only where approved by product architecture; they must never become dependencies of the construction fabric itself.
+
 ---
 
 ## 7. Expert Weaving Doctrine — Permanent Platform Law
@@ -414,6 +445,28 @@ The Assistant should request human intervention only for genuine product decisio
 
 ---
 
+## 15. Resilience, Analytical Intelligence and Organizational Survival Law — PERMANENT
+
+HooshyarOS is explicitly required to improve organizational survival, resilience, adaptability, productivity, time/energy efficiency, balanced growth and competitive capacity. This is a product outcome, not a marketing claim.
+
+The governing analytical doctrine is Docs/HOOSHYAROS_RESILIENCE_AND_ANALYTICAL_INTELLIGENCE_DOCTRINE_V1.md. It is binding on product intelligence, decision support, organizational transformation, risk, forecasting, optimization and autonomous operations.
+
+The platform must progressively support: Understand → Diagnose → Predict → Stress → Decide → Optimize → Execute → Measure → Learn → Adapt.
+
+Systems thinking, analytical thinking and strategic thinking are cross-cutting reasoning methods. Fundamental/business analysis, technical/market analysis where justified, statistics, econometrics, machine learning, time-series analysis, risk/uncertainty analysis, simulation, optimization/operations research, causal inference, NLP/document intelligence, graph/network analysis and trustworthy AI are approved methods governed by evidence, data sufficiency, explainability and risk controls.
+
+These methods MUST be implemented through the existing canonical architecture. No sixth intelligence engine, duplicate Analytics/Risk/Strategy/ML/Resilience engine, or provider-specific architecture may be introduced merely to host these methods.
+
+The product objective is not more algorithms. The objective is measurable business value: lower decision latency and operational waste; higher productivity and capacity utilization; stronger financial and operational resilience; faster organizational learning and adaptation; better risk visibility and scenario preparedness; sustainable and balanced growth; and governed automation with measurable outcomes.
+
+For commercial completion, every such capability must pass: DESIGN → IMPLEMENT → INTEGRATE → WIRE → REAL INPUT → USE → VERIFY → GOVERN → E2E → IMPACT MEASURE → QC → CHECKPOINT → COMPLETE.
+
+IMPLEMENTED ≠ INTEGRATED ≠ USED ≠ VERIFIED ≠ IMPACT-VERIFIED ≠ COMMERCIAL-COMPLETE.
+
+The construction fabric must audit the charter, governance, architecture, doctrine and the whole platform implementation against these requirements, identify genuine gaps, implement them through the correct canonical owner, commercialize them through real runtime/product paths, and preserve evidence for every claim.
+
+---
+
 ## 15. Repository Memory and Change Discipline
 
 Every important permanent decision must become repository memory, not remain only in chat.
@@ -518,3 +571,8 @@ When a more specific technical contract defines an implementation detail, follow
 **ASSISTANT ROLE: CONSTRUCTION INTELLIGENCE ONLY**
 
 **PLATFORM CONTINUATION AFTER ASSISTANT COMPLETION: REQUIRED**
+
+
+## Phase 12 Reservation — Resilience, Analytical Intelligence & Commercial Realization
+
+The Resilience, Analytical Intelligence & Commercial Realization Audit Contract V1 is reserved for Phase 12. It MUST NOT pre-empt, interrupt, or redefine Phase 11. Phase 12 may begin only after the Phase 11 completion gate is independently verified. When Phase 12 begins, the contract becomes an active mandatory audit/implementation/commercialization workstream under Architecture Freeze V4.1 and existing governance controls.

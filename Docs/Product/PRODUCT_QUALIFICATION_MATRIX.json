@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "1.0",
+  "rule": "Every required cell must be PASS with evidence before productComplete=true.",
+  "required": [
+    {"id":"win-core","capability":"commercial-runtime","environment":"windows","workflow":"launch-health-ready","evidence":"runtime"},
+    {"id":"win-business","capability":"financial-platform","environment":"windows","workflow":"login-tenant-ingest-analyze-dashboard","evidence":"application"},
+    {"id":"win-recovery","capability":"persistence","environment":"windows","workflow":"analyze-stop-start-login-dashboard-recovery","evidence":"acceptance"},
+    {"id":"win-security","capability":"security","environment":"windows","workflow":"unauthenticated-api-is-denied","evidence":"application"},
+    {"id":"web-core","capability":"commercial-runtime","environment":"web","workflow":"launch-health-ready-ui","evidence":"runtime"},
+    {"id":"web-business","capability":"financial-platform","environment":"web","workflow":"browser-login-tenant-ingest-analyze-dashboard","evidence":"application"},
+    {"id":"android-release","capability":"commercial-client","environment":"android","workflow":"build-install-launch-smoke","evidence":"acceptance"},
+    {"id":"tenant-isolation","capability":"security","environment":"all","workflow":"cross-tenant-access-denied","evidence":"acceptance"},
+    {"id":"ci-feedback","capability":"autonomous-factory","environment":"ci","workflow":"failure-normalize-repair-retest","evidence":"ci"},
+    {"id":"full-suite","capability":"quality","environment":"ci","workflow":"full-jest-typescript-security","evidence":"test"}
+  ],
+  "completion": {
+    "productComplete": false,
+    "requiredStatuses": {"PASS":"required","BLOCKED":"release-blocking","FAIL":"release-blocking","UNKNOWN":"release-blocking"}
+  }
+}

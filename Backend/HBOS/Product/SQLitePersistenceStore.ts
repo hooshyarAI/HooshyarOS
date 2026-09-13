@@ -6,7 +6,14 @@ export interface TenantScope { readonly tenantId: string; }
 export interface PersistenceRecord { readonly tenantId: string; readonly key: string; readonly value: unknown; }
 export interface SQLitePersistenceStoreOptions { readonly databasePath: string; }
 export class SQLitePersistenceStore {
-  private readonly database: DatabaseSync;
+  /**
+   * Underlying SQLite connection.
+   *
+   * Exposed so repository/engine layers can manage their own typed tables with
+   * parameterized statements while still sharing the canonical persistence
+   * boundary created by this store.
+   */
+  readonly database: DatabaseSync;
   constructor(options: SQLitePersistenceStoreOptions) {
     const databasePath = options.databasePath === ":memory:" ? ":memory:" : resolve(options.databasePath);
     if (databasePath !== ":memory:") mkdirSync(dirname(databasePath), { recursive: true });

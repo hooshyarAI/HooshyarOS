@@ -1,5 +1,4 @@
-﻿import {AutonomousAssistantPlatform}
-from "../Assistant/Autonomous/AutonomousAssistantPlatform";
+﻿import {AutonomousAssistantPlatform} from "../Assistant/Autonomous/AutonomousAssistantPlatform";
 
 
 test(
@@ -7,8 +6,11 @@ test(
 async()=>{
 
 
+const orchestrator = {
+start: jest.fn().mockResolvedValue({status:"RUNNING"})
+};
 const platform=
-new AutonomousAssistantPlatform();
+new AutonomousAssistantPlatform(orchestrator);
 
 
 const result=
@@ -27,6 +29,8 @@ expect(result.health.status)
 
 expect(result.result.status)
 .toBe("RUNNING");
+expect(orchestrator.start)
+.toHaveBeenCalledWith("Complete HooshyarOS mission");
 
 
 });

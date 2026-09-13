@@ -1,15 +1,15 @@
-import {
-  ExecutiveIntelligenceEngine,
-  ExecutiveKpi,
-  ExecutivePerformance,
-  ExecutiveRecommendation,
-} from "../Engines/ExecutiveIntelligenceEngine";
+import { ExecutiveIntelligenceEngine, ExecutiveKpi, ExecutivePerformance, ExecutiveRecommendation } from "../Engines/ExecutiveIntelligenceEngine";
 import { FinancialAnalysisResult } from "../Engines/FinancialIntelligenceEngine";
 
 export interface ExecutiveIntelligenceWorkbenchInput {
   readonly tenantId: string;
-  readonly metrics: Pick<FinancialAnalysisResult, "revenue" | "profit" | "profitMargin" | "debtRatio">;
-  readonly targets: Readonly<Record<"revenue" | "profit" | "profitMargin" | "debtRatio", number>>;
+  readonly metrics: FinancialAnalysisResult;
+  readonly targets: {
+    readonly revenue: number;
+    readonly profit: number;
+    readonly profitMargin: number;
+    readonly debtRatio: number;
+  };
 }
 
 export interface ExecutiveIntelligenceWorkbenchResult {
@@ -17,21 +17,16 @@ export interface ExecutiveIntelligenceWorkbenchResult {
   readonly targetEngine: "Executive Intelligence Engine";
   readonly tenantId: string;
   readonly kpis: readonly ExecutiveKpi[];
-  readonly recommendations: readonly ExecutiveRecommendation[];
   readonly performance: readonly ExecutivePerformance[];
-  readonly status: "READY";
+  readonly recommendations: readonly ExecutiveRecommendation[];
+  readonly status: "READY" | "BLOCKED";
 }
 
-/**
- * Canonical product boundary for executive KPI and performance intelligence.
- * Composes existing executive and verified financial contracts without creating
- * a duplicate engine hierarchy or inventing business thresholds.
- */
 export class ExecutiveIntelligenceWorkbench {
   readonly capabilityId = "product.executive-intelligence-workbench" as const;
   readonly targetEngine = "Executive Intelligence Engine" as const;
 
-  constructor(private readonly executiveIntelligence: ExecutiveIntelligenceEngine) {}
+  constructor(private readonly executive: ExecutiveIntelligenceEngine) {}
 
   initialize(): { status: "READY" } {
     return { status: "READY" };
@@ -39,44 +34,58 @@ export class ExecutiveIntelligenceWorkbench {
 
   execute(input: ExecutiveIntelligenceWorkbenchInput): ExecutiveIntelligenceWorkbenchResult {
     this.assertBoundaryInput(input);
+    if (input.metrics.status !== "READY") return this.blocked(input);
 
-    const definitions = [
-      ["revenue", input.metrics.revenue],
-      ["profit", input.metrics.profit],
-      ["profitMargin", input.metrics.profitMargin],
-      ["debtRatio", input.metrics.debtRatio],
+    const actuals = [
+      ["revenue", input.metrics.revenue, input.targets.revenue],
+      ["profit", input.metrics.profit, input.targets.profit],
+      ["profitMargin", input.metrics.profitMargin, input.targets.profitMargin],
+      ["debtRatio", input.metrics.debtRatio, input.targets.debtRatio],
     ] as const;
 
-    const kpis = definitions.map(([name, actual]) =>
-      this.executiveIntelligence.analyzeKpi(name, actual, input.targets[name]),
-    );
+    const kpis = actuals.map(([name, actual, target]) => this.executive.analyzeKpi(name, actual, target));
+    const performance = actuals.map(([, actual, target]) => this.executive.evaluatePerformance(actual, target));
+    const recommendations = kpis.map((kpi) => this.executive.recommend(kpi));
 
     return {
       capabilityId: this.capabilityId,
       targetEngine: this.targetEngine,
       tenantId: input.tenantId.trim(),
       kpis,
-      recommendations: kpis.map((kpi) => this.executiveIntelligence.recommend(kpi)),
-      performance: kpis.map((kpi) => this.executiveIntelligence.evaluatePerformance(kpi.actual, kpi.target)),
+      performance,
+      recommendations,
       status: "READY",
     };
   }
 
-  private assertBoundaryInput(input: ExecutiveIntelligenceWorkbenchInput): void {
-    if (!input?.tenantId?.trim()) {
-      throw new Error("executive-intelligence-workbench-tenant-required");
-    }
-    if (!input.metrics) {
-      throw new Error("executive-intelligence-workbench-metrics-required");
-    }
+  private blocked(input: ExecutiveIntelligenceWorkbenchInput): ExecutiveIntelligenceWorkbenchResult {
+    return {
+      capabilityId: this.capabilityId,
+      targetEngine: this.targetEngine,
+      tenantId: input.tenantId.trim(),
+      kpis: [],
+      performance: [],
+      recommendations: [],
+      status: "BLOCKED",
+    };
+  }
 
-    for (const name of ["revenue", "profit", "profitMargin", "debtRatio"] as const) {
-      if (!Number.isFinite(input.metrics[name])) {
-        throw new Error(`executive-intelligence-workbench-metric-invalid:${name}`);
-      }
-      if (!Number.isFinite(input.targets[name])) {
-        throw new Error(`executive-intelligence-workbench-target-invalid:${name}`);
-      }
+  private assertBoundaryInput(input: ExecutiveIntelligenceWorkbenchInput): void {
+    if (!input?.tenantId?.trim()) throw new Error("executive-intelligence-workbench-tenant-required");
+    if (!input.metrics || typeof input.metrics !== "object") throw new Error("executive-intelligence-workbench-metrics-required");
+    const targets = input.targets;
+    if (
+      !targets ||
+      !Number.isFinite(targets.revenue) ||
+      !Number.isFinite(targets.profit) ||
+      !Number.isFinite(targets.profitMargin) ||
+      !Number.isFinite(targets.debtRatio) ||
+      targets.revenue <= 0 ||
+      targets.profit <= 0 ||
+      targets.profitMargin <= 0 ||
+      targets.debtRatio <= 0
+    ) {
+      throw new Error("executive-intelligence-workbench-targets-invalid");
     }
   }
 }

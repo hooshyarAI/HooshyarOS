@@ -39,22 +39,158 @@
       <h2>ایجاد نشست</h2>
       <form id="session-form">
         <label>نام کاربری<input id="username" value="مدیرعامل" required /></label>
-        <label>سازمان<input id="organization" value="تست هوشیار" required /></label>
-        <button class="primary" type="submit">ایجاد نشست</button>
+        <label>سازمان<input id="organization" value="سازمان من" required /></label>
+        <button class="primary" type="submit">ورود و ایجاد نشست</button>
       </form>
       <p id="session-result" class="result" aria-live="polite"></p>
     </section>
 
     <section class="card onboarding">
-      <h2>تحلیل واقعی صورت مالی</h2>
-      <p>یک فایل CSV با ستون‌های date, account, debit, credit, currency انتخاب کنید.</p>
+      <h2>ورود و تحلیل واقعی اطلاعات مالی</h2>
+      <p>فایل CSV، JSON، XLSX یا TXT با ستون‌های date, account, debit, credit, currency را بارگذاری کنید.</p>
       <form id="analysis-form">
-        <label>فایل CSV<input id="csv-file" type="file" accept=".csv,text/csv" required /></label>
-        <label>دارایی‌ها<input id="assets" type="number" min="0" step="0.01" value="1000" required /></label>
-        <label>بدهی‌ها<input id="liabilities" type="number" min="0" step="0.01" value="250" required /></label>
-        <button class="primary" type="submit">تحلیل کن</button>
+        <label>فایل داده مالی<input id="csv-file" type="file" accept=".csv,.json,.xlsx,.txt,text/csv,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain" required /></label>
+        <label>دارایی‌ها<input id="assets" type="number" min="0" step="0.01" value="10000" required /></label>
+        <label>بدهی‌ها<input id="liabilities" type="number" min="0" step="0.01" value="2500" required /></label>
+        <button class="primary" type="submit">تحلیل واقعی</button>
       </form>
       <p id="analysis-result" class="result" aria-live="polite"></p>
+    </section>
+
+    <section class="card onboarding">
+      <h2>هوش مدیریتی و KPI</h2>
+      <form id="executive-form">
+        <label>هدف درآمد<input id="target-revenue" type="number" min="1" value="2000" required /></label>
+        <label>هدف سود<input id="target-profit" type="number" min="1" value="1200" required /></label>
+        <label>هدف حاشیه سود<input id="target-margin" type="number" min="0.01" step="0.01" value="0.30" required /></label>
+        <label>هدف نسبت بدهی<input id="target-debt" type="number" min="0.01" step="0.01" value="0.25" required /></label>
+        <button class="primary" type="submit">محاسبه KPI و پیشنهادها</button>
+      </form>
+      <pre id="executive-result" class="result" aria-live="polite"></pre>
+    </section>
+
+    <section class="card onboarding">
+      <h2>کارگاه تصمیم‌گیری و انتخاب خبره</h2>
+      <p>ارزیابی چندمعیاره گزینه‌ها با AHP/TOPSIS و ارائه پیشنهاد همراه با دلیل، وزن‌ها و محدودیت‌ها.</p>
+      <form id="decision-form">
+        <label>مسئله تصمیم<input id="decision-problem" value="انتخاب طرح توسعه" required /></label>
+        <label>گزینه ۱<input id="decision-alt-1" value="طرح الف" required /></label>
+        <label>گزینه ۲<input id="decision-alt-2" value="طرح ب" required /></label>
+        <div class="decision-criteria">
+          <div class="decision-row">
+            <input class="criterion-name" value="سودآوری" aria-label="نام معیار" />
+            <input class="criterion-weight" type="number" step="0.01" min="0.01" value="0.5" aria-label="وزن معیار" />
+            <select class="criterion-direction" aria-label="جهت معیار"><option value="benefit">سود</option><option value="cost">هزینه</option></select>
+            <input class="criterion-score-1" type="number" step="0.01" value="8" aria-label="امتیاز گزینه ۱" />
+            <input class="criterion-score-2" type="number" step="0.01" value="6" aria-label="امتیاز گزینه ۲" />
+          </div>
+          <div class="decision-row">
+            <input class="criterion-name" value="ریسک" aria-label="نام معیار" />
+            <input class="criterion-weight" type="number" step="0.01" min="0.01" value="0.3" aria-label="وزن معیار" />
+            <select class="criterion-direction" aria-label="جهت معیار"><option value="benefit">سود</option><option value="cost" selected>هزینه</option></select>
+            <input class="criterion-score-1" type="number" step="0.01" value="4" aria-label="امتیاز گزینه ۱" />
+            <input class="criterion-score-2" type="number" step="0.01" value="3" aria-label="امتیاز گزینه ۲" />
+          </div>
+          <div class="decision-row">
+            <input class="criterion-name" value="سرعت اجرا" aria-label="نام معیار" />
+            <input class="criterion-weight" type="number" step="0.01" min="0.01" value="0.2" aria-label="وزن معیار" />
+            <select class="criterion-direction" aria-label="جهت معیار"><option value="benefit" selected>سود</option><option value="cost">هزینه</option></select>
+            <input class="criterion-score-1" type="number" step="0.01" value="5" aria-label="امتیاز گزینه ۱" />
+            <input class="criterion-score-2" type="number" step="0.01" value="9" aria-label="امتیاز گزینه ۲" />
+          </div>
+        </div>
+        <button class="primary" type="submit">ارزیابی و پیشنهاد</button>
+      </form>
+      <pre id="decision-result" class="result" aria-live="polite"></pre>
+    </section>
+
+    <section class="card onboarding">
+      <h2>تحلیل مالی پیشرفته</h2>
+      <p>نسبت‌ها، سربه‌سر، پیش‌بینی جریان نقدی و ناهنجاری از منبع داده معتبر یا ورودی ساخت‌یافته. بخش بدون داده کافی به‌صورت BLOCKED بسته می‌شود.</p>
+      <form id="analytics-form">
+        <label>منبع داده<select id="analytics-source"><option value="">— انتخاب منبع —</option></select></label>
+        <label>سری زمانی (اختیاری)<input id="analytics-series" placeholder="1000, 1200, 950, 1400" /></label>
+        <label>هزینه ثابت<input id="analytics-fixed" type="number" step="0.01" /></label>
+        <label>هزینه متغیر هر واحد<input id="analytics-variable" type="number" step="0.01" /></label>
+        <label>قیمت هر واحد<input id="analytics-price" type="number" step="0.01" /></label>
+        <label>تعداد فروش<input id="analytics-units" type="number" step="0.01" /></label>
+        <label class="analytics-wide">صورت مالی ساخت‌یافته (اختیاری، JSON)<textarea id="analytics-statement" rows="4" placeholder='{"revenue":1000,"cogs":600,"grossProfit":400,"operatingExpenses":200,"operatingIncome":200,"interest":20,"preTaxIncome":180,"taxes":30,"netIncome":150,"cash":100,"receivables":200,"inventory":150,"currentAssets":450,"ppe":550,"totalAssets":1000,"payables":120,"shortTermDebt":80,"currentLiabilities":200,"longTermDebt":200,"totalLiabilities":400,"equity":600}'></textarea></label>
+        <button class="primary" type="submit">تحلیل پیشرفته</button>
+      </form>
+      <pre id="analytics-result" class="result" aria-live="polite"></pre>
+    </section>
+
+    <section class="card onboarding">
+      <h2>اجرای سازمانی و گردش کار حاکمیتی</h2>
+      <p>تصمیم تأییدشده را به کار واگذارشده با مسئول، موعد، KPI، شواهد و بازخورد تبدیل کنید. تأیید انسانی و مرز tenant الزامی است.</p>
+      <form id="execution-form">
+        <label>عنوان کار<input id="execution-title" value="اجرای طرح توسعه" required /></label>
+        <label>اولویت<select id="execution-priority"><option value="MEDIUM">متوسط</option><option value="HIGH">بالا</option><option value="CRITICAL">بحرانی</option><option value="LOW">پایین</option></select></label>
+        <button class="primary" type="submit">ایجاد کار از تصمیم</button>
+      </form>
+      <div class="execution-controls">
+        <label>مسئول اجرا<input id="execution-assignee" value="مدیر عملیات" /></label>
+        <label>موعد<input id="execution-due" type="date" /></label>
+        <label>شاخص KPI<input id="execution-kpi-metric" value="revenue" /></label>
+        <label>هدف<input id="execution-kpi-target" type="number" value="1000" /></label>
+        <label>مقدار واقعی<input id="execution-kpi-actual" type="number" value="1100" /></label>
+        <button id="execution-refresh" class="primary" type="button">به‌روزرسانی کارها</button>
+      </div>
+      <div id="execution-list" class="execution-list"></div>
+      <pre id="execution-result" class="result" aria-live="polite"></pre>
+    </section>
+
+    <section class="card onboarding">
+      <h2>تحلیل تاب‌آوری و استرس</h2>
+      <form id="resilience-form">
+        <label>شاخص<select id="resilience-metric"><option value="revenue">درآمد</option><option value="profit">سود</option><option value="cash">نقد</option></select></label>
+        <label>مقدار پایه<input id="resilience-base" type="number" value="1000" required /></label>
+        <label>تعداد شبیه‌سازی<input id="resilience-simulations" type="number" value="1000" required /></label>
+        <button class="primary" type="submit">تحلیل تاب‌آوری</button>
+      </form>
+      <pre id="resilience-result" class="result" aria-live="polite"></pre>
+    </section>
+
+    <section class="card onboarding">
+      <h2>سنجش تأثیر قبل/بعد</h2>
+      <form id="impact-form">
+        <label>درآمد پایه<input id="impact-revenue-before" type="number" value="1000" required /></label>
+        <label>درآمد بعد<input id="impact-revenue-after" type="number" value="1200" required /></label>
+        <label>سود پایه<input id="impact-profit-before" type="number" value="200" required /></label>
+        <label>سود بعد<input id="impact-profit-after" type="number" value="300" required /></label>
+        <label>هزینه عملیاتی پایه<input id="impact-cost-before" type="number" value="500" required /></label>
+        <label>هزینه عملیاتی بعد<input id="impact-cost-after" type="number" value="450" required /></label>
+        <button class="primary" type="submit">سنجش تأثیر</button>
+      </form>
+      <pre id="impact-result" class="result" aria-live="polite"></pre>
+    </section>
+
+    <section class="card onboarding">
+      <h2>یادگیری و بهبود مداوم</h2>
+      <form id="improvement-form">
+        <label>حوزه<select id="improvement-domain"><option value="financial">مالی</option><option value="operational">عملیاتی</option><option value="strategic">استراتژیک</option></select></label>
+        <label>امتیاز ریسک<input id="improvement-risk" type="number" step="0.01" value="0.2" required /></label>
+        <label>تأخیر تصمیم<input id="improvement-latency" type="number" step="0.1" value="3" required /></label>
+        <button class="primary" type="submit">تحلیل بهبود</button>
+      </form>
+      <pre id="improvement-result" class="result" aria-live="polite"></pre>
+    </section>
+
+    <section class="card onboarding">
+      <h2>گزارش و دستیار هوشمند</h2>
+      <p>گزارش مالی/مدیریتی را به‌صورت فایل واقعی و قابل دانلود تولید کنید. قالب‌های پشتیبانی‌شده: Excel (XLSX)، CSV، JSON و متن.</p>
+      <div class="actions report-actions">
+        <label>قالب فایل گزارش<select id="report-format"><option value="XLSX">Excel (XLSX)</option><option value="CSV">CSV</option><option value="JSON">JSON</option><option value="TXT">متن (TXT)</option></select></label>
+        <button id="report-button" class="primary" type="button">پیش‌نمایش گزارش</button>
+        <button id="report-export-button" class="primary" type="button">تولید و دانلود فایل گزارش</button>
+      </div>
+      <pre id="report-result" class="result" aria-live="polite"></pre>
+      <div id="report-artifacts" class="execution-list" aria-live="polite"></div>
+      <form id="assistant-form">
+        <label>سؤال از هوشیار<textarea id="assistant-question" rows="3" required placeholder="مثلاً وضعیت سود و ریسک بدهی من چیست؟"></textarea></label>
+        <button class="primary" type="submit">پرسش از دستیار</button>
+      </form>
+      <pre id="assistant-result" class="result" aria-live="polite"></pre>
     </section>
   </main>
   <script src="/app.js" defer></script>

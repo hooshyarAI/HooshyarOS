@@ -4,7 +4,7 @@ import { DecisionContextEngine } from "./DecisionContextEngine";
 import { TaskDecomposer } from "./TaskDecomposer";
 import { AutonomousExecutionLoop } from "./AutonomousExecutionLoop";
 import { GovernanceGate } from "./GovernanceGate";
-import { AutonomousProjectConductor, ProjectInventory, ProjectGap } from "../../Autonomous/AutonomousProjectConductor";
+import { AutonomousConstructionBridge, ProjectInventory, ProjectGap } from "../../Autonomous/AutonomousConstructionBridge";
 
 export type MissionStage = "OBSERVE" | "REASON" | "DECIDE" | "PLAN" | "EXECUTE" | "VERIFY" | "LEARN";
 export type MissionStatus = "RUNNING" | "COMPLETED" | "BLOCKED" | "FAILED";
@@ -30,7 +30,7 @@ export class AutonomousMissionController {
     private executor = new AutonomousExecutionLoop();
     private governance = new GovernanceGate();
 
-    constructor(private readonly conductor?: AutonomousProjectConductor) {}
+    constructor(private readonly conductor?: AutonomousConstructionBridge) {}
 
     executeMission(goal: string): MissionRecord {
         if (!goal || !goal.trim()) {
