@@ -5,8 +5,10 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const ENGINES_DIR = path.resolve(__dirname, ".", "Engines");
-const HBOS_ROOT = path.resolve(__dirname, ".");
+// Canonical engine location in Architecture Freeze V4.1 is Backend/HBOS/Engines,
+// which is a sibling of this file's directory (Core/). Resolving from __dirname
+// keeps the verifier correct under ts-jest and any other in-tree runner.
+const DEFAULT_ENGINES_DIR = path.resolve(__dirname, "..", "Engines");
 
 export interface DependencyAnalysis {
     engineName: string;
@@ -18,66 +20,68 @@ export interface DependencyAnalysis {
 }
 
 export class EngineDependencyVerifier {
+    public readonly enginesDir: string;
     private engineFiles: string[];
+    private engineNames: Set<string> = new Set();
     private importMap: Map<string, string[]> = new Map();
 
-    constructor() {
+    constructor(enginesDir: string = DEFAULT_ENGINES_DIR) {
+        this.enginesDir = path.resolve(enginesDir);
         this.engineFiles = this.findEngineFiles();
         this.buildImportMap();
     }
 
     private findEngineFiles(): string[] {
-        const files: string[] = [];
-        if (!fs.existsSync(ENGINES_DIR)) {
-            return files;
+        if (!fs.existsSync(this.enginesDir) || !fs.statSync(this.enginesDir).isDirectory()) {
+            throw new Error(
+                `EngineDependencyVerifier: canonical engines directory not found: ${this.enginesDir}`
+            );
         }
 
-        const entries = fs.readdirSync(ENGINES_DIR, { withFileTypes: true });
-        for (const entry of entries) {
-            if (entry.isFile() && entry.name.endsWith(".ts") && entry.name !== "*.test.ts") {
-                files.push(path.join(ENGINES_DIR, entry.name));
-            }
+        const entries = fs.readdirSync(this.enginesDir, { withFileTypes: true });
+        const files = entries
+            .filter(entry => entry.isFile())
+            .map(entry => entry.name)
+            .filter(name => name.endsWith("Engine.ts") && !name.endsWith(".test.ts"))
+            .map(name => path.join(this.enginesDir, name))
+            .sort();
+
+        if (files.length === 0) {
+            throw new Error(
+                `EngineDependencyVerifier: no engine files found in ${this.enginesDir}; refusing to report an empty analysis`
+            );
         }
+
         return files;
     }
 
     private buildImportMap(): void {
+        this.engineNames = new Set(
+            this.engineFiles.map(file => path.basename(file, ".ts"))
+        );
+
         for (const file of this.engineFiles) {
             const content = fs.readFileSync(file, "utf8");
             const engineName = path.basename(file, ".ts");
-            const imports = this.extractImports(content);
+            const imports = this.extractImports(content, engineName);
             this.importMap.set(engineName, imports);
         }
     }
 
-    private extractImports(content: string): string[] {
-        const importRegex = /import\s*\{?\s*([^}]+)\}?\s*from\s+["']([^"']+)["']/g;
-        const imports: string[] = [];
+    private extractImports(content: string, selfName: string): string[] {
+        const importRegex = /(?:^|\n)\s*(?:import|export)\b[\s\S]*?from\s+["']([^"']+)["']/g;
+        const imports = new Set<string>();
 
-        let match;
+        let match: RegExpExecArray | null;
         while ((match = importRegex.exec(content)) !== null) {
-            const importStatement = match[2];
-            if (importStatement.includes(".")) {
-                const importedModule = importStatement.split(".")[0];
-                if (importedModule.endsWith("Engine")) {
-                    imports.push(importedModule);
-                }
+            const specifier = match[1];
+            const importedEngine = path.basename(specifier).replace(/\.ts$/, "");
+            if (importedEngine !== selfName && this.engineNames.has(importedEngine)) {
+                imports.add(importedEngine);
             }
         }
 
-        // Also match simple imports like "from "./DecisionEngine""
-        const simpleImportRegex = /from\s+["'](\.\/[^"']+)["']/g;
-        while ((match = simpleImportRegex.exec(content)) !== null) {
-            const importPath = match[1];
-            if (importPath.startsWith("./")) {
-                const importedEngine = importPath.replace("./", "").replace(/\.ts$/, "");
-                if (importedEngine.endsWith("Engine")) {
-                    imports.push(importedEngine);
-                }
-            }
-        }
-
-        return [...new Set(imports)]; // Remove duplicates
+        return [...imports].sort();
     }
 
     public analyzeDependencies(): DependencyAnalysis[] {
@@ -156,7 +160,7 @@ export class EngineDependencyVerifier {
             }
         }
 
-        return circulars;
+        return circulars.sort();
     }
 
     public getConflictingDirections(): { engine: string; direction: string }[] {
@@ -164,11 +168,15 @@ export class EngineDependencyVerifier {
 
         for (const [engineName, imports] of this.importMap) {
             const direction = this.analyzeDependencyDirection(engineName, imports);
-            if (direction === "INBOUND" && imports.length > 2) {
+            // A conflicting direction is an engine that both consumes and is
+            // consumed by peers (NEUTRAL) while carrying a wide outbound surface.
+            // The prior condition (INBOUND && imports.length > 2) was provably
+            // unreachable because INBOUND implies zero outbound imports.
+            if (direction === "NEUTRAL" && imports.length > 2) {
                 conflicts.push({ engine: engineName, direction });
             }
         }
 
-        return conflicts;
+        return conflicts.sort((a, b) => a.engine.localeCompare(b.engine));
     }
 }

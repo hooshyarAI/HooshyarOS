@@ -1,6 +1,6 @@
 # HooshyarOS — Platform-Wide Commercialization, Standardization & World-Class Conformance Audit
 
-**Status:** COMPLETE (audit) — selected remediation `product.secure-identity-bootstrap` EXECUTED and VERIFIED (§27)
+**Status:** COMPLETE (audit) — `product.secure-identity-bootstrap` EXECUTED and VERIFIED (§27); `EngineDependencyVerifier` assurance knot REPAIRED and VERIFIED (§30)
 **Branch:** `fix/autonomous-product-factory`
 **Trusted baseline SHA:** `c2fd57330e5723a00a3317026c79572af97589d3`
 **Architecture baseline:** Architecture Freeze V4.1
@@ -259,7 +259,7 @@ Canonical path `Source → Connector → Raw Evidence → Validation → Normali
 | Suite | Failure | Classification |
 |---|---|---|
 | `GovernanceEngine.test.ts` | `TS2339: Property 'status' does not exist on type 'void'` — asserts `initialize().status` but frozen `Engine.initialize()` returns `void` | **STALE TEST (guaranteed fail)** |
-| `EngineDependencyVerifier.test.ts` | `TS2307: Cannot find module './EngineDependencyVerifier'` (import should be `../Core/EngineDependencyVerifier`). **Deeper bug:** the verifier resolves `ENGINES_DIR` to `Core/Engines` (does not exist), so `analyzeDependencies()` returns `[]` — the Phase 03 dependency verifier currently analyzes nothing | **STALE TEST + REAL CODE DEFECT** |
+| `EngineDependencyVerifier.test.ts` | `TS2307` wrong import + path defect (`ENGINES_DIR` → nonexistent `Core/Engines`, so `analyzeDependencies()` returned `[]`). **REPAIRED and VERIFIED (§30):** now resolves `Backend/HBOS/Engines`, discovers 36 engines, and fails closed on an unanalyzable target | **REAL CODE DEFECT — REPAIRED (§30)** |
 | `BreakEvenAnalysisService.phase-09-1-5.test.ts` | `TS2345/TS2339` — targets superseded `unitsSold`/`status`/`amount` API | **STALE DUPLICATE (superseded by current service + non-phase test)** |
 | `CashFlowForecastingService.phase-09-1-6.test.ts` | `TS2554/TS2339` — targets superseded 2-arg API | **STALE DUPLICATE** |
 | `ExponentialSmoothingService.phase-09-1-9.test.ts` | `TS2554/TS2339` — targets superseded 3-arg API | **STALE DUPLICATE** |
@@ -343,7 +343,7 @@ No third architecture was invented.
 ## 23. Duplicates / dead / stale / misowned
 
 - **Duplicates:** none in product layer. `HealthMonitorEngine` may exist in two locations — needs confirmation before any action (do not delete).
-- **Stale tests:** 6 suites (GovernanceEngine, EngineDependencyVerifier, KiloCodeExecutionAdapterObservability, 3× Phase-09 analytics) + `EngineDependencyVerifier` also has a real path bug (`Core/EngineDependencyVerifier.ts:8` resolves `Core/Engines`, which does not exist, so it analyzes nothing — see §16).
+- **Stale tests:** 5 suites (GovernanceEngine, KiloCodeExecutionAdapterObservability, 3× Phase-09 analytics). `EngineDependencyVerifier` was a real path defect and is now **REPAIRED** (§30).
 - **Broken code/tests:** `HooshyarAutonomousAssistant` improvement integration (2 suites).
 - **Environment:** `OcrAdapter` missing `tesseract.js`.
 - **Disconnected (valid, unwired):** `SyncStateStore`, `ConnectorRegistry`, `Generic*Connector`, `KpiIntelligenceService`, PDF/DOCX/OCR helpers, several platform engines.
@@ -428,3 +428,89 @@ Scoring per mission: Commercial 20, User 15, Business Criticality 15, Architectu
 - Test failures: executed Jest output at baseline (9 compile failures + LocalFolderWatcher libuv abort).
 - Runtime/CI: `.github/workflows/*` (14 files), `package.json`, `tsconfig.json`, `jest.config.js`.
 - Product governance: `Docs/Product/PRODUCT_CONSTRUCTION_ROADMAP.json`, `PRODUCT_PLATFORM_MANIFEST.json`, `PRODUCT_QUALIFICATION_MATRIX.json`.
+
+---
+
+## 30. Assurance knot — `EngineDependencyVerifier` defect repaired (dependency/control-plane assurance)
+
+**Knot:** restore trustworthy engine-dependency verification.
+**Trusted baseline at execution:** `git rev-parse HEAD` = `2bb62d43fe07f08ce94855f73f83cef8bb61a659` (`fix/autonomous-product-factory`).
+**Classification:** IMPLEMENTATION REPAIR. No architecture change; Architecture Freeze V4.1 preserved; no engine moved; no duplicate verifier created.
+
+### 30.1 Exact defect
+
+`Backend/HBOS/Core/EngineDependencyVerifier.ts:8` resolved the engines directory to `path.resolve(__dirname, ".", "Engines")` — i.e. `Backend/HBOS/Core/Engines`, which does not exist. Consequently `findEngineFiles()` returned `[]`, the constructor produced an empty import map, and `analyzeDependencies()` returned `[]` with no error. The Phase 03 dependency verifier was silently verifying nothing. The companion test could not even load (`TS2307` — it imported `./EngineDependencyVerifier` instead of `../Core/EngineDependencyVerifier`) and, where it did run, asserted tautologies.
+
+Three further defects were found in the same bounded tool while repairing it:
+1. `entry.name !== "*.test.ts"` compared a filename to a literal glob (dead filter).
+2. `extractImports()` used a broken `split(".")[0]` regex and only matched `./` specifiers, so real cross-directory engine imports were missed inconsistently.
+3. `getConflictingDirections()` used the condition `direction === "INBOUND" && imports.length > 2`, which is provably unreachable (`INBOUND` is returned only when outbound imports are zero), so the method could never report a conflict.
+
+### 30.2 Canonical owner / architecture verification
+
+- Canonical owner of the capability is the existing bounded tool `Backend/HBOS/Core/EngineDependencyVerifier.ts` (explicitly "NOT a new Engine").
+- `Backend/HBOS/Core/Dependency/EngineDependencyManager.ts` + `BootDependencyValidator.ts` are a **different** concern (manual boot-time dependency registration/validation); they were not modified and no duplicate owner was created.
+- Actual canonical engine location is `Backend/HBOS/Engines` (exists; contains the five canonical intelligence engines plus supporting engines). The verifier now resolves it from `__dirname` as a sibling of `Core/`.
+- Proof that this is implementation repair, not redesign: only path resolution, file discovery/filtering, import parsing and one dead comparison changed. Public contract (`DependencyAnalysis`, `analyzeDependencies`, `getCircularDependencies`, `getConflictingDirections`) is preserved; engines were not moved and `Core/Engines` was not invented.
+
+### 30.3 Repair
+
+- Default engines directory → `path.resolve(__dirname, "..", "Engines")`.
+- Discovery → `*Engine.ts` files (inherently excludes `*.test.ts`/`.d.ts`), deterministic sort.
+- Fail-closed → throws `EngineDependencyVerifier: canonical engines directory not found: <path>` when the target is missing/not a directory, and `... no engine files found in <path>; refusing to report an empty analysis` when no engines are present. An empty/wrong path can no longer return an empty result silently.
+- Import parsing → extracts module specifiers, keeps those whose basename is a discovered engine and is not the file itself; resolves `./` and cross-directory engine imports alike.
+- Optional constructor argument `enginesDir` enables deterministic fixture testing without changing default behavior.
+- `getConflictingDirections()` condition corrected to the reachable, intended rule: `NEUTRAL` (both consumes and is consumed) with more than two outbound imports.
+- Dead `HBOS_ROOT` constant removed.
+
+### 30.4 Changed files
+
+- `Backend/HBOS/Core/EngineDependencyVerifier.ts` (implementation repair)
+- `Backend/HBOS/test/EngineDependencyVerifier.test.ts` (stale/tautological test replaced with behavioral evidence)
+- `.kilo/plans/platform-wide-commercialization-conformance-audit.md` (this evidence)
+- `.kilo/plans/commercialization-dependency-verifier-checkpoint.md` (knot checkpoint)
+
+### 30.5 Verification evidence
+
+- Focused suite `EngineDependencyVerifier.test.ts`: **7/7 passed**. Tests now assert real discovery (`enginesDir` is `Backend/HBOS/Engines`, `ReasoningEngine.ts` present, ≥30 engines including all five canonical engines), real dependency edges (`AssistantEngine → DecisionEngine/KnowledgeEngine/IntelligenceEngine/MemoryEngine`; `OrganizationalIntelligenceEngine → ReasoningEngine/KnowledgeEngine/MemoryEngine/ProjectPilotEngine`; `ProjectPilotEngine → DecisionEngine/MemoryEngine/ReactionEngine`), absence of cycles cross-verified edge-by-edge, direction classification (`ReasoningEngine=INBOUND`, `AssistantEngine=OUTBOUND`, `MemoryEngine=NEUTRAL`), conflict detection, fail-closed behavior on a missing and on an empty directory, and a deterministic synthetic fixture (cycle `CycleAEngine <-> CycleBEngine`, conflict `HubEngine`).
+- Dependency/architecture regression: `EngineDependencyVerifier`, `EngineDependencyManager`, `BootDependencyValidator`, `EngineUniqueness`, `CanonicalIntelligenceEngines`, `EngineRegistry.phase-11-1.2` → **6 suites / 43 tests passed**.
+- Changed-file typecheck (`tsc --noEmit`, changed files + their import graph): **exit 0, no errors**.
+- Actual verifier output at repair: 36 engines discovered; real edges include `AssistantEngine => DecisionEngine,IntelligenceEngine,KnowledgeEngine,MemoryEngine`; `OrganizationalIntelligenceEngine => KnowledgeEngine,MemoryEngine,ProjectPilotEngine,ReasoningEngine`; `MemoryEngine => ReactionEngine`; circular dependencies `[]`; bidirectional-direction findings `[OrganizationalIntelligenceEngine, ProjectPilotEngine]`.
+
+### 30.6 Full-suite before/after (LocalFolderWatcher excluded to avoid the native abort)
+
+| Metric | Audit baseline (LocalFolderWatcher included as abort) | After repair (LocalFolderWatcher excluded) |
+|---|---|---|
+| Total suites | ~258 | **258** |
+| Passed suites | — | **246** |
+| Failed suites | 10 degraded (9 compile + 1 abort) | **12** (10 compile + 2 behavioral flakes) |
+| Passed tests | — | **1904** |
+| Failed tests | — | **2** (both pass in isolation) |
+
+`EngineDependencyVerifier` is out of the failure set. The remaining 12 failed suites are all pre-existing and independently classified in §30.7; none is caused by this transaction.
+
+### 30.7 Remaining failure classification (after repair)
+
+| Suite | Class | Evidence |
+|---|---|---|
+| `GovernanceEngine.test.ts` | STALE TEST | asserts `initialize().status`; frozen `Engine.initialize(): void`. Align test, never change the frozen interface. |
+| `KiloCodeExecutionAdapterObservability.test.ts` | STALE TEST | `buildWindowsKiloScript` arity drift; also a false-positive string/text test. |
+| `BreakEvenAnalysisService.phase-09-1-5.test.ts` | STALE DUPLICATE | targets superseded `unitsSold`/`status` API; non-phase service test exists. |
+| `CashFlowForecastingService.phase-09-1-6.test.ts` | STALE DUPLICATE | targets superseded 2-arg API. |
+| `ExponentialSmoothingService.phase-09-1-9.test.ts` | STALE DUPLICATE | targets superseded 3-arg API. |
+| `OcrAdapter.test.ts` | ENVIRONMENT GAP | `tesseract.js` not a dependency; OCR deliberately unsupported/not in runtime graph. |
+| `HooshyarAutonomousAssistant.test.ts` | REAL DEFECT (single root cause) | `HooshyarAutonomousAssistant.ts:44` calls `improvement.improve(evaluation)` with an object missing `ImprovementInput` fields (`tenantId, domain, actualImpact, currentState`); `improved` result mismatch. |
+| `HooshyarAutonomousAssistant.platform-construction.test.ts` | REAL DEFECT (same root cause) | same compile error from `HooshyarAutonomousAssistant.ts:44`. |
+| `AutonomousAssistantConstructionHandoff.test.ts` | REAL DEFECT (same root cause) | same compile error from `HooshyarAutonomousAssistant.ts:44`. |
+| `HooshyarSelfOperatingAssistant.test.ts` | REAL DEFECT (same root cause) | same compile error from `HooshyarAutonomousAssistant.ts:44`. |
+| `CommercialRuntimePersistenceRecovery.test.ts` | ENVIRONMENT/TIMING FLAKE | fails only under full parallel load; passes in isolation (3.4 s). |
+| `Autonomous/Runtime/KiloCodeExecutionAdapter.test.ts` | ENVIRONMENT/TIMING FLAKE | real Windows parent+child timeout test; fails only under full parallel load; passes in isolation (5/5). |
+| `LocalFolderWatcher.test.ts` | ENVIRONMENT/CRITICAL FLAKE | Windows libuv `fs-event.c:72` abort; excluded from the run. Separate debt, not touched by this transaction. |
+
+### 30.8 Assurance/truth boundary
+
+This knot restores a dependency-verification control-plane capability and improves test evidence. It does **not** change `productComplete`, `commercialProductRuntimeComplete` or `externalProductionDependenciesComplete`, and it does not alter any of the four delivered commercial capabilities.
+
+### 30.9 Next highest-value assurance knot (candidate, not executed)
+
+The `HooshyarAutonomousAssistant` improvement-integration defect is the next highest-value bounded assurance knot: one real root-cause mismatch in `Assistant/Autonomous/HooshyarAutonomousAssistant.ts:44` currently blocks four suites. It is **not** mixed into this transaction. It must be independently confirmed active and repaired under its own checkpoint before selection.
