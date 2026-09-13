@@ -1,5 +1,10 @@
 ﻿import { Server } from "node:http";
 import { createCommercialRuntimeServer } from "../Autonomous/Runtime/CommercialRuntimeServer";
+import { SecurityEventLogger } from "../Entities/SecurityEventLogger";
+import { DatabaseSync } from "node:sqlite";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const request = async (server: Server, path: string, options: RequestInit = {}) => {
   const address = server.address();
@@ -168,4 +173,128 @@ describe("CommercialRuntimeServer rate limiting", () => {
     });
     expect(okB.status).toBe(200);
   });
+});
+
+describe("CommercialRuntimeServer auth route rate limiting", () => {
+  let server: Server;
+  let nowValue = 1_700_000_000_000;
+  const now = () => nowValue;
+
+  const start = async (securityEventLogger?: SecurityEventLogger) => {
+    nowValue = 1_700_000_000_000;
+    server = createCommercialRuntimeServer({
+      databasePath: ":memory:",
+      now,
+      reasoning: { reason: (problem: string) => ({ problem, status: "verified", success: true }) },
+      securityEventLogger,
+    });
+    await listen(server);
+    return server;
+  };
+
+  afterEach(async () => {
+    if (server?.listening) await close(server);
+  });
+
+  const post = (path: string, body: unknown) => request(server, path, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  test("blocks repeated failed /api/auth/login attempts for the same identity", async () => {
+    await start();
+    const registered = await post("/api/auth/register", { username: "owner", organization: "Acme", password: "correct-horse" });
+    expect(registered.status).toBe(201);
+
+    for (let i = 0; i < 5; i++) {
+      const failed = await post("/api/auth/login", { username: "owner", organization: "Acme", password: "wrong-password" });
+      expect(failed.status).toBe(401);
+    }
+
+    const blocked = await post("/api/auth/login", { username: "owner", organization: "Acme", password: "wrong-password" });
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get("retry-after")).toBe("1");
+    expect(await blocked.json()).toEqual({ error: "RATE_LIMIT_EXCEEDED" });
+  });
+
+  test("password form of /api/session shares the identity limit (no route bypass)", async () => {
+    await start();
+    await post("/api/auth/register", { username: "owner", organization: "Acme", password: "correct-horse" });
+
+    for (let i = 0; i < 5; i++) {
+      const failed = await post("/api/auth/login", { username: "owner", organization: "Acme", password: "wrong-password" });
+      expect(failed.status).toBe(401);
+    }
+
+    // The correct password is refused too: the identity bucket is checked
+    // before credential verification, so switching route does not reset it.
+    const blocked = await post("/api/session", { username: "owner", organization: "Acme", password: "correct-horse" });
+    expect(blocked.status).toBe(429);
+    expect(await blocked.json()).toEqual({ error: "RATE_LIMIT_EXCEEDED" });
+  });
+
+  test("identity limit is isolated per account and does not block other clients", async () => {
+    await start();
+    await post("/api/auth/register", { username: "owner", organization: "Acme", password: "correct-horse" });
+    await post("/api/auth/register", { username: "other", organization: "Beta", password: "correct-horse" });
+
+    for (let i = 0; i < 5; i++) {
+      await post("/api/auth/login", { username: "owner", organization: "Acme", password: "wrong-password" });
+    }
+    const blockedOwner = await post("/api/auth/login", { username: "owner", organization: "Acme", password: "wrong-password" });
+    expect(blockedOwner.status).toBe(429);
+
+    const allowedOther = await post("/api/auth/login", { username: "other", organization: "Beta", password: "correct-horse" });
+    expect(allowedOther.status).toBe(200);
+  });
+
+  test("identity limit resets after the refill window", async () => {
+    await start();
+    await post("/api/auth/register", { username: "owner", organization: "Acme", password: "correct-horse" });
+
+    for (let i = 0; i < 5; i++) {
+      await post("/api/auth/login", { username: "owner", organization: "Acme", password: "wrong-password" });
+    }
+    const blocked = await post("/api/auth/login", { username: "owner", organization: "Acme", password: "wrong-password" });
+    expect(blocked.status).toBe(429);
+
+    nowValue += 6_000;
+    const retry = await post("/api/auth/login", { username: "owner", organization: "Acme", password: "wrong-password" });
+    expect(retry.status).toBe(401);
+  });
+
+  test("client-level limit blocks credential stuffing across many identities", async () => {
+    await start();
+    for (let i = 0; i < 20; i++) {
+      const attempt = await post("/api/auth/login", { username: `stuffer-${i}`, organization: "Acme", password: "wrong-password" });
+      expect(attempt.status).toBe(401);
+    }
+    const blocked = await post("/api/auth/login", { username: "stuffer-final", organization: "Acme", password: "wrong-password" });
+    expect(blocked.status).toBe(429);
+  });
+
+  test("rate-limited authentication emits an auditable security event", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "hooshyar-auth-limit-"));
+    const dbPath = join(directory, "security.sqlite");
+    const logger = new SecurityEventLogger(dbPath);
+    try {
+      await start(logger);
+      await post("/api/auth/register", { username: "owner", organization: "Acme", password: "correct-horse" });
+      for (let i = 0; i < 5; i++) {
+        await post("/api/auth/login", { username: "owner", organization: "Acme", password: "wrong-password" });
+      }
+      const blocked = await post("/api/auth/login", { username: "owner", organization: "Acme", password: "wrong-password" });
+      expect(blocked.status).toBe(429);
+
+      const db = new DatabaseSync(dbPath);
+      const events = db.prepare("SELECT reason FROM audit_events ORDER BY sequence ASC").all() as { reason: string }[];
+      db.close();
+      expect(events.some((event) => event.reason?.includes("RATE_LIMIT_EXCEEDED"))).toBe(true);
+    } finally {
+      if (server?.listening) await close(server);
+      logger.close();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }, 20_000);
 });

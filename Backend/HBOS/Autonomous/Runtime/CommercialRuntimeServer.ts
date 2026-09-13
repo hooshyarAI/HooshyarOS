@@ -323,6 +323,33 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
         return limiter;
     };
 
+    // Authentication entry points are unauthenticated by definition, so they
+    // cannot be protected by the per-session limiter above. They are limited
+    // per client (remote address) and per credential identity
+    // (client + username + organization). `/api/auth/login` and the password
+    // form of `/api/session` share the same per-identity bucket so switching
+    // routes cannot bypass the limit.
+    const AUTH_CLIENT_RATE_LIMIT_CAPACITY = 20;
+    const AUTH_CLIENT_RATE_LIMIT_REFILL_PER_SECOND = 5;
+    const AUTH_IDENTITY_RATE_LIMIT_CAPACITY = 5;
+    const AUTH_IDENTITY_RATE_LIMIT_REFILL_PER_SECOND = 1;
+    const authClientLimiters = new Map<string, TokenBucketRateLimiter>();
+    const authIdentityLimiters = new Map<string, TokenBucketRateLimiter>();
+
+    const getOrCreateAuthLimiter = (
+        map: Map<string, TokenBucketRateLimiter>,
+        key: string,
+        capacity: number,
+        refillPerSecond: number,
+    ): TokenBucketRateLimiter => {
+        let limiter = map.get(key);
+        if (!limiter) {
+            limiter = new TokenBucketRateLimiter({ capacity, refillPerSecond, now });
+            map.set(key, limiter);
+        }
+        return limiter;
+    };
+
     const loadAnalysis = async (tenantId: string): Promise<StoredAnalysis | undefined> => {
         let result = latestResults.get(tenantId);
         if (!result) {
@@ -475,7 +502,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 return res.end();
             }
             if (req.method === "GET" && path === "/health") return corsJson(200, { status: "ok", service: "hooshyar-commercial-runtime" });
-            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "financial-analytics", "ingested-source-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-workbench", "decision-workbench", "expert-choice", "organizational-execution", "governed-approval", "work-item-lifecycle", "kpi-outcome", "reports", "reports-export", "report-artifact-download", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "rbac", "session-lifecycle"] });
+            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "financial-analytics", "ingested-source-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-workbench", "decision-workbench", "expert-choice", "organizational-execution", "governed-approval", "work-item-lifecycle", "kpi-outcome", "reports", "reports-export", "report-artifact-download", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "auth-rate-limiting", "rbac", "session-lifecycle"] });
             if (req.method === "GET" && path === "/") return asset(res, "index.html", "text/html; charset=utf-8");
             if (req.method === "GET" && path === "/app.js") return asset(res, "app.js", "text/javascript; charset=utf-8");
             if (req.method === "GET" && path === "/styles.css") return asset(res, "styles.css", "text/css; charset=utf-8");
@@ -498,7 +525,23 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 }
             };
 
+            const clientAddress = req.socket?.remoteAddress ?? "unknown";
+            const enforceAuthClientLimit = (): boolean =>
+                getOrCreateAuthLimiter(authClientLimiters, `client:${clientAddress}`, AUTH_CLIENT_RATE_LIMIT_CAPACITY, AUTH_CLIENT_RATE_LIMIT_REFILL_PER_SECOND).tryAcquire();
+            const enforceAuthIdentityLimit = (username: string, organization: string): boolean =>
+                getOrCreateAuthLimiter(
+                    authIdentityLimiters,
+                    `identity:${clientAddress}:${username.trim().toLowerCase()}:${organization.trim().toLowerCase()}`,
+                    AUTH_IDENTITY_RATE_LIMIT_CAPACITY,
+                    AUTH_IDENTITY_RATE_LIMIT_REFILL_PER_SECOND,
+                ).tryAcquire();
+            const rateLimited = () => {
+                logAuthFailure("RATE_LIMIT_EXCEEDED");
+                return corsJson(429, { error: "RATE_LIMIT_EXCEEDED" }, { "Retry-After": "1" });
+            };
+
             if (req.method === "POST" && path === "/api/auth/register") {
+                if (!enforceAuthClientLimit()) return rateLimited();
                 const body = await readJson(req);
                 const username = String(body.username ?? "").trim();
                 const organization = String(body.organization ?? "").trim();
@@ -514,11 +557,13 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
             }
 
             if (req.method === "POST" && path === "/api/auth/login") {
+                if (!enforceAuthClientLimit()) return rateLimited();
                 const body = await readJson(req);
                 const username = String(body.username ?? "").trim();
                 const organization = String(body.organization ?? "").trim();
                 const password = String(body.password ?? "");
                 if (!username || !organization || !password) return corsJson(400, { error: "CREDENTIALS_REQUIRED" });
+                if (!enforceAuthIdentityLimit(username, organization)) return rateLimited();
                 const result = identity.login(username, password, organization);
                 if (!result.success || !result.session) {
                     logAuthFailure(result.error ?? "AUTHENTICATION_FAILED");
@@ -540,11 +585,13 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
             }
 
             if (req.method === "POST" && path === "/api/session") {
+                if (!enforceAuthClientLimit()) return rateLimited();
                 const body = await readJson(req);
                 const username = String(body.username ?? "").trim();
                 const organization = String(body.organization ?? "").trim();
                 const password = body.password === undefined ? undefined : String(body.password);
                 if (!username || !organization) return corsJson(400, { error: "SESSION_FIELDS_REQUIRED" });
+                if (!enforceAuthIdentityLimit(username, organization)) return rateLimited();
 
                 if (password === undefined) {
                     const decision = identity.passwordlessBootstrapDecision(username, organization);

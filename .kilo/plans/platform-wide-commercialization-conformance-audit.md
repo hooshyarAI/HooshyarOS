@@ -674,3 +674,47 @@ No change to `productComplete`, `commercialProductRuntimeComplete` or `externalP
 ### 33.7 Next candidate knot (not executed)
 
 `security.auth-route-rate-limiting` — apply the existing rate limiter to `/api/session` and `/api/auth/login` with negative 429 coverage.
+
+---
+
+## 34. Security knot — `security.auth-route-rate-limiting` executed (authentication hardening)
+
+**Knot:** rate-limit the unauthenticated authentication entry points (`POST /api/auth/register`, `POST /api/auth/login`, `POST /api/session`) using the existing canonical limiter.
+**Trusted baseline at execution:** `git rev-parse HEAD` = `c422c4c01364b4c8cc2371e51f8353592b0bdc21` (`fix/autonomous-product-factory`).
+**Classification:** REAL SECURITY DEFECT (unlimited credential-guessing / registration; cross-route bypass). No architecture change; Architecture Freeze V4.1 preserved.
+**Checkpoint:** `.kilo/plans/security-auth-route-rate-limiting-checkpoint.md`.
+
+### 34.1 Independent confirmation of the defect
+
+At this HEAD, `CommercialRuntimeServer` applied `TokenBucketRateLimiter` only to per-session routes (`if (!session) return 401` gate occurs after all `/api/auth/*` and `POST /api/session` handlers). Those auth handlers therefore executed without any limiter, and the password form of `/api/session` would have remained an un-limited bypass had only `/api/auth/login` been covered. Confirmed by direct inspection of `CommercialRuntimeServer.ts` route ordering.
+
+### 34.2 Repair (canonical owner)
+
+- Per-client limiter keyed by `req.socket.remoteAddress` (capacity 20, refill 5/s), checked before body read.
+- Per-identity limiter keyed by client + normalized username + organization (capacity 5, refill 1/s), checked after field validation and before credential verification; shared by `/api/auth/login` and the password form of `/api/session`.
+- Fail-closed `429 { error: "RATE_LIMIT_EXCEEDED" }` + `Retry-After: 1`; emits `RATE_LIMIT_EXCEEDED` security event when a logger is configured.
+- `/api/ready` advertises `auth-rate-limiting`.
+
+Reuses the existing `TokenBucketRateLimiter`; no new limiter, no parallel auth architecture.
+
+### 34.3 Verification evidence
+
+- Focused `CommercialRuntimeServer.rateLimiting.test.ts`: **10/10 tests passed** (6 new auth tests).
+- Integration regression: **16/16 suites, 100/100 tests passed** (e2e, resilience, Phase1[0-4], identity hardening, bootstrap security, RBAC, web entrypoint, business flow, reports export, final qualification).
+- Changed-file typecheck `tsc --noEmit`: **exit 0**.
+- Full suite (`jest --silent`, evidence `.kilo/evidence/jest-full-stage3-auth-rate-limiting.txt`): **257/259 suites, 1959/1960 tests**; rate-limiting suite green under full load.
+
+### 34.4 Remaining failure classification (after repair)
+
+| Suite | Class |
+|---|---|
+| `CommercialRuntimePersistenceRecovery.test.ts` | TIMING/RESOURCE FLAKE (5 s test budget under full parallel load; passes in isolation) |
+| `OcrAdapter.test.ts` | ENVIRONMENT GAP (`tesseract.js` absent) |
+
+### 34.5 Truth boundary
+
+No change to `productComplete`, `commercialProductRuntimeComplete` or `externalProductionDependenciesComplete`. No assertion weakened, no test skipped or deleted. The real file-backed audit test received an explicit 20 s budget for full-suite load; coverage unchanged.
+
+### 34.6 Next candidate knot (not executed)
+
+`product.web-password-auth` — real password register/login in the web entrypoint via the existing `/api/auth/*` routes.

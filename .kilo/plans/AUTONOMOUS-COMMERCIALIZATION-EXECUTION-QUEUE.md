@@ -28,8 +28,8 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 |---|---|---|---|---|---|---|
 | 1 | `assurance.stale-test-reconciliation` | V1–V5 | Reconcile 5 stale suites to current frozen contracts (Governance Engine void-init; Kilo script 1-arg; 3× phase-09 services) | test files only; contracts already frozen | HIGH | **COMPLETE** |
 | 2 | `assurance.local-folder-watcher-lifecycle` | E1 | Diagnose + fix Windows libuv native abort (watcher lifecycle vs test teardown) or record explicit reproducible exclusion; **isolated** | LocalFolderWatcher owner + test | MEDIUM | **COMPLETE** |
-| 3 | `security.auth-route-rate-limiting` | S2 | Apply existing limiter to `/api/session` + `/api/auth/login`; negative 429 test | `CommercialRuntimeServer` | HIGH | **EXECUTING** |
-| 4 | `product.web-password-auth` | S1 | Real register/login in web UI via existing `/api/auth/*` (no new engine) | `web/` + runtime auth | MEDIUM | PLANNED |
+| 3 | `security.auth-route-rate-limiting` | S2 | Apply existing limiter to `/api/session` + `/api/auth/login`; negative 429 test | `CommercialRuntimeServer` | HIGH | **COMPLETE** |
+| 4 | `product.web-password-auth` | S1 | Real register/login in web UI via existing `/api/auth/*` (no new engine) | `web/` + runtime auth | MEDIUM | **EXECUTING** |
 | 5 | `security.http-boundary-tenant-object-authz` | S5,S7 | Invoke `TenantIsolation.checkAccess()` + explicit object-owner check at HTTP boundary | `TenantIsolation`, runtime routes | MEDIUM | PLANNED |
 | 6 | `observability.metrics-and-request-trace` | S6 | Additive metrics + structured request trace (no architecture change) | runtime diagnostics | MEDIUM | PLANNED |
 | 7 | `standardization.pagination-and-idempotency` | S3,S4 | Bounded `limit/offset` on list routes; idempotency keys on mutating POSTs | runtime | MEDIUM | PLANNED |
@@ -95,6 +95,27 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 **Checkpoint:** `.kilo/plans/assurance-local-folder-watcher-lifecycle-checkpoint.md`
 
 **DO-NOT-REPEAT:** do not permanently exclude `LocalFolderWatcher`; do not modify the protected `FinancialDataIngestionAdapter.ts`; do not change the watcher's public contract beyond canonicalization.
+
+---
+
+## Stage 3 — `security.auth-route-rate-limiting`
+
+**State:** COMPLETE
+**Baseline SHA:** `c422c4c01364b4c8cc2371e51f8353592b0bdc21`
+**Classification:** REAL SECURITY DEFECT (unauthenticated auth entry points had no limiter; cross-route bypass possible).
+
+**DISCOVER / INSPECT (done):**
+- `CommercialRuntimeServer` applied `TokenBucketRateLimiter` only per session token, on routes handled after the `if (!session) return 401` gate.
+- `POST /api/auth/register`, `POST /api/auth/login`, and `POST /api/session` execute before that gate, so they were unlimited.
+- `/api/session` accepts the same password credential as `/api/auth/login`; limiting only login would leave a bypass.
+
+**Repair:** per-client bucket (`remoteAddress`, 20 / 5 per s) checked before body read; per-identity bucket (`client + username + organization`, 5 / 1 per s) checked before credential verification and shared by `/api/auth/login` + password `/api/session`; fail-closed `429 { error: "RATE_LIMIT_EXCEEDED" }` with `Retry-After: 1` and a security event; `/api/ready` advertises `auth-rate-limiting`.
+
+**Evidence:** focused 10/10 (login brute force, no route bypass, per-account isolation, deterministic reset, cross-identity client limit, auditable security event); integration regression 16 suites / 100 tests; typecheck exit 0; full suite 257/259 with the rate-limiting suite green under load. See `.kilo/plans/security-auth-route-rate-limiting-checkpoint.md` and audit §34.
+
+**Checkpoint:** `.kilo/plans/security-auth-route-rate-limiting-checkpoint.md`
+
+**DO-NOT-REPEAT:** do not create a second limiter or a parallel auth architecture; reuse `TokenBucketRateLimiter` and `CommercialIdentityService`; do not weaken the passwordless bootstrap decision gate; do not lower limits to make tests pass.
 
 ---
 
