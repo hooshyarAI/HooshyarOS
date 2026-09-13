@@ -3,6 +3,7 @@
 **Status:** VERIFIED
 **Branch:** `fix/autonomous-product-factory`
 **Base commit:** `fea1b22d` (decision-workbench checkpoint)
+**Commit:** `226a716a` (this capability transaction)
 **Architecture baseline:** Architecture Freeze V4.1
 **Master plan:** `.kilo/plans/commercialization-standardization-master-plan.md`
 
