@@ -75,6 +75,22 @@ describe("ContinuousImprovementEngine", () => {
         expect(result.status).toBe("NEEDS_DATA");
     });
 
+    test("fails safe with NEEDS_DATA when no measurement input is supplied", () => {
+        const result = engine.improve(null);
+
+        expect(result.status).toBe("NEEDS_DATA");
+        expect(result.recommendations).toEqual([]);
+        expect(result.learningSummary.adaptationRequired).toBe(false);
+        expect(result.provenance.verificationStatus).toBe("FAILED");
+    });
+
+    test("fails safe with NEEDS_DATA for undefined measurement input", () => {
+        const result = engine.improve(undefined);
+
+        expect(result.status).toBe("NEEDS_DATA");
+        expect(result.recommendations).toEqual([]);
+    });
+
     test("includes provenance in every result", () => {
         const result = engine.improve(baseInput);
 

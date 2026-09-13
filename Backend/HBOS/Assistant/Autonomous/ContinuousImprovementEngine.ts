@@ -73,7 +73,7 @@ export class ContinuousImprovementEngine {
         return { status: "READY" };
     }
 
-    improve(input: ImprovementInput): ImprovementResult {
+    improve(input: ImprovementInput | null | undefined): ImprovementResult {
         if (!input?.tenantId?.trim() || !input.domain || !input.actualImpact) {
             return this.blocked(input);
         }

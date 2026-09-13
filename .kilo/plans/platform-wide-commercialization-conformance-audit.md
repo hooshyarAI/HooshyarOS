@@ -514,3 +514,66 @@ This knot restores a dependency-verification control-plane capability and improv
 ### 30.9 Next highest-value assurance knot (candidate, not executed)
 
 The `HooshyarAutonomousAssistant` improvement-integration defect is the next highest-value bounded assurance knot: one real root-cause mismatch in `Assistant/Autonomous/HooshyarAutonomousAssistant.ts:44` currently blocks four suites. It is **not** mixed into this transaction. It must be independently confirmed active and repaired under its own checkpoint before selection.
+
+---
+
+## 31. Assurance knot — `assurance.hooshyar-assistant-improvement-contract` repaired (assistant/improvement assurance)
+
+**Knot:** repair the `HooshyarAutonomousAssistant` → `ContinuousImprovementEngine` contract mismatch blocking four suites.
+**Trusted baseline at execution:** `git rev-parse HEAD` = `960d7d08582d73e3aba1b5f15137c7cc2efee633` (`fix/autonomous-product-factory`).
+**Classification:** IMPLEMENTATION REPAIR. No architecture change; Architecture Freeze V4.1 preserved; no engine moved; no duplicate owner; delivered commercial capabilities untouched.
+**Checkpoint:** `.kilo/plans/hooshyar-assistant-improvement-contract-checkpoint.md`.
+
+### 31.1 Independent confirmation of the root cause
+
+Confirmed active at baseline by direct execution: `HooshyarAutonomousAssistant.ts:44` called `improve(evaluation)` with `SelfEvaluationEngine.evaluate()` output `{ healthy, score, system }`, which is not an `ImprovementInput`. `TS2345` + `TS2339: 'improved' does not exist` failed compilation of `HooshyarAutonomousAssistant.test.ts`, `HooshyarAutonomousAssistant.platform-construction.test.ts`, `AutonomousAssistantConstructionHandoff.test.ts`, and `HooshyarSelfOperatingAssistant.test.ts` (4 failed suites, 0 tests run). Phase 12-1.4 (`6ce3b375`) replaced the stub engine that returned `{ improved:true, suggestions }` with a real measurement-based engine; the assistant was never migrated.
+
+### 31.2 Architecture proof (why the correct repair is fail-safe, not fabrication)
+
+- `ContinuousImprovementEngine` is the canonical owner (`product.continuous-improvement`, target `Organizational Intelligence Engine`). `ImprovementInput` requires tenant-scoped measured impact and real `currentState`.
+- The only canonical production construction of `ImprovementInput` is `POST /api/improvement/improve` (`CommercialRuntimeServer.ts:1011–1027`) from validated user evidence. The Assistant layer has no tenant context (`tenantId` appears only inside the engine) and `AutonomousIdentityCore.identify()` returns the assistant's own identity, not a tenant. There is therefore no trustworthy impact evidence in the internal construction lifecycle.
+- The engine's documented contract ("Missing data produces NEEDS_DATA") is already implemented by its private `blocked(input: ImprovementInput | null | undefined)` and null guard, while the public parameter forbade null/undefined. Widening the parameter to `ImprovementInput | null | undefined` makes the signature truthful to the documented fail-safe and does not weaken READY-path validation (valid `tenantId`/`domain`/`actualImpact` still required).
+
+### 31.3 Repair
+
+- `HooshyarAutonomousAssistant.execute(goal, improvementInput?: ImprovementInput | null)`: invokes the engine with supplied canonical evidence (`READY`), otherwise invokes the engine's documented fail-safe `improve(null)` (`NEEDS_DATA`). No tenant/domain/state/impact values invented. Early non-COMPLETED return now reports the engine's safe `NEEDS_DATA` result instead of the abolished stub `{ improved:false }`.
+- `ContinuousImprovementEngine.improve(input: ImprovementInput | null | undefined)`.
+- Stale assertion `improvement.improved === true` replaced with real fail-safe + READY-evidence behavioural assertions in `HooshyarAutonomousAssistant.test.ts`; stale improvement stub removed from `AutonomousAssistantConstructionHandoff.test.ts`; two fail-safe tests added to `ContinuousImprovementEngine.phase-12-1.4.test.ts`.
+
+### 31.4 Changed files
+
+- `Backend/HBOS/Assistant/Autonomous/ContinuousImprovementEngine.ts`
+- `Backend/HBOS/Assistant/Autonomous/HooshyarAutonomousAssistant.ts`
+- `Backend/HBOS/test/HooshyarAutonomousAssistant.test.ts`
+- `Backend/HBOS/test/AutonomousAssistantConstructionHandoff.test.ts`
+- `Backend/HBOS/test/ContinuousImprovementEngine.phase-12-1.4.test.ts`
+- `.kilo/plans/platform-wide-commercialization-conformance-audit.md`
+- `.kilo/plans/hooshyar-assistant-improvement-contract-checkpoint.md`
+
+### 31.5 Verification evidence
+
+- Focused: 5 suites / **14 tests passed** (the four knot suites + `ContinuousImprovementEngine.phase-12-1.4`, incl. 2 new fail-safe tests).
+- Regression: `ImpactMeasurementService.phase-12-1.3`, `AutonomousAssistantRuntime`, `AutonomousMissionController`, `AssistantCompletionGate`, `AutonomousCompletionGate`, `AutonomousProjectMission.platform-order`, `CanonicalCapabilityAudit`, `Phase12-E2E` → 8 suites / **19 tests passed**.
+- Changed-file typecheck `tsc --noEmit`: **exit 0**.
+- Full suite (LocalFolderWatcher excluded): **baseline 10 failed / 248 passed / 258 suites, 1906 tests passed → after 6 failed / 252 passed / 258 suites, 1913 tests passed**. Exactly the four knot suites were removed; no new failure.
+
+### 31.6 Remaining failure classification (after repair)
+
+| Suite | Class |
+|---|---|
+| `GovernanceEngine.test.ts` | STALE TEST (frozen `initialize(): void`) |
+| `KiloCodeExecutionAdapterObservability.test.ts` | STALE TEST (`buildWindowsKiloScript` arity; false-positive string test) |
+| `BreakEvenAnalysisService.phase-09-1-5.test.ts` | STALE DUPLICATE (superseded API) |
+| `CashFlowForecastingService.phase-09-1-6.test.ts` | STALE DUPLICATE (superseded 2-arg API) |
+| `ExponentialSmoothingService.phase-09-1-9.test.ts` | STALE DUPLICATE (superseded 3-arg API) |
+| `OcrAdapter.test.ts` | ENVIRONMENT GAP (`tesseract.js` absent) |
+| `LocalFolderWatcher.test.ts` | ENVIRONMENT/CRITICAL FLAKE (Windows libuv abort; excluded) |
+| `CommercialRuntimePersistenceRecovery.test.ts`, `KiloCodeExecutionAdapter.test.ts` | TIMING/RESOURCE FLAKE (pass in both runs) |
+
+### 31.7 Truth boundary
+
+No change to `productComplete`, `commercialProductRuntimeComplete`, or `externalProductionDependenciesComplete`. No delivered commercial capability touched. No fabricated measurement evidence; `NEEDS_DATA` is the truthful outcome when evidence is absent. No test deleted, skipped or weakened. `EngineDependencyVerifier`, `LocalFolderWatcher`, and OCR dependency work were not touched.
+
+### 31.8 Next candidate knot (candidate, not executed)
+
+`assurance.stale-test-reconciliation` — align the 5 remaining stale suites with current frozen contracts by strengthening (never weakening) assertions.
