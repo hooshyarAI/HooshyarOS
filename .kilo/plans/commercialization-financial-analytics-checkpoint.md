@@ -3,7 +3,7 @@
 **Status:** VERIFIED
 **Branch:** `fix/autonomous-product-factory`
 **Trusted baseline:** `68ddc9c1067cf5dddcb61e5aa2486765b06a3547` (Layer 8 complete)
-**Knot commit:** `PENDING`
+**Knot commit:** `5f12a56cb404c75d19169fc761e2eac4f577688b`
 **Architecture baseline:** Architecture Freeze V4.1 (unchanged)
 
 ## 1. Mission

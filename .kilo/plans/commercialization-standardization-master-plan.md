@@ -308,7 +308,7 @@ human-approved governed-execution path can exist using the existing `Authorizati
 | Historical reconciliation + master plan | VERIFIED | this file | `5f5b62f1` |
 | `product.decision-workbench` | VERIFIED | `DecisionWorkbench.test.ts` 9/9, `DecisionWorkbenchRuntime.test.ts` 5/5; 160/160 decision/runtime regression; full Jest 240/253 suites, 1852/1853 tests; `web-product-acceptance` PASS; `security-tenant-acceptance` PASS | `5f5b62f1` |
 | `product.organizational-execution` (Layer 8) | VERIFIED | `OrganizationalExecutionCoordinator.test.ts` 10/10, `OrganizationalExecutionRuntime.test.ts` 4/4; focused regression 113/113 (15 suites); full Jest 241/254 suites, 1864/1865 tests; `web-product-acceptance` PASS; `security-tenant-acceptance` PASS | `226a716a` |
-| `product.financial-analytics` (Layer 5) | VERIFIED | `FinancialAnalyticsService.test.ts` 7/7, `FinancialAnalyticsRuntime.test.ts` 5/5; owner+runtime regression 29/29 (6 suites); full Jest 244/256 suites, 1877/1877 tests; `web-product-acceptance` v6 PASS; `security-tenant-acceptance` v2 PASS; changed-file typecheck clean | `PENDING` |
+| `product.financial-analytics` (Layer 5) | VERIFIED | `FinancialAnalyticsService.test.ts` 7/7, `FinancialAnalyticsRuntime.test.ts` 5/5; owner+runtime regression 29/29 (6 suites); full Jest 244/256 suites, 1877/1877 tests; `web-product-acceptance` v6 PASS; `security-tenant-acceptance` v2 PASS; changed-file typecheck clean | `5f12a56c` |
 
 ### Knot `product.decision-workbench` — delivered
 
