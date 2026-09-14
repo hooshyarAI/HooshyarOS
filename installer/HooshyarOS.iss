@@ -18,13 +18,14 @@ SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64compatible
 WizardStyle=modern
 UninstallDisplayName=HooshyarOS
+SetupIconFile=..\dist\productization\windows\payload\hooshyaros.ico
 
 [Files]
 Source: "..\dist\productization\windows\payload\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 
 [Icons]
-Name: "{autoprograms}\HooshyarOS\HooshyarOS"; Filename: "wscript.exe"; Parameters: """{app}\launch-hooshyar.vbs"""; WorkingDir: "{app}"; IconFilename: "{sys}\imageres.dll"; IconIndex: 2
-Name: "{autodesktop}\HooshyarOS"; Filename: "wscript.exe"; Parameters: """{app}\launch-hooshyar.vbs"""; WorkingDir: "{app}"; IconFilename: "{sys}\imageres.dll"; IconIndex: 2
+Name: "{autoprograms}\HooshyarOS\HooshyarOS"; Filename: "wscript.exe"; Parameters: """{app}\launch-hooshyar.vbs"""; WorkingDir: "{app}"; IconFilename: "{app}\hooshyaros.ico"; IconIndex: 0
+Name: "{autodesktop}\HooshyarOS"; Filename: "wscript.exe"; Parameters: """{app}\launch-hooshyar.vbs"""; WorkingDir: "{app}"; IconFilename: "{app}\hooshyaros.ico"; IconIndex: 0
 
 [Run]
 Filename: "wscript.exe"; Parameters: """{app}\launch-hooshyar.vbs"""; Flags: runhidden nowait
