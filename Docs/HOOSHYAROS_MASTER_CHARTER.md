@@ -481,6 +481,112 @@ When a new decision is approved:
 
 No future construction cycle should need the human to reconstruct hundreds of pages of prior discussion.
 
+### 15.1 Permanent Audit & Verification Memory — PERMANENT
+
+Every significant completed audit MUST leave a durable repository summary. The detailed evidence remains in its dedicated audit artifact; this Master Charter stores only the compact index/recovery state a future autonomous cycle needs to resume without re-auditing or drifting.
+
+Governing rules:
+
+- Every significant completed audit has a durable repository summary.
+- Detailed evidence remains in the dedicated audit artifact.
+- The Master Charter stores only the compact recovery/index state.
+- Every future autonomous cycle MUST read this Audit Memory before performing a broad re-audit.
+- A full audit MUST NOT be repeated merely because old queue, plan, ledger or checkpoint files exist.
+- When repository, governance and evidence have not materially changed, a **delta audit** MUST be used instead of repeating the entire audit.
+- Historical audit records MUST NEVER override the governing source-of-truth hierarchy (Section 2).
+- A closed knot MUST NOT return to the queue unless new evidence reopens it.
+- Every new knot MUST identify the evidence or audit delta that created it.
+- A superseded baseline MUST remain traceable and MUST NOT be silently deleted.
+- This memory is a durable index, NOT a replacement for evidence.
+
+A future autonomous cycle MUST be able to answer from this memory:
+
+1. What has already been audited?
+2. What was actually proven?
+3. What remains?
+4. What is externally blocked?
+5. What is the next dependency-ready knot?
+
+#### 15.1.1 Current Audit Baseline — `fresh-governed-commercialization-2026-09-14`
+
+| Field | Value |
+|---|---|
+| AUDIT ID | `fresh-governed-commercialization-2026-09-14` |
+| DATE | 2026-09-14 |
+| AUDIT ARTIFACT (evidence source) | `.kilo/plans/fresh-governed-commercialization-reaudit-2026-09-14.md` |
+| TRUSTED CHECKPOINT | `977ea944e1bf3adfe3cbc4f25bfed832db7083bb` |
+| QUEUE STATUS | CURRENT but INCOMPLETE |
+| VERIFIED STAGES | Stages 1–10, through HEAD `977ea944` |
+| NEXT DEPENDENCY-READY KNOT | K1 `assurance.construction-remote-attestation` |
+
+Completion states recorded by that audit:
+
+| State | Value |
+|---|---|
+| `assistantComplete` | TRUE (functionally; K1 remote-attestation gap remains) |
+| `canonicalPlatformConstructionComplete` | FALSE |
+| `commercialProductRuntimeComplete` | FALSE |
+| `externalProductionDependenciesComplete` | FALSE |
+| `productComplete` | FALSE |
+
+Remaining repository-local knots: **4 primary (K1–K4)** and **3 conditional (K5–K7)**.
+
+| ID | Knot | Class | Status | Stage |
+|---|---|---|---|---|
+| K1 | `assurance.construction-remote-attestation` | Primary — governance/construction-integrity gap | Remaining | 11 |
+| K2 | `product.offline-sync` | Primary — real missing product capability (Layer 11) | Remaining | 12 |
+| K3 | `assurance.completion-audit-integrity` | Primary — completion-audit false-positive risk | Remaining | 13 |
+| K4 | `standardization.governance-operator-reconciliation` | Primary — docs-only consistency | Remaining | 14 |
+| K5 | `commercial.subscription-entitlements` (repo-local boundary only) | Conditional — scope-gated | Conditional | 15 |
+| K6 | `assurance.android-build-test-evidence` | Conditional — scope/environment | Conditional | 16 |
+| K7 | `assurance.runtime-server-unit-coverage` | Conditional — LOW test-coverage gap | Conditional | 17 |
+
+Blocked items: **3 core external/approval blockers (B1–B3)** and **2 environment/host blockers (B4–B5)**.
+
+| ID | Blocker | Class |
+|---|---|---|
+| B1 | Encryption-at-rest wiring into the production store + key management | Architecture change control / pending human 05C decisions |
+| B2 | Payment-provider activation | `BLOCKED_EXTERNAL_DEPENDENCY` |
+| B3 | Production cloud / DNS / TLS resources | `BLOCKED_EXTERNAL_DEPENDENCY` |
+| B4 | Android device acceptance | External (device) |
+| B5 | Inno Setup 6 build host | Environment/host |
+
+Valid next stages from this baseline: Stage 11 = K1 `assurance.construction-remote-attestation`; Stage 12 (K2) remains valid; K3 SHOULD become Stage 13; K4 SHOULD become Stage 14; K5–K7 remain conditional. No stage may be skipped, invented or reordered without a new evidence-backed audit delta.
+
+Proven by the 2026-09-14 audit (headline finding): the autonomous completion gate (`CanonicalCapabilityAudit.ts`, `CommercialProductCompletionAudit.ts`, composed by `AutonomousBuildDaemon.ts`) derives completion from file existence, contract-marker strings and regex method-name probes rather than runtime/application/acceptance evidence. This is a genuine false-positive risk against Governance Charter §15 and is registered as knot K3. It was recorded, not silently modified.
+
+#### 15.1.2 Historical Audit / Verification Records (evidenced only)
+
+Only records whose completion is supported by their own artifact and/or a verifiable commit are listed. Where a historical status cannot be proven from the repository, it MUST be recorded as **UNKNOWN**, never guessed.
+
+| Artifact | Baseline / HEAD | Evidenced status |
+|---|---|---|
+| `.kilo/plans/platform-wide-commercialization-conformance-audit.md` | `c2fd5733` | COMPLETE (audit); prior principal conformance audit; `product.secure-identity-bootstrap` VERIFIED; `EngineDependencyVerifier` REPAIRED/VERIFIED (§30) |
+| `.kilo/plans/commercialization-standardization-master-plan.md` | `68ddc9c1` | ACTIVE; phases 1–14 reconciliation recorded (Phase 10 = CONDITIONAL PASS) |
+| `.kilo/plans/ACTIVE-COMMERCIALIZATION-MASTER-LEDGER.md` | audit HEAD `a0f0018c` | stages 1–10 recorded VERIFIED (checkpoint-backed) |
+| `.kilo/plans/AUTONOMOUS-COMMERCIALIZATION-EXECUTION-QUEUE.md` | derived from ledger | stages 1–10 COMPLETE; 11–12 PLANNED; 3 BLOCKED; INCOMPLETE vs K3–K7 |
+| `.kilo/plans/phase-11-final-checkpoint.md` | `8ed51f0e` | declared VERIFIED; its `canonicalPlatformConstructionComplete: true` claim is SUPERSEDED by later evidence (`phase-14-final-checkpoint.md` and the 2026-09-14 audit both record FALSE) |
+| `.kilo/plans/phase-12-final-checkpoint.md` | `849f5709` | VERIFIED; local == remote TRUE |
+| `.kilo/plans/phase-13-final-checkpoint.md` | `ed754200` | VERIFIED; remote synchronization confirmed in artifact |
+| `.kilo/plans/phase-14-final-checkpoint.md` | base `e0cc6ce0`; code HEAD `c769c184` | VERIFIED |
+| earlier phase checkpoints (`phase-08*` … `phase-10*`, stage/phase checkpoints under `.kilo/plans/`) | various | Evidence-backed only where the checkpoint declares its tests, result and commit SHA; otherwise **UNKNOWN**. `PHASE-10-FINAL-QUALIFICATION-REPORT.md` = PASS WITH FINDINGS (untracked working-tree artifact) |
+
+Superseded baselines (for example the `phase-11` completion claim and the `a0f0018c`/`c2fd5733` audit baselines) remain traceable here and in their own artifacts; they are historical evidence and are never silently deleted.
+
+#### 15.1.3 Source-of-Truth Discipline
+
+This subsection is a durable index, not a competing source of truth. The governing hierarchy remains:
+
+1. `Docs/HOOSHYAROS_MASTER_CHARTER.md` (this charter)
+2. `Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md`
+3. `Docs/ARCHITECTURE.md` — Architecture Freeze V4
+4. `Assistant/SYSTEM_PROMPT.md`
+5. Existing decisions, implementations, tests and documentation
+6. Current repository state and Git history
+7. Detailed audit evidence (the audit artifact named in §15.1.1)
+
+When this index and a detailed audit artifact disagree, the detailed artifact and current repository evidence win, the disagreement is preserved as evidence, and the index is corrected. Audit Memory never weakens, replaces or overrides Governing evidence.
+
 ---
 
 ## 16. Conflict Resolution
