@@ -587,6 +587,24 @@ This subsection is a durable index, not a competing source of truth. The governi
 
 When this index and a detailed audit artifact disagree, the detailed artifact and current repository evidence win, the disagreement is preserved as evidence, and the index is corrected. Audit Memory never weakens, replaces or overrides Governing evidence.
 
+#### 15.1.4 Post-Audit Update Rule — PERMANENT
+
+Every significant audit MUST, immediately after reaching its final verdict and before ending the audit mission, update Audit Memory. No separate human command is required, and this update MUST NOT trigger a full re-audit.
+
+The update records only:
+
+- audit ID;
+- date;
+- detailed evidence artifact;
+- trusted checkpoint;
+- completion states;
+- remaining repository-local knots;
+- external/approval blockers;
+- queue status;
+- next dependency-ready knot.
+
+If the audit changes no state, it MUST record **verified — no state change**. Audit Memory remains a durable index, NOT a replacement for evidence, and the governing source-of-truth hierarchy (Section 2 and §15.1.3) remains unchanged.
+
 ---
 
 ## 16. Conflict Resolution
