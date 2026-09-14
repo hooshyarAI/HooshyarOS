@@ -32,7 +32,7 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 | 4 | `product.web-password-auth` | S1 | Real register/login in web UI via existing `/api/auth/*` (no new engine) | `web/` + runtime auth | MEDIUM | **COMPLETE** |
 | 5 | `security.http-boundary-tenant-object-authz` | S5,S7 | Invoke `TenantIsolation.checkAccess()` + explicit object-owner check at HTTP boundary | `TenantIsolation`, runtime routes | MEDIUM | **COMPLETE** |
 | 6 | `observability.metrics-and-request-trace` | S6 | Additive metrics + structured request trace (no architecture change) | runtime diagnostics | MEDIUM | **COMPLETE** |
-| 7 | `standardization.pagination-and-idempotency` | S3,S4 | Bounded `limit/offset` on list routes; idempotency keys on mutating POSTs | runtime | MEDIUM | **EXECUTING** |
+| 7 | `standardization.pagination-and-idempotency` | S3,S4 | Bounded `limit/offset` on list routes; idempotency keys on mutating POSTs | runtime | MEDIUM | **COMPLETE** |
 | 8 | `assurance.ocr-environment-gap` | E2 | Resolve only if runtime contract requires; else record explicit, non-hidden gap | `OcrAdapter` | HIGH | PLANNED |
 | 9 | `assurance.flake-containment` | F1,F2 | Analyze + contain parallel-load resource contention (timeouts/serial projects) without hiding real failures | test config + affected tests | HIGH | PLANNED |
 | 10 | `standardization.architecture-doc-registry-reconciliation` | C8 | Reconcile LifecycleManager tier drift + stale dormant labels to repository truth | docs/registry | HIGH | PLANNED |
@@ -172,6 +172,27 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 **Checkpoint:** `.kilo/plans/observability-metrics-and-request-trace-checkpoint.md`
 
 **DO-NOT-REPEAT:** do not create an Engine; do not store or expose credentials/cookies/tokens/content in metrics; do not reflect unsafe inbound request ids.
+
+---
+
+## Stage 7 — `standardization.pagination-and-idempotency`
+
+**State:** COMPLETE
+**Baseline SHA:** `235efe45a333185d630d8745e14c97c541ef0828`
+**Classification:** STANDARDIZATION GAP (S3 pagination; S4 idempotency).
+
+**DISCOVER / INSPECT (done):**
+- Real list routes: `GET /api/sources`, `GET /api/execution/work-items`, `GET /api/report/artifacts` (all tenant-scoped owners; `:latest`/dashboard routes are single objects).
+- Real duplicate-prone mutations: `POST /api/ingest`, `POST /api/execution/work-items`, `POST /api/report/export`. Other POSTs overwrite a `:latest` key, are state-guarded, or are pure computation.
+- Canonical persistence: `SQLitePersistenceStore` KV table `persistence_records` — reused, not replaced.
+
+**Repair:** additive `QueryPagination` contract with default 50 / max 200 and fail-closed validation; paginated owner methods (`listSourcesPage`, `listWorkItemsPage`, `listPage`) with total ordering and tenant filter before slicing; `writeIfAbsent`/`delete` atomic-claim primitives; runtime `runIdempotent` with tenant+actor+route key scope, request hashing, replay (`Idempotency-Replayed`), conflict/in-progress 409, and claim release on failure; `web/app.js` sends rotating keys on the three mutations.
+
+**Evidence:** focused pagination 8/8, focused idempotency 12/12; integration 16 suites/103 tests; persistence/rbac regression 7 suites/67 tests; typecheck exit 0; full suite **261/262 suites, 1988/1988 tests** (only E2 OCR env gap); restart-replay and cross-tenant/race cases asserted. See `.kilo/plans/standardization-pagination-and-idempotency-checkpoint.md`.
+
+**Checkpoint:** `.kilo/plans/standardization-pagination-and-idempotency-checkpoint.md`
+
+**DO-NOT-REPEAT:** do not build a new idempotency store/database or pagination engine; do not paginate single-object routes or add meaningless headers to overwrite/pure-compute POSTs; do not silently clamp invalid limits; do not weaken the tenant/actor key scope; do not touch `FinancialDataIngestionAdapter.ts` or `Engine.initialize()`.
 
 ---
 

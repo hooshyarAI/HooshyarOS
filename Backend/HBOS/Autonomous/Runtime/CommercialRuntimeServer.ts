@@ -36,6 +36,7 @@ import { Scenario } from "../../Uncertainty/MonteCarloTypes";
 import { ImpactMeasurementService } from "../../Product/ImpactMeasurementService";
 import { ContinuousImprovementEngine } from "../../Assistant/Autonomous/ContinuousImprovementEngine";
 import { RuntimeObservability } from "./RuntimeObservability";
+import { parsePagination, toPageMeta } from "./QueryPagination";
 import type { BaselineMetrics, PostInterventionMetrics } from "../../Product/ImpactMeasurementService";
 
 export interface CommercialRuntimeOptions {
@@ -58,6 +59,25 @@ const LATEST_ANALYTICS_KEY = "financial-analytics:latest";
 const DEFAULT_SESSION_TTL_MS = 60 * 60 * 1000;
 const DEFAULT_CORS_ORIGIN = "http://localhost:3000";
 const SESSION_COOKIE = "hooshyar_session";
+const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9._:-]{1,255}$/;
+
+/**
+ * Persisted idempotency evidence. Stored through the canonical
+ * `SQLitePersistenceStore` under the tenant scope, so replay state is durable,
+ * tenant-isolated and survives restarts. `IN_PROGRESS` marks an atomically
+ * claimed key whose side effect has not yet completed.
+ */
+interface IdempotencyRecord {
+    readonly tenantId: string;
+    readonly actorId: string;
+    readonly scope: string;
+    readonly requestHash: string;
+    readonly status: "IN_PROGRESS" | "COMPLETED";
+    readonly createdAt: string;
+    readonly completedAt?: string;
+    readonly responseStatus?: number;
+    readonly responseBody?: unknown;
+}
 
 const corsHeaders = (origin: string): Record<string, string> => ({
     "Access-Control-Allow-Origin": origin,
@@ -490,6 +510,16 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
         }
     };
 
+    /**
+     * Canonical HTTP outcome for a governed work-item operation, shared by the
+     * direct response path and the idempotency path so both produce the exact
+     * same status/payload.
+     */
+    const executionOutcome = (result: WorkItemOperationResult): { readonly status: number; readonly payload: unknown } =>
+        result.status === "READY"
+            ? { status: 200, payload: result.workItem }
+            : { status: executionErrorStatus(result.code), payload: { error: result.code ?? "EXECUTION_BLOCKED", reason: result.reason } };
+
     const close = () => persistence.close();
     const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
         const requestId = observability.requestId(req.headers["x-request-id"]);
@@ -500,19 +530,20 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
         });
         const corsJson = (status: number, payload: unknown, headers: Record<string, string> = {}) =>
             json(res, status, payload, { ...corsHeaders(corsOrigin), ...headers });
-        const executionResponse = (result: WorkItemOperationResult) =>
-            result.status === "READY"
-                ? corsJson(200, result.workItem)
-                : corsJson(executionErrorStatus(result.code), { error: result.code ?? "EXECUTION_BLOCKED", reason: result.reason });
+        const executionResponse = (result: WorkItemOperationResult) => {
+            const outcome = executionOutcome(result);
+            return corsJson(outcome.status, outcome.payload);
+        };
         try {
             const path = req.url?.split("?")[0] ?? "/";
+            const query = new URLSearchParams((req.url ?? "").split("?")[1] ?? "");
             if (req.method === "OPTIONS") {
                 res.statusCode = 204;
                 for (const [key, value] of Object.entries(corsHeaders(corsOrigin))) res.setHeader(key, value);
                 return res.end();
             }
             if (req.method === "GET" && path === "/health") return corsJson(200, { status: "ok", service: "hooshyar-commercial-runtime" });
-            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "financial-analytics", "ingested-source-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-workbench", "decision-workbench", "expert-choice", "organizational-execution", "governed-approval", "work-item-lifecycle", "kpi-outcome", "reports", "reports-export", "report-artifact-download", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "auth-rate-limiting", "rbac", "session-lifecycle", "request-observability"] });
+            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "financial-analytics", "ingested-source-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-workbench", "decision-workbench", "expert-choice", "organizational-execution", "governed-approval", "work-item-lifecycle", "kpi-outcome", "reports", "reports-export", "report-artifact-download", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "auth-rate-limiting", "rbac", "session-lifecycle", "request-observability", "bounded-pagination", "idempotency-keys"] });
             if (req.method === "GET" && path === "/") return asset(res, "index.html", "text/html; charset=utf-8");
             if (req.method === "GET" && path === "/app.js") return asset(res, "app.js", "text/javascript; charset=utf-8");
             if (req.method === "GET" && path === "/styles.css") return asset(res, "styles.css", "text/css; charset=utf-8");
@@ -689,6 +720,89 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 return false;
             };
 
+            /**
+             * Idempotent execution for mutating POSTs that create real,
+             * duplicate-prone side effects (new persisted work items, report
+             * artifacts, raw sources).
+             *
+             * When the caller supplies an `Idempotency-Key` header:
+             *   - the key is validated and scoped to the authenticated
+             *     tenant + actor + route, so it can never replay or collide
+             *     across tenants or users;
+             *   - the key is atomically claimed through the canonical
+             *     persistence store (`writeIfAbsent`), so concurrent duplicate
+             *     submissions cannot both execute;
+             *   - a completed key replays the exact stored response with
+             *     `Idempotency-Replayed: true`;
+             *   - a key reused with a different request body fails closed
+             *     (`409 IDEMPOTENCY_KEY_CONFLICT`);
+             *   - a key claimed but not yet completed fails closed
+             *     (`409 IDEMPOTENCY_IN_PROGRESS`) without a second side effect;
+             *   - failed/error outcomes release the claim so a legitimate retry
+             *     can proceed.
+             *
+             * Without the header the endpoint keeps its original contract.
+             */
+            const runIdempotent = async (
+                scope: string,
+                body: Record<string, unknown>,
+                execute: () => Promise<{ readonly status: number; readonly payload: unknown }>,
+            ): Promise<void> => {
+                const rawHeader = req.headers["idempotency-key"];
+                const rawKey = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
+                if (rawKey === undefined) {
+                    const outcome = await execute();
+                    return corsJson(outcome.status, outcome.payload);
+                }
+                const key = rawKey.trim();
+                if (!IDEMPOTENCY_KEY_PATTERN.test(key)) {
+                    return corsJson(400, { error: "IDEMPOTENCY_KEY_INVALID" });
+                }
+
+                const recordKey = `idempotency:${scope}:${session.userId}:${key}`;
+                const requestHash = createHash("sha256").update(JSON.stringify(body ?? {})).digest("hex");
+                const claim: IdempotencyRecord = {
+                    tenantId: session.tenantId,
+                    actorId: session.userId,
+                    scope,
+                    requestHash,
+                    status: "IN_PROGRESS",
+                    createdAt: new Date(now()).toISOString(),
+                };
+
+                const claimed = await persistence.writeIfAbsent({ tenantId: session.tenantId }, recordKey, claim);
+                if (!claimed.created) {
+                    const existing = claimed.record.value as IdempotencyRecord | undefined;
+                    if (!existing || existing.tenantId !== session.tenantId || existing.requestHash !== requestHash) {
+                        return corsJson(409, { error: "IDEMPOTENCY_KEY_CONFLICT" });
+                    }
+                    if (existing.status === "COMPLETED" && typeof existing.responseStatus === "number") {
+                        return corsJson(existing.responseStatus, existing.responseBody, { "Idempotency-Replayed": "true" });
+                    }
+                    return corsJson(409, { error: "IDEMPOTENCY_IN_PROGRESS" });
+                }
+
+                try {
+                    const outcome = await execute();
+                    if (outcome.status >= 200 && outcome.status < 300) {
+                        const completed: IdempotencyRecord = {
+                            ...claim,
+                            status: "COMPLETED",
+                            completedAt: new Date(now()).toISOString(),
+                            responseStatus: outcome.status,
+                            responseBody: outcome.payload,
+                        };
+                        await persistence.write({ tenantId: session.tenantId }, recordKey, completed);
+                    } else {
+                        await persistence.delete({ tenantId: session.tenantId }, recordKey);
+                    }
+                    return corsJson(outcome.status, outcome.payload);
+                } catch (error) {
+                    await persistence.delete({ tenantId: session.tenantId }, recordKey);
+                    throw error;
+                }
+            };
+
             if (req.method === "GET" && path === "/api/diagnostics/metrics") {
                 if (!ensurePermission("MANAGE_USERS")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
                 return corsJson(200, { status: "READY", ...observability.snapshot() });
@@ -744,32 +858,39 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const body = await readJson(req, INGEST_BODY_BYTES);
                 const ingestError = validateIngestBody(body);
                 if (ingestError) return corsJson(400, { error: ingestError });
-                try {
-                    const outcome = await ingestionService.ingest(session.tenantId, {
-                        sourceName: String(body.sourceName),
-                        format: String(body.format).trim().toUpperCase() as IngestionFormat,
-                        content: body.content === undefined ? undefined : String(body.content),
-                        contentBase64: body.contentBase64 === undefined ? undefined : String(body.contentBase64)
-                    });
-                    return corsJson(201, {
-                        status: "READY",
-                        tenantId: session.tenantId,
-                        format: outcome.requestedFormat,
-                        evidence: outcome.result.evidence,
-                        source: outcome.rawSourceRef,
-                        transactionCount: outcome.result.model.transactions.length,
-                        totals: outcome.result.model.totals
-                    });
-                } catch (error) {
-                    const message = error instanceof Error ? error.message : "INGESTION_FAILED";
-                    return corsJson(422, { error: message });
-                }
+                return runIdempotent("ingest", body, async () => {
+                    try {
+                        const outcome = await ingestionService.ingest(session.tenantId, {
+                            sourceName: String(body.sourceName),
+                            format: String(body.format).trim().toUpperCase() as IngestionFormat,
+                            content: body.content === undefined ? undefined : String(body.content),
+                            contentBase64: body.contentBase64 === undefined ? undefined : String(body.contentBase64)
+                        });
+                        return {
+                            status: 201,
+                            payload: {
+                                status: "READY",
+                                tenantId: session.tenantId,
+                                format: outcome.requestedFormat,
+                                evidence: outcome.result.evidence,
+                                source: outcome.rawSourceRef,
+                                transactionCount: outcome.result.model.transactions.length,
+                                totals: outcome.result.model.totals
+                            }
+                        };
+                    } catch (error) {
+                        const message = error instanceof Error ? error.message : "INGESTION_FAILED";
+                        return { status: 422, payload: { error: message } };
+                    }
+                });
             }
 
             if (req.method === "GET" && path === "/api/sources") {
                 if (!ensurePermission("READ_DASHBOARD")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
-                const sources = await ingestionService.listSources(session.tenantId);
-                return corsJson(200, { status: "READY", tenantId: session.tenantId, sources });
+                const pagination = parsePagination(query);
+                if (pagination.ok === false) return corsJson(400, { error: pagination.error });
+                const page = await ingestionService.listSourcesPage(session.tenantId, pagination.page.limit, pagination.page.offset);
+                return corsJson(200, { status: "READY", tenantId: session.tenantId, sources: page.items, pagination: toPageMeta(pagination.page, page) });
             }
 
             if (req.method === "GET" && path.startsWith("/api/sources/")) {
@@ -880,19 +1001,23 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const body = await readJson(req);
                 const title = String(body.title ?? "").trim();
                 if (!title) return corsJson(400, { error: "WORK_ITEM_TITLE_REQUIRED" });
-                const result = await organizationalExecution.propose(executionContext(session), {
-                    title,
-                    description: body.description === undefined ? undefined : String(body.description),
-                    priority: body.priority === undefined ? undefined : String(body.priority) as WorkItemPriority,
-                    decisionArtifactKey: body.decisionArtifactKey === undefined ? undefined : String(body.decisionArtifactKey)
+                return runIdempotent("work-items:propose", body, async () => {
+                    const result = await organizationalExecution.propose(executionContext(session), {
+                        title,
+                        description: body.description === undefined ? undefined : String(body.description),
+                        priority: body.priority === undefined ? undefined : String(body.priority) as WorkItemPriority,
+                        decisionArtifactKey: body.decisionArtifactKey === undefined ? undefined : String(body.decisionArtifactKey)
+                    });
+                    return executionOutcome(result);
                 });
-                return executionResponse(result);
             }
 
             if (path === "/api/execution/work-items" && req.method === "GET") {
                 if (!ensurePermission("READ_DASHBOARD")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
-                const workItems = await organizationalExecution.listWorkItems(executionContext(session));
-                return corsJson(200, { status: "READY", tenantId: session.tenantId, workItems });
+                const pagination = parsePagination(query);
+                if (pagination.ok === false) return corsJson(400, { error: pagination.error });
+                const page = await organizationalExecution.listWorkItemsPage(executionContext(session), pagination.page.limit, pagination.page.offset);
+                return corsJson(200, { status: "READY", tenantId: session.tenantId, workItems: page.items, pagination: toPageMeta(pagination.page, page) });
             }
 
             if (path.startsWith("/api/execution/work-items/")) {
@@ -990,38 +1115,45 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 if (!SUPPORTED_REPORT_FORMATS.includes(format as ReportFormat)) {
                     return corsJson(400, { error: "REPORT_FORMAT_UNSUPPORTED" });
                 }
-                const result = await loadAnalysis(session.tenantId);
-                if (!result) return corsJson(422, { error: "REPORT_ANALYSIS_REQUIRED" });
-                const workbench = await loadWorkbench(session.tenantId);
-                const analytics = await loadAnalytics(session.tenantId);
-                const exported = await reportExport.generate({
-                    tenantId: session.tenantId,
-                    title: "HooshyarOS Financial and Executive Report",
-                    sections: buildReportSections(session, result, workbench, analytics),
-                    format: format as ReportFormat,
-                    metadata: {
-                        "Source": result.source.sourceName,
-                        "Source type": result.source.sourceType,
-                        "Source SHA-256": result.source.sha256,
-                        "Generated by": "ReportsEngine"
-                    },
-                    sourceRef: `financial-ingestion:${result.source.sha256}`
-                });
-                if (exported.status !== "READY") return corsJson(422, { status: "BLOCKED", error: exported.reason });
-                return corsJson(201, {
-                    status: "READY",
-                    tenantId: session.tenantId,
-                    capabilityId: reportExport.capabilityId,
-                    targetEngine: reportExport.targetEngine,
-                    artifact: exported.artifact,
-                    downloadUrl: exported.downloadPath
+                return runIdempotent("report:export", body, async () => {
+                    const result = await loadAnalysis(session.tenantId);
+                    if (!result) return { status: 422, payload: { error: "REPORT_ANALYSIS_REQUIRED" } };
+                    const workbench = await loadWorkbench(session.tenantId);
+                    const analytics = await loadAnalytics(session.tenantId);
+                    const exported = await reportExport.generate({
+                        tenantId: session.tenantId,
+                        title: "HooshyarOS Financial and Executive Report",
+                        sections: buildReportSections(session, result, workbench, analytics),
+                        format: format as ReportFormat,
+                        metadata: {
+                            "Source": result.source.sourceName,
+                            "Source type": result.source.sourceType,
+                            "Source SHA-256": result.source.sha256,
+                            "Generated by": "ReportsEngine"
+                        },
+                        sourceRef: `financial-ingestion:${result.source.sha256}`
+                    });
+                    if (exported.status !== "READY") return { status: 422, payload: { status: "BLOCKED", error: exported.reason } };
+                    return {
+                        status: 201,
+                        payload: {
+                            status: "READY",
+                            tenantId: session.tenantId,
+                            capabilityId: reportExport.capabilityId,
+                            targetEngine: reportExport.targetEngine,
+                            artifact: exported.artifact,
+                            downloadUrl: exported.downloadPath
+                        }
+                    };
                 });
             }
 
             if (req.method === "GET" && path === "/api/report/artifacts") {
                 if (!ensurePermission("READ_DASHBOARD")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
-                const artifacts = await reportExport.list(session.tenantId);
-                return corsJson(200, { status: "READY", tenantId: session.tenantId, artifacts });
+                const pagination = parsePagination(query);
+                if (pagination.ok === false) return corsJson(400, { error: pagination.error });
+                const page = await reportExport.listPage(session.tenantId, pagination.page.limit, pagination.page.offset);
+                return corsJson(200, { status: "READY", tenantId: session.tenantId, artifacts: page.items, pagination: toPageMeta(pagination.page, page) });
             }
 
             if (req.method === "GET" && path.startsWith("/api/report/artifacts/") && path.endsWith("/download")) {

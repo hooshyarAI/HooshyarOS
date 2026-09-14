@@ -182,6 +182,19 @@ export class ReportExportService {
             .map((entry) => toMetadata(entry));
     }
 
+    /**
+     * Bounded page over the tenant's artifact index. The index is maintained
+     * newest-first with insertion order preserved, so it is deterministic. The
+     * tenant filter is applied before the slice; cross-tenant artifacts never
+     * appear and pages neither duplicate nor skip records.
+     */
+    async listPage(tenantId: string, limit: number, offset: number): Promise<{ readonly items: ReportArtifactMetadata[]; readonly total: number }> {
+        const all = await this.list(tenantId);
+        const safeLimit = Number.isInteger(limit) && limit > 0 ? limit : all.length;
+        const safeOffset = Number.isInteger(offset) && offset > 0 ? offset : 0;
+        return { items: all.slice(safeOffset, safeOffset + safeLimit), total: all.length };
+    }
+
     private async appendIndex(tenantId: string, metadata: ReportArtifactMetadata): Promise<void> {
         const existing = await this.list(tenantId);
         const next = [metadata, ...existing.filter((entry) => entry.artifactId !== metadata.artifactId)]

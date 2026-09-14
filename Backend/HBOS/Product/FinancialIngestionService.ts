@@ -139,11 +139,23 @@ export class FinancialIngestionService {
   }
 
   async listSources(tenantId: string): Promise<SourceSummary[]> {
+    return (await this.listSourcesPage(tenantId, Number.MAX_SAFE_INTEGER, 0)).items;
+  }
+
+  /**
+   * Bounded page over the tenant's raw source evidence.
+   *
+   * Ordering is `updated_at DESC, persistence key ASC`, which is a total order
+   * (the key is unique per tenant), so paginating an unchanged dataset can
+   * neither duplicate nor skip a record. The tenant filter is applied in SQL
+   * before the slice, so cross-tenant evidence can never appear.
+   */
+  async listSourcesPage(tenantId: string, limit: number, offset: number): Promise<{ readonly items: SourceSummary[]; readonly total: number }> {
     const normalizedTenant = tenantId?.trim() ?? "";
     if (!normalizedTenant) throw new Error("ingestion-tenant-required");
 
     const rows = this.persistence.database
-      .prepare("SELECT key, value_json FROM persistence_records WHERE tenant_id = ? AND key LIKE ? ORDER BY updated_at DESC")
+      .prepare("SELECT key, value_json FROM persistence_records WHERE tenant_id = ? AND key LIKE ? ORDER BY updated_at DESC, key ASC")
       .all(normalizedTenant, `${RAW_SOURCE_PREFIX}%`) as Array<{ key: string; value_json: string }>;
 
     const summaries: SourceSummary[] = [];
@@ -152,7 +164,10 @@ export class FinancialIngestionService {
       if (!stored) continue;
       summaries.push(this.toSummary(row.key, stored));
     }
-    return summaries;
+
+    const safeLimit = Number.isInteger(limit) && limit > 0 ? limit : summaries.length;
+    const safeOffset = Number.isInteger(offset) && offset > 0 ? offset : 0;
+    return { items: summaries.slice(safeOffset, safeOffset + safeLimit), total: summaries.length };
   }
 
   async readSource(tenantId: string, sha256: string): Promise<RawSourceEvidence | null> {

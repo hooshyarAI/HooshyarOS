@@ -5,6 +5,22 @@ async function getJson(path, options) {
   return payload;
 }
 
+const idempotencyKeys = new Map();
+
+function idempotencyKey(scope) {
+  if (!idempotencyKeys.has(scope)) {
+    const generated = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `key-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    idempotencyKeys.set(scope, generated);
+  }
+  return idempotencyKeys.get(scope);
+}
+
+function rotateIdempotencyKey(scope) {
+  idempotencyKeys.delete(scope);
+}
+
 function text(value) {
   return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
 }
@@ -104,9 +120,10 @@ document.querySelector('#analysis-form').addEventListener('submit', async event 
     else ingestBody.content = await file.text();
     const ingested = await getJson('/api/ingest', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'idempotency-key': idempotencyKey('ingest') },
       body: JSON.stringify(ingestBody)
     });
+    rotateIdempotencyKey('ingest');
     const analysis = await getJson('/api/financial/analyze', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -270,12 +287,13 @@ document.querySelector('#execution-form').addEventListener('submit', async event
   try {
     const payload = await getJson('/api/execution/work-items', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'idempotency-key': idempotencyKey('work-items:propose') },
       body: JSON.stringify({
         title: document.querySelector('#execution-title').value,
         priority: document.querySelector('#execution-priority').value
       })
     });
+    rotateIdempotencyKey('work-items:propose');
     result.textContent = `کار اجرایی ${payload.workItemId} در وضعیت ${payload.status} ایجاد شد.`;
     await refreshExecution();
   } catch (error) {
@@ -336,9 +354,10 @@ document.querySelector('#report-export-button').addEventListener('click', async 
   try {
     const payload = await getJson('/api/report/export', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'idempotency-key': idempotencyKey('report:export') },
       body: JSON.stringify({ format })
     });
+    rotateIdempotencyKey('report:export');
     const fileResponse = await fetch(payload.downloadUrl);
     if (!fileResponse.ok) throw new Error(`DOWNLOAD_HTTP_${fileResponse.status}`);
     const blob = await fileResponse.blob();

@@ -32,6 +32,25 @@ export class SQLitePersistenceStore {
     this.database.prepare(`INSERT INTO persistence_records (tenant_id, key, value_json, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(tenant_id, key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at`).run(scope.tenantId, key, JSON.stringify(value), new Date().toISOString());
     return record;
   }
+  /**
+   * Atomically create a record only when the (tenant, key) pair is absent.
+   *
+   * Uses `ON CONFLICT DO NOTHING` so the check-and-insert is a single atomic
+   * statement: concurrent callers cannot both observe `created: true`. This is
+   * the canonical primitive for single-writer claims (idempotency keys, lease
+   * guards) without a read-then-write race.
+   */
+  async writeIfAbsent(scope: TenantScope, key: string, value: unknown): Promise<{ readonly created: boolean; readonly record: PersistenceRecord }> {
+    this.assertScope(scope); this.assertKey(key);
+    const result = this.database.prepare(`INSERT INTO persistence_records (tenant_id, key, value_json, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(tenant_id, key) DO NOTHING`).run(scope.tenantId, key, JSON.stringify(value), new Date().toISOString());
+    if (Number(result.changes) > 0) return { created: true, record: { tenantId: scope.tenantId, key, value } };
+    const existing = await this.read(scope, key);
+    return { created: false, record: existing ?? { tenantId: scope.tenantId, key, value } };
+  }
+  async delete(scope: TenantScope, key: string): Promise<void> {
+    this.assertScope(scope); this.assertKey(key);
+    this.database.prepare("DELETE FROM persistence_records WHERE tenant_id = ? AND key = ?").run(scope.tenantId, key);
+  }
   close(): void { if (this.database.isOpen) this.database.close(); }
   private assertScope(scope: TenantScope): void { if (!scope?.tenantId?.trim()) throw new Error("persistence-tenant-required"); }
   private assertKey(key: string): void { if (!key?.trim()) throw new Error("persistence-key-required"); }

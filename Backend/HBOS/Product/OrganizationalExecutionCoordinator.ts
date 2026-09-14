@@ -377,6 +377,22 @@ export class OrganizationalExecutionCoordinator {
         return this.listTenantItems(context.tenantId as string);
     }
 
+    /**
+     * Bounded page over the tenant's governed work items.
+     *
+     * `listTenantItems` applies the tenant filter and a total order
+     * (`createdAt DESC, workItemId ASC`) before the slice, so pages neither
+     * duplicate nor skip records and cross-tenant items never appear.
+     */
+    async listWorkItemsPage(context: SecurityContext, limit: number, offset: number): Promise<{ readonly items: OrganizationalWorkItem[]; readonly total: number }> {
+        const baseline = this.requireGovernedHuman(context);
+        if (baseline.ok === false) return { items: [], total: 0 };
+        const all = await this.listTenantItems(context.tenantId as string);
+        const safeLimit = Number.isInteger(limit) && limit > 0 ? limit : all.length;
+        const safeOffset = Number.isInteger(offset) && offset > 0 ? offset : 0;
+        return { items: all.slice(safeOffset, safeOffset + safeLimit), total: all.length };
+    }
+
     async approve(context: SecurityContext, workItemId: string, input: ApproveWorkItemInput = {}): Promise<WorkItemOperationResult> {
         const baseline = this.requireGovernedHuman(context);
         if (baseline.ok === false) return this.blocked(baseline.reason, baseline.code);
@@ -819,7 +835,7 @@ export class OrganizationalExecutionCoordinator {
         for (const item of this.cache.values()) {
             if (item.tenantId === tenantId && !seen.has(item.workItemId)) items.push(item);
         }
-        return items.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
+        return items.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : a.workItemId < b.workItemId ? -1 : a.workItemId > b.workItemId ? 1 : 0));
     }
 
     private async addToIndex(tenantId: string, workItemId: string): Promise<void> {
