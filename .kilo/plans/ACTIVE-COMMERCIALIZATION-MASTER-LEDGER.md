@@ -14,6 +14,7 @@
 **Stage 5 status:** `security.http-boundary-tenant-object-authz` **EXECUTED and VERIFIED** — object routes now invoke canonical `TenantIsolation.checkAccess()` at the HTTP boundary and work-item reads enforce an explicit object owner/admin check (same-tenant non-owner → 403 audited; cross-tenant → 404). Focused 6/6, integration 18 suites/117 tests, typecheck 0, full suite 257/259. See audit §36 and `.kilo/plans/security-http-boundary-tenant-object-authz-checkpoint.md`.
 **Stage 6 status:** `observability.metrics-and-request-trace` **EXECUTED and VERIFIED** — additive `RuntimeObservability` module (not an Engine) adds `X-Request-Id` correlation, bounded per-route request/error/duration metrics, and privileged `GET /api/diagnostics/metrics`; failure responses carry the correlation id. Focused 5/5, integration 19 suites/122 tests, typecheck 0, full suite 259/260 (only OCR env gap; 1968/1968 tests). See audit §37 and `.kilo/plans/observability-metrics-and-request-trace-checkpoint.md`.
 **Stage 7 status:** `standardization.pagination-and-idempotency` **EXECUTED and VERIFIED** — real list routes (`/api/sources`, `/api/execution/work-items`, `/api/report/artifacts`) now enforce a bounded `limit/offset` contract (default 50, max 200, fail-closed validation, deterministic total ordering, tenant filter before slicing, exact `total`/`nextOffset`), and the real duplicate-prone mutations (`/api/ingest`, `/api/execution/work-items` POST, `/api/report/export`) support tenant+actor-scoped `Idempotency-Key` replay built on the canonical `SQLitePersistenceStore` (`writeIfAbsent`/`delete`), with `web/app.js` sending rotating keys. Focused 8/8 + 12/12, integration 16 suites/103 tests, persistence regression 7 suites/67 tests, typecheck 0, full suite **261/262 suites / 1988/1988 tests** (only E2 OCR env gap). See `.kilo/plans/standardization-pagination-and-idempotency-checkpoint.md`.
+**Stage 8 status:** `assurance.ocr-environment-gap` **EXECUTED and VERIFIED (truthful boundary)** — OCR/images are deliberately outside the supported runtime contract and `tesseract.js` is undeclared/absent, so no dependency was installed. The dormant `OcrAdapter` no longer statically imports the engine; it injects/lazily loads an `OcrEngine` and fails closed with `ingestion-ocr-unsupported`. `OcrAdapter.test.ts` reconciled without weakening. Focused 8 suites/76 tests, typecheck 0, full suite **261/262 suites / 1998/1999 tests** with `OcrAdapter` now passing; only the known F1 flake remains. See audit §39 and `.kilo/plans/assurance-ocr-environment-gap-checkpoint.md`.
 
 ---
 
@@ -61,7 +62,7 @@ The prior audit (`platform-wide-commercialization-conformance-audit.md` §1–§
 | ID | Item | Class | Canonical owner | Evidence | Value | Risk | State | Bounded repair | Expected evidence |
 |---|---|---|---|---|---|---|---|---|---|
 | E1 | `LocalFolderWatcher.test.ts` aborts Node (`fs-event.c:72`, exit 0xC0000409) | **REAL PRODUCT DEFECT (repaired)** — was mis-classified as environment/test-lifecycle | `Backend/HBOS/Product/LocalFolderWatcher.ts` + its test | Two-process inline proof: short path aborts, long path works | Watch short/`%TEMP%` path crashed the whole process | MEDIUM (fail-open availability hazard) | **VERIFIED COMPLETE** (Stage 2, audit §33) | `start()` canonicalizes folder via `fs.realpath` before `fs.watch`; test asserts canonical `sourcePath` | focused 9/9 ×4, regression 37/37, typecheck 0, full suite `LocalFolderWatcher` PASS |
-| E2 | `OcrAdapter.test.ts` imports `tesseract.js` (not a dependency) | **ENVIRONMENT GAP** | `Backend/HBOS/Product/OcrAdapter.ts` | jest: `TS2307` | OCR is deliberately unsupported/not in runtime contract | LOW | ACTIVE | Resolve only if genuinely required by supported runtime; otherwise keep explicit recorded gap. No fake runtime dependency. | classified, not hidden |
+| E2 | `OcrAdapter.test.ts` imports `tesseract.js` (not a dependency) | **ENVIRONMENT GAP (repaired — truthful boundary)** | `Backend/HBOS/Product/OcrAdapter.ts` | OCR is deliberately outside the supported contract; `tesseract.js` absent/undeclared; runtime never imports the adapter | `OcrAdapter` now lazily loads an optional `OcrEngine` and fails closed with `ingestion-ocr-unsupported`; test uses injected engine | **VERIFIED COMPLETE** (Stage 8, audit §39) | No dependency installed; boundary documented in `Docs/Product/FinancialIngestionService.md` | focused 8 suites/76 tests; `OcrAdapter` passes in full suite |
 
 ### 3.3 Flakes (analyzed, not dismissed)
 
@@ -110,7 +111,7 @@ Scoring = commercial value, correctness, security, tenant isolation, runtime int
 5. ~~**S5/S7 — HTTP-boundary tenant/object authorization defense-in-depth**~~ — **DONE (Stage 5, audit §36).**
 6. ~~**S6 — metrics + request tracing**~~ — **DONE (Stage 6, audit §37).**
 7. ~~**S3/S4 — pagination + idempotency**~~ — **DONE (Stage 7): bounded pagination on the 3 real list routes and canonical-persistence idempotency on the 3 duplicate-prone mutations, verified.** Safety: MEDIUM.
-8. **E2 — OCR environment gap** (resolve only if runtime requires; else record). Safety: HIGH.
+8. ~~**E2 — OCR environment gap**~~ — **DONE (Stage 8, audit §39): OCR is deliberately unsupported; no dependency installed; adapter made fail-closed and boundary recorded; its suite now passes.** Safety: HIGH.
 9. **F1/F2 — flake hardening**. Safety: HIGH.
 10. **C8 — doc/registry drift reconciliation**. Safety: HIGH.
 11. **C9 — construction-plane remote attestation**. Safety: MEDIUM.
@@ -146,4 +147,6 @@ Scoring = commercial value, correctness, security, tenant isolation, runtime int
 
 **`standardization.pagination-and-idempotency`** — COMPLETE (Stage 7). Real list routes enforce a bounded, fail-closed `limit/offset` contract with stable ordering and exact totals; the real duplicate-prone mutations replay via tenant+actor-scoped idempotency keys persisted through the canonical `SQLitePersistenceStore`; the web entrypoint sends rotating keys.
 
-**Next selected stage: `assurance.ocr-environment-gap` (E2)** — resolve only if the supported runtime contract requires OCR; otherwise record the truthful environment boundary. See the execution queue.
+**`assurance.ocr-environment-gap`** — COMPLETE (Stage 8; audit §39). OCR/images are deliberately outside the supported runtime contract; no dependency was installed. The dormant `OcrAdapter` now lazily loads an optional engine, injects for tests, and fails closed with `ingestion-ocr-unsupported`; its suite passes and the boundary is documented.
+
+**Next selected stage: `assurance.flake-containment` (F1/F2/F3)** — analyze and contain genuine parallel-load timing/resource nondeterminism without hiding real failures. See the execution queue.

@@ -42,6 +42,10 @@ canonical `FinancialDataIngestionAdapter`.
   the canonical owner).
 - **XLS** — dependency-blocked legacy binary format.
 - **Images** — require OCR; `ingestFile` returns `ingestion-image-requires-ocr`.
+  `TesseractOcrAdapter` (08-IMG.2) remains a reference contract only: its OCR
+  engine (`tesseract.js`) is **not a declared dependency** and is loaded lazily,
+  so an environment without OCR fails closed with `ingestion-ocr-unsupported`
+  instead of breaking module loading. OCR ingestion is therefore **not claimed**.
 
 ---
 

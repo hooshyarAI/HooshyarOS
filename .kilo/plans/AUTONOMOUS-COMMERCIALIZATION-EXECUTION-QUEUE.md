@@ -33,7 +33,7 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 | 5 | `security.http-boundary-tenant-object-authz` | S5,S7 | Invoke `TenantIsolation.checkAccess()` + explicit object-owner check at HTTP boundary | `TenantIsolation`, runtime routes | MEDIUM | **COMPLETE** |
 | 6 | `observability.metrics-and-request-trace` | S6 | Additive metrics + structured request trace (no architecture change) | runtime diagnostics | MEDIUM | **COMPLETE** |
 | 7 | `standardization.pagination-and-idempotency` | S3,S4 | Bounded `limit/offset` on list routes; idempotency keys on mutating POSTs | runtime | MEDIUM | **COMPLETE** |
-| 8 | `assurance.ocr-environment-gap` | E2 | Resolve only if runtime contract requires; else record explicit, non-hidden gap | `OcrAdapter` | HIGH | PLANNED |
+| 8 | `assurance.ocr-environment-gap` | E2 | Resolve only if runtime contract requires; else record explicit, non-hidden gap | `OcrAdapter` | HIGH | **COMPLETE** |
 | 9 | `assurance.flake-containment` | F1,F2 | Analyze + contain parallel-load resource contention (timeouts/serial projects) without hiding real failures | test config + affected tests | HIGH | PLANNED |
 | 10 | `standardization.architecture-doc-registry-reconciliation` | C8 | Reconcile LifecycleManager tier drift + stale dormant labels to repository truth | docs/registry | HIGH | PLANNED |
 | 11 | `assurance.construction-remote-attestation` | C9 | Independent GitHub-remote verification at phase end | `LocalConstructionToolset` | MEDIUM | PLANNED |
@@ -193,6 +193,29 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 **Checkpoint:** `.kilo/plans/standardization-pagination-and-idempotency-checkpoint.md`
 
 **DO-NOT-REPEAT:** do not build a new idempotency store/database or pagination engine; do not paginate single-object routes or add meaningless headers to overwrite/pure-compute POSTs; do not silently clamp invalid limits; do not weaken the tenant/actor key scope; do not touch `FinancialDataIngestionAdapter.ts` or `Engine.initialize()`.
+
+---
+
+## Stage 8 — `assurance.ocr-environment-gap`
+
+**State:** COMPLETE
+**Baseline SHA:** `dd4e94826a6c397df834b4e2dc3474f8d383492c`
+**Classification:** ENVIRONMENT GAP / deliberately-unsupported capability.
+
+**DISCOVER / INSPECT (done):**
+- Governed contract (`Docs/Product/FinancialIngestionService.md`) declares OCR/images **deliberately NOT supported**; `SUPPORTED_INGESTION_FORMATS` excludes images; `/api/ready` advertises no OCR; the runtime never imports `OcrAdapter`.
+- `tesseract.js` is absent from `node_modules` and undeclared in `package.json`.
+- Only `OcrAdapter.ts` statically imported it; `ScannedPdfRouter` uses type-only imports. The failing suite was a module-load failure in a dormant reference adapter.
+
+**Decision:** OCR is **not** required by the supported runtime. Did **not** install any dependency. Made the adapter fail closed and recorded the boundary.
+
+**Repair:** removed the static `tesseract.js` import; added an injectable `OcrEngine` + lazy `loadTesseractEngine(loader?)` that throws `ingestion-ocr-unsupported` when absent/malformed; engine resolved before the recognition try/catch; reconciled `OcrAdapter.test.ts` to injected-engine + loader-path tests (no weakening); documented the boundary.
+
+**Evidence:** focused 8 suites/76 tests; typecheck exit 0; full suite **261/262 suites, 1998/1999 tests** with `OcrAdapter` now passing; only the known F1 flake remains. See `.kilo/plans/assurance-ocr-environment-gap-checkpoint.md`.
+
+**Checkpoint:** `.kilo/plans/assurance-ocr-environment-gap-checkpoint.md`
+
+**DO-NOT-REPEAT:** do not install OCR dependencies to make a suite green; do not claim OCR support; keep the engine lazy/optional; keep `unsupported` distinct from `recognize-failed`.
 
 ---
 

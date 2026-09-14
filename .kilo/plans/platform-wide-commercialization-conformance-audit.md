@@ -840,3 +840,87 @@ No change to `productComplete`, `commercialProductRuntimeComplete` or `externalP
 ### 37.6 Next candidate knot (not executed)
 
 `standardization.pagination-and-idempotency` — bounded list pagination and idempotency keys on mutating POSTs.
+
+---
+
+## 38. Standardization knot — `standardization.pagination-and-idempotency` executed (runtime standardization)
+
+**Knot:** bound the real list endpoints with a strict `limit/offset` contract and make the real duplicate-prone mutations replay-safe using the canonical persistence store; no architecture change.
+**Trusted baseline at execution:** `git rev-parse HEAD` = `235efe45a333185d630d8745e14c97c541ef0828` (`fix/autonomous-product-factory`).
+**Classification:** STANDARDIZATION GAP (S3 pagination, S4 idempotency). Architecture Freeze V4.1 preserved.
+**Checkpoint:** `.kilo/plans/standardization-pagination-and-idempotency-checkpoint.md`.
+
+### 38.1 Independent confirmation of the gaps
+
+- List routes `GET /api/sources`, `GET /api/execution/work-items`, `GET /api/report/artifacts` returned unbounded arrays with no limit/offset/total.
+- `POST /api/ingest`, `POST /api/execution/work-items` and `POST /api/report/export` created new persisted records on every submission with no replay protection. Other POSTs overwrite a per-tenant `:latest` key, are state-guarded, or are pure computation.
+
+### 38.2 Repair
+
+- New supporting module `Autonomous/Runtime/QueryPagination.ts` (NOT an Engine): default 50 / max 200, fail-closed validation, `toPageMeta` continuation metadata.
+- Canonical owners gained `listSourcesPage`, `listWorkItemsPage`, `listPage` with total ordering and tenant filtering before slicing.
+- `SQLitePersistenceStore` gained atomic `writeIfAbsent` (`ON CONFLICT DO NOTHING`) and `delete`; no parallel store or database.
+- Runtime `runIdempotent`: tenant+actor+route scoped keys, SHA-256 body hash, replay with `Idempotency-Replayed`, `409` conflict/in-progress, claim release on failure; `web/app.js` sends rotating keys.
+
+### 38.3 Verification evidence
+
+- Focused pagination `RuntimePagination.test.ts`: **8/8 tests passed**. Focused idempotency `RuntimeIdempotency.test.ts`: **12/12 tests passed** (incl. race, cross-tenant, restart replay).
+- Integration regression: **16/16 suites, 103/103 tests passed**. Persistence/rbac regression: **7/7 suites, 67/67 tests passed**.
+- Changed-file typecheck `tsc --noEmit`: **exit 0**.
+- Full suite (`jest --silent`, evidence `.kilo/evidence/jest-full-stage7-pagination-idempotency.txt`): **261/262 suites, 1988/1988 tests passed**; only `OcrAdapter` failed to load (`tesseract.js` absent).
+
+### 38.4 Remaining failure classification (after repair)
+
+| Suite | Class |
+|---|---|
+| `OcrAdapter.test.ts` | ENVIRONMENT GAP (`tesseract.js` absent) |
+
+### 38.5 Truth boundary
+
+No change to the three completion flags. Pagination responses are additive; an absent `Idempotency-Key` preserves the original contract. No assertion weakened, no test skipped or deleted; idempotency keys are tenant+actor scoped and persisted through the canonical store.
+
+### 38.6 Next candidate knot (not executed)
+
+`assurance.ocr-environment-gap` — resolve only if the supported runtime contract requires OCR; else record the truthful boundary.
+
+---
+
+## 39. Assurance knot — `assurance.ocr-environment-gap` executed (truthful OCR boundary)
+
+**Knot:** stop the OCR environment gap from masquerading as a runtime/product failure, without installing an unapproved dependency or faking OCR support.
+**Trusted baseline at execution:** `git rev-parse HEAD` = `dd4e94826a6c397df834b4e2dc3474f8d383492c` (`fix/autonomous-product-factory`).
+**Classification:** ENVIRONMENT GAP / deliberately-unsupported capability. Architecture Freeze V4.1 preserved.
+**Checkpoint:** `.kilo/plans/assurance-ocr-environment-gap-checkpoint.md`.
+
+### 39.1 Independent confirmation of the boundary
+
+- `Docs/Product/FinancialIngestionService.md` (governed surface) already declares PDF/DOCX/XLS/Images **Deliberately NOT supported**; images require OCR.
+- `SUPPORTED_INGESTION_FORMATS` = CSV/STRUCTURED/XLSX/TXT; `/api/ready` advertises no OCR capability.
+- `tesseract.js` is absent from `node_modules` and is not a declared dependency in `package.json`.
+- Only `OcrAdapter.ts` statically imported `tesseract.js`; the runtime never imports it (`ScannedPdfRouter` uses type-only imports). The gap was a module-load failure in a dormant reference adapter, not a product defect.
+
+### 39.2 Repair (record + fail closed; no dependency installed)
+
+- `OcrAdapter.ts`: removed the static `tesseract.js` import; added an injectable `OcrEngine` and a lazy `loadTesseractEngine(loader?)` resolver that fails closed with `ingestion-ocr-unsupported` when the module is absent or malformed. Resolving the engine before the recognition try/catch keeps `unsupported` distinct from `recognize-failed`.
+- `OcrAdapter.test.ts`: reconciled to drive the adapter through an injected engine and to verify the absent/malformed/present loader paths deterministically, without importing the absent dependency. No assertion weakened; coverage extended.
+- `Docs/Product/FinancialIngestionService.md`: recorded that the OCR engine is optional, lazily loaded, fails closed, and that OCR ingestion is not claimed.
+
+### 39.3 Verification evidence
+
+- Focused acquisition/OCR suites: **8/8 suites, 76/76 tests passed** (`OcrAdapter`, `OcrProvenance`, `ScannedPdfRouter`, `ImageAcquisition`, `PdfAcquisition`, `DocxAcquisition`, `ConnectorRegistry`, `AcquisitionResourcePolicy`).
+- Changed-file typecheck `tsc --noEmit`: **exit 0**.
+- Full suite (`jest --silent`, evidence `.kilo/evidence/jest-full-stage8-ocr-boundary.txt`): **261/262 suites, 1998/1999 tests passed**; `OcrAdapter` now **passes** (11 tests). The single remaining failure is `CommercialRuntimePersistenceRecovery.test.ts` (F1 timing/resource flake under parallel load; passes in isolation).
+
+### 39.4 Remaining failure classification (after repair)
+
+| Suite | Class |
+|---|---|
+| `CommercialRuntimePersistenceRecovery.test.ts` | TIMING/RESOURCE FLAKE (passes in isolation) |
+
+### 39.5 Truth boundary
+
+No change to the three completion flags. OCR ingestion remains **not claimed**; no arbitrary dependency was installed. No assertion weakened, no test skipped or deleted.
+
+### 39.6 Next candidate knot (not executed)
+
+`assurance.flake-containment` — analyze and contain genuine parallel-load timing/resource nondeterminism without hiding real failures.
