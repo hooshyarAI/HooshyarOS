@@ -35,7 +35,7 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 | 7 | `standardization.pagination-and-idempotency` | S3,S4 | Bounded `limit/offset` on list routes; idempotency keys on mutating POSTs | runtime | MEDIUM | **COMPLETE** |
 | 8 | `assurance.ocr-environment-gap` | E2 | Resolve only if runtime contract requires; else record explicit, non-hidden gap | `OcrAdapter` | HIGH | **COMPLETE** |
 | 9 | `assurance.flake-containment` | F1,F2,F3 | Analyze + contain parallel-load resource contention (measured test budgets / owner lifecycle) without hiding real failures | test files + `KiloCodeExecutionAdapter` | HIGH | **COMPLETE** |
-| 10 | `standardization.architecture-doc-registry-reconciliation` | C8 | Reconcile LifecycleManager tier drift + stale dormant labels to repository truth | docs/registry | HIGH | PLANNED |
+| 10 | `standardization.architecture-doc-registry-reconciliation` | C8 | Reconcile LifecycleManager tier drift + stale dormant labels to repository truth | `Docs/ARCHITECTURE.md` | HIGH | **COMPLETE** |
 | 11 | `assurance.construction-remote-attestation` | C9 | Independent GitHub-remote verification at phase end | `LocalConstructionToolset` | MEDIUM | PLANNED |
 | 12 | `product.offline-sync` | C1 | Wire existing `SyncStateStore` owner (no rebuild) | `Product/SyncStateStore.ts` | MEDIUM | PLANNED |
 | — | `security.encryption-at-rest` | C5 | BLOCKED — ARCHITECTURE CHANGE CONTROL / pending human 05C approval | 05C decisions | — | BLOCKED |
@@ -240,6 +240,28 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 **Checkpoint:** `.kilo/plans/assurance-flake-containment-checkpoint.md`
 
 **DO-NOT-REPEAT:** do not lower the F1 budget back to the Jest default; do not re-equalize the F2 process hard kill with the monitored timeout; do not revert F3 to two independent XLSX generations; do not skip/quarantine tests, add retries, widen the whole-suite `testTimeout`, or serialize the entire suite.
+
+---
+
+## Stage 10 — `standardization.architecture-doc-registry-reconciliation`
+
+**State:** COMPLETE
+**Baseline SHA:** `4c067b21f9bbf2d4cdcc4bb7edb3103874142056`
+**Classification:** STANDARDIZATION/DOCUMENTATION DRIFT (C8). Docs-only; no runtime behavior changed.
+
+**DISCOVER / INSPECT (done):**
+- `ARCHITECTURE.md` labels `DecisionIntelligenceEngine` "Dormant / no verified consumers / not implemented", but `Engines/DecisionIntelligenceEngine.ts:84` implements `Engine` (AHP/TOPSIS/decision-tree) with live consumers `Product/DecisionWorkbench.ts:81` and `Product/OrchestratedDecisionIntelligenceService.ts:76`.
+- Canonical health engine class is `HealthMonitorEngine` (`Engines/HealthMonitorEngine.ts:19`), used by `AutonomousOperationsEngine`.
+- `Engines/LifecycleManager.ts` tiers are a preferred ordering resolved against `EngineRegistry` (unregistered skipped, unknown appended); the ordering is asserted by `EngineRegistry.phase-11-1.2.test.ts`, so the code is correct and the model was simply undocumented.
+- `IntelligenceEngine` (registered by `Core/HBOS.ts:178`, used by `AssistantEngine`) is a reasoning pipeline, distinct from the domain calculation engines.
+
+**Repair (`Docs/ARCHITECTURE.md` only):** added the `IntelligenceEngine` boundary; corrected the `DecisionIntelligenceEngine` dormancy label and listed live consumers; corrected `HealthMonitorEngine` identity; rewrote the §5 `DecisionIntelligenceEngine` entry; documented the `LifecycleManager` five-tier preferred-order model. No engine/registry/route/test code changed.
+
+**Evidence:** focused+regression 12 suites/124 tests; doc-content dependency confirmed to be existence-only; full suite **262/262 suites, 1999/1999 tests, exit 0** (`.kilo/evidence/jest-full-stage10-doc-registry-reconciliation.txt`). See audit §41 and `.kilo/plans/standardization-architecture-doc-registry-reconciliation-checkpoint.md`.
+
+**Checkpoint:** `.kilo/plans/standardization-architecture-doc-registry-reconciliation-checkpoint.md`
+
+**DO-NOT-REPEAT:** do not restore the `DecisionIntelligenceEngine` dormant label; do not trim/reorder `LifecycleManager` tiers to "match the registry"; do not treat tier membership as registry membership; do not edit runtime code in a documentation-reconciliation stage.
 
 ---
 

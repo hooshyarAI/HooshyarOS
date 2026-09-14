@@ -68,9 +68,12 @@ Supporting Services:
 Platform Services (NOT required to implement Engine interface):
 - AssistantEngine
 
+Reasoning Pipeline:
+- IntelligenceEngine (reasoning pipeline composition; registered by `Core/HBOS.ts` and used by `AssistantEngine`). It composes reasoning strategies and is distinct from the domain calculation engines `FinancialIntelligenceEngine`, `RiskIntelligenceEngine` and `BudgetIntelligenceEngine`, which provide domain mathematics rather than pipeline composition.
+
 Legacy/Transitional:
 - DecisionEngine (canonical supporting decision capability)
-- DecisionIntelligenceEngine (dormant/transitional extension)
+- DecisionIntelligenceEngine (implemented decision-intelligence engine: AHP, TOPSIS and decision-tree owner; live consumers are `Product/DecisionWorkbench.ts` and `Product/OrchestratedDecisionIntelligenceService.ts`)
 
 Each canonical Engine must have:
 
@@ -405,7 +408,9 @@ Implemented
 ---
 
 
-## Health Monitor Engine
+## HealthMonitorEngine
+
+Canonical implementation: `Engines/HealthMonitorEngine.ts` (implements `Engine`); consumed by `AutonomousOperationsEngine` for health verification.
 
 
 Role:
@@ -431,21 +436,23 @@ Implemented
 
 ---
 
-## Decision Intelligence Engine
+## DecisionIntelligenceEngine
+
+Canonical implementation: `Engines/DecisionIntelligenceEngine.ts` (implements `Engine`).
 
 Role:
 
-Dormant / transitional extension.
-No verified consumers.
-Not canonical.
+Decision-intelligence engine; owner of the decision mathematics
+(AHP, TOPSIS and decision-tree expected monetary value).
 
-Functions:
+Live consumers:
 
-- Placeholder for future intelligence integration (not implemented)
+- `Product/DecisionWorkbench.ts`
+- `Product/OrchestratedDecisionIntelligenceService.ts`
 
 Status:
 
-Dormant
+Implemented
 
 ---
 
@@ -472,12 +479,14 @@ Responsibilities:
 ---
 
 
-## Lifecycle Manager
+## LifecycleManager
+
+Canonical implementation: `Engines/LifecycleManager.ts`.
 
 
 Purpose:
 
-Manage engine lifecycle.
+Manage engine lifecycle and compute the canonical startup/shutdown order.
 
 
 Responsibilities:
@@ -486,10 +495,17 @@ Responsibilities:
 - Initialize engines
 - Update status
 - Monitor states
+- Compute dependency tier order
 
 
+Startup order model:
 
-Lifecycle states:
+`getStartupOrder()` resolves each registered engine against a five-tier
+preferred order declared in `Engines/LifecycleManager.ts`. Tier membership is a
+preferred ordering, not the registry: an unregistered tier name is skipped, and
+a registered engine not named in any tier is appended afterwards. The tier list
+is therefore a superset of the engines registered by `Core/HBOS.ts`.
+`getShutdownOrder()` returns the reverse of the resolved order.
 
 
 ---

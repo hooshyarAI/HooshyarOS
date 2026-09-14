@@ -966,3 +966,42 @@ No change to the three completion flags. No engine, dependency, or frozen interf
 ### 40.6 Next candidate knot (not executed)
 
 `standardization.architecture-doc-registry-reconciliation` — reconcile `LifecycleManager` tier drift and stale dormant labels to repository truth (docs/registry only).
+
+---
+
+## 41. Standardization knot — `standardization.architecture-doc-registry-reconciliation` executed (C8)
+
+**Knot:** reconcile the documented engine identity/dormancy and the `LifecycleManager` tier model to repository truth, without changing runtime behavior.
+**Trusted baseline at execution:** `git rev-parse HEAD` = `4c067b21f9bbf2d4cdcc4bb7edb3103874142056` (`fix/autonomous-product-factory`).
+**Classification:** STANDARDIZATION/DOCUMENTATION DRIFT. No architecture change; Architecture Freeze V4.1 preserved.
+**Checkpoint:** `.kilo/plans/standardization-architecture-doc-registry-reconciliation-checkpoint.md`.
+
+### 41.1 Drift proven against the repository
+
+- `DecisionIntelligenceEngine` is labelled "Dormant / no verified consumers / not implemented", but `Engines/DecisionIntelligenceEngine.ts:84` implements `Engine` (AHP/TOPSIS/decision-tree) and is a live consumer dependency of `Product/DecisionWorkbench.ts:81` and `Product/OrchestratedDecisionIntelligenceService.ts:76`.
+- `HealthMonitorEngine` (`Engines/HealthMonitorEngine.ts:19`, implements `Engine`) is documented under the non-canonical name "Health Monitor Engine".
+- `Engines/LifecycleManager.ts` declares five preferred tiers whose names are looked up in `EngineRegistry` (unregistered names skipped; registered engines not named appended) — tier membership is **not** registry membership, and the ordering semantics are asserted by `EngineRegistry.phase-11-1.2.test.ts`. The code is correct; the model was undocumented.
+- `IntelligenceEngine` (registered by `Core/HBOS.ts:178`, instantiated by `AssistantEngine`) is a reasoning-pipeline engine distinct from the domain calculation engines; its boundary was undocumented.
+
+### 41.2 Reconciliation (`Docs/ARCHITECTURE.md` only)
+
+Added the `IntelligenceEngine` boundary; corrected the `DecisionIntelligenceEngine` dormancy label and listed its live consumers; corrected the `HealthMonitorEngine` identity; rewrote the `DecisionIntelligenceEngine` §5 entry; and documented the `LifecycleManager` five-tier preferred-order model with its skip/append fallback and reverse shutdown. No engine, registry, route, or test code changed; the tested tier contract was preserved.
+
+### 41.3 Verification evidence
+
+- Focused + relevant regression: **12/12 suites, 124/124 tests passed**.
+- Doc-content dependency: only `ProductionReadinessEngine.test.ts` references `Docs/ARCHITECTURE.md`, asserting file existence, not content.
+- Changed-file typecheck: not applicable (Markdown-only change).
+- Full suite (`jest --silent`, `.kilo/evidence/jest-full-stage10-doc-registry-reconciliation.txt`): **262/262 suites, 1999/1999 tests passed, exit 0**; re-confirms the Stage 9 containments remain stable.
+
+### 41.4 Remaining failure classification (after reconciliation)
+
+None.
+
+### 41.5 Truth boundary
+
+No change to the three completion flags. No architectural rule, contract, ownership boundary or dependency direction changed; only stale factual labels were corrected and existing behavior documented.
+
+### 41.6 Next candidate knot (not executed)
+
+`assurance.construction-remote-attestation` — independent GitHub-remote verification at phase end (construction plane).
