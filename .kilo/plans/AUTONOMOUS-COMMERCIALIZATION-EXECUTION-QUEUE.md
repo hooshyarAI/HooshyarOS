@@ -39,6 +39,7 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 | 11 | `assurance.construction-remote-attestation` | C9 | Independent GitHub-remote verification at phase end | `LocalConstructionToolset` | MEDIUM | **COMPLETE** |
 | 12 | `product.offline-sync` | C1 | Wire existing `SyncStateStore` owner (no rebuild) | `Product/SyncStateStore.ts` | MEDIUM | **COMPLETE** |
 | 13 | `assurance.completion-audit-integrity` | K3 | Fail-closed completion gate: require behavioral + commit-bound application/acceptance evidence; reject marker/file/regex-only completion | `CapabilityEvidenceAudit`, `CanonicalCapabilityAudit`, `CommercialProductCompletionAudit`, `AutonomousBuildDaemon` | HIGH | **COMPLETE** |
+| 14 | `standardization.governance-operator-reconciliation` | K4 | Reconcile stale/incomplete governance docs to the approved local execution-operator model (docs-only, no rule change) | `Docs/HOOSHYAROS_MASTER_CHARTER.md`, `Docs/HOOSHYAROS_FINAL_DECISIONS_REGISTER.md`, `AUTONOMOUS_MISSION.md` | HIGH | **COMPLETE** |
 | — | `security.encryption-at-rest` | C5 | BLOCKED — ARCHITECTURE CHANGE CONTROL / pending human 05C approval | 05C decisions | — | BLOCKED |
 | — | `product.billing-entitlements` | C2 | BLOCKED_EXTERNAL_DEPENDENCY (payment provider account/webhook) | — | — | BLOCKED_EXTERNAL |
 | — | `deployment.cloud-production` | C4 | BLOCKED_EXTERNAL_DEPENDENCY (cloud/DNS/TLS credentials) | — | — | BLOCKED_EXTERNAL |
@@ -331,6 +332,27 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 **Checkpoint:** `.kilo/plans/assurance-completion-audit-integrity-checkpoint.md`
 
 **DO-NOT-REPEAT:** do not restore file-existence/marker/regex-only completion; do not treat present-but-stale, unverified or blocked evidence as complete; do not remove the `COMPLETION_EVIDENCE_INSUFFICIENT` barrier or the `evaluateCompletion` gate; do not build a duplicate audit engine; do not modify `FinancialDataIngestionAdapter.ts`, the architecture freeze, or unrelated worktree files.
+
+---
+
+## Stage 14 — `standardization.governance-operator-reconciliation`
+
+**State:** COMPLETE
+**Baseline SHA:** `ed3c47fc5bef775f8b975add4054fa51017095d8`
+**Classification:** DOCUMENTATION CONSISTENCY (K4) — stale/incomplete governance terminology. Docs-only; no runtime behavior or governance rule changed.
+
+**DISCOVER / INSPECT (done):**
+- Governance Charter §5/§10 and `Docs/ARCHITECTURE_DECISIONS/KILO_GOVERNED_OPERATOR_DECISION.md` approve Kilo Code as a local execution/operator layer subordinate to Python/GitHub/Assistant.
+- Master Charter §9 names only Python/GitHub/Assistant and prohibits external coding providers; Final Decisions Register §7/§16 repeat the three-participant framing; `AUTONOMOUS_MISSION.md` states a "Python-only construction-provider enforcement" gate.
+- These omissions read broader than the approved model and create an apparent contradiction with the active Governance Charter. Per K4/GC1 this is documentation drift/incompleteness plus one exclusionary "Python-only" statement — not a governance change.
+
+**Repair (docs-only, minimum coherent):** Master Charter §8/§9/§17 now record that approved local execution operators are subordinate, replaceable mechanisms under the three authorities and are not external coding providers; Final Decisions Register §7/§16/§18 records the same invariant; `AUTONOMOUS_MISSION.md` replaces the Python-only phrasing with approved-operator enforcement. No governance rule invented or changed; source-of-truth hierarchy and Architecture Freeze V4 preserved.
+
+**Evidence:** docs-only diff (3 files); no source/test/runtime file changed; remaining-repository grep confirms no exclusive "Python-only"/"three participants"-without-operator statements remain in governing docs. See `.kilo/plans/standardization-governance-operator-reconciliation-checkpoint.md`.
+
+**Checkpoint:** `.kilo/plans/standardization-governance-operator-reconciliation-checkpoint.md`
+
+**DO-NOT-REPEAT:** do not describe Kilo Code as an external coding provider or architectural authority; do not restore exclusive "Python-only"/"three participants only" wording in governing docs; do not edit runtime, tests, completion gates or architectural engines in a documentation-reconciliation stage; do not reopen K1–K3.
 
 ---
 

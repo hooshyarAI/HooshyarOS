@@ -311,7 +311,7 @@ The Assistant is complete only when its construction fabric can reliably:
 20. re-plan from the new repository state;
 21. hand off automatically from Assistant completion into platform construction.
 
-The Assistant construction fabric is deliberately constrained to the approved Python/GitHub/Assistant toolchain and must not depend on external coding agents.
+The Assistant construction fabric is deliberately constrained to the approved Python/GitHub/Assistant authorities and must not depend on external coding agents. Approved local execution operators may act only as subordinate, replaceable mechanisms under those authorities (see §9).
 
 ---
 
@@ -344,7 +344,9 @@ Only these three participants are permitted in the HooshyarOS construction proce
 2. **GitHub** — repository, source control, synchronization, commits, review and publication.
 3. **This Assistant** — architecture reasoning, critical review, expert choice and construction orchestration.
 
-External coding assistants, cloud coding agents and alternative code-generation providers are prohibited from the construction path. They must not be invoked, installed, configured or depended upon for autonomous construction.
+These three are the only construction **authorities**. Approved local execution **operators** may act as subordinate, replaceable mechanisms under them, but they are not additional participants, authorities or providers. In particular, **Kilo Code** is an approved local VS Code execution/operator layer — a repository-governed local mechanism, not an external coding provider and not an architectural authority. An approved operator may inspect the repository, execute authorized commands, apply governed implementation/repair changes, run focused tests and produce evidence only inside an explicit stage/handoff contract. See `Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md` §5 and §10, `Docs/KILO_EXECUTION_OPERATOR_CONTRACT.md` and `Docs/ARCHITECTURE_DECISIONS/KILO_GOVERNED_OPERATOR_DECISION.md`.
+
+External coding assistants, cloud coding agents and alternative code-generation providers are prohibited from the construction path. They must not be invoked, installed, configured or depended upon for autonomous construction. Approved repository-governed local execution operators are not external coding providers under this prohibition.
 
 This includes Codex, GitHub Copilot, Claude and equivalent coding agents.
 
@@ -507,18 +509,18 @@ A future autonomous cycle MUST be able to answer from this memory:
 4. What is externally blocked?
 5. What is the next dependency-ready knot?
 
-#### 15.1.1 Current Audit Baseline — `post-k3-completion-audit-integrity-reaudit-2026-09-14`
+#### 15.1.1 Current Audit Baseline — `post-k4-governance-operator-reconciliation-2026-09-14`
 
 | Field | Value |
 |---|---|
-| AUDIT ID | `post-k3-completion-audit-integrity-reaudit-2026-09-14` |
+| AUDIT ID | `post-k4-governance-operator-reconciliation-2026-09-14` |
 | DATE | 2026-09-14 |
-| AUDIT ARTIFACT (evidence source) | `.kilo/plans/post-k3-bounded-reaudit-2026-09-14.md` |
-| TYPE | Bounded delta re-audit (post-K3); prior baseline preserved in §15.1.2 |
-| PRE-CHANGE TRUSTED CHECKPOINT | `6bf5404216fe9d1b86ef8658c2d877ca810827b7` |
-| QUEUE STATUS | CURRENT — stages 1–13 COMPLETE; K4 next |
-| VERIFIED STAGES | Stages 1–13 (through Stage 13 K3) |
-| NEXT DEPENDENCY-READY KNOT | K4 `standardization.governance-operator-reconciliation` (Stage 14) |
+| AUDIT ARTIFACT (evidence source) | `.kilo/plans/standardization-governance-operator-reconciliation-checkpoint.md` |
+| TYPE | Bounded delta re-audit (post-K4); prior baseline preserved in §15.1.2 |
+| PRE-CHANGE TRUSTED CHECKPOINT | `ed3c47fc5bef775f8b975add4054fa51017095d8` |
+| QUEUE STATUS | CURRENT — stages 1–14 COMPLETE; no primary repository-local knot remains |
+| VERIFIED STAGES | Stages 1–14 (through Stage 14 K4) |
+| NEXT DEPENDENCY-READY KNOT | None primary — K5–K7 remain conditional/scope-gated |
 
 Completion states recorded by that audit:
 
@@ -530,21 +532,31 @@ Completion states recorded by that audit:
 | `externalProductionDependenciesComplete` | FALSE |
 | `productComplete` | FALSE |
 
-K3 verified **no completion-state change**: the completion gate was hardened fail-closed, but
-`productComplete` and `externalProductionDependenciesComplete` remain `FALSE` because blocked
-external production dependencies prevent a completion state and the gate now explicitly fails
-closed on them.
+K4 verified **no completion-state change**: it was a docs-only standardization knot that reconciled the
+approved local execution-operator model across the Master Charter, the Final Decisions Register and
+`AUTONOMOUS_MISSION.md`. No runtime, test, architecture, completion-gate or external-dependency code changed,
+and `productComplete` / `externalProductionDependenciesComplete` remain `FALSE` because the blocked external
+production dependencies still prevent a completion state.
 
-Remaining repository-local knots: **1 primary (K4)** and **3 conditional (K5–K7)**.
+Remaining repository-local knots: **0 primary** and **3 conditional (K5–K7)**.
 
 | ID | Knot | Class | Status | Stage |
 |---|---|---|---|---|
-| K4 | `standardization.governance-operator-reconciliation` | Primary — docs-only consistency | Remaining | 14 |
+| K4 | `standardization.governance-operator-reconciliation` | Primary — docs-only consistency | COMPLETE (Stage 14) | 14 |
 | K5 | `commercial.subscription-entitlements` (repo-local boundary only) | Conditional — scope-gated | Conditional | 15 |
 | K6 | `assurance.android-build-test-evidence` | Conditional — scope/environment | Conditional | 16 |
 | K7 | `assurance.runtime-server-unit-coverage` | Conditional — LOW test-coverage gap | Conditional | 17 |
 
-Closed since the prior baseline: **K3** `assurance.completion-audit-integrity` (Stage 13). The
+**K4 (Stage 14) closure.** `standardization.governance-operator-reconciliation` VERIFIED as a docs-only
+reconciliation. The Master Charter §8/§9/§17 wording, the Final Decisions Register §7/§16/§18 and
+`AUTONOMOUS_MISSION.md` now record the already-approved local execution-operator model: approved local operators
+(for example Kilo Code) are subordinate, replaceable execution mechanisms under the three authorities
+(Python/GitHub/Assistant) and are **not** external coding providers or architectural authorities. This removes the
+apparent contradiction with Governance Charter §5/§10 without changing any governance rule. No source code, test,
+architecture engine, completion gate or external-dependency implementation was modified. Evidence:
+`.kilo/plans/standardization-governance-operator-reconciliation-checkpoint.md`.
+
+Previously closed (Stage 13): **K3** `assurance.completion-audit-integrity`. The
 completion gate (`CanonicalCapabilityAudit.ts`, `CommercialProductCompletionAudit.ts`, composed by
 `AutonomousBuildDaemon.ts`) no longer derives completion from file existence, contract-marker
 strings or regex method probes. `CapabilityEvidenceAudit.evaluateCompletion()` now requires present,
@@ -558,7 +570,7 @@ and the daemon returns `COMPLETION_EVIDENCE_INSUFFICIENT` when the gate is incom
 
 External/approval blockers unchanged: **B1** encryption-at-rest/key management (architecture change control / pending human 05C decisions), **B2** payment-provider activation, **B3** production cloud/DNS/TLS resources, **B4** Android device acceptance, **B5** Inno Setup host.
 
-Valid next stages from this baseline: Stage 14 = K4 `standardization.governance-operator-reconciliation`; K5–K7 remain conditional. No stage may be skipped, invented or reordered without a new evidence-backed audit delta.
+Valid next stages from this baseline: no primary repository-local knot remains. Stage 15 = K5 `commercial.subscription-entitlements` only if the subscription scope is confirmed; K6–K7 remain conditional. No stage may be skipped, invented or reordered without a new evidence-backed audit delta.
 
 Provenance of K3 (retained from prior baselines, now closed): the autonomous completion gate derived completion from file existence, contract-marker strings and regex method-name probes rather than runtime/application/acceptance evidence — a genuine false-positive risk against Governance Charter §15. It was recorded, then repaired fail-closed in Stage 13.
 
@@ -574,8 +586,9 @@ Only records whose completion is supported by their own artifact and/or a verifi
 | `.kilo/plans/commercialization-standardization-master-plan.md` | `68ddc9c1` | ACTIVE; phases 1–14 reconciliation recorded (Phase 10 = CONDITIONAL PASS) |
 | `.kilo/plans/ACTIVE-COMMERCIALIZATION-MASTER-LEDGER.md` | audit HEAD `a0f0018c` | stages 1–10 recorded VERIFIED (checkpoint-backed); later extended through Stage 13 |
 | `.kilo/plans/post-k2-bounded-reaudit-2026-09-14.md` (baseline `post-k2-offline-sync-reaudit-2026-09-14`, checkpoint `8fd6f522`) | `8fd6f522` | SUPERSEDED by `post-k3-completion-audit-integrity-reaudit-2026-09-14`; recorded stages 1–12 COMPLETE, Layer 11 repository-local complete, and K3 as the next knot; K3 later closed (Stage 13) |
-| `.kilo/plans/post-k3-bounded-reaudit-2026-09-14.md` + `.kilo/plans/assurance-completion-audit-integrity-checkpoint.md` (baseline `post-k3-completion-audit-integrity-reaudit-2026-09-14`, checkpoint `6bf54042`) | `6bf54042` | CURRENT baseline; K3 `assurance.completion-audit-integrity` VERIFIED — completion gate fail-closed on missing/stale/blocked behavioral/application/acceptance evidence; evidence `.kilo/evidence/stage13-k3-completion-audit-integrity-acceptance.txt` (19/19 PASS) |
-| `.kilo/plans/AUTONOMOUS-COMMERCIALIZATION-EXECUTION-QUEUE.md` | derived from ledger | stages 1–13 COMPLETE; Stage 14 (K4) next; B1–B5 BLOCKED; K5–K7 conditional |
+| `.kilo/plans/post-k3-bounded-reaudit-2026-09-14.md` + `.kilo/plans/assurance-completion-audit-integrity-checkpoint.md` (baseline `post-k3-completion-audit-integrity-reaudit-2026-09-14`, checkpoint `6bf54042`) | `6bf54042` | SUPERSEDED by `post-k4-governance-operator-reconciliation-2026-09-14`; K3 `assurance.completion-audit-integrity` VERIFIED — completion gate fail-closed on missing/stale/blocked behavioral/application/acceptance evidence; evidence `.kilo/evidence/stage13-k3-completion-audit-integrity-acceptance.txt` (19/19 PASS) |
+| `.kilo/plans/standardization-governance-operator-reconciliation-checkpoint.md` (baseline `post-k4-governance-operator-reconciliation-2026-09-14`, checkpoint `ed3c47fc`) | `ed3c47fc` | CURRENT baseline; K4 `standardization.governance-operator-reconciliation` VERIFIED — docs-only reconciliation of the approved local execution-operator model across Master Charter §8/§9/§17, Final Decisions Register §7/§16/§18 and `AUTONOMOUS_MISSION.md`; no source code, test, architecture, completion-gate or external-dependency change |
+| `.kilo/plans/AUTONOMOUS-COMMERCIALIZATION-EXECUTION-QUEUE.md` | derived from ledger | stages 1–14 COMPLETE; no primary repository-local knot remains; B1–B5 BLOCKED; K5–K7 conditional |
 | `.kilo/plans/fresh-governed-commercialization-reaudit-2026-09-14.md` (baseline `fresh-governed-commercialization-2026-09-14`, checkpoint `977ea944`) | `977ea944` | SUPERSEDED by `post-k2-offline-sync-reaudit-2026-09-14`; recorded knots K1–K4/K5–K7 and blockers B1–B5; K1 and K2 later closed (Stages 11–12) |
 | `.kilo/plans/phase-11-final-checkpoint.md` | `8ed51f0e` | declared VERIFIED; its `canonicalPlatformConstructionComplete: true` claim is SUPERSEDED by later evidence (`phase-14-final-checkpoint.md` and the 2026-09-14 audit both record FALSE) |
 | `.kilo/plans/phase-12-final-checkpoint.md` | `849f5709` | VERIFIED; local == remote TRUE |
@@ -651,7 +664,7 @@ Never solve uncertainty by inventing a new architecture.
 
 **Rollback, repair and re-verify when wrong.**
 
-**Use only Python, GitHub and the Assistant for construction.**
+**Use only the Python/GitHub/Assistant authorities for construction, with approved local execution operators acting under them.**
 
 **Verify before claiming completion.**
 
