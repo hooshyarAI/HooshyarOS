@@ -507,18 +507,18 @@ A future autonomous cycle MUST be able to answer from this memory:
 4. What is externally blocked?
 5. What is the next dependency-ready knot?
 
-#### 15.1.1 Current Audit Baseline — `post-k2-offline-sync-reaudit-2026-09-14`
+#### 15.1.1 Current Audit Baseline — `post-k3-completion-audit-integrity-reaudit-2026-09-14`
 
 | Field | Value |
 |---|---|
-| AUDIT ID | `post-k2-offline-sync-reaudit-2026-09-14` |
+| AUDIT ID | `post-k3-completion-audit-integrity-reaudit-2026-09-14` |
 | DATE | 2026-09-14 |
-| AUDIT ARTIFACT (evidence source) | `.kilo/plans/post-k2-bounded-reaudit-2026-09-14.md` |
-| TYPE | Bounded delta re-audit (post-K2); prior baseline preserved in §15.1.2 |
-| PRE-CHANGE TRUSTED CHECKPOINT | `8fd6f5222d2cd089817fb4d1e2a20fc922579e41` |
-| QUEUE STATUS | CURRENT — stages 1–12 COMPLETE; K3 next |
-| VERIFIED STAGES | Stages 1–12 (through Stage 12 K2) |
-| NEXT DEPENDENCY-READY KNOT | K3 `assurance.completion-audit-integrity` (Stage 13) |
+| AUDIT ARTIFACT (evidence source) | `.kilo/plans/post-k3-bounded-reaudit-2026-09-14.md` |
+| TYPE | Bounded delta re-audit (post-K3); prior baseline preserved in §15.1.2 |
+| PRE-CHANGE TRUSTED CHECKPOINT | `6bf5404216fe9d1b86ef8658c2d877ca810827b7` |
+| QUEUE STATUS | CURRENT — stages 1–13 COMPLETE; K4 next |
+| VERIFIED STAGES | Stages 1–13 (through Stage 13 K3) |
+| NEXT DEPENDENCY-READY KNOT | K4 `standardization.governance-operator-reconciliation` (Stage 14) |
 
 Completion states recorded by that audit:
 
@@ -530,23 +530,39 @@ Completion states recorded by that audit:
 | `externalProductionDependenciesComplete` | FALSE |
 | `productComplete` | FALSE |
 
-Remaining repository-local knots: **2 primary (K3–K4)** and **3 conditional (K5–K7)**.
+K3 verified **no completion-state change**: the completion gate was hardened fail-closed, but
+`productComplete` and `externalProductionDependenciesComplete` remain `FALSE` because blocked
+external production dependencies prevent a completion state and the gate now explicitly fails
+closed on them.
+
+Remaining repository-local knots: **1 primary (K4)** and **3 conditional (K5–K7)**.
 
 | ID | Knot | Class | Status | Stage |
 |---|---|---|---|---|
-| K3 | `assurance.completion-audit-integrity` | Primary — completion-audit false-positive risk | Remaining | 13 |
 | K4 | `standardization.governance-operator-reconciliation` | Primary — docs-only consistency | Remaining | 14 |
 | K5 | `commercial.subscription-entitlements` (repo-local boundary only) | Conditional — scope-gated | Conditional | 15 |
 | K6 | `assurance.android-build-test-evidence` | Conditional — scope/environment | Conditional | 16 |
 | K7 | `assurance.runtime-server-unit-coverage` | Conditional — LOW test-coverage gap | Conditional | 17 |
 
-Closed since the prior baseline: **K1** `assurance.construction-remote-attestation` (Stage 11) and **K2** `product.offline-sync` (Stage 12). Layer 11 offline/online is now repository-local complete: the canonical `SyncStateStore` owner is wired into the runtime (`/api/ingest`, `/api/analyze`, `GET /api/sync/state`, `/api/ready` capability) and the real web client (durable queue, idempotent replay, server-authoritative conflict resolution). Evidence: `.kilo/plans/product-offline-sync-checkpoint.md`, `.kilo/evidence/stage12-k2-offline-sync-acceptance.txt` (13/13 PASS).
+Closed since the prior baseline: **K3** `assurance.completion-audit-integrity` (Stage 13). The
+completion gate (`CanonicalCapabilityAudit.ts`, `CommercialProductCompletionAudit.ts`, composed by
+`AutonomousBuildDaemon.ts`) no longer derives completion from file existence, contract-marker
+strings or regex method probes. `CapabilityEvidenceAudit.evaluateCompletion()` now requires present,
+verified, checkpoint-fresh and unblocked unit/integration/application/acceptance evidence and treats
+missing, stale, contradictory or externally-blocked evidence as non-complete;
+`CanonicalCapabilityAudit` requires real behavioral evidence per capability;
+`CommercialProductCompletionAudit` requires commit-bound canonical application/acceptance evidence;
+and the daemon returns `COMPLETION_EVIDENCE_INSUFFICIENT` when the gate is incomplete. Evidence:
+`.kilo/plans/assurance-completion-audit-integrity-checkpoint.md`,
+`.kilo/evidence/stage13-k3-completion-audit-integrity-acceptance.txt` (19/19 PASS).
 
 External/approval blockers unchanged: **B1** encryption-at-rest/key management (architecture change control / pending human 05C decisions), **B2** payment-provider activation, **B3** production cloud/DNS/TLS resources, **B4** Android device acceptance, **B5** Inno Setup host.
 
-Valid next stages from this baseline: Stage 13 = K3 `assurance.completion-audit-integrity`; Stage 14 (K4) remains valid; K5–K7 remain conditional. No stage may be skipped, invented or reordered without a new evidence-backed audit delta.
+Valid next stages from this baseline: Stage 14 = K4 `standardization.governance-operator-reconciliation`; K5–K7 remain conditional. No stage may be skipped, invented or reordered without a new evidence-backed audit delta.
 
-Provenance of K3 (retained from the prior baseline): the autonomous completion gate (`CanonicalCapabilityAudit.ts`, `CommercialProductCompletionAudit.ts`, composed by `AutonomousBuildDaemon.ts`) derives completion from file existence, contract-marker strings and regex method-name probes rather than runtime/application/acceptance evidence — a genuine false-positive risk against Governance Charter §15. It was recorded, not silently modified.
+Provenance of K3 (retained from prior baselines, now closed): the autonomous completion gate derived completion from file existence, contract-marker strings and regex method-name probes rather than runtime/application/acceptance evidence — a genuine false-positive risk against Governance Charter §15. It was recorded, then repaired fail-closed in Stage 13.
+
+Bounded observation recorded during K3 (no new knot): `scripts/commercial-application-acceptance.cjs` cannot launch its nested `npm run` steps on this Windows host (nested `spawnSync('npm.cmd', …, { shell: false })` produces no output, exit 1). The canonical per-surface harnesses (`product:web:acceptance`, `product:security:acceptance`) run directly and are the evidence source the completion gate consumes.
 
 #### 15.1.2 Historical Audit / Verification Records (evidenced only)
 
@@ -556,8 +572,10 @@ Only records whose completion is supported by their own artifact and/or a verifi
 |---|---|---|
 | `.kilo/plans/platform-wide-commercialization-conformance-audit.md` | `c2fd5733` | COMPLETE (audit); prior principal conformance audit; `product.secure-identity-bootstrap` VERIFIED; `EngineDependencyVerifier` REPAIRED/VERIFIED (§30) |
 | `.kilo/plans/commercialization-standardization-master-plan.md` | `68ddc9c1` | ACTIVE; phases 1–14 reconciliation recorded (Phase 10 = CONDITIONAL PASS) |
-| `.kilo/plans/ACTIVE-COMMERCIALIZATION-MASTER-LEDGER.md` | audit HEAD `a0f0018c` | stages 1–10 recorded VERIFIED (checkpoint-backed) |
-| `.kilo/plans/AUTONOMOUS-COMMERCIALIZATION-EXECUTION-QUEUE.md` | derived from ledger | stages 1–12 COMPLETE; Stage 13 (K3) next; B1–B5 BLOCKED; INCOMPLETE vs K3–K7 |
+| `.kilo/plans/ACTIVE-COMMERCIALIZATION-MASTER-LEDGER.md` | audit HEAD `a0f0018c` | stages 1–10 recorded VERIFIED (checkpoint-backed); later extended through Stage 13 |
+| `.kilo/plans/post-k2-bounded-reaudit-2026-09-14.md` (baseline `post-k2-offline-sync-reaudit-2026-09-14`, checkpoint `8fd6f522`) | `8fd6f522` | SUPERSEDED by `post-k3-completion-audit-integrity-reaudit-2026-09-14`; recorded stages 1–12 COMPLETE, Layer 11 repository-local complete, and K3 as the next knot; K3 later closed (Stage 13) |
+| `.kilo/plans/post-k3-bounded-reaudit-2026-09-14.md` + `.kilo/plans/assurance-completion-audit-integrity-checkpoint.md` (baseline `post-k3-completion-audit-integrity-reaudit-2026-09-14`, checkpoint `6bf54042`) | `6bf54042` | CURRENT baseline; K3 `assurance.completion-audit-integrity` VERIFIED — completion gate fail-closed on missing/stale/blocked behavioral/application/acceptance evidence; evidence `.kilo/evidence/stage13-k3-completion-audit-integrity-acceptance.txt` (19/19 PASS) |
+| `.kilo/plans/AUTONOMOUS-COMMERCIALIZATION-EXECUTION-QUEUE.md` | derived from ledger | stages 1–13 COMPLETE; Stage 14 (K4) next; B1–B5 BLOCKED; K5–K7 conditional |
 | `.kilo/plans/fresh-governed-commercialization-reaudit-2026-09-14.md` (baseline `fresh-governed-commercialization-2026-09-14`, checkpoint `977ea944`) | `977ea944` | SUPERSEDED by `post-k2-offline-sync-reaudit-2026-09-14`; recorded knots K1–K4/K5–K7 and blockers B1–B5; K1 and K2 later closed (Stages 11–12) |
 | `.kilo/plans/phase-11-final-checkpoint.md` | `8ed51f0e` | declared VERIFIED; its `canonicalPlatformConstructionComplete: true` claim is SUPERSEDED by later evidence (`phase-14-final-checkpoint.md` and the 2026-09-14 audit both record FALSE) |
 | `.kilo/plans/phase-12-final-checkpoint.md` | `849f5709` | VERIFIED; local == remote TRUE |

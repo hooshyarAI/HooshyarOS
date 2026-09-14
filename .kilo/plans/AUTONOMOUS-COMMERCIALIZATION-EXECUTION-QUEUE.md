@@ -38,6 +38,7 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 | 10 | `standardization.architecture-doc-registry-reconciliation` | C8 | Reconcile LifecycleManager tier drift + stale dormant labels to repository truth | `Docs/ARCHITECTURE.md` | HIGH | **COMPLETE** |
 | 11 | `assurance.construction-remote-attestation` | C9 | Independent GitHub-remote verification at phase end | `LocalConstructionToolset` | MEDIUM | **COMPLETE** |
 | 12 | `product.offline-sync` | C1 | Wire existing `SyncStateStore` owner (no rebuild) | `Product/SyncStateStore.ts` | MEDIUM | **COMPLETE** |
+| 13 | `assurance.completion-audit-integrity` | K3 | Fail-closed completion gate: require behavioral + commit-bound application/acceptance evidence; reject marker/file/regex-only completion | `CapabilityEvidenceAudit`, `CanonicalCapabilityAudit`, `CommercialProductCompletionAudit`, `AutonomousBuildDaemon` | HIGH | **COMPLETE** |
 | — | `security.encryption-at-rest` | C5 | BLOCKED — ARCHITECTURE CHANGE CONTROL / pending human 05C approval | 05C decisions | — | BLOCKED |
 | — | `product.billing-entitlements` | C2 | BLOCKED_EXTERNAL_DEPENDENCY (payment provider account/webhook) | — | — | BLOCKED_EXTERNAL |
 | — | `deployment.cloud-production` | C4 | BLOCKED_EXTERNAL_DEPENDENCY (cloud/DNS/TLS credentials) | — | — | BLOCKED_EXTERNAL |
@@ -303,6 +304,33 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 **Checkpoint:** `.kilo/plans/product-offline-sync-checkpoint.md`
 
 **DO-NOT-REPEAT:** do not build a second sync store/engine or a server-side offline queue; do not derive conflict authority from client state; do not drop queued work on a transient/offline failure; do not modify `FinancialDataIngestionAdapter.ts`; do not stage unrelated worktree files.
+
+---
+
+## Stage 13 — `assurance.completion-audit-integrity`
+
+**State:** COMPLETE
+**Baseline SHA:** `6bf5404216fe9d1b86ef8658c2d877ca810827b7`
+**Classification:** GOVERNANCE / COMPLETION-INTEGRITY GAP (K3) — the completion claim could be derived from artifact/marker/regex presence without behavioral, application or acceptance evidence.
+
+**DISCOVER / INSPECT (done):**
+- `CanonicalCapabilityAudit.complete` = roadmap present && backlog exhausted && no missing artifacts, where missing artifacts came only from `existsSync` + a method-name regex.
+- `CommercialProductCompletionAudit.complete` = contract-marker strings + file/dir existence + external dependency status; no application/acceptance evidence.
+- `AutonomousBuildDaemon` composed those booleans into `productComplete` and logged a claim of "independent application-level evidence" that was never checked.
+- `Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md` §Evidence model requires unit, integration, application and acceptance evidence and forbids promoting level 1/2 evidence to commercial completion.
+- Canonical commit-bound application/acceptance evidence already exists: `.hooshyar/web-acceptance-success.json`, `.hooshyar/security-acceptance-success.json` (produced by `product:web:acceptance` / `product:security:acceptance`).
+
+**Repair (minimum coherent, reuse-first, no new engine):**
+- `CapabilityEvidenceAudit.evaluateCompletion(CompletionEvidence)` — fail-closed gate requiring present, verified, checkpoint-fresh, unblocked unit/integration/application/acceptance evidence; named `nonCompleteReasons`; existing boolean `evaluate()` unchanged. Shared `behavioralEvidenceSatisfied()` contract helper added.
+- `CanonicalCapabilityAudit` — requires real behavioral evidence per roadmap capability and exposes `nonBehavioralCapabilities`.
+- `CommercialProductCompletionAudit` — requires commit-bound canonical application/acceptance evidence and exposes `applicationEvidence`, `acceptanceEvidence`, `evidenceGaps`.
+- `AutonomousBuildDaemon` — the `platform-complete` path composes the canonical audit (unit/integration) with the commercial evidence (application/acceptance) through the gate; incomplete ⇒ `platform-audit-blocked` / `COMPLETION_EVIDENCE_INSUFFICIENT`; `productComplete` requires `completionIntegrity.complete`; misleading message corrected.
+
+**Evidence:** focused **4 suites / 29 tests**; audit/runtime regression **16 suites / 44 tests**; changed-file typecheck exit 0; real-repo acceptance **19/19 PASS** (`.kilo/evidence/stage13-k3-completion-audit-integrity-acceptance.txt`). See `.kilo/plans/assurance-completion-audit-integrity-checkpoint.md` and the `post-k3` bounded re-audit.
+
+**Checkpoint:** `.kilo/plans/assurance-completion-audit-integrity-checkpoint.md`
+
+**DO-NOT-REPEAT:** do not restore file-existence/marker/regex-only completion; do not treat present-but-stale, unverified or blocked evidence as complete; do not remove the `COMPLETION_EVIDENCE_INSUFFICIENT` barrier or the `evaluateCompletion` gate; do not build a duplicate audit engine; do not modify `FinancialDataIngestionAdapter.ts`, the architecture freeze, or unrelated worktree files.
 
 ---
 

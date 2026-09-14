@@ -25,7 +25,7 @@ export interface DaemonOptions {
 type MissionDecision =
     | { kind: "mission"; mission: Mission; assistantGatePassed: false; continuation?: undefined }
     | { kind: "platform-continuation"; mission: PlatformCapabilityMission; assistantGatePassed: true; continuation: PlatformContinuationMission }
-    | { kind: "platform-complete"; mission: Mission; assistantGatePassed: true; continuation: PlatformContinuationMission; canonicalAudit: ReturnType<CanonicalCapabilityAudit["audit"]>; commercialAudit: ReturnType<CommercialProductCompletionAudit["audit"]> }
+    | { kind: "platform-complete"; mission: Mission; assistantGatePassed: true; continuation: PlatformContinuationMission; canonicalAudit: ReturnType<CanonicalCapabilityAudit["audit"]>; commercialAudit: ReturnType<CommercialProductCompletionAudit["audit"]>; completionIntegrity: ReturnType<CapabilityEvidenceAudit["evaluateCompletion"]> }
     | { kind: "platform-audit-blocked"; mission: Mission; assistantGatePassed: true; continuation: PlatformContinuationMission; reason: string; details: unknown };
 
 /**
@@ -71,8 +71,7 @@ export class AutonomousBuildDaemon {
         });
     }
 
-    private finalCompletionEvidence(selected: Mission): ReturnType<CapabilityEvidenceAudit["evaluate"]> {
-        const root = selected.evidence?.root || this.root;
+    private finalCompletionEvidence(selected: Mission): ReturnType<CapabilityEvidenceAudit["evaluate"]> {        const root = selected.evidence?.root || this.root;
         const exists = (path: string) => existsSync(join(root, path));
         const implementationPaths = [
             "Backend/HBOS/Assistant/Autonomous/AutonomousAssistantRuntime.ts",
@@ -105,6 +104,37 @@ export class AutonomousBuildDaemon {
         const dependenciesSatisfied = dependencyPaths.every(exists);
         const verified = test && selected.evidence.clean && selected.evidence.commit.length > 0;
         return this.evidenceAudit.evaluate({ implementation, test, documentation, dependenciesSatisfied, verified });
+    }
+
+    /**
+     * The commercial completion claim must survive the canonical fail-closed
+     * evidence gate. Canonical artifact/behavioral evidence supplies unit and
+     * integration levels; the commercial audit supplies commit-bound application
+     * and acceptance levels. Any missing, stale, unverified, contradictory or
+     * externally-blocked level makes the claim non-complete.
+     */
+    private completionIntegrity(
+        canonical: ReturnType<CanonicalCapabilityAudit["audit"]>,
+        commercial: ReturnType<CommercialProductCompletionAudit["audit"]>
+    ): ReturnType<CapabilityEvidenceAudit["evaluateCompletion"]> {
+        const nonBehavioral = canonical.nonBehavioralCapabilities ?? [];
+        const missingArtifacts = canonical.missingArtifacts ?? [];
+        const commercialEvidence = commercial as Partial<ReturnType<CommercialProductCompletionAudit["audit"]>>;
+        return this.evidenceAudit.evaluateCompletion({
+            capabilityId: "platform.commercial-product",
+            base: {
+                implementation: missingArtifacts.length === 0,
+                test: nonBehavioral.length === 0,
+                documentation: canonical.roadmapPresent === true,
+                dependenciesSatisfied: canonical.backlogExhausted === true,
+                verified: canonical.complete === true
+            },
+            unit: { present: true, passed: nonBehavioral.length === 0, fresh: true, artifact: "canonical-behavioral-evidence" },
+            integration: { present: true, passed: missingArtifacts.length === 0, fresh: true, artifact: "canonical-artifact-evidence" },
+            application: commercialEvidence.applicationEvidence,
+            acceptance: commercialEvidence.acceptanceEvidence,
+            externalBlocked: (commercial.blockedExternalDependencies ?? []).length > 0
+        });
     }
 
     private selectMission(): MissionDecision {
@@ -171,7 +201,22 @@ export class AutonomousBuildDaemon {
             };
         }
 
-        return { kind: "platform-complete", mission: selected, assistantGatePassed: true, continuation, canonicalAudit, commercialAudit };
+        // Fail closed: artifact/marker presence is not completion. The commercial
+        // claim must also carry verified, checkpoint-fresh application and acceptance
+        // evidence (and canonical behavioral evidence) before it may be reported.
+        const completionIntegrity = this.completionIntegrity(canonicalAudit, commercialAudit);
+        if (!completionIntegrity.complete) {
+            return {
+                kind: "platform-audit-blocked",
+                mission: selected,
+                assistantGatePassed: true,
+                continuation,
+                reason: "COMPLETION_EVIDENCE_INSUFFICIENT",
+                details: { completionIntegrity, commercialAudit }
+            };
+        }
+
+        return { kind: "platform-complete", mission: selected, assistantGatePassed: true, continuation, canonicalAudit, commercialAudit, completionIntegrity };
     }
 
     run() {
@@ -191,8 +236,8 @@ export class AutonomousBuildDaemon {
             const decision = this.selectMission();
             if (decision.kind === "platform-complete") {
                 budgetSnapshot = this.performanceBudget.completeCycle(cycleStartedAt);
-                const productComplete = decision.canonicalAudit.complete && decision.commercialAudit.complete && decision.commercialAudit.blockedExternalDependencies.length === 0;
-                console.log(JSON.stringify({ type: "AUTONOMOUS_PLATFORM_CONSTRUCTION_COMPLETE", cycle, status: "completed", assistantComplete: true, autonomousConstructionComplete: true, canonicalPlatformConstructionComplete: decision.canonicalAudit.complete, commercialProductRuntimeComplete: decision.commercialAudit.complete, externalProductionDependenciesComplete: decision.commercialAudit.blockedExternalDependencies.length === 0, productComplete, backlogExhausted: decision.canonicalAudit.backlogExhausted, nonAutonomousProductionItems: decision.canonicalAudit.nonAutonomousProductionItems, commercialMissingLayers: decision.commercialAudit.missingLayers, blockedExternalDependencies: decision.commercialAudit.blockedExternalDependencies, continuation: decision.continuation, performance: budgetSnapshot, message: "Assistant and canonical construction are complete; commercial product completion is derived from independent application-level evidence." }));
+                const productComplete = decision.canonicalAudit.complete && decision.commercialAudit.complete && decision.commercialAudit.blockedExternalDependencies.length === 0 && decision.completionIntegrity.complete;
+                console.log(JSON.stringify({ type: "AUTONOMOUS_PLATFORM_CONSTRUCTION_COMPLETE", cycle, status: "completed", assistantComplete: true, autonomousConstructionComplete: true, canonicalPlatformConstructionComplete: decision.canonicalAudit.complete, commercialProductRuntimeComplete: decision.commercialAudit.complete, externalProductionDependenciesComplete: decision.commercialAudit.blockedExternalDependencies.length === 0, productComplete, completionEvidenceComplete: decision.completionIntegrity.complete, completionEvidenceReasons: decision.completionIntegrity.nonCompleteReasons, backlogExhausted: decision.canonicalAudit.backlogExhausted, nonAutonomousProductionItems: decision.canonicalAudit.nonAutonomousProductionItems, commercialMissingLayers: decision.commercialAudit.missingLayers, blockedExternalDependencies: decision.commercialAudit.blockedExternalDependencies, continuation: decision.continuation, performance: budgetSnapshot, message: "Assistant and canonical construction are complete; commercial product completion requires the fail-closed unit/integration/application/acceptance evidence gate and no blocked external dependency." }));
                 return { status: "completed", cycles: cycle, history };
             }
             if (decision.kind === "platform-audit-blocked") {
