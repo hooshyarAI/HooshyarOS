@@ -509,18 +509,18 @@ A future autonomous cycle MUST be able to answer from this memory:
 4. What is externally blocked?
 5. What is the next dependency-ready knot?
 
-#### 15.1.1 Current Audit Baseline — `post-k4-governance-operator-reconciliation-2026-09-14`
+#### 15.1.1 Current Audit Baseline — `blocker-b1-b5-readiness-delta-2026-09-14`
 
 | Field | Value |
 |---|---|
-| AUDIT ID | `post-k4-governance-operator-reconciliation-2026-09-14` |
+| AUDIT ID | `blocker-b1-b5-readiness-delta-2026-09-14` |
 | DATE | 2026-09-14 |
-| AUDIT ARTIFACT (evidence source) | `.kilo/plans/standardization-governance-operator-reconciliation-checkpoint.md` |
-| TYPE | Bounded delta re-audit (post-K4); prior baseline preserved in §15.1.2 |
-| PRE-CHANGE TRUSTED CHECKPOINT | `ed3c47fc5bef775f8b975add4054fa51017095d8` |
-| QUEUE STATUS | CURRENT — stages 1–14 COMPLETE; no primary repository-local knot remains |
+| AUDIT ARTIFACT (evidence source) | `.kilo/plans/blocker-b1-b5-readiness-delta-2026-09-14.md` |
+| TYPE | Bounded B1–B5 blocker readiness delta (read-only; no implementation, no full 16-layer audit); prior baseline preserved in §15.1.2 |
+| PRE-CHANGE TRUSTED CHECKPOINT | `a8538ff028186ecb5eed196143e559917909c2a9` |
+| QUEUE STATUS | CURRENT — stages 1–14 COMPLETE; no primary repository-local knot remains; queue/ledger status unchanged by this readiness audit |
 | VERIFIED STAGES | Stages 1–14 (through Stage 14 K4) |
-| NEXT DEPENDENCY-READY KNOT | None primary — K5–K7 remain conditional/scope-gated |
+| NEXT DEPENDENCY-READY KNOT | None — K5 CONDITIONAL (scope-gated), K6 BLOCKED (environment/host + external device), K7 NOT_NEEDED; no blocker is actionable |
 
 Completion states recorded by that audit:
 
@@ -538,14 +538,47 @@ approved local execution-operator model across the Master Charter, the Final Dec
 and `productComplete` / `externalProductionDependenciesComplete` remain `FALSE` because the blocked external
 production dependencies still prevent a completion state.
 
-Remaining repository-local knots: **0 primary** and **3 conditional (K5–K7)**.
+Remaining repository-local knots: **0 primary**; **K5 CONDITIONAL**, **K6 BLOCKED** (environment/host + external device), **K7 NOT_NEEDED** (readiness delta 2026-09-14).
 
 | ID | Knot | Class | Status | Stage |
 |---|---|---|---|---|
 | K4 | `standardization.governance-operator-reconciliation` | Primary — docs-only consistency | COMPLETE (Stage 14) | 14 |
-| K5 | `commercial.subscription-entitlements` (repo-local boundary only) | Conditional — scope-gated | Conditional | 15 |
-| K6 | `assurance.android-build-test-evidence` | Conditional — scope/environment | Conditional | 16 |
-| K7 | `assurance.runtime-server-unit-coverage` | Conditional — LOW test-coverage gap | Conditional | 17 |
+| K5 | `commercial.subscription-entitlements` (repo-local boundary only) | Conditional — scope-gated | **CONDITIONAL** (readiness delta 2026-09-14) | 15 |
+| K6 | `assurance.android-build-test-evidence` | Conditional — scope/environment | **BLOCKED** (environment/host + external device; readiness delta 2026-09-14) | 16 |
+| K7 | `assurance.runtime-server-unit-coverage` | LOW test-coverage gap | **NOT_NEEDED** (registered basis factually incorrect; readiness delta 2026-09-14) | 17 |
+
+**B1–B5 blocker readiness delta (2026-09-14, baseline `a8538ff0`).** Bounded readiness-only audit
+`.kilo/plans/blocker-b1-b5-readiness-delta-2026-09-14.md`; classifications (exactly one per blocker):
+
+- **B1 — `BLOCKED_HUMAN_APPROVAL`, ACTIONABLE_NOW=FALSE.** The encryption *foundation* exists and is committed
+  (`Backend/HBOS/Security/EncryptionService.ts`, AES-256-GCM, per-tenant DEK, commit `1608a7ea`), but the
+  production store `Product/SQLitePersistenceStore.ts` is plaintext and `CommercialRuntimeServer.ts:307`
+  constructs it with no `encryption` config. **No approved architecture decision permits encryption-at-rest**
+  (`Docs/ARCHITECTURE_DECISIONS/` holds only `KILO_GOVERNED_OPERATOR_DECISION.md`; `ARCHITECTURE.md` has no
+  encryption entry). Ledger `C5` = "ARCHITECTURE CHANGE CONTROL REQUIRED … BLOCKED pending human approval of 7
+  critical 05C decisions"; `phase-05c-e-security-audit.md` records encryption-for-audit as `REQUIRES_HUMAN_APPROVAL`.
+  05C approval/change-control is still required — **do not implement**. Prerequisite: human approval.
+- **B2 — `BLOCKED_EXTERNAL`, ACTIONABLE_NOW=FALSE.** `ExternalProductionDependencyAudit.ts:22-37` = `BLOCKED`
+  unless `HOOSHYAR_PAYMENT_PROVIDER_ACTIVATED=1`; the flag and health URL are empty; no provider account,
+  credential or webhook is present. Prerequisite: external payment-provider account/activation. The repo-local
+  entitlement boundary is **K5**, which is separately scope-gated (contract L229) and is **not** made ready by B2.
+- **B3 — `BLOCKED_EXTERNAL`, ACTIONABLE_NOW=FALSE.** `ExternalProductionDependencyAudit.ts:39-54` = `BLOCKED`
+  unless `HOOSHYAR_PRODUCTION_CLOUD_READY=1`; the flag and production health URL are empty; no in-repo TLS and no
+  reachable cloud/DNS/TLS resources. Prerequisite: external cloud/DNS/TLS infrastructure. Deployment readiness
+  was not fabricated.
+- **B4 — `BLOCKED_ENVIRONMENT`, ACTIONABLE_NOW=FALSE.** `android/` holds only 6 files with no `gradlew` and no
+  `app/src/test`/`androidTest` source set; host probes show no `gradle`/`java`/`javac`/`adb` and empty
+  `ANDROID_HOME`/`ANDROID_SDK_ROOT`; `PRODUCT_QUALIFICATION_MATRIX.json:11` `android-release` = `REQUIRES_DEVICE_EXECUTION`.
+  This is an environment/device blocker, **not** a coding gap. Prerequisite: JDK+Gradle+Android SDK host **and**
+  external device. No toolchain was installed or altered.
+- **B5 — `BLOCKED_ENVIRONMENT`, ACTIONABLE_NOW=FALSE.** `installer/HooshyarOS.iss` and
+  `scripts/build-windows-installer.ps1` exist, but the script throws when `ISCC.exe` is absent
+  (`scripts/build-windows-installer.ps1:31-32`); host probe finds no `ISCC` and neither standard Inno Setup 6
+  path. Prerequisite: Inno Setup 6 host. No installer was built.
+
+**ACTIONABLE BLOCKER: NONE. K5 UNBLOCKED = FALSE. K6 UNBLOCKED = FALSE.** No blocker changed class; no
+queue/ledger status was changed and no stage was started. Completion states are unchanged — **verified — no
+state change.** The prior K5/K6/K7 conditional readiness delta is preserved in §15.1.2 and its own artifact.
 
 **K4 (Stage 14) closure.** `standardization.governance-operator-reconciliation` VERIFIED as a docs-only
 reconciliation. The Master Charter §8/§9/§17 wording, the Final Decisions Register §7/§16/§18 and
@@ -570,7 +603,7 @@ and the daemon returns `COMPLETION_EVIDENCE_INSUFFICIENT` when the gate is incom
 
 External/approval blockers unchanged: **B1** encryption-at-rest/key management (architecture change control / pending human 05C decisions), **B2** payment-provider activation, **B3** production cloud/DNS/TLS resources, **B4** Android device acceptance, **B5** Inno Setup host.
 
-Valid next stages from this baseline: no primary repository-local knot remains. Stage 15 = K5 `commercial.subscription-entitlements` only if the subscription scope is confirmed; K6–K7 remain conditional. No stage may be skipped, invented or reordered without a new evidence-backed audit delta.
+Valid next stages from this baseline: no primary and no dependency-ready repository-local knot remains. K5 `commercial.subscription-entitlements` is CONDITIONAL (approved subscription scope unconfirmed), K6 `assurance.android-build-test-evidence` is BLOCKED (missing Gradle/JDK/Android SDK host + external device B4), and K7 `assurance.runtime-server-unit-coverage` is NOT_NEEDED (dedicated suite exists; contract coverage already present). No stage may be skipped, invented or reordered without a new evidence-backed audit delta.
 
 Provenance of K3 (retained from prior baselines, now closed): the autonomous completion gate derived completion from file existence, contract-marker strings and regex method-name probes rather than runtime/application/acceptance evidence — a genuine false-positive risk against Governance Charter §15. It was recorded, then repaired fail-closed in Stage 13.
 
@@ -587,7 +620,9 @@ Only records whose completion is supported by their own artifact and/or a verifi
 | `.kilo/plans/ACTIVE-COMMERCIALIZATION-MASTER-LEDGER.md` | audit HEAD `a0f0018c` | stages 1–10 recorded VERIFIED (checkpoint-backed); later extended through Stage 13 |
 | `.kilo/plans/post-k2-bounded-reaudit-2026-09-14.md` (baseline `post-k2-offline-sync-reaudit-2026-09-14`, checkpoint `8fd6f522`) | `8fd6f522` | SUPERSEDED by `post-k3-completion-audit-integrity-reaudit-2026-09-14`; recorded stages 1–12 COMPLETE, Layer 11 repository-local complete, and K3 as the next knot; K3 later closed (Stage 13) |
 | `.kilo/plans/post-k3-bounded-reaudit-2026-09-14.md` + `.kilo/plans/assurance-completion-audit-integrity-checkpoint.md` (baseline `post-k3-completion-audit-integrity-reaudit-2026-09-14`, checkpoint `6bf54042`) | `6bf54042` | SUPERSEDED by `post-k4-governance-operator-reconciliation-2026-09-14`; K3 `assurance.completion-audit-integrity` VERIFIED — completion gate fail-closed on missing/stale/blocked behavioral/application/acceptance evidence; evidence `.kilo/evidence/stage13-k3-completion-audit-integrity-acceptance.txt` (19/19 PASS) |
-| `.kilo/plans/standardization-governance-operator-reconciliation-checkpoint.md` (baseline `post-k4-governance-operator-reconciliation-2026-09-14`, checkpoint `ed3c47fc`) | `ed3c47fc` | CURRENT baseline; K4 `standardization.governance-operator-reconciliation` VERIFIED — docs-only reconciliation of the approved local execution-operator model across Master Charter §8/§9/§17, Final Decisions Register §7/§16/§18 and `AUTONOMOUS_MISSION.md`; no source code, test, architecture, completion-gate or external-dependency change |
+| `.kilo/plans/standardization-governance-operator-reconciliation-checkpoint.md` (baseline `post-k4-governance-operator-reconciliation-2026-09-14`, checkpoint `ed3c47fc`) | `ed3c47fc` | SUPERSEDED by `conditional-k5-k7-readiness-delta-2026-09-14`; K4 `standardization.governance-operator-reconciliation` VERIFIED — docs-only reconciliation of the approved local execution-operator model across Master Charter §8/§9/§17, Final Decisions Register §7/§16/§18 and `AUTONOMOUS_MISSION.md`; no source code, test, architecture, completion-gate or external-dependency change |
+| `.kilo/plans/conditional-k5-k7-readiness-delta-2026-09-14.md` (baseline `conditional-k5-k7-readiness-delta-2026-09-14`, checkpoint `a8538ff0`) | `a8538ff0` | SUPERSEDED by `blocker-b1-b5-readiness-delta-2026-09-14`; bounded readiness-only delta for conditional knots K5/K6/K7 — **K5 CONDITIONAL** (scope unconfirmed; B2 external), **K6 BLOCKED** (no Gradle/JDK/Android SDK/host; B4 device external), **K7 NOT_NEEDED** (dedicated `CommercialRuntimeServer.test.ts` exists; coverage already present). Next dependency-ready knot NONE. No source/test/queue/ledger/completion-flag change |
+| `.kilo/plans/blocker-b1-b5-readiness-delta-2026-09-14.md` (baseline `blocker-b1-b5-readiness-delta-2026-09-14`, checkpoint `a8538ff0`) | `a8538ff0` | CURRENT baseline; bounded read-only B1–B5 blocker readiness delta — **B1 BLOCKED_HUMAN_APPROVAL** (no approved encryption-at-rest decision; pending 05C change-control), **B2 BLOCKED_EXTERNAL** (payment provider), **B3 BLOCKED_EXTERNAL** (cloud/DNS/TLS), **B4 BLOCKED_ENVIRONMENT** (no Gradle/JDK/Android SDK/adb; external device; not a coding gap), **B5 BLOCKED_ENVIRONMENT** (no Inno Setup 6 host). ACTIONABLE BLOCKER NONE. No source/test/queue/ledger/completion-flag change |
 | `.kilo/plans/AUTONOMOUS-COMMERCIALIZATION-EXECUTION-QUEUE.md` | derived from ledger | stages 1–14 COMPLETE; no primary repository-local knot remains; B1–B5 BLOCKED; K5–K7 conditional |
 | `.kilo/plans/fresh-governed-commercialization-reaudit-2026-09-14.md` (baseline `fresh-governed-commercialization-2026-09-14`, checkpoint `977ea944`) | `977ea944` | SUPERSEDED by `post-k2-offline-sync-reaudit-2026-09-14`; recorded knots K1–K4/K5–K7 and blockers B1–B5; K1 and K2 later closed (Stages 11–12) |
 | `.kilo/plans/phase-11-final-checkpoint.md` | `8ed51f0e` | declared VERIFIED; its `canonicalPlatformConstructionComplete: true` claim is SUPERSEDED by later evidence (`phase-14-final-checkpoint.md` and the 2026-09-14 audit both record FALSE) |
