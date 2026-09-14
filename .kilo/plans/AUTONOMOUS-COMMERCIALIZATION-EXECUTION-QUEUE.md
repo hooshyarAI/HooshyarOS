@@ -34,7 +34,7 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 | 6 | `observability.metrics-and-request-trace` | S6 | Additive metrics + structured request trace (no architecture change) | runtime diagnostics | MEDIUM | **COMPLETE** |
 | 7 | `standardization.pagination-and-idempotency` | S3,S4 | Bounded `limit/offset` on list routes; idempotency keys on mutating POSTs | runtime | MEDIUM | **COMPLETE** |
 | 8 | `assurance.ocr-environment-gap` | E2 | Resolve only if runtime contract requires; else record explicit, non-hidden gap | `OcrAdapter` | HIGH | **COMPLETE** |
-| 9 | `assurance.flake-containment` | F1,F2 | Analyze + contain parallel-load resource contention (timeouts/serial projects) without hiding real failures | test config + affected tests | HIGH | PLANNED |
+| 9 | `assurance.flake-containment` | F1,F2,F3 | Analyze + contain parallel-load resource contention (measured test budgets / owner lifecycle) without hiding real failures | test files + `KiloCodeExecutionAdapter` | HIGH | **COMPLETE** |
 | 10 | `standardization.architecture-doc-registry-reconciliation` | C8 | Reconcile LifecycleManager tier drift + stale dormant labels to repository truth | docs/registry | HIGH | PLANNED |
 | 11 | `assurance.construction-remote-attestation` | C9 | Independent GitHub-remote verification at phase end | `LocalConstructionToolset` | MEDIUM | PLANNED |
 | 12 | `product.offline-sync` | C1 | Wire existing `SyncStateStore` owner (no rebuild) | `Product/SyncStateStore.ts` | MEDIUM | PLANNED |
@@ -216,6 +216,30 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 **Checkpoint:** `.kilo/plans/assurance-ocr-environment-gap-checkpoint.md`
 
 **DO-NOT-REPEAT:** do not install OCR dependencies to make a suite green; do not claim OCR support; keep the engine lazy/optional; keep `unsupported` distinct from `recognize-failed`.
+
+---
+
+## Stage 9 — `assurance.flake-containment`
+
+**State:** COMPLETE
+**Baseline SHA:** `2714d3f25a72d1fd138766219730bae104891c23`
+**Classification:** F1 = test-budget under contention; F2 = real owner-level process-lifecycle race; F3 = non-deterministic test fixture. No architecture change.
+
+**DISCOVER / INSPECT (done):**
+- F1: isolated body **4270 ms** vs Jest default 5000 ms; `createCommercialRuntimeServer` closes `SQLitePersistenceStore` on `server.close` (`CommercialRuntimeServer.ts:523,1288`) and a keep-alive probe measured close at ~145 ms → real work, not a leak/close stall.
+- F2: `streamWindowsKilo` set `spawnSync` timeout equal to the monitor's `$payload.timeout`, but the monitor's timer starts after `Start-Process` writes `kilo.pid`; isolated run showed `elapsedMs:13597` (timeout 12000) with empty `EXECUTION_FINISHED code=`, and full runs failed at `expect(fs.existsSync(pidPath)).toBe(true)`.
+- F3: ExcelJS/JSZip embed generation timestamps; probe showed two independent XLSX writes are byte-equal within a second but differ across 1.5 s.
+
+**Repair:**
+- `KiloCodeExecutionAdapter.ts`: `MONITOR_TIMEOUT_GRACE_MS = 30_000`; hard kill at `timeout + grace`; `status === 124` recognised as timeout. No interface change.
+- `CommercialRuntimePersistenceRecovery.test.ts`: explicit `20_000` budget; assertions unchanged.
+- `FinancialDataIngestionAdapter.test.ts`: duplicate-detection fixture writes byte-identical content; production adapter and assertion untouched.
+
+**Evidence:** focused 3 suites/34 tests ×stable (F2 ×3, F1+F3 ×3); regression 12 suites/83 tests; typecheck exit 0; full suite **262/262 suites, 1999/1999 tests, exit 0** twice (`.kilo/evidence/jest-full-stage9-flake-containment.txt`, `…-run2.txt`). See audit §40 and `.kilo/plans/assurance-flake-containment-checkpoint.md`.
+
+**Checkpoint:** `.kilo/plans/assurance-flake-containment-checkpoint.md`
+
+**DO-NOT-REPEAT:** do not lower the F1 budget back to the Jest default; do not re-equalize the F2 process hard kill with the monitored timeout; do not revert F3 to two independent XLSX generations; do not skip/quarantine tests, add retries, widen the whole-suite `testTimeout`, or serialize the entire suite.
 
 ---
 

@@ -72,5 +72,5 @@ describe("Commercial runtime persistence and recovery", () => {
     });
     await close(second);
     rmSync(directory, { recursive: true, force: true });
-  });
+  }, 20_000);
 });

@@ -924,3 +924,45 @@ No change to the three completion flags. OCR ingestion remains **not claimed**; 
 ### 39.6 Next candidate knot (not executed)
 
 `assurance.flake-containment` — analyze and contain genuine parallel-load timing/resource nondeterminism without hiding real failures.
+
+---
+
+## 40. Assurance knot — `assurance.flake-containment` executed (F1/F2/F3 contained)
+
+**Knot:** diagnose and contain the remaining parallel-load nondeterminism (F1 persistence recovery, F2 real Windows process-tree timeout, F3 XLSX duplicate-detection SHA-256) without hiding real failures.
+**Trusted baseline at execution:** `git rev-parse HEAD` = `2714d3f25a72d1fd138766219730bae104891c23` (`fix/autonomous-product-factory`).
+**Classification:** F1 = test-budget under contention; F2 = real owner-level process-lifecycle race; F3 = invalid (non-deterministic) test premise. No architecture change; Architecture Freeze V4.1 preserved.
+**Checkpoint:** `.kilo/plans/assurance-flake-containment-checkpoint.md`.
+
+### 40.1 Root causes proven
+
+- **F1** `CommercialRuntimePersistenceRecovery.test.ts`: isolated test body **4270 ms** against Jest's default 5000 ms; full run fails at exactly 5 s. `createCommercialRuntimeServer` closes `SQLitePersistenceStore` on `server.close` (`CommercialRuntimeServer.ts:523,1288`); a keep-alive probe measured `server.close()` at ~145 ms, so the budget is real work, not a hang or handle leak.
+- **F2** `streamWindowsKilo`: `spawnSync(..., { timeout })` and the monitor's `$payload.timeout` were equal, but the monitor's timer starts **after** `Start-Process` writes `kilo.pid`. Isolated run showed `elapsedMs:13597` with `timeout:12000` and `EXECUTION_FINISHED code=` (empty), i.e. the hard kill pre-empted the monitor's `taskkill /T /F` + `exit 124` and its pid-file write; full runs failed at `expect(fs.existsSync(pidPath)).toBe(true)`.
+- **F3** XLSX fixtures: ExcelJS writes `Workbook.created`/`modified` into `docProps/core.xml` and JSZip stamps per-entry ZIP times. Probe: independently generated files were byte-equal within a second and differed across 1.5 s (ZIP time field `0x2b13` vs `0x2b15`). The full-run mismatch and the derived temp-dir `EPERM` both follow from the assertion throwing before `database.close()`.
+
+### 40.2 Containment
+
+- `KiloCodeExecutionAdapter.ts`: `MONITOR_TIMEOUT_GRACE_MS = 30_000` decouples the process hard kill from the monitored timeout, and `child.status === 124` is recognised as a timeout so the monitor's canonical timeout path completes. No interface change.
+- `CommercialRuntimePersistenceRecovery.test.ts`: explicit `20_000` budget, consistent with the other real runtime integration suites; assertions unchanged.
+- `FinancialDataIngestionAdapter.test.ts`: duplicate-detection fixture writes byte-identical content for the second source; the production `FinancialDataIngestionAdapter.ts` owner is untouched and the assertion is unchanged.
+
+### 40.3 Verification evidence
+
+- Focused: F1+F2+F3 — **3/3 suites, 34/34 tests passed**. F2 ×3 **5/5** (clean `[KILO] EXECUTION_TIMEOUT` path); F1+F3 ×3 **29/29**.
+- Relevant regression: **12/12 suites, 83/83 tests passed**.
+- Changed-file typecheck `tsc --noEmit`: **exit 0**.
+- Full suite (`jest --silent`, `.kilo/evidence/jest-full-stage9-flake-containment.txt` and `…-run2.txt`): **262/262 suites, 1999/1999 tests passed, exit 0** in **two** consecutive runs.
+
+### 40.4 Remaining failure classification (after repair)
+
+None. The full suite is green with zero failures and zero skipped tests.
+
+Residual non-failing observation: Jest's `A worker process has failed to exit gracefully` teardown warning remains in both runs (also present in Stage 8 evidence line 305); it is pre-existing and does not fail any suite or test.
+
+### 40.5 Truth boundary
+
+No change to the three completion flags. No engine, dependency, or frozen interface changed. No test hidden, weakened, skipped, or deleted; no assertion relaxed. The pre-existing unrelated local modifications (`package-lock.json`, `.kilo/agents/hooshyar-construction.md`) were not staged.
+
+### 40.6 Next candidate knot (not executed)
+
+`standardization.architecture-doc-registry-reconciliation` — reconcile `LifecycleManager` tier drift and stale dormant labels to repository truth (docs/registry only).

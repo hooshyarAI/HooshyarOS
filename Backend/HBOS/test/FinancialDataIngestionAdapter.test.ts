@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import ExcelJS from "exceljs-hardened";
@@ -389,7 +389,10 @@ describe("FinancialDataIngestionAdapter - XLSX Ingestion", () => {
       const sourcePath1 = join(directory, "ledger1.xlsx");
       const sourcePath2 = join(directory, "ledger2.xlsx");
       await createValidXlsxFile(sourcePath1);
-      await createValidXlsxFile(sourcePath2);
+      // XLSX archives embed generation timestamps, so two independent writes are
+      // not guaranteed to be byte-identical. Duplicate detection is defined on
+      // raw bytes, so the second source must carry the exact same bytes.
+      writeFileSync(sourcePath2, readFileSync(sourcePath1));
 
       const database = new SQLitePersistenceStore({ databasePath: join(directory, "financial.sqlite") });
       const adapter = new FinancialDataIngestionAdapter(database);

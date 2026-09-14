@@ -44,6 +44,12 @@ const FREE_MODEL_CONFIG = JSON.stringify({
     model: "kilo/kilo-auto/free"
 });
 
+// The process-level hard kill must outlast the monitor's own timeout: the
+// monitor only starts its timer after Start-Process writes the pid file, so if
+// the budgets were equal the hard kill could pre-empt the pid file, the tree
+// termination and the `exit 124` the timeout contract depends on.
+const MONITOR_TIMEOUT_GRACE_MS = 30_000;
+
 function candidateCliPaths(): string[] {
     const home = process.env.USERPROFILE || process.env.HOME || "";
     const extensionRoot = join(home, ".vscode", "extensions");
@@ -272,14 +278,15 @@ function streamWindowsKilo(invocation: KiloCommand, cwd: string, timeout: number
         {
             cwd,
             env: invocation.env,
-            timeout,
+            timeout: timeout + MONITOR_TIMEOUT_GRACE_MS,
             stdio: ["ignore", "inherit", "inherit"],
             windowsHide: false
         }
     );
 
     const output = existsSync(progressLogPath) ? readFileSync(progressLogPath, "utf8") : "";
-    const timedOut = String((child.error as any)?.code ?? "") === "ETIMEDOUT";
+    const hardKilled = String((child.error as any)?.code ?? "") === "ETIMEDOUT";
+    const timedOut = hardKilled || child.status === 124;
 
     if (timedOut) {
         const innerPidRaw = existsSync(pidPath) ? readFileSync(pidPath, "utf8").trim() : null;
