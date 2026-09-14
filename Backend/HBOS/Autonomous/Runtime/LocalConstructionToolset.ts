@@ -99,6 +99,137 @@ export function repositoryStateChanged(before: string, after: string): boolean {
     return before.trim() !== after.trim();
 }
 
+export interface GitCommandResult {
+    ok: boolean;
+    code: number;
+    output: string;
+    error: string | null;
+    elapsedMs: number;
+}
+
+export type GitCommandRunner = (command: string, args: string[], cwd: string, timeout?: number) => GitCommandResult;
+
+export interface RemoteAttestation {
+    type: "AUTONOMOUS_REMOTE_ATTESTATION";
+    branch: string | null;
+    localHead: string | null;
+    originTrackingHead: string | null;
+    remoteHead: string | null;
+    remoteQuery: string;
+    trackingRefAuthoritative: false;
+    parity: boolean;
+    status: "PASS" | "FAIL" | "UNVERIFIED";
+    reason: string | null;
+    evidence: string[];
+    timestamp: string;
+}
+
+const COMMIT_SHA_PATTERN = /^[0-9a-f]{40,64}$/i;
+
+function isResolvedSha(value: string | null | undefined): value is string {
+    return Boolean(value && COMMIT_SHA_PATTERN.test(value.trim()));
+}
+
+/**
+ * Independent construction-plane remote attestation (Governance Charter §16).
+ *
+ * Proves the construction state is actually synchronized:
+ *   LOCAL HEAD == independently queried GitHub remote branch HEAD
+ *
+ * The remote branch HEAD is obtained by `git ls-remote origin refs/heads/<branch>`,
+ * never from `git status`, a push exit code, a local ref or the cached/stale
+ * `origin/<branch>` tracking ref. The tracking ref is reported for observability
+ * only and never determines parity. Any unavailable, malformed or ambiguous
+ * remote response fails closed as UNVERIFIED; unequal valid SHAs fail as FAIL.
+ * Equal SHAs prove identical committed content through Git content addressing.
+ */
+export function attestRemoteBranchParity(
+    root: string = process.cwd(),
+    branchOverride?: string,
+    runner: GitCommandRunner = run
+): RemoteAttestation {
+    const evidence: string[] = [];
+    let branch = branchOverride?.trim() || "";
+    if (!branch) {
+        const branchResult = runner("git", ["branch", "--show-current"], root);
+        branch = branchResult.ok ? branchResult.output.trim() : "";
+    }
+    const base = {
+        type: "AUTONOMOUS_REMOTE_ATTESTATION" as const,
+        branch: branch || null,
+        localHead: null as string | null,
+        originTrackingHead: null as string | null,
+        remoteHead: null as string | null,
+        remoteQuery: branch ? `git ls-remote origin refs/heads/${branch}` : "git ls-remote origin refs/heads/<branch>",
+        trackingRefAuthoritative: false as const,
+        parity: false,
+        status: "UNVERIFIED" as const,
+        reason: null as string | null,
+        evidence,
+        timestamp: new Date().toISOString()
+    };
+    if (!branch) {
+        return { ...base, reason: "BRANCH_UNRESOLVED", evidence: ["target branch could not be resolved (detached HEAD or branch query failure)"] };
+    }
+
+    const localResult = runner("git", ["rev-parse", "HEAD"], root);
+    const localHead = localResult.ok ? localResult.output.trim() : "";
+    if (!isResolvedSha(localHead)) {
+        return { ...base, reason: "LOCAL_HEAD_UNAVAILABLE", evidence: ["git rev-parse HEAD did not yield a valid commit SHA"] };
+    }
+
+    const trackingResult = runner("git", ["rev-parse", "--verify", `refs/remotes/origin/${branch}`], root);
+    const trackingHead = trackingResult.ok ? trackingResult.output.trim() : "";
+    const originTrackingHead = isResolvedSha(trackingHead) ? trackingHead : null;
+
+    const remoteResult = runner("git", ["ls-remote", "origin", `refs/heads/${branch}`], root);
+    if (!remoteResult.ok) {
+        return {
+            ...base,
+            localHead,
+            originTrackingHead,
+            reason: "REMOTE_BRANCH_QUERY_UNAVAILABLE",
+            evidence: ["independent remote query failed (no network/authorization/remote)", `remote error: ${remoteResult.error || "non-zero exit"}`]
+        };
+    }
+
+    const remoteLine = remoteResult.output
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(Boolean)
+        .map(line => line.split(/\s+/))
+        .find(parts => parts.length >= 2 && parts[1] === `refs/heads/${branch}`);
+    const remoteHead = remoteLine && isResolvedSha(remoteLine[0]) ? remoteLine[0] : null;
+    if (!remoteHead) {
+        return {
+            ...base,
+            localHead,
+            originTrackingHead,
+            reason: "REMOTE_BRANCH_RESPONSE_MALFORMED_OR_ABSENT",
+            evidence: ["git ls-remote returned no valid commit SHA for the target ref"]
+        };
+    }
+
+    const parity = localHead === remoteHead;
+    return {
+        ...base,
+        localHead,
+        originTrackingHead,
+        remoteHead,
+        parity,
+        status: parity ? "PASS" : "FAIL",
+        reason: parity ? null : "LOCAL_REMOTE_SHA_MISMATCH",
+        evidence: [
+            `localHead=${localHead}`,
+            `originTrackingHead=${originTrackingHead ?? "unavailable"} (observability only; not authoritative)`,
+            `remoteHead=${remoteHead} (independent: ${base.remoteQuery})`,
+            parity
+                ? "local HEAD equals independently queried remote branch HEAD; committed content is identical"
+                : "local HEAD differs from independently queried remote branch HEAD"
+        ]
+    };
+}
+
 export function buildAgentArgs(agent: ImplementationAgent, prompt: string): string[] {
     // Must match the governed KiloCodeExecutionAdapter invocation contract exactly
     // so any caller building Kilo args resolves the same governed agent selection.
@@ -133,6 +264,7 @@ const BUILDER_TEST_EVERY = Math.max(1, Number.parseInt(process.env.HOOSHYAR_BUIL
 
 function focusedTestFor(capabilityId: string): string | null {
     const known: Record<string, string> = {
+        "assurance.construction-remote-attestation": "Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.test.ts",
         "platform.user-management": "Backend/HBOS/test/UserManagementEngine.test.ts",
         "platform.organization-model": "Backend/HBOS/test/OrganizationModelEngine.test.ts",
         "platform.security-layer": "Backend/HBOS/test/SecurityLayerEngine.test.ts",
@@ -217,9 +349,10 @@ function buildAgentPrompt(context: ConstructionContext): string {
     ].join("\n");
 }
 
-export function createLocalConstructionTools(root = process.cwd()): ConstructionTool[] {
+export function createLocalConstructionTools(root = process.cwd(), options: { runner?: GitCommandRunner } = {}): ConstructionTool[] {
     let verificationCount = 0;
     const kiloOperator = new KiloCodeExecutionAdapter();
+    const gitRunner: GitCommandRunner = options.runner ?? run;
     return [
         {
             name: "architecture",
@@ -363,38 +496,47 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
             name: "git",
             execute: (stage) => {
                 if (stage !== "FINALIZE") return { ok: true };
-                const status = run("git", REPOSITORY_STATUS_ARGS, root);
+                const status = gitRunner("git", REPOSITORY_STATUS_ARGS, root);
                 if (!status.ok) return { ok: false, issue: "GIT_STATUS_FAILED", artifact: { output: status.output, error: status.error } };
                 if (!status.output.trim()) return { ok: false, issue: "GIT_NO_REPOSITORY_CHANGE", artifact: { clean: true, committed: false, pushed: false, changeDetected: false } };
-                const add = run("git", ["add", "-A"], root);
+                const add = gitRunner("git", ["add", "-A"], root);
                 if (!add.ok) return { ok: false, issue: "GIT_ADD_FAILED", artifact: { output: add.output, error: add.error } };
-                const staged = run("git", ["diff", "--cached", "--quiet"], root);
+                const staged = gitRunner("git", ["diff", "--cached", "--quiet"], root);
                 if (!staged.ok && staged.code !== 1) return { ok: false, issue: "GIT_STAGED_DIFF_CHECK_FAILED", artifact: { output: staged.output, error: staged.error } };
                 if (staged.code === 0) return { ok: false, issue: "GIT_NO_STAGED_CHANGE", artifact: { clean: true, committed: false, pushed: false, changeDetected: false } };
-                const commit = run("git", ["commit", "-m", "feat(hbos): autonomous construction progress"], root);
+                const commit = gitRunner("git", ["commit", "-m", "feat(hbos): autonomous construction progress"], root);
                 if (!commit.ok) return { ok: false, issue: "GIT_COMMIT_FAILED", artifact: { output: commit.output, error: commit.error } };
-                const branchResult = run("git", ["branch", "--show-current"], root);
+                const branchResult = gitRunner("git", ["branch", "--show-current"], root);
                 if (!branchResult.ok) return { ok: false, issue: "GIT_BRANCH_DETECTION_FAILED", artifact: { output: branchResult.output, error: branchResult.error } };
                 const branch = branchResult.output.trim();
                 if (!branch) return { ok: false, issue: "GIT_DETACHED_HEAD", artifact: { committed: true, pushed: false, changeDetected: true } };
-                const fetch = run("git", ["fetch", "origin", branch], root);
+                const fetch = gitRunner("git", ["fetch", "origin", branch], root);
                 if (!fetch.ok) return { ok: false, issue: "GIT_FETCH_FAILED", artifact: { branch, output: fetch.output, error: fetch.error } };
                 const remoteRef = `origin/${branch}`;
-                const remoteExists = run("git", ["rev-parse", "--verify", remoteRef], root);
+                const remoteExists = gitRunner("git", ["rev-parse", "--verify", remoteRef], root);
                 if (remoteExists.ok) {
-                    const remoteAncestor = run("git", ["merge-base", "--is-ancestor", remoteRef, "HEAD"], root);
+                    const remoteAncestor = gitRunner("git", ["merge-base", "--is-ancestor", remoteRef, "HEAD"], root);
                     if (!remoteAncestor.ok && remoteAncestor.code !== 1) return { ok: false, issue: "GIT_DIVERGENCE_CHECK_FAILED", artifact: { branch, output: remoteAncestor.output, error: remoteAncestor.error } };
                     if (remoteAncestor.code === 1) {
-                        const rebase = run("git", ["rebase", remoteRef], root);
+                        const rebase = gitRunner("git", ["rebase", remoteRef], root);
                         if (!rebase.ok) {
-                            run("git", ["rebase", "--abort"], root);
+                            gitRunner("git", ["rebase", "--abort"], root);
                             return { ok: false, issue: "GIT_REBASE_CONFLICT", artifact: { branch, output: rebase.output, error: rebase.error } };
                         }
                     }
                 }
-                const push = run("git", ["push", "origin", branch], root);
+                const push = gitRunner("git", ["push", "origin", branch], root);
                 if (!push.ok) return { ok: false, issue: "GIT_PUSH_FAILED", artifact: { branch, output: push.output, error: push.error } };
-                return { ok: true, artifact: { committed: true, pushed: true, branch, changeDetected: true } };
+
+                // Governance §16 independent remote-attestation barrier: a successful
+                // push exit code is not proof of synchronization. Verify the actual
+                // remote branch HEAD independently and fail closed otherwise.
+                const remoteAttestation = attestRemoteBranchParity(root, branch, gitRunner);
+                console.log(JSON.stringify(remoteAttestation, null, 2));
+                if (remoteAttestation.status !== "PASS") {
+                    return { ok: false, issue: "GIT_REMOTE_ATTESTATION_FAILED", artifact: { committed: true, pushed: true, branch, changeDetected: true, remoteAttestation } };
+                }
+                return { ok: true, artifact: { committed: true, pushed: true, branch, changeDetected: true, remoteAttestation } };
             }
         }
     ];

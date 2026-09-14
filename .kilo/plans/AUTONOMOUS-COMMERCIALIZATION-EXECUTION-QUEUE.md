@@ -36,7 +36,7 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 | 8 | `assurance.ocr-environment-gap` | E2 | Resolve only if runtime contract requires; else record explicit, non-hidden gap | `OcrAdapter` | HIGH | **COMPLETE** |
 | 9 | `assurance.flake-containment` | F1,F2,F3 | Analyze + contain parallel-load resource contention (measured test budgets / owner lifecycle) without hiding real failures | test files + `KiloCodeExecutionAdapter` | HIGH | **COMPLETE** |
 | 10 | `standardization.architecture-doc-registry-reconciliation` | C8 | Reconcile LifecycleManager tier drift + stale dormant labels to repository truth | `Docs/ARCHITECTURE.md` | HIGH | **COMPLETE** |
-| 11 | `assurance.construction-remote-attestation` | C9 | Independent GitHub-remote verification at phase end | `LocalConstructionToolset` | MEDIUM | PLANNED |
+| 11 | `assurance.construction-remote-attestation` | C9 | Independent GitHub-remote verification at phase end | `LocalConstructionToolset` | MEDIUM | **COMPLETE** |
 | 12 | `product.offline-sync` | C1 | Wire existing `SyncStateStore` owner (no rebuild) | `Product/SyncStateStore.ts` | MEDIUM | PLANNED |
 | — | `security.encryption-at-rest` | C5 | BLOCKED — ARCHITECTURE CHANGE CONTROL / pending human 05C approval | 05C decisions | — | BLOCKED |
 | — | `product.billing-entitlements` | C2 | BLOCKED_EXTERNAL_DEPENDENCY (payment provider account/webhook) | — | — | BLOCKED_EXTERNAL |
@@ -262,6 +262,27 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 **Checkpoint:** `.kilo/plans/standardization-architecture-doc-registry-reconciliation-checkpoint.md`
 
 **DO-NOT-REPEAT:** do not restore the `DecisionIntelligenceEngine` dormant label; do not trim/reorder `LifecycleManager` tiers to "match the registry"; do not treat tier membership as registry membership; do not edit runtime code in a documentation-reconciliation stage.
+
+---
+
+## Stage 11 — `assurance.construction-remote-attestation`
+
+**State:** COMPLETE
+**Baseline SHA:** `568bebdf1c1fe87091f746b9bc5b6f8bcb9fafbb`
+**Classification:** GOVERNANCE / CONSTRUCTION-INTEGRITY GAP (C9). No architecture change; additive to the existing construction-plane owner.
+
+**DISCOVER / INSPECT (done):**
+- The construction `git` tool in `LocalConstructionToolset.ts` only did fetch/rebase/push and trusted the push exit code; it never proved local HEAD == remote branch HEAD (Governance Charter §16).
+- `AutonomousConstructionEngine` executes the `git` tool on `FINALIZE` and blocks when it returns `ok:false`; `AutonomousBuildDaemon.ts:65` and `AutonomousConstructionBridge.ts:29` supply `createLocalConstructionTools(...)`.
+- `CommercialProductCompletionAudit` inspects local files only; the local `origin/<branch>` tracking ref is cached and not authoritative.
+
+**Repair:** exported `attestRemoteBranchParity(root, branchOverride?, runner?)` returning `localHead` / `originTrackingHead` (report-only) / independent `remoteHead` / `parity` / `status`; fail-closed `UNVERIFIED` on unavailable or malformed remote query, `FAIL` on unequal valid SHAs, `PASS` on equality. The existing `git` FINALIZE step now runs the attestation after a successful push and returns `ok:false` (`GIT_REMOTE_ATTESTATION_FAILED`) unless `PASS`. Optional injected runner enables deterministic fail-closed testing without mutating the repository.
+
+**Evidence:** focused 13/13; construction regression 14 suites/30 tests; changed-file typecheck exit 0; real-repository acceptance **15/15 checks PASS** against the live remote (independent `ls-remote` == `rev-parse HEAD` == tracking ref = `568bebd`), including FINALIZE reject-on-FAIL / reject-on-UNVERIFIED / accept-only-on-PASS. Transcript: `.kilo/evidence/stage11-k1-remote-attestation-acceptance.txt`. See `.kilo/plans/assurance-construction-remote-attestation-checkpoint.md`.
+
+**Checkpoint:** `.kilo/plans/assurance-construction-remote-attestation-checkpoint.md`
+
+**DO-NOT-REPEAT:** do not derive parity from the local tracking ref; do not convert `UNVERIFIED` to `PASS`; do not remove the FINALIZE attestation barrier or weaken the equality assertion; do not build a duplicate Git engine; do not `git reset --hard`/`git clean`; do not stage unrelated worktree files.
 
 ---
 
