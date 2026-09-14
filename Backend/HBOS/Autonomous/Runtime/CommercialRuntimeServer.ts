@@ -8,6 +8,7 @@ import { ReasoningEngine } from "../../Engines/ReasoningEngine";
 import { ReportsEngine, SUPPORTED_REPORT_FORMATS, type ReportFormat, type ReportSection } from "../../Engines/ReportsEngine";
 import { FinancialDataIngestionAdapter, type FinancialCanonicalModel, type FinancialSourceEvidence } from "../../Product/FinancialDataIngestionAdapter";
 import { FinancialIngestionService, IngestionFormat, SUPPORTED_INGESTION_FORMATS } from "../../Product/FinancialIngestionService";
+import { SyncStateStore } from "../../Product/SyncStateStore";
 import { FinancialStatementAnalysisService } from "../../Product/FinancialStatementAnalysisService";
 import { SecurityEventLogger } from "../../Entities/SecurityEventLogger";
 import { ExecutiveIntelligenceWorkbench, ExecutiveIntelligenceWorkbenchInput, ExecutiveIntelligenceWorkbenchResult } from "../../Product/ExecutiveIntelligenceWorkbench";
@@ -306,6 +307,10 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     const persistence = new SQLitePersistenceStore({ databasePath: options.databasePath ?? process.env.HOOSHYAR_DB_PATH ?? "data/hooshyar.sqlite" });
     const ingestion = new FinancialDataIngestionAdapter(persistence);
     const ingestionService = new FinancialIngestionService(persistence, ingestion);
+    // Canonical tenant-scoped sync-cursor owner (Stage 08-GOV.3). Wired here so
+    // every ingestion advances a durable per-(tenant, source) watermark that the
+    // offline/online client path can reconcile against.
+    const syncState = new SyncStateStore(persistence);
     const reasoning = options.reasoning ?? new ReasoningEngine();
     const analysis = new FinancialStatementAnalysisService(new FinancialIntelligenceEngine(), reasoning);
     const executiveWorkbench = new ExecutiveIntelligenceWorkbench(new ExecutiveIntelligenceEngine());
@@ -543,9 +548,10 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 return res.end();
             }
             if (req.method === "GET" && path === "/health") return corsJson(200, { status: "ok", service: "hooshyar-commercial-runtime" });
-            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "financial-analytics", "ingested-source-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-workbench", "decision-workbench", "expert-choice", "organizational-execution", "governed-approval", "work-item-lifecycle", "kpi-outcome", "reports", "reports-export", "report-artifact-download", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "auth-rate-limiting", "rbac", "session-lifecycle", "request-observability", "bounded-pagination", "idempotency-keys"] });
+            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "financial-analytics", "ingested-source-analysis", "tenant-scoped-persistence", "offline-sync", "reasoning", "executive-intelligence-workbench", "decision-workbench", "expert-choice", "organizational-execution", "governed-approval", "work-item-lifecycle", "kpi-outcome", "reports", "reports-export", "report-artifact-download", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "auth-rate-limiting", "rbac", "session-lifecycle", "request-observability", "bounded-pagination", "idempotency-keys"] });
             if (req.method === "GET" && path === "/") return asset(res, "index.html", "text/html; charset=utf-8");
             if (req.method === "GET" && path === "/app.js") return asset(res, "app.js", "text/javascript; charset=utf-8");
+            if (req.method === "GET" && path === "/offline-sync.js") return asset(res, "offline-sync.js", "text/javascript; charset=utf-8");
             if (req.method === "GET" && path === "/styles.css") return asset(res, "styles.css", "text/css; charset=utf-8");
             if (req.method === "GET" && path === "/manifest.webmanifest") return asset(res, "manifest.webmanifest", "application/manifest+json; charset=utf-8");
             if (req.method === "GET" && path === "/sw.js") return asset(res, "sw.js", "text/javascript; charset=utf-8");
@@ -819,6 +825,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const assets = Number(body.assets);
                 const liabilities = Number(body.liabilities);
                 const ingested = await ingestionService.ingest(session.tenantId, { sourceName, format: "CSV", content: csv });
+                await syncState.recordSuccess(session.tenantId, ingested.result.evidence.sourceName, ingested.rawSourceRef.sha256);
                 const result = analysis.execute({ tenantId: session.tenantId, revenue: ingested.result.model.totals.credit, expenses: ingested.result.model.totals.debit, assets, liabilities, source: ingested.result.evidence });
                 if (result.status !== "READY") return corsJson(422, result);
                 await persistence.write({ tenantId: session.tenantId }, LATEST_ANALYSIS_KEY, result);
@@ -859,6 +866,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const ingestError = validateIngestBody(body);
                 if (ingestError) return corsJson(400, { error: ingestError });
                 return runIdempotent("ingest", body, async () => {
+                    const sourceKey = String(body.sourceName).trim();
                     try {
                         const outcome = await ingestionService.ingest(session.tenantId, {
                             sourceName: String(body.sourceName),
@@ -866,6 +874,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                             content: body.content === undefined ? undefined : String(body.content),
                             contentBase64: body.contentBase64 === undefined ? undefined : String(body.contentBase64)
                         });
+                        await syncState.recordSuccess(session.tenantId, sourceKey, outcome.rawSourceRef.sha256);
                         return {
                             status: 201,
                             payload: {
@@ -880,9 +889,32 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                         };
                     } catch (error) {
                         const message = error instanceof Error ? error.message : "INGESTION_FAILED";
+                        if (sourceKey) {
+                            try { await syncState.recordError(session.tenantId, sourceKey, message); } catch { /* cursor is evidence, never the ingestion result */ }
+                        }
                         return { status: 422, payload: { error: message } };
                     }
                 });
+            }
+
+            /**
+             * Tenant-scoped read of the canonical sync cursors owned by
+             * `SyncStateStore`. The offline client uses this to reconcile its
+             * queued work against the server-authoritative watermark. Without a
+             * `source` query the whole tenant cursor set is returned; with a
+             * `source` query a single cursor (or null) is returned.
+             */
+            if (req.method === "GET" && path === "/api/sync/state") {
+                if (!ensurePermission("READ_DASHBOARD")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                const sourceFilter = query.get("source");
+                if (sourceFilter !== null) {
+                    const sourceKey = sourceFilter.trim();
+                    if (!sourceKey) return corsJson(400, { error: "SYNC_SOURCE_REQUIRED" });
+                    const cursor = await syncState.get(session.tenantId, sourceKey);
+                    return corsJson(200, { status: "READY", tenantId: session.tenantId, sourceKey, cursor });
+                }
+                const cursors = await syncState.list(session.tenantId);
+                return corsJson(200, { status: "READY", tenantId: session.tenantId, cursors });
             }
 
             if (req.method === "GET" && path === "/api/sources") {

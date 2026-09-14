@@ -90,7 +90,7 @@ The prior audit (`platform-wide-commercialization-conformance-audit.md` §1–§
 
 | ID | Item | Class | Canonical owner | Value | Risk | State |
 |---|---|---|---|---|---|---|
-| C1 | Layer 11 offline/online sync | **REAL MISSING IMPLEMENTATION** | `Product/SyncStateStore.ts` (exists, unwired) | Product scope | MEDIUM | ACTIVE — reuse owner, do not rebuild |
+| C1 | Layer 11 offline/online sync | **REAL MISSING IMPLEMENTATION (repaired)** | `Product/SyncStateStore.ts` (reused, now wired) | Product scope | MEDIUM | **VERIFIED COMPLETE** (Stage 12) — owner wired into runtime + `GET /api/sync/state` + real web offline queue; no rebuild |
 | C2 | Layer 15 billing/entitlements | **EXTERNAL BLOCKER** | — | Commercial | — | BLOCKED_EXTERNAL_DEPENDENCY |
 | C3 | Enterprise connectors / PDF/DOCX/OCR ingestion | **INTEGRATION GAP (deliberate)** | `ConnectorRegistry`, `PdfAcquisition`, `DocxAcquisition` | Coverage | LOW | ACTIVE — not claimed; reuse before build |
 | C4 | Cloud/DNS/TLS/payment production resources | **EXTERNAL BLOCKER** | — | Deployment | — | BLOCKED_EXTERNAL_DEPENDENCY |
@@ -116,8 +116,8 @@ Scoring = commercial value, correctness, security, tenant isolation, runtime int
 8. ~~**E2 — OCR environment gap**~~ — **DONE (Stage 8, audit §39): OCR is deliberately unsupported; no dependency installed; adapter made fail-closed and boundary recorded; its suite now passes.** Safety: HIGH.
 9. ~~**F1/F2/F3 — flake containment**~~ — **DONE (Stage 9, audit §40): root causes proven (test budget; owner-level process hard-kill race; non-deterministic XLSX fixture); contained without hiding failures; full suite green twice (262/262).** Safety: HIGH.
 10. ~~**C8 — doc/registry drift reconciliation**~~ — **DONE (Stage 10, audit §41): `Docs/ARCHITECTURE.md` reconciled to repository truth (live `DecisionIntelligenceEngine`, `HealthMonitorEngine` identity, `IntelligenceEngine` boundary, `LifecycleManager` tier model); no runtime code changed.** Safety: HIGH.
-11. **C9 — construction-plane remote attestation**. Safety: MEDIUM.
-12. **C1 — offline sync** (larger). Safety: MEDIUM.
+11. ~~**C9 — construction-plane remote attestation**~~ — **DONE (Stage 11): independent `ls-remote` parity barrier on FINALIZE; real-remote acceptance 15/15 PASS.** Safety: MEDIUM.
+12. ~~**C1 — offline sync**~~ — **DONE (Stage 12): existing `SyncStateStore` owner wired into runtime + tenant-scoped `GET /api/sync/state` + real web offline queue with idempotent replay and server-authoritative conflict resolution; runtime/application acceptance 13/13 PASS.** Safety: MEDIUM.
 13. **C5 — encryption-at-rest** (ARCHITECTURE CHANGE CONTROL / human approval). BLOCKED.
 14. **C2/C4 — billing + cloud production** (EXTERNAL). BLOCKED.
 
@@ -157,4 +157,6 @@ Scoring = commercial value, correctness, security, tenant isolation, runtime int
 
 **`assurance.construction-remote-attestation`** — COMPLETE (Stage 11; C9). The construction `git` tool now performs independent remote attestation on `FINALIZE`: local HEAD is compared against the independently queried `git ls-remote origin refs/heads/<branch>` value, the local `origin/<branch>` tracking ref is report-only, and a non-`PASS` result (including unavailable/malformed remote ⇒ `UNVERIFIED`) fails closed as `GIT_REMOTE_ATTESTATION_FAILED`, blocking `AutonomousConstructionEngine` FINALIZE. Focused 13/13; construction regression 14 suites/30 tests; changed-file typecheck exit 0; real-repository acceptance 15/15 checks PASS against the live remote. See `.kilo/plans/assurance-construction-remote-attestation-checkpoint.md`.
 
-**Next selected stage: `product.offline-sync` (C1)** — wire the existing `SyncStateStore` owner (no rebuild); Stage 12. See the execution queue. K2 must not be started until this checkpoint is committed and pushed and a new trusted checkpoint is recorded.
+**`product.offline-sync`** — COMPLETE (Stage 12; C1). The existing `SyncStateStore` owner is now wired into the real product/runtime path: `/api/ingest` and `/api/analyze` record durable per-(tenant, source) cursors; tenant-scoped `GET /api/sync/state[?source=]` exposes them (owner gained only an additive `list()`); `/api/ready` advertises `offline-sync`; and the real web client (`web/offline-sync.js`, used by `web/app.js`) persists work before any request, retains it on network loss, replays idempotently on reconnect and resolves conflicts server-authoritatively. Focused 4 suites/28 tests; runtime/ingestion regression 8 suites/85 tests; architecture/qualification regression 8 suites/30 tests; changed-file typecheck exit 0; real runtime + real client over real HTTP acceptance **13/13 PASS** (`.kilo/evidence/stage12-k2-offline-sync-acceptance.txt`). See `.kilo/plans/product-offline-sync-checkpoint.md`.
+
+**Next selected stage: K3 `assurance.completion-audit-integrity`** (Stage 13) — strengthen the completion gate so it refuses to report completion from markers alone. See Audit Memory §15.1. K3 must not be started until this checkpoint is committed and pushed and a new trusted checkpoint is recorded.

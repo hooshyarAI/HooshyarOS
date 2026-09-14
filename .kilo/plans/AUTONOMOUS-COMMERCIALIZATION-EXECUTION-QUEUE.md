@@ -37,7 +37,7 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 | 9 | `assurance.flake-containment` | F1,F2,F3 | Analyze + contain parallel-load resource contention (measured test budgets / owner lifecycle) without hiding real failures | test files + `KiloCodeExecutionAdapter` | HIGH | **COMPLETE** |
 | 10 | `standardization.architecture-doc-registry-reconciliation` | C8 | Reconcile LifecycleManager tier drift + stale dormant labels to repository truth | `Docs/ARCHITECTURE.md` | HIGH | **COMPLETE** |
 | 11 | `assurance.construction-remote-attestation` | C9 | Independent GitHub-remote verification at phase end | `LocalConstructionToolset` | MEDIUM | **COMPLETE** |
-| 12 | `product.offline-sync` | C1 | Wire existing `SyncStateStore` owner (no rebuild) | `Product/SyncStateStore.ts` | MEDIUM | PLANNED |
+| 12 | `product.offline-sync` | C1 | Wire existing `SyncStateStore` owner (no rebuild) | `Product/SyncStateStore.ts` | MEDIUM | **COMPLETE** |
 | — | `security.encryption-at-rest` | C5 | BLOCKED — ARCHITECTURE CHANGE CONTROL / pending human 05C approval | 05C decisions | — | BLOCKED |
 | — | `product.billing-entitlements` | C2 | BLOCKED_EXTERNAL_DEPENDENCY (payment provider account/webhook) | — | — | BLOCKED_EXTERNAL |
 | — | `deployment.cloud-production` | C4 | BLOCKED_EXTERNAL_DEPENDENCY (cloud/DNS/TLS credentials) | — | — | BLOCKED_EXTERNAL |
@@ -283,6 +283,26 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 **Checkpoint:** `.kilo/plans/assurance-construction-remote-attestation-checkpoint.md`
 
 **DO-NOT-REPEAT:** do not derive parity from the local tracking ref; do not convert `UNVERIFIED` to `PASS`; do not remove the FINALIZE attestation barrier or weaken the equality assertion; do not build a duplicate Git engine; do not `git reset --hard`/`git clean`; do not stage unrelated worktree files.
+
+---
+
+## Stage 12 — `product.offline-sync`
+
+**State:** COMPLETE
+**Baseline SHA:** `8fd6f5222d2cd089817fb4d1e2a20fc922579e41`
+**Classification:** REAL MISSING PRODUCT CAPABILITY (Layer 11) — the canonical `SyncStateStore` owner existed but was unwired (no runtime import, no route, no client sync, no conflict resolution).
+
+**DISCOVER / INSPECT (done):**
+- `SyncStateStore` referenced only by itself and `SyncStateStore.test.ts`; `web/sw.js` cached the app shell only and bypassed `/api/`; `web/app.js` lost uploaded work on a network failure.
+- Persistence/recovery contracts already existed (`SQLitePersistenceStore`); no new persistence layer needed.
+
+**Repair (reuse the owner, no rebuild):** additive `SyncStateStore.list()`; runtime records a durable per-(tenant, source) cursor on `/api/ingest`/`/api/analyze`, exposes tenant-scoped `GET /api/sync/state[?source=]`, advertises `offline-sync` in `/api/ready`, and serves the real client transport; `web/offline-sync.js` provides a durable offline queue, idempotent replay, server-cursor reconciliation and `server-authoritative` conflict resolution, wired into `web/app.js` (queue-on-network-loss + flush-on-reconnect), `web/index.html` and the service-worker shell.
+
+**Evidence:** focused 4 suites/28 tests; runtime/ingestion regression 8 suites/85 tests; architecture/qualification regression 8 suites/30 tests; changed-file typecheck exit 0; real runtime + real client over real HTTP acceptance **13/13 PASS** (`.kilo/evidence/stage12-k2-offline-sync-acceptance.txt`). See `.kilo/plans/product-offline-sync-checkpoint.md`.
+
+**Checkpoint:** `.kilo/plans/product-offline-sync-checkpoint.md`
+
+**DO-NOT-REPEAT:** do not build a second sync store/engine or a server-side offline queue; do not derive conflict authority from client state; do not drop queued work on a transient/offline failure; do not modify `FinancialDataIngestionAdapter.ts`; do not stage unrelated worktree files.
 
 ---
 

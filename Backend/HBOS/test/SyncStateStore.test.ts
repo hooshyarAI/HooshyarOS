@@ -76,4 +76,36 @@ describe("SyncStateStore (Stage 08-GOV.3)", () => {
     expect(back?.lastWatermark).toBe("wm-durable");
     store2.close();
   });
+
+  test("list enumerates the tenant's cursors with source keys", async () => {
+    await sync.recordSuccess("t1", "a.csv", "wm-a");
+    await sync.recordSuccess("t1", "b.csv", "wm-b");
+    const entries = await sync.list("t1");
+    expect(entries.map(e => e.sourceKey).sort()).toEqual(["a.csv", "b.csv"]);
+    expect(entries.find(e => e.sourceKey === "a.csv")?.cursor.lastWatermark).toBe("wm-a");
+    expect(entries.find(e => e.sourceKey === "b.csv")?.cursor.lastSuccessAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  test("list returns empty for a tenant with no cursors", async () => {
+    expect(await sync.list("t-empty")).toEqual([]);
+  });
+
+  test("list is tenant-scoped (cross-tenant isolation)", async () => {
+    await sync.recordSuccess("t1", "src", "wm-1");
+    expect(await sync.list("t2")).toEqual([]);
+  });
+
+  test("list reflects an error cursor without losing the last success watermark", async () => {
+    await sync.recordSuccess("t1", "src", "wm-1");
+    await sync.recordError("t1", "src", "boom");
+    const entries = await sync.list("t1");
+    expect(entries).toHaveLength(1);
+    expect(entries[0].cursor.lastWatermark).toBe("wm-1");
+    expect(entries[0].cursor.lastError).toBe("boom");
+    expect(entries[0].cursor.lastErrorAt).toBeDefined();
+  });
+
+  test("list rejects empty tenant", async () => {
+    await expect(sync.list("")).rejects.toThrow(SYNC_STATE_ERROR_CODES.TENANT_REQUIRED);
+  });
 });

@@ -21,6 +21,48 @@ function rotateIdempotencyKey(scope) {
   idempotencyKeys.delete(scope);
 }
 
+const offlineSync = typeof window !== 'undefined' && window.HooshyarOfflineSync
+  ? window.HooshyarOfflineSync.createOfflineSync({ storage: window.localStorage })
+  : null;
+
+const lastSyncCursors = new Map();
+
+function isOfflineError(error) {
+  return (typeof navigator !== 'undefined' && navigator.onLine === false) || error instanceof TypeError;
+}
+
+async function refreshSyncState() {
+  if (!offlineSync) return;
+  try {
+    const state = await offlineSync.serverState();
+    lastSyncCursors.clear();
+    for (const entry of state.cursors || []) lastSyncCursors.set(entry.sourceKey, entry.cursor.lastWatermark);
+  } catch {
+    /* server state is a reconciliation aid, not a hard requirement */
+  }
+}
+
+async function flushOfflineQueue() {
+  if (!offlineSync) return;
+  try {
+    const report = await offlineSync.sync();
+    if (report.attempted > 0) {
+      const target = document.querySelector('#analysis-result');
+      if (report.pending === 0 && report.rejected.length === 0) {
+        const conflicts = report.conflicts.length ? ` (${report.conflicts.length} تعارض با مرجع سرور حل شد)` : '';
+        target.textContent = `همگام‌سازی آفلاین: ${report.synced.length} مورد ارسال شد${conflicts}.`;
+      } else if (report.status === 'OFFLINE') {
+        target.textContent = `اتصال هنوز برقرار نیست؛ ${report.pending} مورد در صف آفلاین باقی ماند.`;
+      } else if (report.rejected.length) {
+        target.textContent = `همگام‌سازی: ${report.synced.length} موفق، ${report.rejected.length} رد شد.`;
+      }
+      await refreshDashboard();
+    }
+  } finally {
+    await refreshSyncState();
+  }
+}
+
 function text(value) {
   return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
 }
@@ -118,12 +160,27 @@ document.querySelector('#analysis-form').addEventListener('submit', async event 
     const ingestBody = { sourceName: file.name, format };
     if (format === 'XLSX') ingestBody.contentBase64 = await fileToBase64(file);
     else ingestBody.content = await file.text();
-    const ingested = await getJson('/api/ingest', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'idempotency-key': idempotencyKey('ingest') },
-      body: JSON.stringify(ingestBody)
-    });
-    rotateIdempotencyKey('ingest');
+    let ingested;
+    try {
+      ingested = await getJson('/api/ingest', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'idempotency-key': idempotencyKey('ingest') },
+        body: JSON.stringify(ingestBody)
+      });
+      rotateIdempotencyKey('ingest');
+    } catch (error) {
+      if (offlineSync && isOfflineError(error)) {
+        offlineSync.enqueue({
+          ...ingestBody,
+          baseWatermark: lastSyncCursors.get(file.name) || null,
+          idempotencyKey: idempotencyKey('ingest')
+        });
+        rotateIdempotencyKey('ingest');
+        result.textContent = 'اتصال در دسترس نیست؛ کار در صف آفلاین ذخیره شد و پس از برقراری اتصال خودکار همگام‌سازی می‌شود.';
+        return;
+      }
+      throw error;
+    }
     const analysis = await getJson('/api/financial/analyze', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -558,5 +615,7 @@ document.querySelector('#analytics-form').addEventListener('submit', async event
 });
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => undefined);
+if (typeof window !== 'undefined') window.addEventListener('online', () => { flushOfflineQueue(); });
 refreshSessionState();
 refreshDashboard();
+refreshSyncState();

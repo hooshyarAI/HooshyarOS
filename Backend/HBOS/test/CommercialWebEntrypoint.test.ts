@@ -54,11 +54,13 @@ describe("Commercial web entrypoint", () => {
         const app = await request(port, "/app.js");
         const styles = await request(port, "/styles.css");
         const manifest = await request(port, "/manifest.webmanifest");
+        const offlineSync = await request(port, "/offline-sync.js");
 
         expect(home.status).toBe(200);
         expect(home.contentType).toContain("text/html");
         expect(home.body).toContain("هوشیار.ai");
         expect(home.body).toContain("/app.js");
+        expect(home.body).toContain("/offline-sync.js");
         expect(home.body).toContain("/manifest.webmanifest");
         expect(home.body).toContain("register-form");
         expect(home.body).toContain("login-form");
@@ -71,6 +73,13 @@ describe("Commercial web entrypoint", () => {
         expect(app.body).toContain("/api/auth/register");
         expect(app.body).toContain("/api/auth/login");
         expect(app.body).toContain("/api/auth/logout");
+        expect(app.body).toContain("HooshyarOfflineSync");
+
+        expect(offlineSync.status).toBe(200);
+        expect(offlineSync.contentType).toContain("text/javascript");
+        expect(offlineSync.body).toContain("createOfflineSync");
+        expect(offlineSync.body).toContain("/api/ingest");
+        expect(offlineSync.body).toContain("/api/sync/state");
 
         expect(styles.status).toBe(200);
         expect(styles.contentType).toContain("text/css");

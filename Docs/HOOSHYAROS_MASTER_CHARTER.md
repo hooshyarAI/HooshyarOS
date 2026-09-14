@@ -507,53 +507,46 @@ A future autonomous cycle MUST be able to answer from this memory:
 4. What is externally blocked?
 5. What is the next dependency-ready knot?
 
-#### 15.1.1 Current Audit Baseline — `fresh-governed-commercialization-2026-09-14`
+#### 15.1.1 Current Audit Baseline — `post-k2-offline-sync-reaudit-2026-09-14`
 
 | Field | Value |
 |---|---|
-| AUDIT ID | `fresh-governed-commercialization-2026-09-14` |
+| AUDIT ID | `post-k2-offline-sync-reaudit-2026-09-14` |
 | DATE | 2026-09-14 |
-| AUDIT ARTIFACT (evidence source) | `.kilo/plans/fresh-governed-commercialization-reaudit-2026-09-14.md` |
-| TRUSTED CHECKPOINT | `977ea944e1bf3adfe3cbc4f25bfed832db7083bb` |
-| QUEUE STATUS | CURRENT but INCOMPLETE |
-| VERIFIED STAGES | Stages 1–10, through HEAD `977ea944` |
-| NEXT DEPENDENCY-READY KNOT | K1 `assurance.construction-remote-attestation` |
+| AUDIT ARTIFACT (evidence source) | `.kilo/plans/post-k2-bounded-reaudit-2026-09-14.md` |
+| TYPE | Bounded delta re-audit (post-K2); prior baseline preserved in §15.1.2 |
+| PRE-CHANGE TRUSTED CHECKPOINT | `8fd6f5222d2cd089817fb4d1e2a20fc922579e41` |
+| QUEUE STATUS | CURRENT — stages 1–12 COMPLETE; K3 next |
+| VERIFIED STAGES | Stages 1–12 (through Stage 12 K2) |
+| NEXT DEPENDENCY-READY KNOT | K3 `assurance.completion-audit-integrity` (Stage 13) |
 
 Completion states recorded by that audit:
 
 | State | Value |
 |---|---|
-| `assistantComplete` | TRUE (functionally; K1 remote-attestation gap remains) |
+| `assistantComplete` | TRUE (functionally) |
 | `canonicalPlatformConstructionComplete` | FALSE |
 | `commercialProductRuntimeComplete` | FALSE |
 | `externalProductionDependenciesComplete` | FALSE |
 | `productComplete` | FALSE |
 
-Remaining repository-local knots: **4 primary (K1–K4)** and **3 conditional (K5–K7)**.
+Remaining repository-local knots: **2 primary (K3–K4)** and **3 conditional (K5–K7)**.
 
 | ID | Knot | Class | Status | Stage |
 |---|---|---|---|---|
-| K1 | `assurance.construction-remote-attestation` | Primary — governance/construction-integrity gap | Remaining | 11 |
-| K2 | `product.offline-sync` | Primary — real missing product capability (Layer 11) | Remaining | 12 |
 | K3 | `assurance.completion-audit-integrity` | Primary — completion-audit false-positive risk | Remaining | 13 |
 | K4 | `standardization.governance-operator-reconciliation` | Primary — docs-only consistency | Remaining | 14 |
 | K5 | `commercial.subscription-entitlements` (repo-local boundary only) | Conditional — scope-gated | Conditional | 15 |
 | K6 | `assurance.android-build-test-evidence` | Conditional — scope/environment | Conditional | 16 |
 | K7 | `assurance.runtime-server-unit-coverage` | Conditional — LOW test-coverage gap | Conditional | 17 |
 
-Blocked items: **3 core external/approval blockers (B1–B3)** and **2 environment/host blockers (B4–B5)**.
+Closed since the prior baseline: **K1** `assurance.construction-remote-attestation` (Stage 11) and **K2** `product.offline-sync` (Stage 12). Layer 11 offline/online is now repository-local complete: the canonical `SyncStateStore` owner is wired into the runtime (`/api/ingest`, `/api/analyze`, `GET /api/sync/state`, `/api/ready` capability) and the real web client (durable queue, idempotent replay, server-authoritative conflict resolution). Evidence: `.kilo/plans/product-offline-sync-checkpoint.md`, `.kilo/evidence/stage12-k2-offline-sync-acceptance.txt` (13/13 PASS).
 
-| ID | Blocker | Class |
-|---|---|---|
-| B1 | Encryption-at-rest wiring into the production store + key management | Architecture change control / pending human 05C decisions |
-| B2 | Payment-provider activation | `BLOCKED_EXTERNAL_DEPENDENCY` |
-| B3 | Production cloud / DNS / TLS resources | `BLOCKED_EXTERNAL_DEPENDENCY` |
-| B4 | Android device acceptance | External (device) |
-| B5 | Inno Setup 6 build host | Environment/host |
+External/approval blockers unchanged: **B1** encryption-at-rest/key management (architecture change control / pending human 05C decisions), **B2** payment-provider activation, **B3** production cloud/DNS/TLS resources, **B4** Android device acceptance, **B5** Inno Setup host.
 
-Valid next stages from this baseline: Stage 11 = K1 `assurance.construction-remote-attestation`; Stage 12 (K2) remains valid; K3 SHOULD become Stage 13; K4 SHOULD become Stage 14; K5–K7 remain conditional. No stage may be skipped, invented or reordered without a new evidence-backed audit delta.
+Valid next stages from this baseline: Stage 13 = K3 `assurance.completion-audit-integrity`; Stage 14 (K4) remains valid; K5–K7 remain conditional. No stage may be skipped, invented or reordered without a new evidence-backed audit delta.
 
-Proven by the 2026-09-14 audit (headline finding): the autonomous completion gate (`CanonicalCapabilityAudit.ts`, `CommercialProductCompletionAudit.ts`, composed by `AutonomousBuildDaemon.ts`) derives completion from file existence, contract-marker strings and regex method-name probes rather than runtime/application/acceptance evidence. This is a genuine false-positive risk against Governance Charter §15 and is registered as knot K3. It was recorded, not silently modified.
+Provenance of K3 (retained from the prior baseline): the autonomous completion gate (`CanonicalCapabilityAudit.ts`, `CommercialProductCompletionAudit.ts`, composed by `AutonomousBuildDaemon.ts`) derives completion from file existence, contract-marker strings and regex method-name probes rather than runtime/application/acceptance evidence — a genuine false-positive risk against Governance Charter §15. It was recorded, not silently modified.
 
 #### 15.1.2 Historical Audit / Verification Records (evidenced only)
 
@@ -564,7 +557,8 @@ Only records whose completion is supported by their own artifact and/or a verifi
 | `.kilo/plans/platform-wide-commercialization-conformance-audit.md` | `c2fd5733` | COMPLETE (audit); prior principal conformance audit; `product.secure-identity-bootstrap` VERIFIED; `EngineDependencyVerifier` REPAIRED/VERIFIED (§30) |
 | `.kilo/plans/commercialization-standardization-master-plan.md` | `68ddc9c1` | ACTIVE; phases 1–14 reconciliation recorded (Phase 10 = CONDITIONAL PASS) |
 | `.kilo/plans/ACTIVE-COMMERCIALIZATION-MASTER-LEDGER.md` | audit HEAD `a0f0018c` | stages 1–10 recorded VERIFIED (checkpoint-backed) |
-| `.kilo/plans/AUTONOMOUS-COMMERCIALIZATION-EXECUTION-QUEUE.md` | derived from ledger | stages 1–10 COMPLETE; 11–12 PLANNED; 3 BLOCKED; INCOMPLETE vs K3–K7 |
+| `.kilo/plans/AUTONOMOUS-COMMERCIALIZATION-EXECUTION-QUEUE.md` | derived from ledger | stages 1–12 COMPLETE; Stage 13 (K3) next; B1–B5 BLOCKED; INCOMPLETE vs K3–K7 |
+| `.kilo/plans/fresh-governed-commercialization-reaudit-2026-09-14.md` (baseline `fresh-governed-commercialization-2026-09-14`, checkpoint `977ea944`) | `977ea944` | SUPERSEDED by `post-k2-offline-sync-reaudit-2026-09-14`; recorded knots K1–K4/K5–K7 and blockers B1–B5; K1 and K2 later closed (Stages 11–12) |
 | `.kilo/plans/phase-11-final-checkpoint.md` | `8ed51f0e` | declared VERIFIED; its `canonicalPlatformConstructionComplete: true` claim is SUPERSEDED by later evidence (`phase-14-final-checkpoint.md` and the 2026-09-14 audit both record FALSE) |
 | `.kilo/plans/phase-12-final-checkpoint.md` | `849f5709` | VERIFIED; local == remote TRUE |
 | `.kilo/plans/phase-13-final-checkpoint.md` | `ed754200` | VERIFIED; remote synchronization confirmed in artifact |
