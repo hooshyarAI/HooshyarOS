@@ -1,0 +1,174 @@
+INSTALLATION-READY ARTIFACT EVIDENCE (bounded delta under Audit Memory 15.1.1)
+================================================================================
+AUDIT DELTA ID : stage15-k8-installer-rebuild-installation-ready-2026-09-15
+DATE           : 2026-09-15
+TYPE           : Bounded artifact-rebuild + re-acceptance delta. Does NOT reopen the
+                 completed Stage-15 K8 acceptance and does NOT create a new stage.
+K8 STATE       : PRESERVED (K8 productization.installed-product-acceptance = VERIFIED)
+
+1. VERIFIED SOURCE COMMIT
+================================================================================
+git rev-parse HEAD                                   = 6afbd28b8afe0adb491719b6983e8a85f45a7225
+git rev-parse origin/fix/autonomous-product-factory  = 6afbd28b8afe0adb491719b6983e8a85f45a7225
+git ls-remote origin refs/heads/fix/autonomous-product-factory
+                                                     = 6afbd28b8afe0adb491719b6983e8a85f45a7225
+git ls-remote origin refs/pull/112/head              = 6afbd28b8afe0adb491719b6983e8a85f45a7225
+(bare `git ls-remote origin HEAD` returns 99542164... because that is refs/heads/main,
+ unrelated to the tracked branch and not a divergence of the verified commit.)
+Commit subject: fix(productization): establish end-to-end commercial acceptance barrier
+
+2. B5 REAL HOST STATUS (corrected)
+================================================================================
+Prior record (Master Charter 15.1.1a, blocker-b1-b5-readiness-delta-2026-09-14) classified
+B5 as BLOCKED_ENVIRONMENT: "no Inno Setup 6 host". That probe checked only Program Files
+and missed the per-user install location. Deterministic host-wide re-probe (2026-09-15):
+
+  C:\Users\avalipour\AppData\Local\Programs\Inno Setup 6\ISCC.exe   = PRESENT
+  HKLM/HKCU Uninstall -> DisplayName "Inno Setup version 6.7.3"     = PRESENT
+                         InstallLocation C:\Users\avalipour\AppData\Local\Programs\Inno Setup 6\
+  C:\Program Files (x86)\Inno Setup 6\ISCC.exe                       = absent
+  C:\Program Files\Inno Setup 6\ISCC.exe                             = absent
+  Program Files / (x86) / LocalAppData "Inno Setup 5"                 = absent
+  Get-Command ISCC.exe / where.exe ISCC.exe                           = not found (not on PATH)
+
+RESULT: B5 is NOT blocked on this host. Inno Setup 6.7.3 is installed and functional
+(this rebuild compiled two real installers with it). B5 remains a build-HOST prerequisite
+only: a host without Inno Setup 6 still cannot compile the installer. The Inno Setup 6.7.3
+compiler itself reports "Non-commercial use only", which is a licensing consideration for
+commercial distribution, not a build blocker.
+
+3. INSTALLER BUILD (clean isolated source)
+================================================================================
+Build source: git worktree --detach 6afbd28b in an isolated directory outside the repo
+(no reuse of the possibly-dirty main working tree; no `git reset`/`clean`/`stash`).
+Dependency closure: `npm ci --ignore-scripts` from the COMMITTED package-lock.json
+(626 packages). The only install script skipped is better-sqlite3's node-gyp rebuild; the
+package ships working prebuilds (node_modules/better-sqlite3/prebuilds/win32-x64.node,
+Node ABI 137) and was verified functional (`new Database(':memory:')` + DDL OK). Note: the
+runtime's persistence uses Node's built-in node:sqlite, so better-sqlite3 is not on the
+critical runtime path.
+Payload builder: `python Backend/AI_Runtime/release_product_builder.py` (exit 0). Its own
+behavioral `_validate_windows_payload` gate passed: bundled node.exe resolved
+exceljs-hardened/mammoth/pdf-parse/better-sqlite3 from the packaged context AND the packaged
+commercial runtime reached a real /health before the payload was accepted (5472 files, 258 MB).
+Installer compiler: ISCC.exe 6.7.3 via `scripts/build-windows-installer.ps1` (exit 0).
+Clean-tree check before build: `git diff 6afbd28b -- web Backend installer` = empty.
+
+PAYLOAD FIDELITY (payload copy vs verified-commit source, SHA-256 equal)
+  web/app.js                                                  MATCH
+  web/offline-sync.js                                         MATCH
+  Backend/HBOS/Autonomous/Runtime/start-commercial-runtime.ts MATCH
+Repaired-client markers present in payload: resolveIngestRequest (app.js), classifyFailure
+and STORAGE_QUOTA_FAILURE (offline-sync.js); forbidden "error instanceof TypeError" absent.
+
+4. INSTALLER ARTIFACT (installation-ready)
+================================================================================
+PRODUCTION INSTALLER
+  path   : D:\HooshyarOS\dist\productization\windows\installer\HooshyarOS-Setup-1.0.0.exe
+  bytes  : 57452433
+  sha256 : 2235C85648E588B506B38F879709A08DB2E160E4587600895AEA829737796E4F
+  authenticode : NotSigned (no code-signing certificate on this host)
+PREVIOUS ARTIFACT PRESERVED (not destroyed):
+  D:\HooshyarOS\dist\productization\windows\installer\HooshyarOS-Setup-1.0.0.pre-rebuild-2026-09-15.exe
+  (31143706 bytes)
+BOOTSTRAP ARCHIVE
+  path   : D:\HooshyarOS\dist\productization\windows\HooshyarOS-Windows-Bootstrap.zip
+  bytes  : 93754748
+  sha256 : E07A3CD3BA724A02D99442939838C93011B57E5F68B2B6EB590A0A1429EC5940
+MANIFEST (payload/product-manifest.json)
+  {"name":"HooshyarOS","runtime":"Backend/HBOS/Autonomous/Runtime/start-commercial-runtime.ts","health":"/health","web":"web/index.html"}
+
+5. INSTALLED-PRODUCT ACCEPTANCE (against the newly built artifact)
+================================================================================
+Command : node scripts/installed-product-acceptance.cjs   (exit code 0)
+Location: C:\Users\avalipour\AppData\Local\Programs\HooshyarOS-Acceptance
+          (isolated AppId + isolated dir; the user's real installation was NOT touched)
+Isolated acceptance installer: HooshyarOS-Acceptance-Setup.exe
+  bytes  : 57452478
+  sha256 : 21F1B7EF40AD0E7871FF251DC3529DAC8E9C658B1282A3804C80DE69FE61C985
+Evidence: .hooshyar/installed-product-acceptance.json (in the isolated build worktree)
+  type            : INSTALLED_PRODUCT_ACCEPTANCE
+  status          : PASS
+  createdAt       : 2026-09-15T08:17:08.866Z
+  commit          : 6afbd28b8afe0adb491719b6983e8a85f45a7225
+  launcherHealthy : true
+  runtimeDependenciesVerified : true
+  repairedClientInstalled     : true
+  sourceSha256    : d74b461f090fa4cb0870bb69e617dabe6f6a7b85e122e27bc4ca0147a0aa7e8f
+  profit          : 200
+  checks (16/16)  : health, ready, web-shell, register, session, pdf-boundary, ingest,
+                    analysis, dashboard, sources, tenant-isolation, offline-queue,
+                    offline-reload, offline-reconnect, restart-recovery, persistence
+
+INSTALLED PAYLOAD FIDELITY (installed files vs verified-commit source, SHA-256 equal)
+  web/app.js                                                  MATCH
+  web/offline-sync.js                                         MATCH
+  Backend/HBOS/Autonomous/Runtime/start-commercial-runtime.ts MATCH
+
+NO MOCKS: every check drove the real installed runtime over HTTP; PDF boundary is enforced
+by the real /api/ingest (400 INGEST_FORMAT_UNSUPPORTED); the offline transport used the real
+shipped web/offline-sync.js module; restart/recovery killed port 4173 and relaunched through
+the real installed shortcut target. Launcher acceptance still requires both a real /health
+success AND a clean launcher exit (exit code 0) with no fixed-delay substitution.
+
+6. NEW DELTA - additional bounded acceptance-harness robustness defects (K8 scope, not product)
+================================================================================
+Two additional defects were found in `scripts/installed-product-acceptance.cjs` while
+re-accepting the rebuilt artifact. Both are test-infrastructure robustness defects; neither
+weakens any acceptance criterion and neither changes product code.
+
+D1 - isolated acceptance installer auto-launch races the harness launch:
+  The generated isolated .iss inherited `[Run] ... Flags: runhidden nowait`, so the silent
+  acceptance install auto-started a runtime that opened the same <app>\data\hooshyar.sqlite
+  while the harness started its own runtime. Observed failure:
+    Error: database is locked  (ERR_SQLITE_ERROR, errcode 5)
+    at new SQLitePersistenceStore (Backend/HBOS/Product/SQLitePersistenceStore.ts:21)
+  -> the runtime exited before becoming healthy.
+  Repair: append `skipifsilent` to the generated ISOLATED installer's [Run] line only. The
+  production installer (installer/HooshyarOS.iss) is unchanged and still auto-launches for
+  interactive users. The harness's real-shortcut launch becomes the single deterministic launch.
+
+D2 - launcher exit event could be missed (TOCTOU):
+  `waitLauncherExit()` attached `child.once('exit')` only AFTER `waitHealth()`. When the
+  launcher exits immediately after health (measured: 243 ms after health, exit 0), the exit
+  event could fire before the listener was attached, so the promise resolved only via its
+  bounded 5 s timer and reported a false "shortcut launcher did not exit".
+  Repair: capture the child exit promise at spawn time (`launchInstalledShortcut`) and have
+  `waitLauncherExit` resolve from it. The bounded window and the requirement for exit code 0
+  are unchanged.
+
+Verification after repair: acceptance exit code 0, PASS, 16/16. Independent controlled
+launcher measurement (real installed shortcut): health in 3007 ms, launcher exit 243 ms after
+health, exit code 0.
+
+7. COMPLETION STATE / REMAINING BLOCKERS
+================================================================================
+Completion states: UNCHANGED - assistantComplete TRUE (functionally),
+canonicalPlatformConstructionComplete FALSE, commercialProductRuntimeComplete FALSE,
+externalProductionDependenciesComplete FALSE, productComplete FALSE.
+  B1 encryption-at-rest / key management : BLOCKED_HUMAN_APPROVAL (unchanged)
+  B2 payment-provider activation          : BLOCKED_EXTERNAL (unchanged)
+  B3 production cloud/DNS/TLS resources   : BLOCKED_EXTERNAL (unchanged)
+  B4 Android device acceptance            : BLOCKED_ENVIRONMENT (unchanged)
+  B5 Inno Setup build host                : AVAILABLE ON THIS HOST (corrected); prerequisite
+                                            only for hosts without Inno Setup 6
+  New observation (not a prior classified blocker): the installer is Authenticode-NotSigned;
+  a code-signing certificate is an external prerequisite for signed distribution.
+
+8. DOES THE USER'S EXISTING INSTALLATION NEED REPLACEMENT?
+================================================================================
+YES. The user's existing installation at
+  C:\Users\avalipour\AppData\Local\Programs\HooshyarOS
+predates the current fixes and was NOT modified or re-installed by this audit (all
+acceptance ran in the separate HooshyarOS-Acceptance location). To obtain the repaired
+runtime/client, reinstall with the verified artifact above. The installer performs no
+[InstallDelete] and [UninstallDelete] applies only on uninstall, so an in-place upgrade is
+expected to retain {app}\data\hooshyar.sqlite; back up that file first as a precaution.
+
+9. K8 PRESERVATION
+================================================================================
+The completed Stage-15 K8 verification (`.kilo/plans/stage15-k8-installed-product-acceptance-checkpoint.md`,
+evidence `.kilo/evidence/stage15-k8-installed-product-acceptance.txt`) remains VERIFIED and is
+not reopened. This delta adds the rebuilt installation-ready artifact, the B5 host correction,
+and two bounded harness robustness repairs. No new stage was created and no queue/ledger/stage
+was advanced.

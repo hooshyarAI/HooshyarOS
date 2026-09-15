@@ -1,0 +1,172 @@
+# HooshyarOS — Active Commercialization Master Ledger
+
+**Program:** Autonomous Commercialization & Standardization
+**Branch:** `fix/autonomous-product-factory`
+**Fresh-audit HEAD:** `a0f0018c43f910c7dcd5e4c025bd2b2a74ec27a8`
+**Remote parity at audit:** `local == origin/fix/autonomous-product-factory == ls-remote == a0f0018c` (verified)
+**Architecture baseline:** Architecture Freeze V4.1
+**Audit method:** fresh repository-wide re-audit from current HEAD; executed evidence over prior classifications; prior audit §30/§31 re-verified, not copied.
+**Companion queue:** `.kilo/plans/AUTONOMOUS-COMMERCIALIZATION-EXECUTION-QUEUE.md`
+**Stage 1 status:** `assurance.stale-test-reconciliation` **EXECUTED and VERIFIED** — V1–V5 reconciled; full suite 255/259 suites, 1943/1945 tests (remaining 4 failures are E1, E2, F1, the last Kilo/pid-file adapter). See audit §32 and `.kilo/plans/assurance-stale-test-reconciliation-checkpoint.md`.
+**Stage 2 status:** `assurance.local-folder-watcher-lifecycle` **EXECUTED and VERIFIED** — the abort is a **REAL PRODUCT DEFECT**, not a flake: watching an 8.3 short path (`os.tmpdir()`) aborts libuv (`fs-event.c:72`, `0xC0000409`). Repaired in `LocalFolderWatcher.start()` by canonicalizing with `fs.realpath` before `fs.watch`. Focused 9/9 ×4, regression 37/37, typecheck exit 0, full suite 255/259 suites / 1951/1954 tests with `LocalFolderWatcher` now **PASS**. See audit §33 and `.kilo/plans/assurance-local-folder-watcher-lifecycle-checkpoint.md`.
+**Stage 3 status:** `security.auth-route-rate-limiting` **EXECUTED and VERIFIED** — unauthenticated auth entry points had no limiter (REAL SECURITY DEFECT). Repaired in `CommercialRuntimeServer` with per-client + per-identity token buckets; `/api/auth/login` and password `/api/session` share the identity bucket (no bypass). Focused 10/10, integration regression 16 suites/100 tests, typecheck 0, full suite 257/259. See audit §34 and `.kilo/plans/security-auth-route-rate-limiting-checkpoint.md`.
+**Stage 4 status:** `product.web-password-auth` **EXECUTED and VERIFIED** — the web entrypoint exposed only passwordless `/api/session` and could not register/login. `web/index.html` + `web/app.js` now use the canonical `/api/auth/register|login|logout` backend (no new auth architecture); real HTTP end-to-end test covers register, invalid 401, login, session, authorized vs anonymous route, logout. Focused 2/2, integration 16 suites/101 tests, typecheck 0, full suite 256/259. See audit §35 and `.kilo/plans/product-web-password-auth-checkpoint.md`.
+**Stage 5 status:** `security.http-boundary-tenant-object-authz` **EXECUTED and VERIFIED** — object routes now invoke canonical `TenantIsolation.checkAccess()` at the HTTP boundary and work-item reads enforce an explicit object owner/admin check (same-tenant non-owner → 403 audited; cross-tenant → 404). Focused 6/6, integration 18 suites/117 tests, typecheck 0, full suite 257/259. See audit §36 and `.kilo/plans/security-http-boundary-tenant-object-authz-checkpoint.md`.
+**Stage 6 status:** `observability.metrics-and-request-trace` **EXECUTED and VERIFIED** — additive `RuntimeObservability` module (not an Engine) adds `X-Request-Id` correlation, bounded per-route request/error/duration metrics, and privileged `GET /api/diagnostics/metrics`; failure responses carry the correlation id. Focused 5/5, integration 19 suites/122 tests, typecheck 0, full suite 259/260 (only OCR env gap; 1968/1968 tests). See audit §37 and `.kilo/plans/observability-metrics-and-request-trace-checkpoint.md`.
+**Stage 7 status:** `standardization.pagination-and-idempotency` **EXECUTED and VERIFIED** — real list routes (`/api/sources`, `/api/execution/work-items`, `/api/report/artifacts`) now enforce a bounded `limit/offset` contract (default 50, max 200, fail-closed validation, deterministic total ordering, tenant filter before slicing, exact `total`/`nextOffset`), and the real duplicate-prone mutations (`/api/ingest`, `/api/execution/work-items` POST, `/api/report/export`) support tenant+actor-scoped `Idempotency-Key` replay built on the canonical `SQLitePersistenceStore` (`writeIfAbsent`/`delete`), with `web/app.js` sending rotating keys. Focused 8/8 + 12/12, integration 16 suites/103 tests, persistence regression 7 suites/67 tests, typecheck 0, full suite **261/262 suites / 1988/1988 tests** (only E2 OCR env gap). See `.kilo/plans/standardization-pagination-and-idempotency-checkpoint.md`.
+**Stage 8 status:** `assurance.ocr-environment-gap` **EXECUTED and VERIFIED (truthful boundary)** — OCR/images are deliberately outside the supported runtime contract and `tesseract.js` is undeclared/absent, so no dependency was installed. The dormant `OcrAdapter` no longer statically imports the engine; it injects/lazily loads an `OcrEngine` and fails closed with `ingestion-ocr-unsupported`. `OcrAdapter.test.ts` reconciled without weakening. Focused 8 suites/76 tests, typecheck 0, full suite **261/262 suites / 1998/1999 tests** with `OcrAdapter` now passing; only the known F1 flake remains. See audit §39 and `.kilo/plans/assurance-ocr-environment-gap-checkpoint.md`.
+**Stage 9 status:** `assurance.flake-containment` **EXECUTED and VERIFIED** — F1 (`CommercialRuntimePersistenceRecovery`) had an isolated 4270 ms body against Jest's 5000 ms default, so it received an explicit 20 s budget (repo convention); F2 (`KiloCodeExecutionAdapter`) had the `spawnSync` hard kill equal to the monitor's monitored timeout, racing the pid-file/tree-kill/`exit 124` path — fixed in the owner with `MONITOR_TIMEOUT_GRACE_MS` and recognition of `status === 124`; F3 (XLSX duplicate detection) compared two independently generated XLSX archives that embed timestamps — the second fixture now carries byte-identical content, production owner untouched. Focused 3 suites/34 tests ×stable, regression 12 suites/83 tests, typecheck 0, full suite **262/262 suites / 1999/1999 tests, exit 0, twice**. No test weakened/skipped. See audit §40 and `.kilo/plans/assurance-flake-containment-checkpoint.md`.
+**Stage 10 status:** `standardization.architecture-doc-registry-reconciliation` **EXECUTED and VERIFIED (docs-only)** — `Docs/ARCHITECTURE.md` reconciled to repository truth: `DecisionIntelligenceEngine` is implemented and has live consumers (`DecisionWorkbench`, `OrchestratedDecisionIntelligenceService`), not dormant; `HealthMonitorEngine` identity corrected; the `IntelligenceEngine` boundary vs the domain intelligence engines documented; the `LifecycleManager` five-tier preferred-order model (unregistered skipped, unknown appended, reverse shutdown) documented. `Engines/LifecycleManager.ts` was **not** changed (its tiers are a tested ordering contract). Focused+regression 12 suites/124 tests, full suite **262/262 suites / 1999/1999 tests, exit 0**. See audit §41 and `.kilo/plans/standardization-architecture-doc-registry-reconciliation-checkpoint.md`.
+**Stages 11–14 status:** `assurance.construction-remote-attestation` (K1), `product.offline-sync` (K2), `assurance.completion-audit-integrity` (K3) and `standardization.governance-operator-reconciliation` (K4, docs-only) are all **EXECUTED and VERIFIED**. See §6 and Audit Memory §15.1.
+**Stage 15 status:** `productization.installed-product-acceptance` **EXECUTED and VERIFIED** — the real installed Windows artifact now qualifies end-to-end (isolated Inno Setup build → silent isolated install → real installed shortcut launch → real `/health` → authenticated customer journey → PDF boundary → offline queue/reload/reconnect → kill → relaunch → persistence), full acceptance exit 0 with **16/16** checks including `restart-recovery` and `persistence`. Repair was confined to the acceptance harness (`scripts/installed-product-acceptance.cjs`): its `cmd.exe /c "\"…\""` launch was double-quoted by Node/libuv into a literal `\"…\"` command and exited 1 without starting the product; it now activates the real installed shortcut target `wscript.exe launch-hooshyar.vbs` and requires a real health success **and** a clean launcher exit. The product launcher itself is correct and unchanged. Focused 4 suites/50 tests PASS. Evidence `.kilo/evidence/stage15-k8-installed-product-acceptance.txt`; checkpoint `.kilo/plans/stage15-k8-installed-product-acceptance-checkpoint.md`.
+
+---
+
+## 1. Fresh evidence gathered at this HEAD
+
+| Check | Command | Result |
+|---|---|---|
+| HEAD | `git rev-parse HEAD` | `a0f0018c43f910c7dcd5e4c025bd2b2a74ec27a8` |
+| Remote parity | `git ls-remote origin refs/heads/fix/autonomous-product-factory` | `a0f0018c4...` (equal) |
+| Stale compile suites | jest 6-file run | **6 failed / 0 tests run** (all compile errors) |
+| Previously repaired assistant knot | jest 5-file run | **5 passed / 20 tests** — `HooshyarAutonomousAssistant`, `AssistantConstructionHandoff`, `SelfOperatingAssistant`, `ContinuousImprovementEngine.phase-12-1.4`, `EngineDependencyVerifier` |
+| Persistence flake | isolated run | **1 passed** (25.2 s) |
+| Kilo adapter flake | isolated run | **5 passed** (23.2 s) |
+| LocalFolderWatcher | isolated run | **Node process aborted**, exit `-1073740791` (0xC0000409), libuv `src\win\fs-event.c:72` |
+| Security fix presence | `CommercialRuntimeServer.ts:542-565`, `CommercialIdentityService.ts:221-238` | **ACTIVE** (`passwordlessBootstrapDecision` gate; `403 ORGANIZATION_ALREADY_ESTABLISHED` / `PASSWORD_AUTHENTICATION_REQUIRED`) |
+| Delivered capabilities | code/route/test inventory | 4 capability owners present, wired, tested; commits `5f5b62f1`,`226a716a`,`5f12a56c`,`5a21cec3`,`c7bd874f`,`960d7d08`,`a0f0018c` |
+
+The prior audit (`platform-wide-commercialization-conformance-audit.md` §1–§31) is **reconciled as current** for architecture, security, persistence/provenance, delivered capabilities and the External Production Dependency boundary. The only drift since the audit is additional repair work already committed (§30, §31), which this ledger reflects.
+
+---
+
+## 2. Taxonomy key
+
+`REAL DEFECT` · `REAL MISSING IMPLEMENTATION` · `INTEGRATION GAP` · `STANDARDIZATION GAP` · `STALE TEST` · `STALE DUPLICATE` · `ENVIRONMENT GAP` · `TIMING/RESOURCE FLAKE` · `EXTERNAL BLOCKER` · `ARCHITECTURE CHANGE CONTROL REQUIRED` · `VERIFIED COMPLETE`
+
+---
+
+## 3. Item ledger
+
+### 3.1 Verification base (highest leverage — everything else depends on trust)
+
+| ID | Item | Class | Canonical owner | Evidence (fresh) | User/business value | Dependency | Risk | State | Verification available | Prereq | Bounded repair | Expected evidence |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| V1 | `GovernanceEngine.test.ts` asserts `initialize().status`; frozen `Engine.initialize(): void` | **STALE TEST** | `Backend/HBOS/Engines/GovernanceEngine.ts` | jest: `TS2339` compile fail, 0 tests | Restores trustworthy governance-contract signal | none | LOW | ACTIVE | `GovernanceEngine.test.ts` | none | Reconcile test to frozen contract (`initialize(): void`, `health()`, real `evaluate`) | focused suite green, real assertions |
+| V2 | `KiloCodeExecutionAdapterObservability.test.ts` calls 1-arg `buildWindowsKiloScript` with 2 args + old script text | **STALE TEST** | `Autonomous/Runtime/KiloCodeExecutionAdapter.ts` | jest: `TS2554`, 0 tests | Restores observable-operator contract coverage | none | LOW | ACTIVE | same file | none | Reconcile arity + assert current streaming/timeout/termination script contract | focused suite green |
+| V3 | `BreakEvenAnalysisService.phase-09-1-5.test.ts` targets superseded `{unitsSold}` / `marginOfSafety.amount` / `margins.interest` API | **STALE DUPLICATE** | `Backend/HBOS/Product/BreakEvenAnalysisService.ts` | jest: `TS2345/TS2339`, 0 tests; current owner returns `{marginOfSafety,marginOfSafetyRatio}` | Preserves fail-closed/edge coverage without obsolete APIs | V1,V2 independent | LOW | ACTIVE | same file | none | Rewrite to current frozen `analyze/marginOfSafety/margins` contract, strengthening edge + fail-closed assertions | focused suite green, edge cases asserted |
+| V4 | `CashFlowForecastingService.phase-09-1-6.test.ts` targets removed 2-arg horizon API (`points`) | **STALE DUPLICATE** | `Backend/HBOS/Product/CashFlowForecastingService.ts` | jest: `TS2554/TS2339`, 0 tests; current owner has no horizon | Preserves forecasting fail-closed coverage | none | LOW | ACTIVE | same file | none | Rewrite to current `naive/movingAverage/linearTrend` contract incl. non-finite handling | focused suite green |
+| V5 | `ExponentialSmoothingService.phase-09-1-9.test.ts` targets removed 3-arg API (`fitted/points/inSampleMae`), and asserts `alpha=1/0` READY while frozen owner blocks `alpha<=0`/`>=1` | **STALE DUPLICATE** | `Backend/HBOS/Product/ExponentialSmoothingService.ts` | jest: `TS2554/TS2339`, 0 tests | Preserves smoothing boundary/fail-closed coverage | none | LOW | ACTIVE | same file | none | Rewrite to current `ses(history, alpha)` contract; assert alpha boundaries + non-finite | focused suite green |
+| V6 | `Engines/GovernanceEngine` void-initialize is *intentional*; no implementation change | **VERIFIED COMPLETE** | `Core/Engine.ts` | 06-F + phase-11-1.6 suites green | n/a | n/a | n/a | FROZEN | n/a | n/a | Do NOT change `Engine` interface | n/a |
+
+**Stage 1 result:** V1–V5 are now **VERIFIED COMPLETE** (reconciled to frozen contracts, 32/32 focused tests, 97/97 regression tests, full suite 255/259 suites / 1943/1945 tests). Nothing in the five suites was weakened, deleted, or back-ported.
+
+### 3.2 Test-process hazards / environment
+
+| ID | Item | Class | Canonical owner | Evidence | Value | Risk | State | Bounded repair | Expected evidence |
+|---|---|---|---|---|---|---|---|---|---|
+| E1 | `LocalFolderWatcher.test.ts` aborts Node (`fs-event.c:72`, exit 0xC0000409) | **REAL PRODUCT DEFECT (repaired)** — was mis-classified as environment/test-lifecycle | `Backend/HBOS/Product/LocalFolderWatcher.ts` + its test | Two-process inline proof: short path aborts, long path works | Watch short/`%TEMP%` path crashed the whole process | MEDIUM (fail-open availability hazard) | **VERIFIED COMPLETE** (Stage 2, audit §33) | `start()` canonicalizes folder via `fs.realpath` before `fs.watch`; test asserts canonical `sourcePath` | focused 9/9 ×4, regression 37/37, typecheck 0, full suite `LocalFolderWatcher` PASS |
+| E2 | `OcrAdapter.test.ts` imports `tesseract.js` (not a dependency) | **ENVIRONMENT GAP (repaired — truthful boundary)** | `Backend/HBOS/Product/OcrAdapter.ts` | OCR is deliberately outside the supported contract; `tesseract.js` absent/undeclared; runtime never imports the adapter | `OcrAdapter` now lazily loads an optional `OcrEngine` and fails closed with `ingestion-ocr-unsupported`; test uses injected engine | **VERIFIED COMPLETE** (Stage 8, audit §39) | No dependency installed; boundary documented in `Docs/Product/FinancialIngestionService.md` | focused 8 suites/76 tests; `OcrAdapter` passes in full suite |
+
+### 3.3 Flakes (analyzed, not dismissed)
+
+| ID | Item | Class | Evidence | Verdict |
+|---|---|---|---|---|
+| F1 | `CommercialRuntimePersistenceRecovery.test.ts` | **TIMING/RESOURCE FLAKE (contained)** | Isolated body **4270 ms** vs Jest default 5000 ms; full run fails at 5 s. Not a handle leak: `createCommercialRuntimeServer` closes the `SQLitePersistenceStore` on `server.close` | **VERIFIED COMPLETE** (Stage 9, audit §40). Explicit `20_000` budget (repo convention for real runtime integration suites); assertions unchanged. |
+| F2 | `Autonomous/Runtime/KiloCodeExecutionAdapter.test.ts` | **OWNER RACE (contained)** | Isolated `elapsedMs:13597` with `timeout:12000` and empty `EXECUTION_FINISHED code=`; full run fails at `expect(fs.existsSync(pidPath)).toBe(true)` | **VERIFIED COMPLETE** (Stage 9, audit §40). `spawnSync` hard kill decoupled via `MONITOR_TIMEOUT_GRACE_MS`; `status === 124` recognised as timeout; monitor's pid-file/tree-kill/`exit 124` path now completes. |
+| F3 | `test/FinancialDataIngestionAdapter.test.ts` (XLSX duplicate-detection SHA-256) | **INVALID TEST PREMISE (contained)** | Probe: independently generated XLSX archives differ across a wall-clock second (ZIP DOS time fields + core.xml). Full run fails with different SHA-256; the trailing temp-dir `EPERM` is derived from the throw-before-close | **VERIFIED COMPLETE** (Stage 9, audit §40). Duplicate-detection fixture now writes byte-identical content; production `FinancialDataIngestionAdapter.ts` untouched; assertion unchanged. |
+
+### 3.4 Security / platform (repository-local actionable)
+
+| ID | Item | Class | Canonical owner | Evidence | Value | Risk | State | Bounded repair | Expected evidence |
+|---|---|---|---|---|---|---|---|---|---|
+| S1 | Web UI exposes only passwordless `/api/session`; no register/login UI | **REAL PRODUCT/USABILITY GAP (repaired)** | `web/index.html` + `web/app.js` + `CommercialRuntimeServer` auth routes | audit §19; `web` only had a passwordless session form | Real authentication UX; removes reliance on legacy bootstrap | MEDIUM | **VERIFIED COMPLETE** (Stage 4, audit §35) | Register/login/logout/password fields wired to canonical `/api/auth/*`; no new engine | web HTTP end-to-end (register → invalid 401 → login → session → authz → logout) |
+| S2 | `/api/session` + `/api/auth/login` not rate-limited | **REAL SECURITY DEFECT (repaired)** | `CommercialRuntimeServer.ts` existing limiter | audit R6; route ordering proves auth handlers run before the session gate | Brute-force/takeover resistance | HIGH security, LOW impl | **VERIFIED COMPLETE** (Stage 3, audit §34) | Per-client + per-identity token buckets; identity bucket shared across `/api/auth/login` and password `/api/session`; fail-closed 429 + Retry-After + security event | focused 10/10 (incl. no-bypass, reset, cross-identity, audit event); regression 16 suites/100 tests |
+| S3 | No pagination on list routes | **STANDARDIZATION GAP (repaired)** | runtime list routes + canonical owners | audit R4 | Scalability | MEDIUM | **VERIFIED COMPLETE** (Stage 7) | `QueryPagination` + `listSourcesPage`/`listWorkItemsPage`/`listPage`; default 50 / max 200; fail-closed validation; total order; tenant filter before slice | focused 8/8, integration walk tests, negative 400s |
+| S4 | No idempotency keys on mutating POSTs | **STANDARDIZATION GAP (repaired)** | runtime + canonical `SQLitePersistenceStore` | audit R5 | Duplicate-execution safety | MEDIUM | **VERIFIED COMPLETE** (Stage 7) | `runIdempotent` on ingest/propose/export; tenant+actor+route key scope; atomic `writeIfAbsent` claim; replay/conflict/in-progress; `web/app.js` rotates keys | focused 12/12 incl. race, cross-tenant, restart replay |
+| S5 | `TenantIsolation.checkAccess()` not invoked at HTTP layer | **DEFENSE-IN-DEPTH GAP (repaired)** | `Security/TenantIsolation.ts` integrated in `CommercialRuntimeServer` | audit R2; guard existed but unwired at HTTP | Defense-in-depth | MEDIUM | **VERIFIED COMPLETE** (Stage 5, audit §36) | `enforceTenantBoundary()` on work-item/source/report-artifact routes; fail closed + TENANT_VIOLATION audit | object-route tests incl. cross-tenant 404 |
+| S6 | No metrics/tracing export | **OBSERVABILITY GAP (repaired)** | runtime diagnostics — new `Autonomous/Runtime/RuntimeObservability.ts` | audit §15; no request id/metrics existed | Operational readiness | MEDIUM | **VERIFIED COMPLETE** (Stage 6, audit §37) | Additive `X-Request-Id` + bounded per-route metrics + privileged `/api/diagnostics/metrics`; no architecture change | focused 5/5 (normalization, injection-safe ids, counting, HTTP trace, metrics authz 401/403) |
+| S7 | Object-level authorization on `GET /api/execution/work-items/:id` is tenant-scope only | **DEFENSE-IN-DEPTH GAP (repaired)** | `OrganizationalExecutionCoordinator` + route | audit R3; same-tenant member could read any item | Explicit owner check | MEDIUM | **VERIFIED COMPLETE** (Stage 5, audit §36) | `canAccessWorkItem()` (creator/approver/assignee or ADMINISTER); 403 + audited denial | owner 200 / non-owner 403 / anonymous 401 / cross-tenant 404 |
+
+### 3.5 Capability / layer gaps
+
+| ID | Item | Class | Canonical owner | Value | Risk | State |
+|---|---|---|---|---|---|---|
+| C1 | Layer 11 offline/online sync | **REAL MISSING IMPLEMENTATION (repaired)** | `Product/SyncStateStore.ts` (reused, now wired) | Product scope | MEDIUM | **VERIFIED COMPLETE** (Stage 12) — owner wired into runtime + `GET /api/sync/state` + real web offline queue; no rebuild |
+| C2 | Layer 15 billing/entitlements | **EXTERNAL BLOCKER** | — | Commercial | — | BLOCKED_EXTERNAL_DEPENDENCY |
+| C3 | Enterprise connectors / PDF/DOCX/OCR ingestion | **INTEGRATION GAP (deliberate)** | `ConnectorRegistry`, `PdfAcquisition`, `DocxAcquisition` | Coverage | LOW | ACTIVE — not claimed; reuse before build |
+| C4 | Cloud/DNS/TLS/payment production resources | **EXTERNAL BLOCKER** | — | Deployment | — | BLOCKED_EXTERNAL_DEPENDENCY |
+| C5 | Encryption-at-rest wiring | **ARCHITECTURE CHANGE CONTROL REQUIRED** | 05C key-management/encryption decisions | Security | HIGH | BLOCKED pending human approval of 7 critical 05C decisions |
+| C6 | 4 delivered product capabilities | **VERIFIED COMPLETE** | product layer | Core product | LOW | PRESERVE — do not rebuild |
+| C7 | 5 canonical intelligence engines + identity bootstrap hardening | **VERIFIED COMPLETE** | engines + `CommercialIdentityService` | Core | LOW | PRESERVE |
+| C8 | LifecycleManager tier drift / ARCHITECTURE dormant-label drift | **STANDARDIZATION GAP (repaired — docs/registry)** | `Engines/LifecycleManager.ts`, `Docs/ARCHITECTURE.md` | Clarity | LOW | **VERIFIED COMPLETE** (Stage 10, audit §41) — `Docs/ARCHITECTURE.md` reconciled to repository truth; `LifecycleManager` tiers documented as a preferred-order contract and left unchanged |
+| C9 | Construction-plane independent remote verification | **GOVERNANCE GAP** | `LocalConstructionToolset` | Construction integrity | MEDIUM | ACTIVE — but outside runtime commercialization; bounded |
+
+---
+
+## 4. Ranked unresolved items (highest value first)
+
+Scoring = commercial value, correctness, security, tenant isolation, runtime integrity, integration completeness, persistence/provenance, observability, deployment readiness, usability, architectural risk.
+
+1. **V1–V5 — restore the verification base** (correctness + standardization; unblocks trusting every later stage). Safety: HIGH. *Selected stage 1.*
+2. ~~**E1 — LocalFolderWatcher native abort**~~ — **DONE (Stage 2, audit §33): REAL PRODUCT DEFECT, repaired and verified.**
+3. ~~**S2 — rate-limit auth routes**~~ — **DONE (Stage 3, audit §34): real security defect repaired and verified.**
+4. ~~**S1 — real password auth in web UI**~~ — **DONE (Stage 4, audit §35): product gap repaired and verified.**
+5. ~~**S5/S7 — HTTP-boundary tenant/object authorization defense-in-depth**~~ — **DONE (Stage 5, audit §36).**
+6. ~~**S6 — metrics + request tracing**~~ — **DONE (Stage 6, audit §37).**
+7. ~~**S3/S4 — pagination + idempotency**~~ — **DONE (Stage 7): bounded pagination on the 3 real list routes and canonical-persistence idempotency on the 3 duplicate-prone mutations, verified.** Safety: MEDIUM.
+8. ~~**E2 — OCR environment gap**~~ — **DONE (Stage 8, audit §39): OCR is deliberately unsupported; no dependency installed; adapter made fail-closed and boundary recorded; its suite now passes.** Safety: HIGH.
+9. ~~**F1/F2/F3 — flake containment**~~ — **DONE (Stage 9, audit §40): root causes proven (test budget; owner-level process hard-kill race; non-deterministic XLSX fixture); contained without hiding failures; full suite green twice (262/262).** Safety: HIGH.
+10. ~~**C8 — doc/registry drift reconciliation**~~ — **DONE (Stage 10, audit §41): `Docs/ARCHITECTURE.md` reconciled to repository truth (live `DecisionIntelligenceEngine`, `HealthMonitorEngine` identity, `IntelligenceEngine` boundary, `LifecycleManager` tier model); no runtime code changed.** Safety: HIGH.
+11. ~~**C9 — construction-plane remote attestation**~~ — **DONE (Stage 11): independent `ls-remote` parity barrier on FINALIZE; real-remote acceptance 15/15 PASS.** Safety: MEDIUM.
+12. ~~**C1 — offline sync**~~ — **DONE (Stage 12): existing `SyncStateStore` owner wired into runtime + tenant-scoped `GET /api/sync/state` + real web offline queue with idempotent replay and server-authoritative conflict resolution; runtime/application acceptance 13/13 PASS.** Safety: MEDIUM.
+13. **C5 — encryption-at-rest** (ARCHITECTURE CHANGE CONTROL / human approval). BLOCKED.
+14. **C2/C4 — billing + cloud production** (EXTERNAL). BLOCKED.
+
+---
+
+## 5. Truth boundary
+
+- No completion flag (`productComplete`, `commercialProductRuntimeComplete`, `externalProductionDependenciesComplete`) is changed by this ledger or by verification-base repair.
+- External production dependencies remain **BLOCKED_EXTERNAL_DEPENDENCY** with reproducible evidence; not faked.
+- `LocalFolderWatcher` short-path abort was a **REAL PRODUCT DEFECT** (fail-open availability hazard), not a test-harness quirk; it is repaired in the canonical owner (audit §33). It was **not** permanently excluded.
+- OCR remains an explicit environment gap; OCR ingestion is not claimed.
+- This ledger is an index/decision record; the authoritative chronological audit remains `.kilo/plans/platform-wide-commercialization-conformance-audit.md`.
+
+---
+
+## 6. Next selected stage
+
+**`assurance.stale-test-reconciliation`** — COMPLETE (Stage 1; audit §32). V1–V5 reconciled; verification base restored to 255/259 suites.
+
+**`assurance.local-folder-watcher-lifecycle`** — COMPLETE (Stage 2; audit §33). Short-path libuv abort is a real product defect; repaired via folder canonicalization; watcher suite passes in the full run.
+
+**`security.auth-route-rate-limiting`** — COMPLETE (Stage 3; audit §34). Auth entry points now enforce per-client and per-identity token buckets, fail closed with 429, and emit security events; no route bypass.
+
+**`product.web-password-auth`** — COMPLETE (Stage 4; audit §35). Web entrypoint now performs real password register/login/logout through the canonical `/api/auth/*` backend; verified HTTP end-to-end including authorization integration.
+
+**`security.http-boundary-tenant-object-authz`** — COMPLETE (Stage 5; audit §36). HTTP object routes invoke canonical `TenantIsolation.checkAccess()` and work-item reads enforce an explicit object owner/admin check.
+
+**`observability.metrics-and-request-trace`** — COMPLETE (Stage 6; audit §37). Runtime now emits `X-Request-Id` correlation, bounded per-route operation metrics and a privileged diagnostics endpoint; failures carry the correlation id.
+
+**`standardization.pagination-and-idempotency`** — COMPLETE (Stage 7). Real list routes enforce a bounded, fail-closed `limit/offset` contract with stable ordering and exact totals; the real duplicate-prone mutations replay via tenant+actor-scoped idempotency keys persisted through the canonical `SQLitePersistenceStore`; the web entrypoint sends rotating keys.
+
+**`assurance.ocr-environment-gap`** — COMPLETE (Stage 8; audit §39). OCR/images are deliberately outside the supported runtime contract; no dependency was installed. The dormant `OcrAdapter` now lazily loads an optional engine, injects for tests, and fails closed with `ingestion-ocr-unsupported`; its suite passes and the boundary is documented.
+
+**`assurance.flake-containment`** — COMPLETE (Stage 9; audit §40). F1 received an explicit measured budget (isolated body 4270 ms vs the 5000 ms default); F2's process hard kill no longer races the monitor's monitored timeout (pid-file/tree-kill/`exit 124` path now completes); F3's duplicate-detection fixture is byte-deterministic while the production owner is untouched. Full suite **262/262 suites, 1999/1999 tests, exit 0** in two consecutive runs. See `.kilo/plans/assurance-flake-containment-checkpoint.md`.
+
+**`standardization.architecture-doc-registry-reconciliation`** — COMPLETE (Stage 10; audit §41). `Docs/ARCHITECTURE.md` now records `DecisionIntelligenceEngine` as implemented with its live consumers, the canonical `HealthMonitorEngine` identity, the `IntelligenceEngine` boundary, and the `LifecycleManager` five-tier preferred-order model; `Engines/LifecycleManager.ts` was deliberately left unchanged because its tiers are a tested ordering contract. Focused+regression 12 suites/124 tests; full suite **262/262 suites, 1999/1999 tests, exit 0**. See `.kilo/plans/standardization-architecture-doc-registry-reconciliation-checkpoint.md`.
+
+**`assurance.construction-remote-attestation`** — COMPLETE (Stage 11; C9). The construction `git` tool now performs independent remote attestation on `FINALIZE`: local HEAD is compared against the independently queried `git ls-remote origin refs/heads/<branch>` value, the local `origin/<branch>` tracking ref is report-only, and a non-`PASS` result (including unavailable/malformed remote ⇒ `UNVERIFIED`) fails closed as `GIT_REMOTE_ATTESTATION_FAILED`, blocking `AutonomousConstructionEngine` FINALIZE. Focused 13/13; construction regression 14 suites/30 tests; changed-file typecheck exit 0; real-repository acceptance 15/15 checks PASS against the live remote. See `.kilo/plans/assurance-construction-remote-attestation-checkpoint.md`.
+
+**`product.offline-sync`** — COMPLETE (Stage 12; C1). The existing `SyncStateStore` owner is now wired into the real product/runtime path: `/api/ingest` and `/api/analyze` record durable per-(tenant, source) cursors; tenant-scoped `GET /api/sync/state[?source=]` exposes them (owner gained only an additive `list()`); `/api/ready` advertises `offline-sync`; and the real web client (`web/offline-sync.js`, used by `web/app.js`) persists work before any request, retains it on network loss, replays idempotently on reconnect and resolves conflicts server-authoritatively. Focused 4 suites/28 tests; runtime/ingestion regression 8 suites/85 tests; architecture/qualification regression 8 suites/30 tests; changed-file typecheck exit 0; real runtime + real client over real HTTP acceptance **13/13 PASS** (`.kilo/evidence/stage12-k2-offline-sync-acceptance.txt`). See `.kilo/plans/product-offline-sync-checkpoint.md`.
+
+**Next selected stage: K3 `assurance.completion-audit-integrity`** (Stage 13) — strengthen the completion gate so it refuses to report completion from markers alone. See Audit Memory §15.1. K3 must not be started until this checkpoint is committed and pushed and a new trusted checkpoint is recorded.
+
+**`assurance.completion-audit-integrity`** — COMPLETE (Stage 13; K3). The completion gate is now fail-closed. `CapabilityEvidenceAudit.evaluateCompletion()` requires present, verified, checkpoint-fresh and unblocked unit/integration/application/acceptance evidence; `CanonicalCapabilityAudit` requires real behavioral evidence per roadmap capability (exposes `nonBehavioralCapabilities`); `CommercialProductCompletionAudit` requires commit-bound canonical application/acceptance evidence (exposes `applicationEvidence`/`acceptanceEvidence`/`evidenceGaps`); and `AutonomousBuildDaemon` composes them through the gate, returning `COMPLETION_EVIDENCE_INSUFFICIENT` when incomplete and requiring `completionIntegrity.complete` before reporting `productComplete`. No completion flag changed; `productComplete` and `externalProductionDependenciesComplete` remain FALSE. Focused 4 suites/29 tests; audit/runtime regression 16 suites/44 tests; changed-file typecheck exit 0; real-repo acceptance 19/19 PASS (`.kilo/evidence/stage13-k3-completion-audit-integrity-acceptance.txt`). See `.kilo/plans/assurance-completion-audit-integrity-checkpoint.md` and `.kilo/plans/post-k3-bounded-reaudit-2026-09-14.md`.
+
+**`standardization.governance-operator-reconciliation`** — COMPLETE (Stage 14; K4). Docs-only reconciliation of the approved local execution-operator model: the Master Charter §8/§9/§17, the Final Decisions Register §7/§16/§18 and `AUTONOMOUS_MISSION.md` now record that approved local execution operators (for example Kilo Code) are subordinate, replaceable mechanisms under the Python/GitHub/Assistant authorities and are **not** external coding providers or architectural authorities. No governance rule was invented or changed; no source code, test, architecture engine, completion gate or external-dependency implementation was modified. See `.kilo/plans/standardization-governance-operator-reconciliation-checkpoint.md` and Audit Memory §15.1.1.
+
+**`productization.installed-product-acceptance`** — COMPLETE (Stage 15; K8). The real installed Windows artifact is now qualified end-to-end through the actual installed shortcut: isolated installer build and silent isolated install, real shortcut launch (`wscript.exe launch-hooshyar.vbs`), real `/health`, authenticated customer journey (register/session/PDF capability boundary/CSV ingest/analysis/dashboard/sources/tenant isolation), offline queue/reload/reconnect, then kill → relaunch through the real shortcut → re-login → persisted analysis. Full acceptance exit 0, **16/16** checks including `restart-recovery` and `persistence` (`.kilo/evidence/stage15-k8-installed-product-acceptance.txt`, `.hooshyar/installed-product-acceptance.json`). The resumed BLOCKED condition was an **acceptance-harness defect**, not a product defect: Node/libuv escaped the harness's embedded quotes to `\"`, so `cmd.exe` received a literal `\"…launch-hooshyar.cmd\"` command and exited 1 without starting the product. The harness now invokes the real installed shortcut target and requires a real health success **and** a clean launcher exit; the product launcher is unchanged. Focused 4 suites/50 tests PASS. See `.kilo/plans/stage15-k8-installed-product-acceptance-checkpoint.md`.
+
+**Next selected stage:** no primary repository-local knot remains. K5 `commercial.subscription-entitlements` is dependency-ready only if the subscription scope is confirmed; K6–K7 remain conditional. External/approval blockers B1–B5 remain unchanged.

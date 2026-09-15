@@ -12,6 +12,7 @@ import { createLocalConstructionTools } from "./LocalConstructionToolset";
 import { AutonomousPerformanceBudget } from "./AutonomousPerformanceBudget";
 
 export interface DaemonOptions {
+    knotRecovery?: AutonomousKnotRecovery;
     root?: string;
     maxCycles?: number;
     reportEvery?: number;
@@ -24,8 +25,24 @@ export interface DaemonOptions {
 type MissionDecision =
     | { kind: "mission"; mission: Mission; assistantGatePassed: false; continuation?: undefined }
     | { kind: "platform-continuation"; mission: PlatformCapabilityMission; assistantGatePassed: true; continuation: PlatformContinuationMission }
-    | { kind: "platform-complete"; mission: Mission; assistantGatePassed: true; continuation: PlatformContinuationMission; canonicalAudit: ReturnType<CanonicalCapabilityAudit["audit"]>; commercialAudit: ReturnType<CommercialProductCompletionAudit["audit"]> }
+    | { kind: "platform-complete"; mission: Mission; assistantGatePassed: true; continuation: PlatformContinuationMission; canonicalAudit: ReturnType<CanonicalCapabilityAudit["audit"]>; commercialAudit: ReturnType<CommercialProductCompletionAudit["audit"]>; completionIntegrity: ReturnType<CapabilityEvidenceAudit["evaluateCompletion"]> }
     | { kind: "platform-audit-blocked"; mission: Mission; assistantGatePassed: true; continuation: PlatformContinuationMission; reason: string; details: unknown };
+
+/**
+ * Workspace cleanliness is a construction precondition, not a planner failure.
+ * Once a mission has been selected from a dirty workspace, convert that state
+ * into an explicit repair knot before any new platform capability can be
+ * handed to the weaving planner.
+ */
+export function createWorkspaceRepairMission(selected: Mission): Mission {
+    return {
+        ...selected,
+        capabilityId: `repair-${selected.evidence.commit || "workspace"}`,
+        capability: `repair and verify the current working tree before continuing ${selected.capabilityId}`,
+        targetEngine: "Autonomous Operations Engine",
+        dependencies: []
+    };
+}
 
 export class AutonomousBuildDaemon {
     private readonly root: string;
@@ -36,7 +53,7 @@ export class AutonomousBuildDaemon {
     private readonly canonicalAudit = new CanonicalCapabilityAudit();
     private readonly commercialAudit = new CommercialProductCompletionAudit();
     private readonly weavingPlanner = new AutonomousWeavingPlanner();
-    private readonly knotRecovery = new AutonomousKnotRecovery();
+    private readonly knotRecovery: AutonomousKnotRecovery;
     private readonly maxCycles: number;
     private readonly reportEvery: number;
     private readonly performanceBudget: AutonomousPerformanceBudget;
@@ -46,6 +63,7 @@ export class AutonomousBuildDaemon {
         this.mission = options.mission ?? new AutonomousProjectMission(this.root);
         this.continuation = options.continuation ?? new AutonomousPlatformContinuation();
         this.development = options.development ?? new AutonomousDevelopmentLoop(createLocalConstructionTools(this.root));
+        this.knotRecovery = options.knotRecovery ?? new AutonomousKnotRecovery();
         this.maxCycles = options.maxCycles ?? 1000;
         this.reportEvery = options.reportEvery ?? 1;
         this.performanceBudget = options.performanceBudget ?? new AutonomousPerformanceBudget({
@@ -53,8 +71,7 @@ export class AutonomousBuildDaemon {
         });
     }
 
-    private finalCompletionEvidence(selected: Mission): ReturnType<CapabilityEvidenceAudit["evaluate"]> {
-        const root = selected.evidence?.root || this.root;
+    private finalCompletionEvidence(selected: Mission): ReturnType<CapabilityEvidenceAudit["evaluate"]> {        const root = selected.evidence?.root || this.root;
         const exists = (path: string) => existsSync(join(root, path));
         const implementationPaths = [
             "Backend/HBOS/Assistant/Autonomous/AutonomousAssistantRuntime.ts",
@@ -86,12 +103,54 @@ export class AutonomousBuildDaemon {
         const documentation = documentationPaths.every(exists);
         const dependenciesSatisfied = dependencyPaths.every(exists);
         const verified = test && selected.evidence.clean && selected.evidence.commit.length > 0;
-
         return this.evidenceAudit.evaluate({ implementation, test, documentation, dependenciesSatisfied, verified });
+    }
+
+    /**
+     * The commercial completion claim must survive the canonical fail-closed
+     * evidence gate. Canonical artifact/behavioral evidence supplies unit and
+     * integration levels; the commercial audit supplies commit-bound application
+     * and acceptance levels. Any missing, stale, unverified, contradictory or
+     * externally-blocked level makes the claim non-complete.
+     */
+    private completionIntegrity(
+        canonical: ReturnType<CanonicalCapabilityAudit["audit"]>,
+        commercial: ReturnType<CommercialProductCompletionAudit["audit"]>
+    ): ReturnType<CapabilityEvidenceAudit["evaluateCompletion"]> {
+        const nonBehavioral = canonical.nonBehavioralCapabilities ?? [];
+        const missingArtifacts = canonical.missingArtifacts ?? [];
+        const commercialEvidence = commercial as Partial<ReturnType<CommercialProductCompletionAudit["audit"]>>;
+        return this.evidenceAudit.evaluateCompletion({
+            capabilityId: "platform.commercial-product",
+            base: {
+                implementation: missingArtifacts.length === 0,
+                test: nonBehavioral.length === 0,
+                documentation: canonical.roadmapPresent === true,
+                dependenciesSatisfied: canonical.backlogExhausted === true,
+                verified: canonical.complete === true
+            },
+            unit: { present: true, passed: nonBehavioral.length === 0, fresh: true, artifact: "canonical-behavioral-evidence" },
+            integration: { present: true, passed: missingArtifacts.length === 0, fresh: true, artifact: "canonical-artifact-evidence" },
+            application: commercialEvidence.applicationEvidence,
+            acceptance: commercialEvidence.acceptanceEvidence,
+            externalBlocked: (commercial.blockedExternalDependencies ?? []).length > 0
+        });
     }
 
     private selectMission(): MissionDecision {
         const selected = this.mission.nextMission();
+
+        // The Assistant completion gate is allowed to hand off to platform
+        // construction only from a clean checkpoint. A dirty workspace is an
+        // explicit repair mission, never a reason to block the next capability.
+        if (!selected.evidence.clean && !selected.capabilityId.startsWith("repair-")) {
+            return {
+                kind: "mission",
+                mission: createWorkspaceRepairMission(selected),
+                assistantGatePassed: false
+            };
+        }
+
         if (selected.capabilityId !== "assistant.completion.gate") return { kind: "mission", mission: selected, assistantGatePassed: false };
 
         const continuation = this.continuation.createMission();
@@ -120,7 +179,7 @@ export class AutonomousBuildDaemon {
         }
 
         const commercialAudit = this.commercialAudit.audit(this.root);
-        if (!commercialAudit.complete) {
+        if (commercialAudit.missingLayers.length > 0) {
             return {
                 kind: "platform-audit-blocked",
                 mission: selected,
@@ -131,7 +190,33 @@ export class AutonomousBuildDaemon {
             };
         }
 
-        return { kind: "platform-complete", mission: selected, assistantGatePassed: true, continuation, canonicalAudit, commercialAudit };
+        if (commercialAudit.blockedExternalDependencies.length > 0) {
+            return {
+                kind: "platform-audit-blocked",
+                mission: selected,
+                assistantGatePassed: true,
+                continuation,
+                reason: "BLOCKED_EXTERNAL_DEPENDENCY",
+                details: { ...commercialAudit, terminal: true }
+            };
+        }
+
+        // Fail closed: artifact/marker presence is not completion. The commercial
+        // claim must also carry verified, checkpoint-fresh application and acceptance
+        // evidence (and canonical behavioral evidence) before it may be reported.
+        const completionIntegrity = this.completionIntegrity(canonicalAudit, commercialAudit);
+        if (!completionIntegrity.complete) {
+            return {
+                kind: "platform-audit-blocked",
+                mission: selected,
+                assistantGatePassed: true,
+                continuation,
+                reason: "COMPLETION_EVIDENCE_INSUFFICIENT",
+                details: { completionIntegrity, commercialAudit }
+            };
+        }
+
+        return { kind: "platform-complete", mission: selected, assistantGatePassed: true, continuation, canonicalAudit, commercialAudit, completionIntegrity };
     }
 
     run() {
@@ -151,8 +236,8 @@ export class AutonomousBuildDaemon {
             const decision = this.selectMission();
             if (decision.kind === "platform-complete") {
                 budgetSnapshot = this.performanceBudget.completeCycle(cycleStartedAt);
-                const productComplete = decision.canonicalAudit.complete && decision.commercialAudit.complete;
-                console.log(JSON.stringify({ type: "AUTONOMOUS_PLATFORM_CONSTRUCTION_COMPLETE", cycle, status: "completed", assistantComplete: true, autonomousConstructionComplete: true, canonicalPlatformConstructionComplete: decision.canonicalAudit.complete, commercialProductRuntimeComplete: decision.commercialAudit.complete, externalProductionDependenciesComplete: decision.commercialAudit.blockedExternalDependencies.length === 0, productComplete, backlogExhausted: decision.canonicalAudit.backlogExhausted, nonAutonomousProductionItems: decision.canonicalAudit.nonAutonomousProductionItems, commercialMissingLayers: decision.commercialAudit.missingLayers, blockedExternalDependencies: decision.commercialAudit.blockedExternalDependencies, continuation: decision.continuation, performance: budgetSnapshot, message: "Assistant and canonical construction are complete; commercial product completion is derived from independent application-level evidence." }));
+                const productComplete = decision.canonicalAudit.complete && decision.commercialAudit.complete && decision.commercialAudit.blockedExternalDependencies.length === 0 && decision.completionIntegrity.complete;
+                console.log(JSON.stringify({ type: "AUTONOMOUS_PLATFORM_CONSTRUCTION_COMPLETE", cycle, status: "completed", assistantComplete: true, autonomousConstructionComplete: true, canonicalPlatformConstructionComplete: decision.canonicalAudit.complete, commercialProductRuntimeComplete: decision.commercialAudit.complete, externalProductionDependenciesComplete: decision.commercialAudit.blockedExternalDependencies.length === 0, productComplete, completionEvidenceComplete: decision.completionIntegrity.complete, completionEvidenceReasons: decision.completionIntegrity.nonCompleteReasons, backlogExhausted: decision.canonicalAudit.backlogExhausted, nonAutonomousProductionItems: decision.canonicalAudit.nonAutonomousProductionItems, commercialMissingLayers: decision.commercialAudit.missingLayers, blockedExternalDependencies: decision.commercialAudit.blockedExternalDependencies, continuation: decision.continuation, performance: budgetSnapshot, message: "Assistant and canonical construction are complete; commercial product completion requires the fail-closed unit/integration/application/acceptance evidence gate and no blocked external dependency." }));
                 return { status: "completed", cycles: cycle, history };
             }
             if (decision.kind === "platform-audit-blocked") {

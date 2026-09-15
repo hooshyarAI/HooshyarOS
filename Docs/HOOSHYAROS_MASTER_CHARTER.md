@@ -156,6 +156,37 @@ The next capability is the first genuinely missing capability whose dependencies
 
 The Assistant must never stop simply because its own construction layer is complete.
 
+### 6.1 Autonomous Platform Self-Management Law — PERMANENT
+
+The platform's construction fabric is required to autonomously plan and execute the complete engineering lifecycle for platform construction, repair, standardization, commercialization, qualification and continuation. The human owner is not the mechanical lifecycle driver.
+
+The canonical lifecycle is:
+
+**READ → AUDIT → DISCOVER → PRIORITIZE → PLAN → DEPENDENCY CHECK → CHECKPOINT → IMPLEMENT → FOCUSED TEST → INTEGRATE → RUNTIME/APPLICATION ACCEPTANCE → VERIFY → REPAIR IF NEEDED → STANDARDIZE → COMMERCIALIZE → QUALIFY → EVIDENCE → COMMIT/PUSH → CI FEEDBACK → RE-PLAN**
+
+The Assistant, Autonomous Operations Engine and approved construction fabric must choose and execute this lifecycle automatically from repository state. A human shell command may bootstrap or intentionally approve a governed action, but routine mechanical advancement must not require a human to manually choose the next stage, invoke a repair handoff, or stitch together separate commands.
+
+A factory failure, CI failure or acceptance failure must automatically enter the governed failure path and produce or invoke the canonical repair contract (`ASSISTANT_REPAIR_MISSION`) without synthetic success and without repeated blind retries.
+
+### 6.2 Canonical Reuse Law — PERMANENT
+
+Before creating any new Agent, Engine, Tool, Service, orchestration layer or alternative implementation path, autonomous planning must inventory the existing canonical architecture and registry and select reusable components wherever they satisfy the required contract.
+
+The platform must preferentially reuse existing:
+
+- Engines and Engine Registry entries;
+- Assistants and Assistant capabilities;
+- Builder, Planner, Orchestrator, Memory, Knowledge and Reasoning components;
+- autonomous construction and self-repair runners;
+- Product runtime, persistence, security and acceptance services;
+- repository-native Python and TypeScript workers;
+- tests, contracts and evidence collectors;
+- existing GitHub/CI workflows and release tooling.
+
+Creating a parallel Agent, duplicate Engine, duplicate business semantic, duplicate orchestration hierarchy or provider-specific construction path is prohibited unless an explicit architecture decision establishes a genuine missing capability or contradiction.
+
+The construction fabric must not depend on an external coding agent. Existing product provider integrations may exist only where approved by product architecture; they must never become dependencies of the construction fabric itself.
+
 ---
 
 ## 7. Expert Weaving Doctrine — Permanent Platform Law
@@ -280,7 +311,7 @@ The Assistant is complete only when its construction fabric can reliably:
 20. re-plan from the new repository state;
 21. hand off automatically from Assistant completion into platform construction.
 
-The Assistant construction fabric is deliberately constrained to the approved Python/GitHub/Assistant toolchain and must not depend on external coding agents.
+The Assistant construction fabric is deliberately constrained to the approved Python/GitHub/Assistant authorities and must not depend on external coding agents. Approved local execution operators may act only as subordinate, replaceable mechanisms under those authorities (see §9).
 
 ---
 
@@ -313,7 +344,9 @@ Only these three participants are permitted in the HooshyarOS construction proce
 2. **GitHub** — repository, source control, synchronization, commits, review and publication.
 3. **This Assistant** — architecture reasoning, critical review, expert choice and construction orchestration.
 
-External coding assistants, cloud coding agents and alternative code-generation providers are prohibited from the construction path. They must not be invoked, installed, configured or depended upon for autonomous construction.
+These three are the only construction **authorities**. Approved local execution **operators** may act as subordinate, replaceable mechanisms under them, but they are not additional participants, authorities or providers. In particular, **Kilo Code** is an approved local VS Code execution/operator layer — a repository-governed local mechanism, not an external coding provider and not an architectural authority. An approved operator may inspect the repository, execute authorized commands, apply governed implementation/repair changes, run focused tests and produce evidence only inside an explicit stage/handoff contract. See `Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md` §5 and §10, `Docs/KILO_EXECUTION_OPERATOR_CONTRACT.md` and `Docs/ARCHITECTURE_DECISIONS/KILO_GOVERNED_OPERATOR_DECISION.md`.
+
+External coding assistants, cloud coding agents and alternative code-generation providers are prohibited from the construction path. They must not be invoked, installed, configured or depended upon for autonomous construction. Approved repository-governed local execution operators are not external coding providers under this prohibition.
 
 This includes Codex, GitHub Copilot, Claude and equivalent coding agents.
 
@@ -414,6 +447,28 @@ The Assistant should request human intervention only for genuine product decisio
 
 ---
 
+## 15. Resilience, Analytical Intelligence and Organizational Survival Law — PERMANENT
+
+HooshyarOS is explicitly required to improve organizational survival, resilience, adaptability, productivity, time/energy efficiency, balanced growth and competitive capacity. This is a product outcome, not a marketing claim.
+
+The governing analytical doctrine is Docs/HOOSHYAROS_RESILIENCE_AND_ANALYTICAL_INTELLIGENCE_DOCTRINE_V1.md. It is binding on product intelligence, decision support, organizational transformation, risk, forecasting, optimization and autonomous operations.
+
+The platform must progressively support: Understand → Diagnose → Predict → Stress → Decide → Optimize → Execute → Measure → Learn → Adapt.
+
+Systems thinking, analytical thinking and strategic thinking are cross-cutting reasoning methods. Fundamental/business analysis, technical/market analysis where justified, statistics, econometrics, machine learning, time-series analysis, risk/uncertainty analysis, simulation, optimization/operations research, causal inference, NLP/document intelligence, graph/network analysis and trustworthy AI are approved methods governed by evidence, data sufficiency, explainability and risk controls.
+
+These methods MUST be implemented through the existing canonical architecture. No sixth intelligence engine, duplicate Analytics/Risk/Strategy/ML/Resilience engine, or provider-specific architecture may be introduced merely to host these methods.
+
+The product objective is not more algorithms. The objective is measurable business value: lower decision latency and operational waste; higher productivity and capacity utilization; stronger financial and operational resilience; faster organizational learning and adaptation; better risk visibility and scenario preparedness; sustainable and balanced growth; and governed automation with measurable outcomes.
+
+For commercial completion, every such capability must pass: DESIGN → IMPLEMENT → INTEGRATE → WIRE → REAL INPUT → USE → VERIFY → GOVERN → E2E → IMPACT MEASURE → QC → CHECKPOINT → COMPLETE.
+
+IMPLEMENTED ≠ INTEGRATED ≠ USED ≠ VERIFIED ≠ IMPACT-VERIFIED ≠ COMMERCIAL-COMPLETE.
+
+The construction fabric must audit the charter, governance, architecture, doctrine and the whole platform implementation against these requirements, identify genuine gaps, implement them through the correct canonical owner, commercialize them through real runtime/product paths, and preserve evidence for every claim.
+
+---
+
 ## 15. Repository Memory and Change Discipline
 
 Every important permanent decision must become repository memory, not remain only in chat.
@@ -427,6 +482,278 @@ When a new decision is approved:
 5. continue construction from the updated source of truth.
 
 No future construction cycle should need the human to reconstruct hundreds of pages of prior discussion.
+
+### 15.1 Permanent Audit & Verification Memory — PERMANENT
+
+Every significant completed audit MUST leave a durable repository summary. The detailed evidence remains in its dedicated audit artifact; this Master Charter stores only the compact index/recovery state a future autonomous cycle needs to resume without re-auditing or drifting.
+
+Governing rules:
+
+- Every significant completed audit has a durable repository summary.
+- Detailed evidence remains in the dedicated audit artifact.
+- The Master Charter stores only the compact recovery/index state.
+- Every future autonomous cycle MUST read this Audit Memory before performing a broad re-audit.
+- A full audit MUST NOT be repeated merely because old queue, plan, ledger or checkpoint files exist.
+- When repository, governance and evidence have not materially changed, a **delta audit** MUST be used instead of repeating the entire audit.
+- Historical audit records MUST NEVER override the governing source-of-truth hierarchy (Section 2).
+- A closed knot MUST NOT return to the queue unless new evidence reopens it.
+- Every new knot MUST identify the evidence or audit delta that created it.
+- A superseded baseline MUST remain traceable and MUST NOT be silently deleted.
+- This memory is a durable index, NOT a replacement for evidence.
+
+A future autonomous cycle MUST be able to answer from this memory:
+
+1. What has already been audited?
+2. What was actually proven?
+3. What remains?
+4. What is externally blocked?
+5. What is the next dependency-ready knot?
+
+#### 15.1.1 Current Audit Baseline — `stage15-k8-installed-product-acceptance-2026-09-15`
+
+| Field | Value |
+|---|---|
+| AUDIT ID | `stage15-k8-installed-product-acceptance-2026-09-15` |
+| DATE | 2026-09-15 |
+| AUDIT ARTIFACT (evidence source) | `.kilo/plans/stage15-k8-installed-product-acceptance-checkpoint.md` |
+| EVIDENCE ARTIFACT | `.kilo/evidence/stage15-k8-installed-product-acceptance.txt` |
+| TYPE | Bounded Stage 15 productization-knot verdict (K8 `productization.installed-product-acceptance`); the prior `blocker-b1-b5-readiness-delta-2026-09-14` baseline is preserved in §15.1.1a and §15.1.2 |
+| PRE-CHANGE TRUSTED CHECKPOINT | `14995d7d21b1c97a0083a9aa147793bd9fb2f5fd` |
+| QUEUE STATUS | CURRENT — stages 1–15 COMPLETE; K8 `productization.installed-product-acceptance` EXECUTED and VERIFIED |
+| VERIFIED STAGES | Stages 1–15 (through Stage 15 K8) |
+| NEXT DEPENDENCY-READY KNOT | None — K5 `commercial.subscription-entitlements` CONDITIONAL (scope-gated), K6 `assurance.android-build-test-evidence` BLOCKED (environment/host + external device), K7 `assurance.runtime-server-unit-coverage` NOT_NEEDED |
+
+Completion states recorded by this verdict (unchanged from §15.1.1a):
+
+| State | Value |
+|---|---|
+| `assistantComplete` | TRUE (functionally) |
+| `canonicalPlatformConstructionComplete` | FALSE |
+| `commercialProductRuntimeComplete` | FALSE |
+| `externalProductionDependenciesComplete` | FALSE |
+| `productComplete` | FALSE |
+
+**K8 (Stage 15) closure — `productization.installed-product-acceptance`.** VERIFIED. The real
+installed Windows artifact now qualifies end-to-end: isolated Inno Setup build → silent isolated install
+→ real installed shortcut launch → real `/health` → authenticated customer journey (register/session/PDF
+boundary/CSV ingest/analysis/dashboard/sources/tenant-isolation) → offline queue/reload/reconnect →
+kill → relaunch through the real shortcut → re-login → persisted analysis. Full acceptance exit code 0
+with **16/16** checks including `restart-recovery` and `persistence`.
+
+Root cause of the resumed BLOCKED state (an **acceptance-harness defect**, not a product defect):
+`scripts/installed-product-acceptance.cjs` launched the launcher with
+`spawn('cmd.exe', ['/d','/s','/c', `"${launcher}"`])`; Node/libuv escapes the embedded quotes to `\"`,
+so `cmd.exe` received a literal `\"…launch-hooshyar.cmd\"` command, printed
+`'\"…launch-hooshyar.cmd\"' is not recognized as an internal or external command`, and exited **1**
+without starting the product. The harness's `stdio: 'ignore'` plus swallowed `error` event hid the
+cause, leaving only `installed runtime did not recover after restart`. The product launcher itself is
+correct (manual launch reaches `/health` in ~1 s) and was not changed.
+
+Repair (smallest canonical owner = the harness): `launchInstalledShortcut()` now activates the **real
+installed shortcut target** used by `installer/HooshyarOS.iss` `[Icons]`/`[Run]`,
+`wscript.exe "<app>\launch-hooshyar.vbs"` with `cwd: installDir`; stdio is captured; and
+`launchInstalledProduct()` requires both a real health success **and** a clean launcher exit
+(`exit.code === 0`). No criterion was weakened, no mock was introduced, and no product code changed.
+
+Evidence: focused K8 suites **4 suites / 50 tests PASS**
+(`CommercialAcceptanceBarrier`, `InstalledProductPackagingRepair`, `PdfAcquisition`,
+`OfflineSyncClient`); bounded focused restart check PASS (first launch healthy 1636 ms / exit 0;
+restart after kill healthy 2024 ms / exit 0); full installed-product acceptance
+`.kilo/evidence/stage15-k8-installed-product-acceptance.txt` = `status: PASS`, and
+`.hooshyar/installed-product-acceptance.json` with `launcherHealthy: true`,
+`runtimeDependenciesVerified: true`, `repairedClientInstalled: true`.
+
+Related K8 evidence not invalidated by this repair: PDF acquisition acceptance
+`.hooshyar/pdf-acquisition-acceptance.json` (PASS) and web/application acceptance
+`.hooshyar/web-acceptance-success.json` (PASS, v8) with
+`.kilo/evidence/stage15-k8-web-application-acceptance.txt`.
+
+External/approval blockers: **B1** encryption-at-rest/key management (architecture change
+control / pending human 05C decisions), **B2** payment-provider activation, **B3** production
+cloud/DNS/TLS resources and **B4** Android device acceptance remain unchanged; **B5 is CORRECTED —
+Inno Setup 6.7.3 IS available on this host** (`C:\Users\avalipour\AppData\Local\Programs\Inno Setup 6\ISCC.exe`;
+the earlier B5 probe checked only Program Files), so B5 is a build-host prerequisite satisfied here
+rather than a host-environment blocker. A code-signing certificate (the installer is
+Authenticode-NotSigned) remains an external prerequisite for signed distribution.
+
+Valid next stages from this baseline: no primary and no dependency-ready repository-local knot remains.
+K5 is CONDITIONAL, K6 is BLOCKED (environment + external device), K7 is NOT_NEEDED. No stage may be
+skipped, invented or reordered without a new evidence-backed audit delta.
+
+**Bounded delta (2026-09-15) — `stage15-k8-installer-rebuild-installation-ready-2026-09-15`.** A
+non-stage, non-reopening delta rebuilt and re-accepted the installation-ready Windows artifact from
+the verified commit `6afbd28b` in a clean isolated worktree (committed lock; payload 5472 files /
+258 MB; behavioral payload `/health` gate PASS). Artifact
+`dist/productization/windows/installer/HooshyarOS-Setup-1.0.0.exe` = 57,452,433 bytes, SHA-256
+`2235C85648E588B506B38F879709A08DB2E160E4587600895AEA829737796E4F`; the installed-product acceptance
+re-ran against it to `status: PASS`, exit code 0, **16/16** checks (`restart-recovery`, `persistence`
+included) in the isolated `HooshyarOS-Acceptance` location. Two additional bounded acceptance-harness
+robustness defects were found and repaired in the canonical harness
+(`scripts/installed-product-acceptance.cjs`): the isolated acceptance installer's `[Run]` auto-launch
+raced the harness launch (`database is locked`, errcode 5; repaired with `skipifsilent` on the
+generated isolated `.iss` only), and `waitLauncherExit()` could miss a launcher exit that preceded
+listener attachment (repaired by capturing the exit at spawn). Neither change weakens a criterion;
+product code and the production installer are unchanged. K8 remains VERIFIED and no new
+stage/queue/ledger entry was created. Evidence:
+`.kilo/evidence/stage15-k8-installer-rebuild-installation-ready-2026-09-15.txt`.
+
+#### 15.1.1a Superseded Baseline — `blocker-b1-b5-readiness-delta-2026-09-14`
+
+| Field | Value |
+|---|---|
+| AUDIT ID | `blocker-b1-b5-readiness-delta-2026-09-14` |
+| DATE | 2026-09-14 |
+| AUDIT ARTIFACT (evidence source) | `.kilo/plans/blocker-b1-b5-readiness-delta-2026-09-14.md` |
+| TYPE | Bounded B1–B5 blocker readiness delta (read-only; no implementation, no full 16-layer audit); prior baseline preserved in §15.1.2 |
+| PRE-CHANGE TRUSTED CHECKPOINT | `a8538ff028186ecb5eed196143e559917909c2a9` |
+| QUEUE STATUS | CURRENT — stages 1–14 COMPLETE; no primary repository-local knot remains; queue/ledger status unchanged by this readiness audit |
+| VERIFIED STAGES | Stages 1–14 (through Stage 14 K4) |
+| NEXT DEPENDENCY-READY KNOT | None — K5 CONDITIONAL (scope-gated), K6 BLOCKED (environment/host + external device), K7 NOT_NEEDED; no blocker is actionable |
+
+Completion states recorded by that audit:
+
+| State | Value |
+|---|---|
+| `assistantComplete` | TRUE (functionally) |
+| `canonicalPlatformConstructionComplete` | FALSE |
+| `commercialProductRuntimeComplete` | FALSE |
+| `externalProductionDependenciesComplete` | FALSE |
+| `productComplete` | FALSE |
+
+K4 verified **no completion-state change**: it was a docs-only standardization knot that reconciled the
+approved local execution-operator model across the Master Charter, the Final Decisions Register and
+`AUTONOMOUS_MISSION.md`. No runtime, test, architecture, completion-gate or external-dependency code changed,
+and `productComplete` / `externalProductionDependenciesComplete` remain `FALSE` because the blocked external
+production dependencies still prevent a completion state.
+
+Remaining repository-local knots: **0 primary**; **K5 CONDITIONAL**, **K6 BLOCKED** (environment/host + external device), **K7 NOT_NEEDED** (readiness delta 2026-09-14).
+
+| ID | Knot | Class | Status | Stage |
+|---|---|---|---|---|
+| K4 | `standardization.governance-operator-reconciliation` | Primary — docs-only consistency | COMPLETE (Stage 14) | 14 |
+| K5 | `commercial.subscription-entitlements` (repo-local boundary only) | Conditional — scope-gated | **CONDITIONAL** (readiness delta 2026-09-14) | 15 |
+| K6 | `assurance.android-build-test-evidence` | Conditional — scope/environment | **BLOCKED** (environment/host + external device; readiness delta 2026-09-14) | 16 |
+| K7 | `assurance.runtime-server-unit-coverage` | LOW test-coverage gap | **NOT_NEEDED** (registered basis factually incorrect; readiness delta 2026-09-14) | 17 |
+
+**B1–B5 blocker readiness delta (2026-09-14, baseline `a8538ff0`).** Bounded readiness-only audit
+`.kilo/plans/blocker-b1-b5-readiness-delta-2026-09-14.md`; classifications (exactly one per blocker):
+
+- **B1 — `BLOCKED_HUMAN_APPROVAL`, ACTIONABLE_NOW=FALSE.** The encryption *foundation* exists and is committed
+  (`Backend/HBOS/Security/EncryptionService.ts`, AES-256-GCM, per-tenant DEK, commit `1608a7ea`), but the
+  production store `Product/SQLitePersistenceStore.ts` is plaintext and `CommercialRuntimeServer.ts:307`
+  constructs it with no `encryption` config. **No approved architecture decision permits encryption-at-rest**
+  (`Docs/ARCHITECTURE_DECISIONS/` holds only `KILO_GOVERNED_OPERATOR_DECISION.md`; `ARCHITECTURE.md` has no
+  encryption entry). Ledger `C5` = "ARCHITECTURE CHANGE CONTROL REQUIRED … BLOCKED pending human approval of 7
+  critical 05C decisions"; `phase-05c-e-security-audit.md` records encryption-for-audit as `REQUIRES_HUMAN_APPROVAL`.
+  05C approval/change-control is still required — **do not implement**. Prerequisite: human approval.
+- **B2 — `BLOCKED_EXTERNAL`, ACTIONABLE_NOW=FALSE.** `ExternalProductionDependencyAudit.ts:22-37` = `BLOCKED`
+  unless `HOOSHYAR_PAYMENT_PROVIDER_ACTIVATED=1`; the flag and health URL are empty; no provider account,
+  credential or webhook is present. Prerequisite: external payment-provider account/activation. The repo-local
+  entitlement boundary is **K5**, which is separately scope-gated (contract L229) and is **not** made ready by B2.
+- **B3 — `BLOCKED_EXTERNAL`, ACTIONABLE_NOW=FALSE.** `ExternalProductionDependencyAudit.ts:39-54` = `BLOCKED`
+  unless `HOOSHYAR_PRODUCTION_CLOUD_READY=1`; the flag and production health URL are empty; no in-repo TLS and no
+  reachable cloud/DNS/TLS resources. Prerequisite: external cloud/DNS/TLS infrastructure. Deployment readiness
+  was not fabricated.
+- **B4 — `BLOCKED_ENVIRONMENT`, ACTIONABLE_NOW=FALSE.** `android/` holds only 6 files with no `gradlew` and no
+  `app/src/test`/`androidTest` source set; host probes show no `gradle`/`java`/`javac`/`adb` and empty
+  `ANDROID_HOME`/`ANDROID_SDK_ROOT`; `PRODUCT_QUALIFICATION_MATRIX.json:11` `android-release` = `REQUIRES_DEVICE_EXECUTION`.
+  This is an environment/device blocker, **not** a coding gap. Prerequisite: JDK+Gradle+Android SDK host **and**
+  external device. No toolchain was installed or altered.
+- **B5 — `BLOCKED_ENVIRONMENT`, ACTIONABLE_NOW=FALSE.** `installer/HooshyarOS.iss` and
+  `scripts/build-windows-installer.ps1` exist, but the script throws when `ISCC.exe` is absent
+  (`scripts/build-windows-installer.ps1:31-32`); host probe finds no `ISCC` and neither standard Inno Setup 6
+  path. Prerequisite: Inno Setup 6 host. No installer was built.
+
+**ACTIONABLE BLOCKER: NONE. K5 UNBLOCKED = FALSE. K6 UNBLOCKED = FALSE.** No blocker changed class; no
+queue/ledger status was changed and no stage was started. Completion states are unchanged — **verified — no
+state change.** The prior K5/K6/K7 conditional readiness delta is preserved in §15.1.2 and its own artifact.
+
+**K4 (Stage 14) closure.** `standardization.governance-operator-reconciliation` VERIFIED as a docs-only
+reconciliation. The Master Charter §8/§9/§17 wording, the Final Decisions Register §7/§16/§18 and
+`AUTONOMOUS_MISSION.md` now record the already-approved local execution-operator model: approved local operators
+(for example Kilo Code) are subordinate, replaceable execution mechanisms under the three authorities
+(Python/GitHub/Assistant) and are **not** external coding providers or architectural authorities. This removes the
+apparent contradiction with Governance Charter §5/§10 without changing any governance rule. No source code, test,
+architecture engine, completion gate or external-dependency implementation was modified. Evidence:
+`.kilo/plans/standardization-governance-operator-reconciliation-checkpoint.md`.
+
+Previously closed (Stage 13): **K3** `assurance.completion-audit-integrity`. The
+completion gate (`CanonicalCapabilityAudit.ts`, `CommercialProductCompletionAudit.ts`, composed by
+`AutonomousBuildDaemon.ts`) no longer derives completion from file existence, contract-marker
+strings or regex method probes. `CapabilityEvidenceAudit.evaluateCompletion()` now requires present,
+verified, checkpoint-fresh and unblocked unit/integration/application/acceptance evidence and treats
+missing, stale, contradictory or externally-blocked evidence as non-complete;
+`CanonicalCapabilityAudit` requires real behavioral evidence per capability;
+`CommercialProductCompletionAudit` requires commit-bound canonical application/acceptance evidence;
+and the daemon returns `COMPLETION_EVIDENCE_INSUFFICIENT` when the gate is incomplete. Evidence:
+`.kilo/plans/assurance-completion-audit-integrity-checkpoint.md`,
+`.kilo/evidence/stage13-k3-completion-audit-integrity-acceptance.txt` (19/19 PASS).
+
+External/approval blockers unchanged: **B1** encryption-at-rest/key management (architecture change control / pending human 05C decisions), **B2** payment-provider activation, **B3** production cloud/DNS/TLS resources, **B4** Android device acceptance, **B5** Inno Setup host.
+
+Valid next stages from this baseline: no primary and no dependency-ready repository-local knot remains. K5 `commercial.subscription-entitlements` is CONDITIONAL (approved subscription scope unconfirmed), K6 `assurance.android-build-test-evidence` is BLOCKED (missing Gradle/JDK/Android SDK host + external device B4), and K7 `assurance.runtime-server-unit-coverage` is NOT_NEEDED (dedicated suite exists; contract coverage already present). No stage may be skipped, invented or reordered without a new evidence-backed audit delta.
+
+Provenance of K3 (retained from prior baselines, now closed): the autonomous completion gate derived completion from file existence, contract-marker strings and regex method-name probes rather than runtime/application/acceptance evidence — a genuine false-positive risk against Governance Charter §15. It was recorded, then repaired fail-closed in Stage 13.
+
+Bounded observation recorded during K3 (no new knot): `scripts/commercial-application-acceptance.cjs` cannot launch its nested `npm run` steps on this Windows host (nested `spawnSync('npm.cmd', …, { shell: false })` produces no output, exit 1). The canonical per-surface harnesses (`product:web:acceptance`, `product:security:acceptance`) run directly and are the evidence source the completion gate consumes.
+
+#### 15.1.2 Historical Audit / Verification Records (evidenced only)
+
+Only records whose completion is supported by their own artifact and/or a verifiable commit are listed. Where a historical status cannot be proven from the repository, it MUST be recorded as **UNKNOWN**, never guessed.
+
+| Artifact | Baseline / HEAD | Evidenced status |
+|---|---|---|
+| `.kilo/plans/platform-wide-commercialization-conformance-audit.md` | `c2fd5733` | COMPLETE (audit); prior principal conformance audit; `product.secure-identity-bootstrap` VERIFIED; `EngineDependencyVerifier` REPAIRED/VERIFIED (§30) |
+| `.kilo/plans/commercialization-standardization-master-plan.md` | `68ddc9c1` | ACTIVE; phases 1–14 reconciliation recorded (Phase 10 = CONDITIONAL PASS) |
+| `.kilo/plans/ACTIVE-COMMERCIALIZATION-MASTER-LEDGER.md` | audit HEAD `a0f0018c` | stages 1–10 recorded VERIFIED (checkpoint-backed); later extended through Stage 13 |
+| `.kilo/plans/post-k2-bounded-reaudit-2026-09-14.md` (baseline `post-k2-offline-sync-reaudit-2026-09-14`, checkpoint `8fd6f522`) | `8fd6f522` | SUPERSEDED by `post-k3-completion-audit-integrity-reaudit-2026-09-14`; recorded stages 1–12 COMPLETE, Layer 11 repository-local complete, and K3 as the next knot; K3 later closed (Stage 13) |
+| `.kilo/plans/post-k3-bounded-reaudit-2026-09-14.md` + `.kilo/plans/assurance-completion-audit-integrity-checkpoint.md` (baseline `post-k3-completion-audit-integrity-reaudit-2026-09-14`, checkpoint `6bf54042`) | `6bf54042` | SUPERSEDED by `post-k4-governance-operator-reconciliation-2026-09-14`; K3 `assurance.completion-audit-integrity` VERIFIED — completion gate fail-closed on missing/stale/blocked behavioral/application/acceptance evidence; evidence `.kilo/evidence/stage13-k3-completion-audit-integrity-acceptance.txt` (19/19 PASS) |
+| `.kilo/plans/standardization-governance-operator-reconciliation-checkpoint.md` (baseline `post-k4-governance-operator-reconciliation-2026-09-14`, checkpoint `ed3c47fc`) | `ed3c47fc` | SUPERSEDED by `conditional-k5-k7-readiness-delta-2026-09-14`; K4 `standardization.governance-operator-reconciliation` VERIFIED — docs-only reconciliation of the approved local execution-operator model across Master Charter §8/§9/§17, Final Decisions Register §7/§16/§18 and `AUTONOMOUS_MISSION.md`; no source code, test, architecture, completion-gate or external-dependency change |
+| `.kilo/plans/conditional-k5-k7-readiness-delta-2026-09-14.md` (baseline `conditional-k5-k7-readiness-delta-2026-09-14`, checkpoint `a8538ff0`) | `a8538ff0` | SUPERSEDED by `blocker-b1-b5-readiness-delta-2026-09-14`; bounded readiness-only delta for conditional knots K5/K6/K7 — **K5 CONDITIONAL** (scope unconfirmed; B2 external), **K6 BLOCKED** (no Gradle/JDK/Android SDK/host; B4 device external), **K7 NOT_NEEDED** (dedicated `CommercialRuntimeServer.test.ts` exists; coverage already present). Next dependency-ready knot NONE. No source/test/queue/ledger/completion-flag change |
+| `.kilo/plans/blocker-b1-b5-readiness-delta-2026-09-14.md` (baseline `blocker-b1-b5-readiness-delta-2026-09-14`, checkpoint `a8538ff0`) | `a8538ff0` | SUPERSEDED by `stage15-k8-installed-product-acceptance-2026-09-15` (preserved in §15.1.1a); bounded read-only B1–B5 blocker readiness delta — **B1 BLOCKED_HUMAN_APPROVAL** (no approved encryption-at-rest decision; pending 05C change-control), **B2 BLOCKED_EXTERNAL** (payment provider), **B3 BLOCKED_EXTERNAL** (cloud/DNS/TLS), **B4 BLOCKED_ENVIRONMENT** (no Gradle/JDK/Android SDK/adb; external device; not a coding gap), **B5 BLOCKED_ENVIRONMENT** (no Inno Setup 6 host). ACTIONABLE BLOCKER NONE. No source/test/queue/ledger/completion-flag change |
+| `.kilo/plans/stage15-k8-installed-product-acceptance-checkpoint.md` (baseline `stage15-k8-installed-product-acceptance-2026-09-15`, checkpoint `14995d7d`) | `14995d7d` | SUPERSEDED by future baselines only; K8 `productization.installed-product-acceptance` VERIFIED — real installed Windows artifact acceptance PASS (16/16 checks incl. `restart-recovery`/`persistence`); repaired an acceptance-harness Windows cmd.exe double-quoting defect (product correct, launcher unchanged); focused 4 suites/50 tests PASS; evidence `.kilo/evidence/stage15-k8-installed-product-acceptance.txt` |
+| `.kilo/evidence/stage15-k8-installer-rebuild-installation-ready-2026-09-15.txt` (delta `stage15-k8-installer-rebuild-installation-ready-2026-09-15`, verified commit `6afbd28b`) | `6afbd28b` | Bounded non-stage delta — installation-ready installer rebuilt from the verified commit in a clean isolated worktree and re-accepted against the new artifact (PASS, exit 0, 16/16 incl. `restart-recovery`/`persistence`); B5 corrected to **AVAILABLE ON THIS HOST** (Inno Setup 6.7.3 in LocalAppData); two bounded acceptance-harness robustness repairs (`skipifsilent` on the generated isolated acceptance installer; spawn-time launcher exit capture); K8 remains VERIFIED |
+| `.kilo/plans/AUTONOMOUS-COMMERCIALIZATION-EXECUTION-QUEUE.md` | derived from ledger | stages 1–15 COMPLETE; no primary repository-local knot remains; B1–B5 BLOCKED; K5–K7 conditional |
+| `.kilo/plans/fresh-governed-commercialization-reaudit-2026-09-14.md` (baseline `fresh-governed-commercialization-2026-09-14`, checkpoint `977ea944`) | `977ea944` | SUPERSEDED by `post-k2-offline-sync-reaudit-2026-09-14`; recorded knots K1–K4/K5–K7 and blockers B1–B5; K1 and K2 later closed (Stages 11–12) |
+| `.kilo/plans/phase-11-final-checkpoint.md` | `8ed51f0e` | declared VERIFIED; its `canonicalPlatformConstructionComplete: true` claim is SUPERSEDED by later evidence (`phase-14-final-checkpoint.md` and the 2026-09-14 audit both record FALSE) |
+| `.kilo/plans/phase-12-final-checkpoint.md` | `849f5709` | VERIFIED; local == remote TRUE |
+| `.kilo/plans/phase-13-final-checkpoint.md` | `ed754200` | VERIFIED; remote synchronization confirmed in artifact |
+| `.kilo/plans/phase-14-final-checkpoint.md` | base `e0cc6ce0`; code HEAD `c769c184` | VERIFIED |
+| earlier phase checkpoints (`phase-08*` … `phase-10*`, stage/phase checkpoints under `.kilo/plans/`) | various | Evidence-backed only where the checkpoint declares its tests, result and commit SHA; otherwise **UNKNOWN**. `PHASE-10-FINAL-QUALIFICATION-REPORT.md` = PASS WITH FINDINGS (untracked working-tree artifact) |
+
+Superseded baselines (for example the `phase-11` completion claim and the `a0f0018c`/`c2fd5733` audit baselines) remain traceable here and in their own artifacts; they are historical evidence and are never silently deleted.
+
+#### 15.1.3 Source-of-Truth Discipline
+
+This subsection is a durable index, not a competing source of truth. The governing hierarchy remains:
+
+1. `Docs/HOOSHYAROS_MASTER_CHARTER.md` (this charter)
+2. `Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md`
+3. `Docs/ARCHITECTURE.md` — Architecture Freeze V4
+4. `Assistant/SYSTEM_PROMPT.md`
+5. Existing decisions, implementations, tests and documentation
+6. Current repository state and Git history
+7. Detailed audit evidence (the audit artifact named in §15.1.1)
+
+When this index and a detailed audit artifact disagree, the detailed artifact and current repository evidence win, the disagreement is preserved as evidence, and the index is corrected. Audit Memory never weakens, replaces or overrides Governing evidence.
+
+#### 15.1.4 Post-Audit Update Rule — PERMANENT
+
+Every significant audit MUST, immediately after reaching its final verdict and before ending the audit mission, update Audit Memory. No separate human command is required, and this update MUST NOT trigger a full re-audit.
+
+The update records only:
+
+- audit ID;
+- date;
+- detailed evidence artifact;
+- trusted checkpoint;
+- completion states;
+- remaining repository-local knots;
+- external/approval blockers;
+- queue status;
+- next dependency-ready knot.
+
+If the audit changes no state, it MUST record **verified — no state change**. Audit Memory remains a durable index, NOT a replacement for evidence, and the governing source-of-truth hierarchy (Section 2 and §15.1.3) remains unchanged.
 
 ---
 
@@ -462,7 +789,7 @@ Never solve uncertainty by inventing a new architecture.
 
 **Rollback, repair and re-verify when wrong.**
 
-**Use only Python, GitHub and the Assistant for construction.**
+**Use only the Python/GitHub/Assistant authorities for construction, with approved local execution operators acting under them.**
 
 **Verify before claiming completion.**
 
@@ -518,3 +845,8 @@ When a more specific technical contract defines an implementation detail, follow
 **ASSISTANT ROLE: CONSTRUCTION INTELLIGENCE ONLY**
 
 **PLATFORM CONTINUATION AFTER ASSISTANT COMPLETION: REQUIRED**
+
+
+## Phase 12 Reservation — Resilience, Analytical Intelligence & Commercial Realization
+
+The Resilience, Analytical Intelligence & Commercial Realization Audit Contract V1 is reserved for Phase 12. It MUST NOT pre-empt, interrupt, or redefine Phase 11. Phase 12 may begin only after the Phase 11 completion gate is independently verified. When Phase 12 begins, the contract becomes an active mandatory audit/implementation/commercialization workstream under Architecture Freeze V4.1 and existing governance controls.

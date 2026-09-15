@@ -20,10 +20,16 @@ describe("Windows product installer contract", () => {
 
     it("copies the runtime dependency closure", () => {
         expect(builder).toContain("def _runtime_dependency_names");
-        expect(builder).toContain("def _copy_node_dependency");
         expect(builder).toContain("def _copy_runtime_node_modules");
-        expect(builder).toContain("tsx");
-        expect(builder).toContain("typescript");
+        expect(builder).toContain("for name in _runtime_dependency_names()");
+        expect(builder).toContain("shutil.copytree(src, destination / name, dirs_exist_ok=True)");
+        expect(builder).toContain("def _production_dependency_roots");
+        expect(builder).toContain("RUNTIME_DEPENDENCY_ROOTS = (\"tsx\",)");
+        expect(builder).toContain("_copy_runtime_node_modules(ROOT, payload)");
+        expect(builder).toContain("exceljs-hardened");
+        expect(builder).toContain("mammoth");
+        expect(builder).toContain("pdf-parse");
+        expect(builder).toContain("better-sqlite3");
     });
 
     it("bundles an executable Node runtime and an observable launch surface", () => {
@@ -47,6 +53,6 @@ describe("Windows product installer contract", () => {
         expect(builder).toContain("start-commercial-runtime.ts");
         expect(builder).toContain("product-manifest.json");
         expect(builder).toContain('web = payload / "web"');
-        expect(builder).toContain('index = web / "index.html"');
+        expect(builder).toContain('payload / "web" / "index.html"');
     });
 });

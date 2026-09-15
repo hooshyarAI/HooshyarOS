@@ -1,6 +1,7 @@
 ﻿__pycache__/
 *.pyc
 *.db
+*.sqlite
 .env
 .vscode/
 
@@ -16,3 +17,9 @@ node_modules/
 .aider.tags.cache.v4/
 .vscode-clean/
 .vscode-extensions-clean/
+
+# Local Kilo project configuration
+.kilo/kilo.jsonc
+
+# Local HooshyarOS product-factory evidence
+.hooshyar/*.json
