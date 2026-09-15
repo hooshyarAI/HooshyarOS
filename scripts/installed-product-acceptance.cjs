@@ -95,19 +95,28 @@ function launchInstalledShortcut() {
     windowsHide: true,
   });
   const captured = { stdout: '', stderr: '' };
-  child.on('error', () => undefined);
+  const exited = new Promise((resolve) => {
+    child.once('error', (error) => resolve({ error }));
+    child.once('exit', (code, signal) => resolve({ code, signal }));
+  });
   child.stdout.on('data', (chunk) => { captured.stdout += chunk.toString(); });
   child.stderr.on('data', (chunk) => { captured.stderr += chunk.toString(); });
-  return { child, captured };
+  return { child, captured, exited };
 }
 
 /** Bounded wait for the launcher process to exit, preserving its captured output. */
 function waitLauncherExit(launcher, timeoutMs) {
-  const { child, captured } = launcher;
+  let timer;
   return new Promise((resolve) => {
-    const timer = setTimeout(() => resolve({ timedOut: true, ...captured }), timeoutMs);
-    child.once('error', (error) => { clearTimeout(timer); resolve({ error, ...captured }); });
-    child.once('exit', (code, signal) => { clearTimeout(timer); resolve({ code, signal, ...captured }); });
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve({ ...result, ...launcher.captured });
+    };
+    timer = setTimeout(() => finish({ timedOut: true }), timeoutMs);
+    launcher.exited.then(finish);
   });
 }
 
@@ -157,8 +166,9 @@ function buildIsolatedInstaller() {
     .replace(/OutputDir=.*\r?\n/, `OutputDir=${installerOut}\n`)
     .replace(/OutputBaseFilename=.*\r?\n/, 'OutputBaseFilename=HooshyarOS-Acceptance-Setup\n')
     .replace(/SetupIconFile=.*\r?\n/, `SetupIconFile=${path.join(payload, 'hooshyaros.ico')}\n`)
-    .replace(/Source: ".*payload\\\*"/, `Source: "${path.join(payload, '*')}"`);
-  if (!isolated.includes('HooshyarOS-Acceptance') || !isolated.includes(appId)) fail('failed to generate the isolated installer definition');
+    .replace(/Source: ".*payload\\\*"/, `Source: "${path.join(payload, '*')}"`)
+    .replace(/Flags: runhidden nowait/, 'Flags: runhidden nowait skipifsilent');
+  if (!isolated.includes('HooshyarOS-Acceptance') || !isolated.includes(appId) || !isolated.includes('skipifsilent')) fail('failed to generate the isolated installer definition');
   fs.writeFileSync(isolatedIss, isolated, 'utf8');
 
   run(iscc, [isolatedIss]);

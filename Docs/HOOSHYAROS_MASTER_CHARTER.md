@@ -568,13 +568,34 @@ Related K8 evidence not invalidated by this repair: PDF acquisition acceptance
 `.hooshyar/web-acceptance-success.json` (PASS, v8) with
 `.kilo/evidence/stage15-k8-web-application-acceptance.txt`.
 
-External/approval blockers unchanged: **B1** encryption-at-rest/key management (architecture change
+External/approval blockers: **B1** encryption-at-rest/key management (architecture change
 control / pending human 05C decisions), **B2** payment-provider activation, **B3** production
-cloud/DNS/TLS resources, **B4** Android device acceptance, **B5** Inno Setup host.
+cloud/DNS/TLS resources and **B4** Android device acceptance remain unchanged; **B5 is CORRECTED —
+Inno Setup 6.7.3 IS available on this host** (`C:\Users\avalipour\AppData\Local\Programs\Inno Setup 6\ISCC.exe`;
+the earlier B5 probe checked only Program Files), so B5 is a build-host prerequisite satisfied here
+rather than a host-environment blocker. A code-signing certificate (the installer is
+Authenticode-NotSigned) remains an external prerequisite for signed distribution.
 
 Valid next stages from this baseline: no primary and no dependency-ready repository-local knot remains.
 K5 is CONDITIONAL, K6 is BLOCKED (environment + external device), K7 is NOT_NEEDED. No stage may be
 skipped, invented or reordered without a new evidence-backed audit delta.
+
+**Bounded delta (2026-09-15) — `stage15-k8-installer-rebuild-installation-ready-2026-09-15`.** A
+non-stage, non-reopening delta rebuilt and re-accepted the installation-ready Windows artifact from
+the verified commit `6afbd28b` in a clean isolated worktree (committed lock; payload 5472 files /
+258 MB; behavioral payload `/health` gate PASS). Artifact
+`dist/productization/windows/installer/HooshyarOS-Setup-1.0.0.exe` = 57,452,433 bytes, SHA-256
+`2235C85648E588B506B38F879709A08DB2E160E4587600895AEA829737796E4F`; the installed-product acceptance
+re-ran against it to `status: PASS`, exit code 0, **16/16** checks (`restart-recovery`, `persistence`
+included) in the isolated `HooshyarOS-Acceptance` location. Two additional bounded acceptance-harness
+robustness defects were found and repaired in the canonical harness
+(`scripts/installed-product-acceptance.cjs`): the isolated acceptance installer's `[Run]` auto-launch
+raced the harness launch (`database is locked`, errcode 5; repaired with `skipifsilent` on the
+generated isolated `.iss` only), and `waitLauncherExit()` could miss a launcher exit that preceded
+listener attachment (repaired by capturing the exit at spawn). Neither change weakens a criterion;
+product code and the production installer are unchanged. K8 remains VERIFIED and no new
+stage/queue/ledger entry was created. Evidence:
+`.kilo/evidence/stage15-k8-installer-rebuild-installation-ready-2026-09-15.txt`.
 
 #### 15.1.1a Superseded Baseline — `blocker-b1-b5-readiness-delta-2026-09-14`
 
@@ -691,6 +712,7 @@ Only records whose completion is supported by their own artifact and/or a verifi
 | `.kilo/plans/conditional-k5-k7-readiness-delta-2026-09-14.md` (baseline `conditional-k5-k7-readiness-delta-2026-09-14`, checkpoint `a8538ff0`) | `a8538ff0` | SUPERSEDED by `blocker-b1-b5-readiness-delta-2026-09-14`; bounded readiness-only delta for conditional knots K5/K6/K7 — **K5 CONDITIONAL** (scope unconfirmed; B2 external), **K6 BLOCKED** (no Gradle/JDK/Android SDK/host; B4 device external), **K7 NOT_NEEDED** (dedicated `CommercialRuntimeServer.test.ts` exists; coverage already present). Next dependency-ready knot NONE. No source/test/queue/ledger/completion-flag change |
 | `.kilo/plans/blocker-b1-b5-readiness-delta-2026-09-14.md` (baseline `blocker-b1-b5-readiness-delta-2026-09-14`, checkpoint `a8538ff0`) | `a8538ff0` | SUPERSEDED by `stage15-k8-installed-product-acceptance-2026-09-15` (preserved in §15.1.1a); bounded read-only B1–B5 blocker readiness delta — **B1 BLOCKED_HUMAN_APPROVAL** (no approved encryption-at-rest decision; pending 05C change-control), **B2 BLOCKED_EXTERNAL** (payment provider), **B3 BLOCKED_EXTERNAL** (cloud/DNS/TLS), **B4 BLOCKED_ENVIRONMENT** (no Gradle/JDK/Android SDK/adb; external device; not a coding gap), **B5 BLOCKED_ENVIRONMENT** (no Inno Setup 6 host). ACTIONABLE BLOCKER NONE. No source/test/queue/ledger/completion-flag change |
 | `.kilo/plans/stage15-k8-installed-product-acceptance-checkpoint.md` (baseline `stage15-k8-installed-product-acceptance-2026-09-15`, checkpoint `14995d7d`) | `14995d7d` | SUPERSEDED by future baselines only; K8 `productization.installed-product-acceptance` VERIFIED — real installed Windows artifact acceptance PASS (16/16 checks incl. `restart-recovery`/`persistence`); repaired an acceptance-harness Windows cmd.exe double-quoting defect (product correct, launcher unchanged); focused 4 suites/50 tests PASS; evidence `.kilo/evidence/stage15-k8-installed-product-acceptance.txt` |
+| `.kilo/evidence/stage15-k8-installer-rebuild-installation-ready-2026-09-15.txt` (delta `stage15-k8-installer-rebuild-installation-ready-2026-09-15`, verified commit `6afbd28b`) | `6afbd28b` | Bounded non-stage delta — installation-ready installer rebuilt from the verified commit in a clean isolated worktree and re-accepted against the new artifact (PASS, exit 0, 16/16 incl. `restart-recovery`/`persistence`); B5 corrected to **AVAILABLE ON THIS HOST** (Inno Setup 6.7.3 in LocalAppData); two bounded acceptance-harness robustness repairs (`skipifsilent` on the generated isolated acceptance installer; spawn-time launcher exit capture); K8 remains VERIFIED |
 | `.kilo/plans/AUTONOMOUS-COMMERCIALIZATION-EXECUTION-QUEUE.md` | derived from ledger | stages 1–15 COMPLETE; no primary repository-local knot remains; B1–B5 BLOCKED; K5–K7 conditional |
 | `.kilo/plans/fresh-governed-commercialization-reaudit-2026-09-14.md` (baseline `fresh-governed-commercialization-2026-09-14`, checkpoint `977ea944`) | `977ea944` | SUPERSEDED by `post-k2-offline-sync-reaudit-2026-09-14`; recorded knots K1–K4/K5–K7 and blockers B1–B5; K1 and K2 later closed (Stages 11–12) |
 | `.kilo/plans/phase-11-final-checkpoint.md` | `8ed51f0e` | declared VERIFIED; its `canonicalPlatformConstructionComplete: true` claim is SUPERSEDED by later evidence (`phase-14-final-checkpoint.md` and the 2026-09-14 audit both record FALSE) |
