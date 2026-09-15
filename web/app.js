@@ -1,7 +1,30 @@
+const syncApi = typeof window !== 'undefined' && window.HooshyarOfflineSync ? window.HooshyarOfflineSync : null;
+
+function classifiedError(message, kind, extra) {
+  if (syncApi) return syncApi.typedError(message, kind, extra);
+  const error = new Error(message);
+  error.kind = kind;
+  if (extra) Object.assign(error, extra);
+  return error;
+}
+
 async function getJson(path, options) {
-  const response = await fetch(path, options);
-  const payload = await response.json();
-  if (!response.ok) throw new Error(payload.error || `HTTP_${response.status}`);
+  let response;
+  try {
+    response = await fetch(path, options);
+  } catch (error) {
+    throw syncApi ? syncApi.networkError(error) : classifiedError(`offline-network-failure:${error && error.message ? error.message : 'unknown'}`, 'NETWORK_FAILURE', { cause: error });
+  }
+  let payload = {};
+  try {
+    payload = await response.json();
+  } catch {
+    payload = {};
+  }
+  if (!response.ok) {
+    const kind = syncApi ? syncApi.classifyHttpStatus(response.status) : 'HTTP_4XX';
+    throw classifiedError(payload.error || `HTTP_${response.status}`, kind, { status: response.status });
+  }
   return payload;
 }
 
@@ -22,13 +45,45 @@ function rotateIdempotencyKey(scope) {
 }
 
 const offlineSync = typeof window !== 'undefined' && window.HooshyarOfflineSync
-  ? window.HooshyarOfflineSync.createOfflineSync({ storage: window.localStorage })
+  ? window.HooshyarOfflineSync.createOfflineSync({})
   : null;
 
 const lastSyncCursors = new Map();
 
-function isOfflineError(error) {
-  return (typeof navigator !== 'undefined' && navigator.onLine === false) || error instanceof TypeError;
+function classifyErrorKind(error) {
+  return syncApi
+    ? syncApi.classifyFailure(error, typeof navigator !== 'undefined' ? navigator : undefined)
+    : ((error && error.kind) || 'APPLICATION_FAILURE');
+}
+
+function isConnectivityError(error) {
+  return syncApi ? syncApi.isConnectivityFailure(classifyErrorKind(error)) : false;
+}
+
+function describeFailure(error) {
+  const kind = classifyErrorKind(error);
+  const message = error && error.message ? error.message : String(error);
+  switch (kind) {
+    case 'STORAGE_QUOTA_FAILURE':
+      return 'فضای ذخیره‌سازی مرورگر برای صف آفلاین کافی نیست؛ فایل ذخیره نشد. اتصال را برقرار کنید و دوباره تلاش کنید.';
+    case 'STORAGE_FAILURE':
+      return 'ذخیره‌سازی صف آفلاین ناموفق بود؛ فایل در صف ذخیره نشد.';
+    case 'FILE_REPRESENTATION_FAILURE':
+      return `خواندن یا شناسایی فایل ناموفق بود: ${message}`;
+    case 'AUTHENTICATION_FAILURE':
+      return 'نشست معتبر نیست؛ دوباره وارد شوید.';
+    case 'AUTHORIZATION_FAILURE':
+      return 'برای این عملیات مجوز ندارید.';
+    case 'HTTP_5XX':
+      return `خطای موقت سرویس: ${message}`;
+    case 'VALIDATION_FAILURE':
+      if (message === 'INGEST_FORMAT_UNSUPPORTED') {
+        return 'این فرمت فایل در حال حاضر پشتیبانی نمی‌شود (PDF/DOCX/XLS/تصویر)؛ فایل CSV، JSON، TXT یا XLSX انتخاب کنید.';
+      }
+      return `ورودی نامعتبر است: ${message}`;
+    default:
+      return message;
+  }
 }
 
 async function refreshSyncState() {
@@ -51,8 +106,12 @@ async function flushOfflineQueue() {
       if (report.pending === 0 && report.rejected.length === 0) {
         const conflicts = report.conflicts.length ? ` (${report.conflicts.length} تعارض با مرجع سرور حل شد)` : '';
         target.textContent = `همگام‌سازی آفلاین: ${report.synced.length} مورد ارسال شد${conflicts}.`;
-      } else if (report.status === 'OFFLINE') {
+      } else if (report.status === 'OFFLINE' || report.status === 'NETWORK_FAILURE') {
         target.textContent = `اتصال هنوز برقرار نیست؛ ${report.pending} مورد در صف آفلاین باقی ماند.`;
+      } else if (report.status === 'AUTHENTICATION_FAILURE' || report.status === 'AUTHORIZATION_FAILURE') {
+        target.textContent = `همگام‌سازی انجام نشد؛ ابتدا دوباره وارد شوید (${report.pending} مورد در صف باقی ماند).`;
+      } else if (report.status === 'STORAGE_QUOTA_FAILURE' || report.status === 'STORAGE_FAILURE') {
+        target.textContent = `ذخیره‌سازی صف آفلاین ناموفق بود؛ کارهای همگام‌سازی‌نشده حفظ شدند (${report.pending} مورد).`;
       } else if (report.rejected.length) {
         target.textContent = `همگام‌سازی: ${report.synced.length} موفق، ${report.rejected.length} رد شد.`;
       }
@@ -131,11 +190,6 @@ document.querySelector('#logout-button').addEventListener('click', async () => {
   }
 });
 
-function fileExtension(name) {
-  const parts = String(name || '').toLowerCase().split('.');
-  return parts.length > 1 ? parts.pop() : '';
-}
-
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -144,9 +198,37 @@ function fileToBase64(file) {
       const comma = result.indexOf(',');
       resolve(comma >= 0 ? result.slice(comma + 1) : result);
     };
-    reader.onerror = () => reject(new Error('FILE_READ_FAILED'));
+    reader.onerror = () => reject(classifiedError('file-read-failed', 'FILE_REPRESENTATION_FAILURE'));
     reader.readAsDataURL(file);
   });
+}
+
+async function readFileText(file) {
+  try {
+    return await file.text();
+  } catch (error) {
+    throw classifiedError(
+      `file-text-failed:${error && error.message ? error.message : 'unknown'}`,
+      'FILE_REPRESENTATION_FAILURE',
+      { cause: error }
+    );
+  }
+}
+
+/**
+ * Resolve the canonical ingest representation for a selected file using the
+ * shared format table. Binary formats are sent as `contentBase64`; text
+ * formats as `content`. PDF is a known-but-unsupported format: it is sent with
+ * its correct identifier so the canonical runtime can fail it closed precisely
+ * (never as CSV, never as an offline event).
+ */
+function resolveIngestRequest(file) {
+  const format = syncApi ? syncApi.formatFromSourceName(file.name) : null;
+  if (!format) {
+    throw classifiedError(`unknown-file-format:${file.name}`, 'FILE_REPRESENTATION_FAILURE');
+  }
+  const binary = syncApi ? syncApi.isBinaryFormat(format) : format === 'XLSX';
+  return { format, binary };
 }
 
 document.querySelector('#analysis-form').addEventListener('submit', async event => {
@@ -155,11 +237,10 @@ document.querySelector('#analysis-form').addEventListener('submit', async event 
   const file = document.querySelector('#csv-file').files[0];
   if (!file) return;
   try {
-    const extension = fileExtension(file.name);
-    const format = extension === 'json' ? 'STRUCTURED' : extension === 'xlsx' ? 'XLSX' : extension === 'txt' ? 'TXT' : 'CSV';
+    const { format, binary } = resolveIngestRequest(file);
     const ingestBody = { sourceName: file.name, format };
-    if (format === 'XLSX') ingestBody.contentBase64 = await fileToBase64(file);
-    else ingestBody.content = await file.text();
+    if (binary) ingestBody.contentBase64 = await fileToBase64(file);
+    else ingestBody.content = await readFileText(file);
     let ingested;
     try {
       ingested = await getJson('/api/ingest', {
@@ -169,12 +250,17 @@ document.querySelector('#analysis-form').addEventListener('submit', async event 
       });
       rotateIdempotencyKey('ingest');
     } catch (error) {
-      if (offlineSync && isOfflineError(error)) {
-        offlineSync.enqueue({
-          ...ingestBody,
-          baseWatermark: lastSyncCursors.get(file.name) || null,
-          idempotencyKey: idempotencyKey('ingest')
-        });
+      if (offlineSync && isConnectivityError(error)) {
+        try {
+          await offlineSync.enqueue({
+            ...ingestBody,
+            baseWatermark: lastSyncCursors.get(file.name) || null,
+            idempotencyKey: idempotencyKey('ingest')
+          });
+        } catch (storageError) {
+          result.textContent = `ذخیره در صف آفلاین ناموفق بود: ${describeFailure(storageError)} فایل حفظ شد؛ پس از برقراری اتصال دوباره تلاش کنید.`;
+          return;
+        }
         rotateIdempotencyKey('ingest');
         result.textContent = 'اتصال در دسترس نیست؛ کار در صف آفلاین ذخیره شد و پس از برقراری اتصال خودکار همگام‌سازی می‌شود.';
         return;
@@ -192,7 +278,7 @@ document.querySelector('#analysis-form').addEventListener('submit', async event 
     });
     result.textContent = `تحلیل موفق (${format}): سود ${Number(analysis.metrics.profit).toLocaleString('fa-IR')}، نسبت بدهی ${Number(analysis.metrics.debtRatio * 100).toLocaleString('fa-IR')}٪. وضعیت: ${analysis.status}`;
     await refreshDashboard();  } catch (error) {
-    result.textContent = `تحلیل ناموفق بود: ${error.message}`;
+    result.textContent = `تحلیل ناموفق بود: ${describeFailure(error)}`;
   }
 });
 

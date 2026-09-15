@@ -114,22 +114,22 @@ export async function acquirePdf(params: {
   const parser = new PDFParse({ data: new Uint8Array(rawBytes) });
   let info: { info?: unknown; metadata?: unknown } = {};
   let textPages: Array<{ num: number; text: string }> = [];
+  const classifyReadError = (e: unknown): null => {
+    if (isLikelyPasswordError(e)) throw new Error(PDF_ERROR_CODES.PASSWORD);
+    if (isLikelyCorruptError(e)) throw new Error(PDF_ERROR_CODES.CORRUPT);
+    return null;
+  };
   try {
-    const [infoResult, textResult] = await Promise.all([
-      parser.getInfo().catch((e: unknown) => {
-        if (isLikelyPasswordError(e)) throw new Error(PDF_ERROR_CODES.PASSWORD);
-        if (isLikelyCorruptError(e)) throw new Error(PDF_ERROR_CODES.CORRUPT);
-        return null;
-      }),
-      parser.getText().catch((e: unknown) => {
-        if (isLikelyPasswordError(e)) throw new Error(PDF_ERROR_CODES.PASSWORD);
-        if (isLikelyCorruptError(e)) throw new Error(PDF_ERROR_CODES.CORRUPT);
-        return null;
-      }),
-    ]);
+    // pdf-parse v2 exposes a single worker-backed parser instance that cannot
+    // service `getInfo()` and `getText()` concurrently: parallel calls make the
+    // underlying transferable fail with `DataCloneError`, which was previously
+    // swallowed to `null` and misclassified a text-native PDF as scanned.
+    // Read sequentially on the same instance (proven safe) instead.
+    const infoResult = await parser.getInfo().catch(classifyReadError);
     if (infoResult) {
       info = { info: (infoResult as { info?: unknown }).info, metadata: (infoResult as { metadata?: unknown }).metadata };
     }
+    const textResult = await parser.getText().catch(classifyReadError);
     if (textResult) {
       const pages = (textResult as { pages: Array<{ num: number; text: string }> }).pages;
       textPages = pages.map((p) => ({ num: p.num, text: p.text ?? "" }));

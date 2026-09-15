@@ -60,6 +60,31 @@ describe("PdfAcquisition (Stage 08-DOC.2)", () => {
     })).rejects.toThrow(PDF_ERROR_CODES.SCANNED);
   });
 
+  test("acquirePdf reads info and text sequentially, never concurrently (K8 regression)", async () => {
+    // pdf-parse v2 backs a single parser instance; concurrent getInfo()/getText()
+    // makes the transferable fail with DataCloneError, which used to be
+    // swallowed to null and misclassified a text-native PDF as scanned.
+    let inFlight = 0;
+    let observedConcurrency = false;
+    const read = async () => {
+      inFlight += 1;
+      if (inFlight > 1) observedConcurrency = true;
+      await new Promise(resolve => setTimeout(resolve, 5));
+      inFlight -= 1;
+      return null;
+    };
+    PDFParseMock.mockImplementation(() => ({
+      getInfo: async () => { await read(); return { info: {}, metadata: null, total: 1 }; },
+      getText: async () => { await read(); return { pages: [{ num: 1, text: "ledger text ".repeat(10) }], text: "combined", total: 1, getPageText: () => "" }; },
+      destroy: async () => undefined,
+    }));
+
+    const result = await acquirePdf({ sourceName: "ledger.pdf", rawBytes: makePdfHeader(Buffer.alloc(100)) });
+    expect(observedConcurrency).toBe(false);
+    expect(result.pageCount).toBe(1);
+    expect(result.averageCharsPerPage).toBeGreaterThanOrEqual(50);
+  });
+
   test("acquirePdf throws PASSWORD when underlying error mentions password", async () => {
     PDFParseMock.mockImplementation(() => ({
       getInfo: async () => { throw new Error("PDF is encrypted and requires a password"); },

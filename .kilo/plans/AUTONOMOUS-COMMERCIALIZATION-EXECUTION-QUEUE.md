@@ -40,6 +40,7 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 | 12 | `product.offline-sync` | C1 | Wire existing `SyncStateStore` owner (no rebuild) | `Product/SyncStateStore.ts` | MEDIUM | **COMPLETE** |
 | 13 | `assurance.completion-audit-integrity` | K3 | Fail-closed completion gate: require behavioral + commit-bound application/acceptance evidence; reject marker/file/regex-only completion | `CapabilityEvidenceAudit`, `CanonicalCapabilityAudit`, `CommercialProductCompletionAudit`, `AutonomousBuildDaemon` | HIGH | **COMPLETE** |
 | 14 | `standardization.governance-operator-reconciliation` | K4 | Reconcile stale/incomplete governance docs to the approved local execution-operator model (docs-only, no rule change) | `Docs/HOOSHYAROS_MASTER_CHARTER.md`, `Docs/HOOSHYAROS_FINAL_DECISIONS_REGISTER.md`, `AUTONOMOUS_MISSION.md` | HIGH | **COMPLETE** |
+| 15 | `productization.installed-product-acceptance` | K8 | Qualify the real installed Windows artifact end-to-end; repair the acceptance-harness launch construction (Windows quoting) without weakening the criterion | `scripts/installed-product-acceptance.cjs` | MEDIUM | **COMPLETE** |
 | — | `security.encryption-at-rest` | C5 | BLOCKED — ARCHITECTURE CHANGE CONTROL / pending human 05C approval | 05C decisions | — | BLOCKED |
 | — | `product.billing-entitlements` | C2 | BLOCKED_EXTERNAL_DEPENDENCY (payment provider account/webhook) | — | — | BLOCKED_EXTERNAL |
 | — | `deployment.cloud-production` | C4 | BLOCKED_EXTERNAL_DEPENDENCY (cloud/DNS/TLS credentials) | — | — | BLOCKED_EXTERNAL |
@@ -353,6 +354,27 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 **Checkpoint:** `.kilo/plans/standardization-governance-operator-reconciliation-checkpoint.md`
 
 **DO-NOT-REPEAT:** do not describe Kilo Code as an external coding provider or architectural authority; do not restore exclusive "Python-only"/"three participants only" wording in governing docs; do not edit runtime, tests, completion gates or architectural engines in a documentation-reconciliation stage; do not reopen K1–K3.
+
+---
+
+## Stage 15 — `productization.installed-product-acceptance`
+
+**State:** COMPLETE
+**Baseline SHA:** `14995d7d21b1c97a0083a9aa147793bd9fb2f5fd`
+**Classification:** ACCEPTANCE-HARNESS DEFECT (K8). The installed product is correct; the harness used to qualify it was wrong.
+
+**DISCOVER / INSPECT (done):**
+- The installed product launches correctly through its real shortcut: manual `launch-hooshyar.cmd` reaches `/health` in ~1 s, and `launch-hooshyar.ps1` waits for a real `/health` success before opening the browser.
+- `scripts/installed-product-acceptance.cjs` launched `launch-hooshyar.cmd` via `spawn('cmd.exe', ['/d','/s','/c', \`"${launcher}"\`])`. Node/libuv escapes the embedded quotes to `\"`, so `cmd.exe` (`/s` only strips a leading quote) received the literal command `\"…\launch-hooshyar.cmd\"`, printed `'\"…\"' is not recognized as an internal or external command`, and exited **1** without starting the product. `stdio: 'ignore'` plus a swallowed `error` event hid the cause.
+- Controlled captures: quoted `cmd.exe` → health false / exit 1 / "not recognized"; unquoted `cmd.exe` → health true / exit 0 / no stderr; `spawn(launcher, [], { shell: true })` → health true / exit 0; `wscript.exe launch-hooshyar.vbs` (the real shortcut target from `installer/HooshyarOS.iss [Icons]/[Run]`) → health true / exit 0. The runtime log was untouched by the failed harness launches, proving the product was never started.
+
+**Repair:** `scripts/installed-product-acceptance.cjs` — `launchInstalledShortcut()` now activates the real installed shortcut target `wscript.exe "<app>\launch-hooshyar.vbs"` with `cwd: installDir`; stdio is captured instead of discarded; and `launchInstalledProduct()` requires a real health success **and** a clean launcher exit (`exit.code === 0`) for both the initial launch and the restart. No product code changed; no criterion weakened; no mock introduced.
+
+**Evidence:** focused **4 suites / 50 tests PASS** (`CommercialAcceptanceBarrier`, `InstalledProductPackagingRepair`, `PdfAcquisition`, `OfflineSyncClient`); bounded focused restart check PASS (first launch healthy 1636 ms / exit 0; restart after kill healthy 2024 ms / exit 0); full installed-product acceptance exit 0 with **16/16** checks including `restart-recovery`/`persistence` (`.kilo/evidence/stage15-k8-installed-product-acceptance.txt`, `.hooshyar/installed-product-acceptance.json`). See `.kilo/plans/stage15-k8-installed-product-acceptance-checkpoint.md`.
+
+**Checkpoint:** `.kilo/plans/stage15-k8-installed-product-acceptance-checkpoint.md`
+
+**DO-NOT-REPEAT:** do not launch the installed product through `cmd.exe /c "\"<path>\""`; use the real shortcut target with a single unquoted path argument. Do not discard the launcher exit code/stderr or replace the real health check with a fixed delay. Do not weaken the installed acceptance, mock the installed product, or change the launcher to compensate for a harness bug. Do not `git reset`/`clean`/`stash`; do not stage unrelated worktree files.
 
 ---
 

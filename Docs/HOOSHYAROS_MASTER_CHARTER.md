@@ -509,7 +509,74 @@ A future autonomous cycle MUST be able to answer from this memory:
 4. What is externally blocked?
 5. What is the next dependency-ready knot?
 
-#### 15.1.1 Current Audit Baseline — `blocker-b1-b5-readiness-delta-2026-09-14`
+#### 15.1.1 Current Audit Baseline — `stage15-k8-installed-product-acceptance-2026-09-15`
+
+| Field | Value |
+|---|---|
+| AUDIT ID | `stage15-k8-installed-product-acceptance-2026-09-15` |
+| DATE | 2026-09-15 |
+| AUDIT ARTIFACT (evidence source) | `.kilo/plans/stage15-k8-installed-product-acceptance-checkpoint.md` |
+| EVIDENCE ARTIFACT | `.kilo/evidence/stage15-k8-installed-product-acceptance.txt` |
+| TYPE | Bounded Stage 15 productization-knot verdict (K8 `productization.installed-product-acceptance`); the prior `blocker-b1-b5-readiness-delta-2026-09-14` baseline is preserved in §15.1.1a and §15.1.2 |
+| PRE-CHANGE TRUSTED CHECKPOINT | `14995d7d21b1c97a0083a9aa147793bd9fb2f5fd` |
+| QUEUE STATUS | CURRENT — stages 1–15 COMPLETE; K8 `productization.installed-product-acceptance` EXECUTED and VERIFIED |
+| VERIFIED STAGES | Stages 1–15 (through Stage 15 K8) |
+| NEXT DEPENDENCY-READY KNOT | None — K5 `commercial.subscription-entitlements` CONDITIONAL (scope-gated), K6 `assurance.android-build-test-evidence` BLOCKED (environment/host + external device), K7 `assurance.runtime-server-unit-coverage` NOT_NEEDED |
+
+Completion states recorded by this verdict (unchanged from §15.1.1a):
+
+| State | Value |
+|---|---|
+| `assistantComplete` | TRUE (functionally) |
+| `canonicalPlatformConstructionComplete` | FALSE |
+| `commercialProductRuntimeComplete` | FALSE |
+| `externalProductionDependenciesComplete` | FALSE |
+| `productComplete` | FALSE |
+
+**K8 (Stage 15) closure — `productization.installed-product-acceptance`.** VERIFIED. The real
+installed Windows artifact now qualifies end-to-end: isolated Inno Setup build → silent isolated install
+→ real installed shortcut launch → real `/health` → authenticated customer journey (register/session/PDF
+boundary/CSV ingest/analysis/dashboard/sources/tenant-isolation) → offline queue/reload/reconnect →
+kill → relaunch through the real shortcut → re-login → persisted analysis. Full acceptance exit code 0
+with **16/16** checks including `restart-recovery` and `persistence`.
+
+Root cause of the resumed BLOCKED state (an **acceptance-harness defect**, not a product defect):
+`scripts/installed-product-acceptance.cjs` launched the launcher with
+`spawn('cmd.exe', ['/d','/s','/c', `"${launcher}"`])`; Node/libuv escapes the embedded quotes to `\"`,
+so `cmd.exe` received a literal `\"…launch-hooshyar.cmd\"` command, printed
+`'\"…launch-hooshyar.cmd\"' is not recognized as an internal or external command`, and exited **1**
+without starting the product. The harness's `stdio: 'ignore'` plus swallowed `error` event hid the
+cause, leaving only `installed runtime did not recover after restart`. The product launcher itself is
+correct (manual launch reaches `/health` in ~1 s) and was not changed.
+
+Repair (smallest canonical owner = the harness): `launchInstalledShortcut()` now activates the **real
+installed shortcut target** used by `installer/HooshyarOS.iss` `[Icons]`/`[Run]`,
+`wscript.exe "<app>\launch-hooshyar.vbs"` with `cwd: installDir`; stdio is captured; and
+`launchInstalledProduct()` requires both a real health success **and** a clean launcher exit
+(`exit.code === 0`). No criterion was weakened, no mock was introduced, and no product code changed.
+
+Evidence: focused K8 suites **4 suites / 50 tests PASS**
+(`CommercialAcceptanceBarrier`, `InstalledProductPackagingRepair`, `PdfAcquisition`,
+`OfflineSyncClient`); bounded focused restart check PASS (first launch healthy 1636 ms / exit 0;
+restart after kill healthy 2024 ms / exit 0); full installed-product acceptance
+`.kilo/evidence/stage15-k8-installed-product-acceptance.txt` = `status: PASS`, and
+`.hooshyar/installed-product-acceptance.json` with `launcherHealthy: true`,
+`runtimeDependenciesVerified: true`, `repairedClientInstalled: true`.
+
+Related K8 evidence not invalidated by this repair: PDF acquisition acceptance
+`.hooshyar/pdf-acquisition-acceptance.json` (PASS) and web/application acceptance
+`.hooshyar/web-acceptance-success.json` (PASS, v8) with
+`.kilo/evidence/stage15-k8-web-application-acceptance.txt`.
+
+External/approval blockers unchanged: **B1** encryption-at-rest/key management (architecture change
+control / pending human 05C decisions), **B2** payment-provider activation, **B3** production
+cloud/DNS/TLS resources, **B4** Android device acceptance, **B5** Inno Setup host.
+
+Valid next stages from this baseline: no primary and no dependency-ready repository-local knot remains.
+K5 is CONDITIONAL, K6 is BLOCKED (environment + external device), K7 is NOT_NEEDED. No stage may be
+skipped, invented or reordered without a new evidence-backed audit delta.
+
+#### 15.1.1a Superseded Baseline — `blocker-b1-b5-readiness-delta-2026-09-14`
 
 | Field | Value |
 |---|---|
@@ -622,8 +689,9 @@ Only records whose completion is supported by their own artifact and/or a verifi
 | `.kilo/plans/post-k3-bounded-reaudit-2026-09-14.md` + `.kilo/plans/assurance-completion-audit-integrity-checkpoint.md` (baseline `post-k3-completion-audit-integrity-reaudit-2026-09-14`, checkpoint `6bf54042`) | `6bf54042` | SUPERSEDED by `post-k4-governance-operator-reconciliation-2026-09-14`; K3 `assurance.completion-audit-integrity` VERIFIED — completion gate fail-closed on missing/stale/blocked behavioral/application/acceptance evidence; evidence `.kilo/evidence/stage13-k3-completion-audit-integrity-acceptance.txt` (19/19 PASS) |
 | `.kilo/plans/standardization-governance-operator-reconciliation-checkpoint.md` (baseline `post-k4-governance-operator-reconciliation-2026-09-14`, checkpoint `ed3c47fc`) | `ed3c47fc` | SUPERSEDED by `conditional-k5-k7-readiness-delta-2026-09-14`; K4 `standardization.governance-operator-reconciliation` VERIFIED — docs-only reconciliation of the approved local execution-operator model across Master Charter §8/§9/§17, Final Decisions Register §7/§16/§18 and `AUTONOMOUS_MISSION.md`; no source code, test, architecture, completion-gate or external-dependency change |
 | `.kilo/plans/conditional-k5-k7-readiness-delta-2026-09-14.md` (baseline `conditional-k5-k7-readiness-delta-2026-09-14`, checkpoint `a8538ff0`) | `a8538ff0` | SUPERSEDED by `blocker-b1-b5-readiness-delta-2026-09-14`; bounded readiness-only delta for conditional knots K5/K6/K7 — **K5 CONDITIONAL** (scope unconfirmed; B2 external), **K6 BLOCKED** (no Gradle/JDK/Android SDK/host; B4 device external), **K7 NOT_NEEDED** (dedicated `CommercialRuntimeServer.test.ts` exists; coverage already present). Next dependency-ready knot NONE. No source/test/queue/ledger/completion-flag change |
-| `.kilo/plans/blocker-b1-b5-readiness-delta-2026-09-14.md` (baseline `blocker-b1-b5-readiness-delta-2026-09-14`, checkpoint `a8538ff0`) | `a8538ff0` | CURRENT baseline; bounded read-only B1–B5 blocker readiness delta — **B1 BLOCKED_HUMAN_APPROVAL** (no approved encryption-at-rest decision; pending 05C change-control), **B2 BLOCKED_EXTERNAL** (payment provider), **B3 BLOCKED_EXTERNAL** (cloud/DNS/TLS), **B4 BLOCKED_ENVIRONMENT** (no Gradle/JDK/Android SDK/adb; external device; not a coding gap), **B5 BLOCKED_ENVIRONMENT** (no Inno Setup 6 host). ACTIONABLE BLOCKER NONE. No source/test/queue/ledger/completion-flag change |
-| `.kilo/plans/AUTONOMOUS-COMMERCIALIZATION-EXECUTION-QUEUE.md` | derived from ledger | stages 1–14 COMPLETE; no primary repository-local knot remains; B1–B5 BLOCKED; K5–K7 conditional |
+| `.kilo/plans/blocker-b1-b5-readiness-delta-2026-09-14.md` (baseline `blocker-b1-b5-readiness-delta-2026-09-14`, checkpoint `a8538ff0`) | `a8538ff0` | SUPERSEDED by `stage15-k8-installed-product-acceptance-2026-09-15` (preserved in §15.1.1a); bounded read-only B1–B5 blocker readiness delta — **B1 BLOCKED_HUMAN_APPROVAL** (no approved encryption-at-rest decision; pending 05C change-control), **B2 BLOCKED_EXTERNAL** (payment provider), **B3 BLOCKED_EXTERNAL** (cloud/DNS/TLS), **B4 BLOCKED_ENVIRONMENT** (no Gradle/JDK/Android SDK/adb; external device; not a coding gap), **B5 BLOCKED_ENVIRONMENT** (no Inno Setup 6 host). ACTIONABLE BLOCKER NONE. No source/test/queue/ledger/completion-flag change |
+| `.kilo/plans/stage15-k8-installed-product-acceptance-checkpoint.md` (baseline `stage15-k8-installed-product-acceptance-2026-09-15`, checkpoint `14995d7d`) | `14995d7d` | SUPERSEDED by future baselines only; K8 `productization.installed-product-acceptance` VERIFIED — real installed Windows artifact acceptance PASS (16/16 checks incl. `restart-recovery`/`persistence`); repaired an acceptance-harness Windows cmd.exe double-quoting defect (product correct, launcher unchanged); focused 4 suites/50 tests PASS; evidence `.kilo/evidence/stage15-k8-installed-product-acceptance.txt` |
+| `.kilo/plans/AUTONOMOUS-COMMERCIALIZATION-EXECUTION-QUEUE.md` | derived from ledger | stages 1–15 COMPLETE; no primary repository-local knot remains; B1–B5 BLOCKED; K5–K7 conditional |
 | `.kilo/plans/fresh-governed-commercialization-reaudit-2026-09-14.md` (baseline `fresh-governed-commercialization-2026-09-14`, checkpoint `977ea944`) | `977ea944` | SUPERSEDED by `post-k2-offline-sync-reaudit-2026-09-14`; recorded knots K1–K4/K5–K7 and blockers B1–B5; K1 and K2 later closed (Stages 11–12) |
 | `.kilo/plans/phase-11-final-checkpoint.md` | `8ed51f0e` | declared VERIFIED; its `canonicalPlatformConstructionComplete: true` claim is SUPERSEDED by later evidence (`phase-14-final-checkpoint.md` and the 2026-09-14 audit both record FALSE) |
 | `.kilo/plans/phase-12-final-checkpoint.md` | `849f5709` | VERIFIED; local == remote TRUE |

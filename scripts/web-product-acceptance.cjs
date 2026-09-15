@@ -88,6 +88,60 @@ async function main() {
     const xlsxAnalysis = await request('/api/financial/analyze', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceSha256: xlsxIngest.body.evidence.sha256, assets: 10000, liabilities: 4000 }) });
     if (xlsxAnalysis.status !== 200 || xlsxAnalysis.body.ingestedSource?.sourceType !== 'XLSX' || xlsxAnalysis.body.metrics?.profit !== 1000) throw new Error(`WEB_ACCEPTANCE_XLSX_ANALYSIS_FAILED:${xlsxAnalysis.status}`);
 
+    // K8 commercial-acceptance barrier: a real binary PDF must fail closed with a
+    // precise, supported-capability error — never as CSV, never as an offline event.
+    const pdfBase64 = Buffer.from('%PDF-1.7\n1 0 obj\n<<>>\nendobj\n%%EOF\n', 'latin1').toString('base64');
+    await sleep(1100);
+    const pdfIngest = await request('/api/ingest', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceName: 'web-qa.pdf', format: 'PDF', contentBase64: pdfBase64 }) });
+    if (pdfIngest.status !== 400 || pdfIngest.body.error !== 'INGEST_FORMAT_UNSUPPORTED') throw new Error(`WEB_ACCEPTANCE_PDF_BOUNDARY_FAILED:${pdfIngest.status}:${JSON.stringify(pdfIngest.body)}`);
+
+    // K8: real browser offline transport against the real runtime — network loss
+    // queues work durably, reload preserves it, reconnect synchronizes it, and a
+    // storage-quota failure can never masquerade as offline.
+    const offlineClient = require(path.join(root, 'web', 'offline-sync.js'));
+    const runtimeFetch = (url, init = {}) => fetch(`http://127.0.0.1:${port}${url}`, { ...init, headers: { ...(init.headers || {}), cookie } });
+    let browserOnline = false;
+    const flakyFetch = (url, init) => (browserOnline ? runtimeFetch(url, init) : Promise.reject(new TypeError('Failed to fetch')));
+    const offlineStorage = offlineClient.memoryStorage();
+    const offlineSync = offlineClient.createOfflineSync({ storage: offlineStorage, fetchImpl: flakyFetch });
+    await offlineSync.enqueue({ sourceName: 'web-qa-offline.csv', format: 'CSV', content: csv });
+    const offlineReport = await offlineSync.sync();
+    if (offlineReport.status !== 'OFFLINE' || offlineReport.pending !== 1) throw new Error(`WEB_ACCEPTANCE_OFFLINE_QUEUE_FAILED:${JSON.stringify(offlineReport)}`);
+    const offlineReload = offlineClient.createOfflineSync({ storage: offlineStorage, fetchImpl: flakyFetch });
+    if ((await offlineReload.pending()).length !== 1) throw new Error('WEB_ACCEPTANCE_OFFLINE_RELOAD_FAILED');
+    browserOnline = true;
+    await sleep(1100);
+    const onlineReport = await offlineSync.sync();
+    if (onlineReport.status !== 'ONLINE' || onlineReport.pending !== 0 || onlineReport.synced.length !== 1) throw new Error(`WEB_ACCEPTANCE_OFFLINE_RECONNECT_FAILED:${JSON.stringify(onlineReport)}`);
+    if ((await offlineClient.createOfflineSync({ storage: offlineStorage, fetchImpl: flakyFetch }).pending()).length !== 0) throw new Error('WEB_ACCEPTANCE_OFFLINE_DRAIN_FAILED');
+
+    const quotaBase = offlineClient.memoryStorage();
+    let quotaBlocked = false;
+    const quotaStorage = {
+      getItem: key => quotaBase.getItem(key),
+      removeItem: key => quotaBase.removeItem(key),
+      setItem: (key, value) => {
+        if (quotaBlocked) {
+          const error = new Error(`Setting the value of '${key}' exceeded the quota.`);
+          error.name = 'QuotaExceededError';
+          throw error;
+        }
+        quotaBase.setItem(key, value);
+      }
+    };
+    const quotaSync = offlineClient.createOfflineSync({ storage: quotaStorage, fetchImpl: runtimeFetch });
+    await quotaSync.enqueue({ sourceName: 'quota-kept.csv', format: 'CSV', content: csv });
+    quotaBlocked = true;
+    let quotaKind = 'NONE';
+    try {
+      await quotaSync.enqueue({ sourceName: 'quota-blocked.csv', format: 'CSV', content: csv });
+    } catch (error) {
+      quotaKind = offlineClient.classifyFailure(error);
+    }
+    if (quotaKind !== 'STORAGE_QUOTA_FAILURE' || offlineClient.isConnectivityFailure(quotaKind)) throw new Error(`WEB_ACCEPTANCE_QUOTA_MASQUERADE_FAILED:${quotaKind}`);
+    quotaBlocked = false;
+    if ((await quotaSync.pending()).length !== 1) throw new Error('WEB_ACCEPTANCE_QUOTA_LOSS_FAILED');
+
     const sources = await request('/api/sources', { headers: { cookie } });
     if (sources.status !== 200 || !Array.isArray(sources.body.sources) || sources.body.sources.length < 3) throw new Error(`WEB_ACCEPTANCE_SOURCES_FAILED:${sources.status}`);
 
@@ -154,9 +208,9 @@ async function main() {
     const executionList = await request('/api/execution/work-items', { headers: { cookie } });
     if (executionList.status !== 200 || !Array.isArray(executionList.body.workItems) || !executionList.body.workItems.some(item => item.workItemId === workItemId)) throw new Error(`WEB_ACCEPTANCE_EXECUTION_LIST_FAILED:${executionList.status}`);
 
-    const success = { type: 'WEB_PRODUCT_ACCEPTANCE_SUCCESS', version: 7, status: 'PASS', createdAt: new Date().toISOString(), repository: root, commit: gitCommit(), tenantId: session.body.tenantId, profit: dashboard.body.metrics.profit, acceptance: ['root','health','session','tenant','ingestion','analysis','executive-workbench','report','assistant','dashboard','multi-format-ingestion','structured-analysis','xlsx-analysis','raw-source-evidence','financial-analytics','financial-analytics-persistence','financial-analytics-report-integration','decision-workbench','expert-choice','decision-persistence','organizational-execution','governed-approval','work-item-lifecycle','kpi-outcome','execution-evidence','execution-feedback','reports-export','report-artifact-persistence','report-artifact-download','report-provenance'] };
+    const success = { type: 'WEB_PRODUCT_ACCEPTANCE_SUCCESS', version: 8, status: 'PASS', createdAt: new Date().toISOString(), repository: root, commit: gitCommit(), tenantId: session.body.tenantId, profit: dashboard.body.metrics.profit, acceptance: ['root','health','session','tenant','ingestion','analysis','executive-workbench','report','assistant','dashboard','multi-format-ingestion','structured-analysis','xlsx-analysis','raw-source-evidence','financial-analytics','financial-analytics-persistence','financial-analytics-report-integration','decision-workbench','expert-choice','decision-persistence','organizational-execution','governed-approval','work-item-lifecycle','kpi-outcome','execution-evidence','execution-feedback','reports-export','report-artifact-persistence','report-artifact-download','report-provenance','pdf-capability-boundary','offline-queue-binary-transport','offline-reload-durability','offline-reconnect-reconciliation','storage-quota-not-offline'] };
     fs.writeFileSync(evidencePath, JSON.stringify(success, null, 2), 'utf8');
-    console.log(JSON.stringify({ type: 'WEB_PRODUCT_ACCEPTANCE', status: 'PASS', tenantId: session.body.tenantId, profit: dashboard.body.metrics.profit, root: true, session: true, analysis: true, executive: true, report: true, assistant: true, dashboard: true, multiFormat: true, financialAnalytics: true, decisionWorkbench: true, organizationalExecution: true, reportsExport: true }, null, 2));
+    console.log(JSON.stringify({ type: 'WEB_PRODUCT_ACCEPTANCE', status: 'PASS', tenantId: session.body.tenantId, profit: dashboard.body.metrics.profit, root: true, session: true, analysis: true, executive: true, report: true, assistant: true, dashboard: true, multiFormat: true, financialAnalytics: true, decisionWorkbench: true, organizationalExecution: true, reportsExport: true, pdfBoundary: true, offlineQueue: true, offlineReload: true, offlineReconnect: true, storageQuota: true }, null, 2));
   } finally { await stop(); }
 }
 main().catch((error) => { try { fs.rmSync(evidencePath, { force: true }); } catch {} console.error(JSON.stringify({ type: 'WEB_PRODUCT_ACCEPTANCE', status: 'BLOCKED', error: error.message, platform: process.platform, node: process.version }, null, 2)); process.exitCode = 1; });

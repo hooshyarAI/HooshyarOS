@@ -29,6 +29,7 @@ fs.rmSync(evidencePath, { force: true });
 const repositoryCommit = commit();
 const checks = [
   ['product:web:acceptance', 'web-application'],
+  ['product:pdf:acceptance', 'pdf-acquisition'],
   ['product:security:acceptance', 'security-application']
 ];
 const completed = [];
