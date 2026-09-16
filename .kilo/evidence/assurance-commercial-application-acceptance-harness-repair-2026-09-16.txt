@@ -1,0 +1,185 @@
+ASSURANCE — COMMERCIAL APPLICATION ACCEPTANCE HARNESS REPAIR — EVIDENCE ARTIFACT
+================================================================================
+KNOT ID        : assurance.commercial-application-acceptance-harness-repair
+DATE           : 2026-09-16
+TYPE           : Bounded repository-local repair of a REAL acceptance-harness defect.
+                 Not a new stage, not a new audit, not a reopening of K8.
+                 No product runtime code, engine, architecture freeze, completion
+                 gate, acceptance criterion or completion flag was changed.
+BRANCH         : fix/autonomous-product-factory
+PRE-CHANGE TRUSTED CHECKPOINT : f132d1de4f427b3886b94d72f872340caaae77b7
+CLASSIFICATION : IMPLEMENTATION_GAP (acceptance-harness launcher defect) — repaired.
+
+1. GOVERNING SOURCES READ
+================================================================================
+- Docs/HOOSHYAROS_MASTER_CHARTER.md (§15.1.1, §15.1.2, §15.1.4)
+- Docs/ARCHITECTURE.md (Architecture Freeze V4 — unchanged by this knot)
+- Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md (§Evidence model, §Completion states)
+- .kilo/plans/ACTIVE-COMMERCIALIZATION-MASTER-LEDGER.md
+- .kilo/plans/AUTONOMOUS-COMMERCIALIZATION-EXECUTION-QUEUE.md
+- .kilo/plans/governed-commercialization-b1-b5-truth-2026-09-16-checkpoint.md
+- .kilo/plans/post-k3-bounded-reaudit-2026-09-14.md (§8 bounded observation)
+- .kilo/plans/stage15-k8-installed-product-acceptance-checkpoint.md (harness-defect precedent)
+
+2. GIT / GITHUB PARITY BEFORE THE KNOT
+================================================================================
+git rev-parse HEAD                                     = f132d1de4f427b3886b94d72f872340caaae77b7
+git rev-parse origin/fix/autonomous-product-factory    = f132d1de4f427b3886b94d72f872340caaae77b7
+git ls-remote origin refs/heads/fix/autonomous-product-factory
+                                                       = f132d1de4f427b3886b94d72f872340caaae77b7
+PARITY: local == origin tracking == independent ls-remote  (HOLDS)
+
+Pre-existing unrelated worktree changes were preserved and NOT touched:
+  M .kilo/agents/hooshyar-construction.md
+  M package-lock.json
+  ?? (.kilo/kilo.jsonc.bak-*, dist/, fixtures, tmp_*.js, historical phase artifacts, ...)
+No git reset / clean / revert / stash / destructive checkout was performed.
+
+3. THE DEFECT (reproduced at f132d1de)
+================================================================================
+The canonical combined commercial application acceptance harness
+(scripts/commercial-application-acceptance.cjs, npm `product:commercial:acceptance`)
+could not run any capability on Windows and permanently wrote a BLOCKED artifact.
+
+Command:
+  node scripts/commercial-application-acceptance.cjs
+Observed output (exit code 1):
+  {
+    "type": "COMMERCIAL_APPLICATION_ACCEPTANCE_FAILURE",
+    "version": 1,
+    "status": "BLOCKED",
+    "repositoryCommit": "f132d1de4f427b3886b94d72f872340caaae77b7",
+    "failedCapability": "web-application",
+    "script": "product:web:acceptance",
+    "exitCode": 1,
+    "completed": []
+  }
+The committed local evidence artifact .hooshyar/commercial-application-acceptance.json
+carried the same BLOCKED shape bound to the older commit 6bf5404216fe9d1b86ef8658c2d877ca810827b7,
+proving the defect was long-standing and not a one-off run.
+
+4. ROOT CAUSE (proven, not inferred)
+================================================================================
+scripts/commercial-application-acceptance.cjs launched its nested steps with
+  const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+  spawnSync(npm, ['run', name], { shell: false, stdio: 'inherit', ... })
+Node refuses to spawn a `.cmd`/`.bat` file with `shell: false` and reports EINVAL
+before the child process starts, so `result.status` was `null`, the `?? 1`
+fallback produced exit code 1, and the ignored `result.error` hid the cause.
+
+Host probe (fresh, this knot):
+  shell:false npm.cmd -> status null  error EINVAL
+  shell:true  npm     -> status 0     error undefined
+  cmd.exe /d /s /c npm -> status 0    error undefined
+
+This matches the pre-existing bounded observation recorded at K3
+(.kilo/plans/post-k3-bounded-reaudit-2026-09-14.md §8 and Master Charter §15.1.1),
+which had classified it as "a pre-existing aggregate-wrapper launcher quirk only ...
+recorded, not silently modified". This knot closes that observation with a bounded repair.
+
+5. REPAIR (one canonical owner, minimum coherent change)
+================================================================================
+Owner: scripts/commercial-application-acceptance.cjs  (unchanged public contract:
+same npm script name, same evidence path, same evidence schema, same exit semantics).
+
+- The npm CLI is now launched through the platform command processor on Windows
+  (`process.env.ComSpec || 'cmd.exe'` with `/d /s /c "npm <args>"`), the same
+  convention already used by scripts/web-product-acceptance.cjs,
+  scripts/security-tenant-acceptance.cjs, scripts/autonomous-factory-loop.cjs and
+  scripts/autonomous-ci-repair-loop.cjs. POSIX still spawns `npm` directly.
+- The launcher no longer hides the cause: spawn errors are surfaced as
+  `launcherError` and an abnormal signal as `signal` in the failure artifact
+  (the K8 lesson: never discard the launcher's exit code/stderr).
+- `runScript` validates the capability script against the fixed canonical list and
+  fails closed with COMMERCIAL_ACCEPTANCE_UNKNOWN_SCRIPT.
+- `main()` is guarded by `require.main === module` and the launch helpers are
+  exported so the real launch path is behaviorally testable.
+
+No capability was reordered, added or removed; no acceptance criterion was
+weakened; no product code was touched.
+
+6. NEW FOCUSED BEHAVIORAL TEST (no mocks)
+================================================================================
+Backend/HBOS/test/CommercialApplicationAcceptanceHarness.test.ts  (6 tests)
+- launches the npm CLI on this host instead of failing before the process starts
+- runs a real canonical npm script (`npm run product:assurance`) through the same path
+- surfaces a real child failure as an exit code rather than a launcher error
+- fails closed on an unknown capability script
+- binds exactly the canonical capability scripts that package.json defines
+- does not execute the acceptance chain when it is merely imported
+
+7. VERIFICATION
+================================================================================
+Focused:      jest --runTestsByPath CommercialApplicationAcceptanceHarness.test.ts
+              -> 6 passed / 6 total
+Regression:   jest --runTestsByPath CommercialAcceptanceBarrier.test.ts
+                InstalledProductPackagingRepair.test.ts CommercialWebEntrypoint.test.ts
+              -> 3 suites passed / 22 tests passed
+Typecheck:    tsc --noEmit (changed test file) -> exit 0
+End-to-end:   node scripts/commercial-application-acceptance.cjs -> exit 0
+              {
+                "type": "COMMERCIAL_APPLICATION_ACCEPTANCE",
+                "version": 1,
+                "status": "PASS",
+                "repositoryCommit": "f132d1de4f427b3886b94d72f872340caaae77b7",
+                "checks": ["web-application", "pdf-acquisition", "security-application"]
+              }
+              Raw transcript: .kilo/evidence/commercial-application-acceptance-repair-2026-09-16.txt
+Full suite:   jest (full) -> Test Suites: 267 passed / 267 total;
+              Tests: 2082 passed / 2082 total
+              (.kilo/evidence/jest-full-commercial-acceptance-harness-repair-2026-09-16.txt)
+              Pre-change baseline at f132d1de was 266 / 2076
+              (.kilo/evidence/jest-full-continuation-2026-09-16.txt)
+
+Real application/acceptance evidence was refreshed against the current HEAD by this
+run and is commit-fresh in the completion gate:
+  .hooshyar/web-acceptance-success.json       commit f132d1de, status PASS (35 acceptance steps)
+  .hooshyar/security-acceptance-success.json  commit f132d1de, status PASS (15 acceptance steps)
+(.hooshyar/ is git-excluded by .git/info/exclude and is produced per checkout.)
+
+8. COMPLETION GATE STATE AFTER THE KNOT (authoritative, unchanged flags)
+================================================================================
+CommercialProductCompletionAudit (HEAD):
+  complete                    = false
+  applicationEvidence         = application-evidence-passed (fresh: true)
+  acceptanceEvidence          = acceptance-evidence-passed  (fresh: true)
+  evidenceGaps                = ["external-dependency-blocked"]
+  blockedExternalDependencies = ["payment-provider-activation", "production-cloud-resources"]
+CanonicalCapabilityAudit (HEAD):
+  complete = true; backlogExhausted = true; missingArtifacts = []; nonBehavioralCapabilities = []
+
+The only remaining commercial non-completion reason is the truthful external
+dependency block (B2 payment provider, B3 production cloud resources). No completion
+flag was changed by this knot:
+  assistantComplete                      = TRUE
+  canonicalPlatformConstructionComplete  = FALSE
+  commercialProductRuntimeComplete       = FALSE
+  externalProductionDependenciesComplete = FALSE
+  productComplete                        = FALSE
+
+9. FILES CHANGED BY THIS KNOT
+================================================================================
+- scripts/commercial-application-acceptance.cjs            (repair)
+- Backend/HBOS/test/CommercialApplicationAcceptanceHarness.test.ts   (new focused test)
+- .kilo/evidence/assurance-commercial-application-acceptance-harness-repair-2026-09-16.txt
+- .kilo/evidence/commercial-application-acceptance-repair-2026-09-16.txt
+- .kilo/evidence/jest-full-commercial-acceptance-harness-repair-2026-09-16.txt
+- .kilo/evidence/jest-full-continuation-2026-09-16.txt
+- .kilo/plans/commercial-application-acceptance-harness-repair-checkpoint.md
+- .kilo/plans/ACTIVE-COMMERCIALIZATION-MASTER-LEDGER.md     (bounded delta entry)
+- .kilo/plans/AUTONOMOUS-COMMERCIALIZATION-EXECUTION-QUEUE.md (bounded knot entry)
+- Docs/HOOSHYAROS_MASTER_CHARTER.md §15.1.1/§15.1.2          (Audit Memory delta + observation closure)
+
+10. REMAINING AFTER THE KNOT
+================================================================================
+Remaining dependency-ready repository-local implementation knots : none found by the
+  current-state scan (commercial queue, architecture queue, productization, runtime,
+  persistence, security, acceptance, Windows, Web, Android, autonomous construction,
+  deployment, observability, tenant isolation).
+Remaining human approvals  : B1 05C encryption-at-rest / key-management decisions.
+Remaining external blockers: B2 payment-provider activation; B3 production cloud/DNS/TLS;
+  code-signing (Authenticode) certificate.
+Remaining environment/device: B4 Android toolchain (JDK/Gradle/Android SDK/adb) + device;
+  B5 is AVAILABLE ON THIS HOST (Inno Setup 6 in LocalAppData).
+Conditional: K5 subscription/entitlements (approved commercial scope unconfirmed);
+  K6 Android build/test evidence (environment); K7 runtime-server unit coverage NOT_NEEDED.

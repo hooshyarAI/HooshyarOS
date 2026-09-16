@@ -41,6 +41,7 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 | 13 | `assurance.completion-audit-integrity` | K3 | Fail-closed completion gate: require behavioral + commit-bound application/acceptance evidence; reject marker/file/regex-only completion | `CapabilityEvidenceAudit`, `CanonicalCapabilityAudit`, `CommercialProductCompletionAudit`, `AutonomousBuildDaemon` | HIGH | **COMPLETE** |
 | 14 | `standardization.governance-operator-reconciliation` | K4 | Reconcile stale/incomplete governance docs to the approved local execution-operator model (docs-only, no rule change) | `Docs/HOOSHYAROS_MASTER_CHARTER.md`, `Docs/HOOSHYAROS_FINAL_DECISIONS_REGISTER.md`, `AUTONOMOUS_MISSION.md` | HIGH | **COMPLETE** |
 | 15 | `productization.installed-product-acceptance` | K8 | Qualify the real installed Windows artifact end-to-end; repair the acceptance-harness launch construction (Windows quoting) without weakening the criterion | `scripts/installed-product-acceptance.cjs` | MEDIUM | **COMPLETE** |
+| — | `assurance.commercial-application-acceptance-harness-repair` | continuation scan (closes the K3 bounded observation, Master Charter §15.1.1) | Repair the canonical combined acceptance harness so its nested `npm run` capability steps actually launch on Windows, and surface the launcher cause instead of writing a permanent BLOCKED artifact | `scripts/commercial-application-acceptance.cjs` | MEDIUM | **COMPLETE** |
 | — | `security.encryption-at-rest` | C5 | BLOCKED — ARCHITECTURE CHANGE CONTROL / pending human 05C approval | 05C decisions | — | BLOCKED |
 | — | `product.billing-entitlements` | C2 | BLOCKED_EXTERNAL_DEPENDENCY (payment provider account/webhook) | — | — | BLOCKED_EXTERNAL |
 | — | `deployment.cloud-production` | C4 | BLOCKED_EXTERNAL_DEPENDENCY (cloud/DNS/TLS credentials) | — | — | BLOCKED_EXTERNAL |
@@ -377,6 +378,26 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 **DO-NOT-REPEAT:** do not launch the installed product through `cmd.exe /c "\"<path>\""`; use the real shortcut target with a single unquoted path argument. Do not discard the launcher exit code/stderr or replace the real health check with a fixed delay. Do not weaken the installed acceptance, mock the installed product, or change the launcher to compensate for a harness bug. Do not `git reset`/`clean`/`stash`; do not stage unrelated worktree files.
 
 **Bounded delta (2026-09-16) — `stage15-k8-real-installation-upgrade-2026-09-16` (no new stage).** The final verified installation-ready installer was applied to the user's REAL installation `C:\Users\avalipour\AppData\Local\Programs\HooshyarOS` (timestamped backup first) with silent upgrade exit code 0, and the canonical installed-product acceptance then ran against that real path: **PASS, exit 0, 16/16** (`restart-recovery` and `persistence` included). An additive `HOOSHYAR_ACCEPTANCE_INSTALL_DIR` real-target mode was added to the single canonical harness (no duplicate acceptance framework, no criterion weakened). K8 remains VERIFIED; stage order, other stage states and completion flags are unchanged. Evidence: `.kilo/evidence/stage15-k8-real-installation-upgrade-2026-09-16.txt`; see Audit Memory 15.1.1.
+
+---
+
+## Bounded knot — `assurance.commercial-application-acceptance-harness-repair`
+
+**State:** COMPLETE
+**Baseline SHA:** `f132d1de4f427b3886b94d72f872340caaae77b7`
+**Classification:** `IMPLEMENTATION_GAP` — acceptance-harness launcher defect on Windows (REAL, reproducible), repaired in the canonical owner. Not a product defect; no product code changed.
+
+**SELECTION BASIS (continuation current-state scan, not a new audit):** the registered knots are exhausted (K1–K4/K8 VERIFIED, K5 CONDITIONAL, K6 BLOCKED, K7 NOT_NEEDED, B1–B5 blocked/conditional), so the mandated continuation scan was executed. It re-verified the K3 bounded observation recorded in Master Charter §15.1.1 and `.kilo/plans/post-k3-bounded-reaudit-2026-09-14.md` §8 as a **live defect** and promoted it to a knot.
+
+**DISCOVER / INSPECT (done):**
+- `node scripts/commercial-application-acceptance.cjs` → exit **1**, `status: BLOCKED`, `failedCapability: web-application`, `completed: []`, commit-bound to `f132d1de`. The committed local artifact `.hooshyar/commercial-application-acceptance.json` showed the same BLOCKED shape at `6bf54042`, proving the defect was long-standing.
+- Root cause probe: `spawnSync('npm.cmd', …, { shell: false })` → `status null`, `error EINVAL` (Node refuses `.cmd`/`.bat` without a shell); `shell:true npm` → 0; `cmd.exe /d /s /c npm` → 0. The harness's ignored `result.error` plus the `?? 1` fallback hid the cause.
+
+**Repair:** npm is launched through `process.env.ComSpec || 'cmd.exe'` + `/d /s /c "npm <args>"` on Windows (matching `scripts/web-product-acceptance.cjs`, `scripts/security-tenant-acceptance.cjs`, `scripts/autonomous-factory-loop.cjs`, `scripts/autonomous-ci-repair-loop.cjs`); spawn errors and abnormal signals are surfaced as `launcherError`/`signal` in the failure artifact; `runScript` fails closed on an unknown capability script; `main()` is guarded by `require.main === module` and the launch helpers are exported for behavioral testing.
+
+**Evidence:** focused `Backend/HBOS/test/CommercialApplicationAcceptanceHarness.test.ts` **6/6 PASS** (real subprocesses, no mocks); regression 3 suites/22 tests PASS; changed-file typecheck exit 0; real end-to-end acceptance **PASS, exit 0**, `checks: [web-application, pdf-acquisition, security-application]`; full suite **267/267 suites, 2082/2082 tests PASS**. Application/acceptance evidence refreshed commit-fresh at `f132d1de`. Evidence artifact: `.kilo/evidence/assurance-commercial-application-acceptance-harness-repair-2026-09-16.txt`. Checkpoint: `.kilo/plans/commercial-application-acceptance-harness-repair-checkpoint.md`.
+
+**DO-NOT-REPEAT:** do not re-introduce `spawnSync('npm.cmd', …, { shell: false })`; do not discard the launcher exit code/signal/spawn error; do not build a second combined acceptance framework; do not weaken or reorder the three canonical capability checks; do not touch `FinancialDataIngestionAdapter.ts`, `Core/Engine.ts`, the architecture freeze, completion flags or unrelated worktree files.
 
 ---
 
