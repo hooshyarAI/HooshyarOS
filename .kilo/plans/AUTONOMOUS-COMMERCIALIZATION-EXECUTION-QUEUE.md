@@ -466,6 +466,23 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 
 ---
 
+## Bounded knot — `standardization.android-acceptance-single-owner`
+
+**State:** COMPLETE
+**Baseline SHA:** `f18a9533c217cbe02b40734fe8b9c863f031995e`
+**Closure SHA:** `a2d4da65e9d0a64cdbc4811c909601bdfd8a51ab`
+**Classification:** `STANDARDIZATION_GAP` — two CI callers duplicated the canonical Android acceptance harness and had drifted from it. No product/runtime/engine/architecture/completion-gate change.
+
+**SELECTION BASIS (continuation current-state scan):** the item recorded by `assurance.test-reference-integrity`. `.github/workflows/android-release.yml` and `.github/workflows/release-artifacts.yml` each carried an inline adb install/launch/liveness block that duplicated `scripts/android-product-acceptance.sh` and omitted the explicit device/boot wait and the longer Package-Manager/pidof budgets.
+
+**REPAIR:** both emulator steps now run `script: bash scripts/android-product-acceptance.sh`; the inline copies were removed. No gate weakened — the canonical harness is strictly stronger and additionally emits commit-bound evidence.
+
+**EVIDENCE:** both workflows parse as valid YAML; `git grep` shows 3 callers (`android-release.yml:50`, `final-product-factory.yml:126`, `release-artifacts.yml:82`) and no remaining inline `adb install -r android/app/build` block; `TestReferenceIntegrity.test.ts` 2/2 PASS; `product:assurance` PASS with `productComplete:false`; full suite **270/270 suites, 2098/2098 tests PASS**. Honest limit: no emulator/device here (B4), so the workflows were not executed; their owner is the harness verified device-free by the previous knot. Artifact: `.kilo/evidence/android-acceptance-single-owner-2026-09-16.txt`; checkpoint: `.kilo/plans/android-acceptance-single-owner-checkpoint.md`.
+
+**DO-NOT-REPEAT:** do not re-introduce inline adb acceptance verification in any workflow; call the canonical harness; do not weaken the canonical Android steps or its evidence contract.
+
+---
+
 ## Self-replanning rule
 
 After stage 1 verifies, re-audit the affected verification area, refresh this queue, and advance to the next highest-value **safe** stage automatically. Stop only on: all repository-local items VERIFIED COMPLETE; genuine EXTERNAL BLOCKER; required ARCHITECTURE CHANGE CONTROL; or a safety/integrity condition.
