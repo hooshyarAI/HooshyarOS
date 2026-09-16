@@ -47,9 +47,13 @@ async function getText(url) {
  * reports EINVAL before the child starts), so such launchers are routed through
  * the platform command processor — the convention used by the other construction
  * and acceptance launchers in this repository.
+ *
+ * `platform` is injectable so both branches of this host-dependent contract can
+ * be verified deterministically on any machine (the POSIX pass-through branch
+ * previously had no correct coverage).
  */
-function normalizeCommand(command, args) {
-  if (process.platform === "win32" && /\.(cmd|bat)$/i.test(String(command))) {
+function normalizeCommand(command, args, platform = process.platform) {
+  if (platform === "win32" && /\.(cmd|bat)$/i.test(String(command))) {
     return { command: process.env.ComSpec || "cmd.exe", args: ["/d", "/s", "/c", [command, ...args].join(" ")] };
   }
   return { command, args };

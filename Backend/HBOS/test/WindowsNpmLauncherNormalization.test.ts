@@ -15,7 +15,11 @@ interface QualificationModule {
 }
 
 interface RunnerModule {
-    normalizeCommand(command: string, args: string[]): { command: string; args: string[] };
+    normalizeCommand(
+        command: string,
+        args: string[],
+        platform?: NodeJS.Platform,
+    ): { command: string; args: string[] };
 }
 
 function assertSpawnable(invocation: { command: string; args: string[] }): void {
@@ -65,8 +69,31 @@ describe("Windows npm launcher normalization", () => {
             expect(normalized.args.slice(0, 3)).toEqual(["/d", "/s", "/c"]);
             expect(normalized.args[3]).toContain("npm.cmd --version");
         } else {
-            expect(normalized.command).toBe("npm.cmd");
+            expect(normalized.command).toBe(npmCommand);
+            expect(normalized.args).toEqual(["--version"]);
         }
+    });
+
+    it("leaves every invocation untouched off win32 and routes .cmd/.bat through ComSpec on win32", () => {
+        for (const platform of ["linux", "darwin"] as const) {
+            const native = runner.normalizeCommand(process.execPath, ["--version"], platform);
+            expect(native.command).toBe(process.execPath);
+            expect(native.args).toEqual(["--version"]);
+
+            for (const launcher of ["npm", "npm.cmd", "gradle.bat"]) {
+                const resolved = runner.normalizeCommand(launcher, ["run", "product:assurance"], platform);
+                expect(resolved.command).toBe(launcher);
+                expect(resolved.args).toEqual(["run", "product:assurance"]);
+            }
+        }
+
+        const windows = runner.normalizeCommand("npm.cmd", ["run", "product:assurance"], "win32");
+        expect(/cmd\.exe$/i.test(windows.command)).toBe(true);
+        expect(windows.args).toEqual(["/d", "/s", "/c", "npm.cmd run product:assurance"]);
+
+        const windowsNative = runner.normalizeCommand(process.execPath, ["--version"], "win32");
+        expect(windowsNative.command).toBe(process.execPath);
+        expect(windowsNative.args).toEqual(["--version"]);
     });
 
     it("resolves a spawnable invocation for the canonical product factory contract", () => {
