@@ -9,7 +9,7 @@ const gates = {
   ],
   architecture: [
     'Backend/HBOS/test/HBOSBootIntegration.test.ts',
-    'Backend/HBOS/test/EngineRegistry.test.ts',
+    'Backend/HBOS/test/EngineRegistry.phase-11-1.2.test.ts',
     'Backend/HBOS/test/EngineDependencyManager.test.ts',
     'Backend/HBOS/test/BootDependencyValidator.test.ts',
   ],
