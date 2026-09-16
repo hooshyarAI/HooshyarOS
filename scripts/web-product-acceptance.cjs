@@ -2,6 +2,7 @@ const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const cp = require('node:child_process');
+const { isSessionRateLimitedPost, createSessionRateLimitPacer } = require('./session-rate-limit-pacer.cjs');
 
 const root = process.cwd();
 const port = Number(process.env.HOOSHYAR_WEB_ACCEPTANCE_PORT ?? '4174');
@@ -13,6 +14,10 @@ const tsxCli = path.join(root, 'node_modules', 'tsx', 'dist', 'cli.mjs');
 const runtimeEntrypoint = path.join(root, 'Backend', 'HBOS', 'Autonomous', 'Runtime', 'start-commercial-runtime.ts');
 const shell = process.platform === 'win32' ? (process.env.ComSpec || 'cmd.exe') : undefined;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+// Mirrors the canonical runtime's per-session token bucket (capacity 5,
+// refill 1/s) so this QA client never exceeds the documented contract
+// regardless of machine speed. See scripts/session-rate-limit-pacer.cjs.
+const sessionPacer = createSessionRateLimitPacer();
 function gitCommit() { try { return cp.execFileSync(process.platform === 'win32' ? 'git.exe' : 'git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(); } catch { return 'UNKNOWN'; } }
 
 async function createXlsxBase64() {
@@ -38,7 +43,7 @@ async function waitHealth(child) {
   }
   throw new Error(`WEB_ACCEPTANCE_HEALTH_TIMEOUT:port=${port}`);
 }
-async function request(pathname, options = {}) { const response = await fetch(`http://127.0.0.1:${port}${pathname}`, options); const text = await response.text(); let body = {}; try { body = text ? JSON.parse(text) : {}; } catch { body = { raw: text }; } return { status: response.status, body, setCookie: response.headers.get('set-cookie') || '' }; }
+async function request(pathname, options = {}) { if (isSessionRateLimitedPost(pathname, options.method)) await sessionPacer.acquire(); const response = await fetch(`http://127.0.0.1:${port}${pathname}`, options); const text = await response.text(); let body = {}; try { body = text ? JSON.parse(text) : {}; } catch { body = { raw: text }; } return { status: response.status, body, setCookie: response.headers.get('set-cookie') || '' }; }
 function spawnRuntime() {
   const child = spawn(node, [tsxCli, runtimeEntrypoint], { cwd: root, stdio: ['ignore', 'inherit', 'inherit'], shell: false, windowsHide: true, env: { ...process.env, HOOSHYAR_HOST: '127.0.0.1', HOOSHYAR_PORT: String(port), HOOSHYAR_DB_PATH: db } });
   child.spawnError = null;
@@ -99,7 +104,7 @@ async function main() {
     // queues work durably, reload preserves it, reconnect synchronizes it, and a
     // storage-quota failure can never masquerade as offline.
     const offlineClient = require(path.join(root, 'web', 'offline-sync.js'));
-    const runtimeFetch = (url, init = {}) => fetch(`http://127.0.0.1:${port}${url}`, { ...init, headers: { ...(init.headers || {}), cookie } });
+    const runtimeFetch = async (url, init = {}) => { if (isSessionRateLimitedPost(url, init.method)) await sessionPacer.acquire(); return fetch(`http://127.0.0.1:${port}${url}`, { ...init, headers: { ...(init.headers || {}), cookie } }); };
     let browserOnline = false;
     const flakyFetch = (url, init) => (browserOnline ? runtimeFetch(url, init) : Promise.reject(new TypeError('Failed to fetch')));
     const offlineStorage = offlineClient.memoryStorage();
