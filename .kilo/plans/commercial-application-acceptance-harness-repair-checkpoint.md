@@ -16,10 +16,15 @@
 | Field | Value |
 |---|---|
 | Pre-change trusted checkpoint | `f132d1de4f427b3886b94d72f872340caaae77b7` |
-| Knot closure commit | recorded in the follow-up checkpoint-persistence commit; verified by `git rev-parse HEAD` == `git rev-parse origin/fix/autonomous-product-factory` == `git ls-remote origin refs/heads/fix/autonomous-product-factory` |
+| Knot closure commit | `8e52acea2266a9c6ad074b36b341f8d4382ae30a` — `fix(acceptance): repair combined commercial application acceptance harness launch` |
+| `git rev-parse HEAD` | `8e52acea2266a9c6ad074b36b341f8d4382ae30a` |
+| `git rev-parse origin/fix/autonomous-product-factory` | `8e52acea2266a9c6ad074b36b341f8d4382ae30a` |
+| `git ls-remote origin refs/heads/fix/autonomous-product-factory` | `8e52acea2266a9c6ad074b36b341f8d4382ae30a` |
 | Parity | **HOLDS** — local == origin tracking == independent `ls-remote` |
 
-One implementation commit. The follow-up commit persists this closure SHA only (no code change).
+One implementation commit (the knot). This checkpoint file and its closure SHA are persisted by the
+immediately following docs-only commit (no code change), matching the repository's existing checkpoint
+persistence precedent.
 
 ## 2. Selection basis (how this knot was found)
 
