@@ -42,6 +42,7 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 | 14 | `standardization.governance-operator-reconciliation` | K4 | Reconcile stale/incomplete governance docs to the approved local execution-operator model (docs-only, no rule change) | `Docs/HOOSHYAROS_MASTER_CHARTER.md`, `Docs/HOOSHYAROS_FINAL_DECISIONS_REGISTER.md`, `AUTONOMOUS_MISSION.md` | HIGH | **COMPLETE** |
 | 15 | `productization.installed-product-acceptance` | K8 | Qualify the real installed Windows artifact end-to-end; repair the acceptance-harness launch construction (Windows quoting) without weakening the criterion | `scripts/installed-product-acceptance.cjs` | MEDIUM | **COMPLETE** |
 | — | `assurance.commercial-application-acceptance-harness-repair` | continuation scan (closes the K3 bounded observation, Master Charter §15.1.1) | Repair the canonical combined acceptance harness so its nested `npm run` capability steps actually launch on Windows, and surface the launcher cause instead of writing a permanent BLOCKED artifact | `scripts/commercial-application-acceptance.cjs` | MEDIUM | **COMPLETE** |
+| — | `assurance.windows-npm-launcher-normalization` | continuation scan (defect class of the previous knot) | Normalize the remaining canonical npm launchers so `.cmd` launchers resolve a spawnable invocation on Windows; surface launcher cause; preserve real restart recovery | `scripts/real-product-qualification.cjs`, `Backend/HBOS/Autonomous/Product/AutonomousProductFactory.ts`, `scripts/autonomous-ci-repair-runner.cjs` | MEDIUM | **COMPLETE** |
 | — | `security.encryption-at-rest` | C5 | BLOCKED — ARCHITECTURE CHANGE CONTROL / pending human 05C approval | 05C decisions | — | BLOCKED |
 | — | `product.billing-entitlements` | C2 | BLOCKED_EXTERNAL_DEPENDENCY (payment provider account/webhook) | — | — | BLOCKED_EXTERNAL |
 | — | `deployment.cloud-production` | C4 | BLOCKED_EXTERNAL_DEPENDENCY (cloud/DNS/TLS credentials) | — | — | BLOCKED_EXTERNAL |
@@ -398,6 +399,30 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 **Evidence:** focused `Backend/HBOS/test/CommercialApplicationAcceptanceHarness.test.ts` **6/6 PASS** (real subprocesses, no mocks); regression 3 suites/22 tests PASS; changed-file typecheck exit 0; real end-to-end acceptance **PASS, exit 0**, `checks: [web-application, pdf-acquisition, security-application]`; full suite **267/267 suites, 2082/2082 tests PASS**. Application/acceptance evidence refreshed commit-fresh at `f132d1de`. Evidence artifact: `.kilo/evidence/assurance-commercial-application-acceptance-harness-repair-2026-09-16.txt`. Checkpoint: `.kilo/plans/commercial-application-acceptance-harness-repair-checkpoint.md`.
 
 **DO-NOT-REPEAT:** do not re-introduce `spawnSync('npm.cmd', …, { shell: false })`; do not discard the launcher exit code/signal/spawn error; do not build a second combined acceptance framework; do not weaken or reorder the three canonical capability checks; do not touch `FinancialDataIngestionAdapter.ts`, `Core/Engine.ts`, the architecture freeze, completion flags or unrelated worktree files.
+
+---
+
+## Bounded knot — `assurance.windows-npm-launcher-normalization`
+
+**State:** COMPLETE
+**Baseline SHA:** `50c76a311e1595264c4849320c9acd161070337a`
+**Classification:** `IMPLEMENTATION_GAP` — the same Windows `.cmd` npm-launch defect class as the predecessor knot, in three further canonical launchers (REAL, reproducible). No product/runtime/engine/architecture/completion-gate change.
+
+**SELECTION BASIS (continuation current-state scan):** after the predecessor knot closed, the scan searched for the same defect class (Windows `.cmd`/`.bat` spawned with `shell: false` → `EINVAL`). Exactly one coherent root cause ⇒ one bounded change set with one test boundary, per the queue rule "One coherent root cause = one bounded change set = one test boundary = one commit".
+
+**DISCOVER / INSPECT (done):**
+- `scripts/real-product-qualification.cjs` (`product:real:qualification`) — `spawnSync('npm.cmd', args, { shell: false })`.
+- `Backend/HBOS/Autonomous/Product/AutonomousProductFactory.ts` (`product:factory:contract`) — `spawn('npm.cmd', …)` ×2 and `execFileSync('npm.cmd', …)` ×2.
+- `scripts/autonomous-ci-repair-runner.cjs` (referenced by `.github/workflows/autonomous-ci-repair.yml`, `runs-on: ubuntu-latest`, so its Windows path was latent) — `exec` helper with `shell: false` + `npm.cmd`.
+- Host probe (from the predecessor knot): `shell:false npm.cmd` → `null`/`EINVAL`; `cmd.exe /d /s /c npm` → `0`.
+
+**Repair:** npm is launched through `process.env.ComSpec || 'cmd.exe'` + `/d /s /c "npm <args>"` on Windows and directly on POSIX (the established repository convention); launcher failures report `exitCode`/`signal`/`launcherError`; `main()` is guarded by `require.main === module` with exported testable helpers; `AutonomousProductFactory` now terminates the process tree (`taskkill /PID /T /F` on Windows) instead of `child.kill()`, removing a stale-port false-recovery risk in the restart step.
+
+**Evidence:** focused `Backend/HBOS/test/WindowsNpmLauncherNormalization.test.ts` **7/7 PASS** (real subprocesses, no mocks); regression 3 suites/20 tests PASS; changed-file typecheck exit 0; real launch-path proof (`REAL_PRODUCT_QUALIFICATION` `web-acceptance` PASS through the repaired wrapper, exit 0); full suite **268/268 suites, 2089/2089 tests PASS**. Evidence artifact: `.kilo/evidence/assurance-windows-npm-launcher-normalization-2026-09-16.txt`. Checkpoint: `.kilo/plans/windows-npm-launcher-normalization-checkpoint.md`.
+
+**RECORDED, NOT SELECTED:** `scripts/product-web-acceptance.cjs` has the identical defect but is an UNREFERENCED DUPLICATE of the canonical `scripts/web-product-acceptance.cjs` → `NOT_NEEDED`; recommended separate owner decision: delete the duplicate.
+
+**DO-NOT-REPEAT:** do not spawn `.cmd`/`.bat` with `shell: false` on Windows; do not collapse a launcher failure into exit 1; do not use `child.kill()` for npm-launched runtimes on Windows; do not weaken or reorder the canonical qualification steps; do not touch unrelated worktree files.
 
 ---
 

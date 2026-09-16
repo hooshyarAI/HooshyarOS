@@ -58,6 +58,37 @@ async function jsonRequest(port: number, path: string, init: RequestInit): Promi
   return { status: response.status, body, cookie: response.headers.get("set-cookie") ?? undefined };
 }
 
+const windowsShell = process.platform === "win32" ? (process.env.ComSpec ?? "cmd.exe") : null;
+
+/**
+ * Resolve the npm CLI invocation for this platform. Node refuses to spawn a
+ * `.cmd`/`.bat` file with `shell: false` on Windows (it reports EINVAL before the
+ * child starts), so the npm CLI is launched through the platform command processor
+ * there — the convention used by FinalProductFactoryRunner and the other
+ * construction/acceptance launchers in this repository.
+ */
+export function npmInvocation(args: readonly string[]): { command: string; args: string[] } {
+  if (args.length === 0) throw new Error("PRODUCT_FACTORY_EMPTY_NPM_ARGS");
+  if (windowsShell) return { command: windowsShell, args: ["/d", "/s", "/c", `npm ${args.join(" ")}`] };
+  return { command: "npm", args: [...args] };
+}
+
+/**
+ * Terminate a launched runtime. On Windows the npm CLI runs behind the command
+ * processor, so the whole process tree must be killed; otherwise the previous
+ * runtime keeps the port and database open and the restart step could observe a
+ * stale process instead of a real recovery.
+ */
+async function stopChild(child: ChildProcess | undefined): Promise<void> {
+  if (!child || child.exitCode !== null || child.signalCode !== null) return;
+  if (windowsShell) {
+    try { execFileSync(windowsShell, ["/d", "/s", "/c", `taskkill /PID ${child.pid} /T /F`], { cwd: process.cwd(), stdio: "ignore" }); } catch { /* best-effort tree termination */ }
+  } else {
+    child.kill("SIGTERM");
+  }
+  await sleep(750);
+}
+
 export class AutonomousProductFactory {
   private readonly root: string;
   private readonly port: number;
@@ -144,8 +175,9 @@ export class AutonomousProductFactory {
     if (!recordLocal(evidence, "INTEGRATE", this.startPrerequisites(), "commercial runtime and persistence prerequisites available", "repository")) return { ok: false, failure: "runtime prerequisites unavailable" };
 
     let child: ChildProcess | undefined;
+    const runtimeLaunch = npmInvocation(["run", "start:commercial"]);
     try {
-      child = spawn(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "start:commercial"], {
+      child = spawn(runtimeLaunch.command, runtimeLaunch.args, {
         cwd: this.root,
         stdio: ["ignore", "pipe", "pipe"],
         env: { ...process.env, HOOSHYAR_DB_PATH: this.databasePath, HOOSHYAR_PORT: String(this.port) }
@@ -169,9 +201,8 @@ export class AutonomousProductFactory {
       const dashboard = await jsonRequest(this.port, "/api/dashboard", { headers: { cookie } });
       if (dashboard.status !== 200 || dashboard.body?.analysisAvailable !== true || dashboard.body?.metrics?.profit !== 1000) return { ok: false, failure: "dashboard acceptance failed before restart" };
       recordLocal(evidence, "ACCEPT", true, `customer journey produced tenant ${tenantId} with profit ${dashboard.body.metrics.profit}`, "runtime");
-      child.kill();
-      await sleep(500);
-      child = spawn(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "start:commercial"], {
+      await stopChild(child);
+      child = spawn(runtimeLaunch.command, runtimeLaunch.args, {
         cwd: this.root,
         stdio: "ignore",
         env: { ...process.env, HOOSHYAR_DB_PATH: this.databasePath, HOOSHYAR_PORT: String(this.port) }
@@ -190,7 +221,7 @@ export class AutonomousProductFactory {
     } catch (error) {
       return { ok: false, failure: error instanceof Error ? error.message : String(error) };
     } finally {
-      if (child && !child.killed) child.kill();
+      await stopChild(child);
       try { rmSync(this.databasePath, { force: true }); } catch { /* best-effort cleanup of runtime state */ }
     }
   }
@@ -207,12 +238,14 @@ export class AutonomousProductFactory {
   }
 
   private runTests(): boolean {
-    try { execFileSync(process.platform === "win32" ? "npm.cmd" : "npm", ["test", "--", "--runInBand"], { cwd: this.root, stdio: "ignore", timeout: 10 * 60 * 1000 }); return true; }
+    const launch = npmInvocation(["test", "--", "--runInBand"]);
+    try { execFileSync(launch.command, launch.args, { cwd: this.root, stdio: "ignore", timeout: 10 * 60 * 1000 }); return true; }
     catch { return false; }
   }
 
   private startPrerequisites(): boolean {
-    try { execFileSync(process.platform === "win32" ? "npm.cmd" : "npm", ["--version"], { cwd: this.root, stdio: "ignore" }); return true; }
+    const launch = npmInvocation(["--version"]);
+    try { execFileSync(launch.command, launch.args, { cwd: this.root, stdio: "ignore" }); return true; }
     catch { return false; }
   }
 

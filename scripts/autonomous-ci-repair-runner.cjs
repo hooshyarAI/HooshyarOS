@@ -13,9 +13,11 @@ const maxAttempts = Number(process.env.HOOSHYAR_CI_REPAIR_MAX_ATTEMPTS || 3);
 const pollSeconds = Number(process.env.HOOSHYAR_CI_REPAIR_POLL_SECONDS || 10);
 const maxLog = 30000;
 
-if (!runId || !initialSha || !branch || ["main", "master"].includes(branch)) {
-  console.error(JSON.stringify({ type: "AUTONOMOUS_CI_REPAIR_BLOCKED", reason: "INVALID_REPAIR_CONTEXT", runId, initialSha, branch }));
-  process.exit(2);
+function assertRepairContext() {
+  if (!runId || !initialSha || !branch || ["main", "master"].includes(branch)) {
+    console.error(JSON.stringify({ type: "AUTONOMOUS_CI_REPAIR_BLOCKED", reason: "INVALID_REPAIR_CONTEXT", runId, initialSha, branch }));
+    process.exit(2);
+  }
 }
 
 function headers() {
@@ -40,8 +42,22 @@ async function getText(url) {
   return text.length > maxLog ? text.slice(-maxLog) : text;
 }
 
+/**
+ * Node refuses to spawn a `.cmd`/`.bat` file with `shell: false` on Windows (it
+ * reports EINVAL before the child starts), so such launchers are routed through
+ * the platform command processor — the convention used by the other construction
+ * and acceptance launchers in this repository.
+ */
+function normalizeCommand(command, args) {
+  if (process.platform === "win32" && /\.(cmd|bat)$/i.test(String(command))) {
+    return { command: process.env.ComSpec || "cmd.exe", args: ["/d", "/s", "/c", [command, ...args].join(" ")] };
+  }
+  return { command, args };
+}
+
 function exec(command, args, options = {}) {
-  return cp.spawnSync(command, args, {
+  const normalized = normalizeCommand(command, args);
+  return cp.spawnSync(normalized.command, normalized.args, {
     cwd: root,
     env: process.env,
     encoding: "utf8",
@@ -192,6 +208,7 @@ function commitPush() {
 }
 
 async function main() {
+  assertRepairContext();
   let currentSha = initialSha;
   let targetRun = {
     id: Number(runId),
@@ -249,7 +266,11 @@ async function main() {
   throw new Error("AUTONOMOUS_CI_REPAIR_MAX_ATTEMPTS_EXCEEDED:" + maxAttempts);
 }
 
-main().catch(error => {
-  console.error(JSON.stringify({ type: "AUTONOMOUS_CI_REPAIR_FAILED", error: String(error) }));
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch(error => {
+    console.error(JSON.stringify({ type: "AUTONOMOUS_CI_REPAIR_FAILED", error: String(error) }));
+    process.exit(1);
+  });
+}
+
+module.exports = { normalizeCommand, exec };
