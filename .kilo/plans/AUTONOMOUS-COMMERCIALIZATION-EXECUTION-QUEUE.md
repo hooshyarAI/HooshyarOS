@@ -506,6 +506,29 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 
 ---
 
+## Bounded knot — `runtime.session-lifecycle-sweep`
+
+**State:** COMPLETE
+**Baseline SHA:** `3504ee43fe93ccef2b87b7e946788fbcab8a631d`
+**Closure SHA:** `15b5b63e64c6d9fe303ec786441bbc8e119f0df8`
+**Classification:** `REAL DEFECT` (unwired canonical lifecycle owner → unbounded growth). No engine, route, contract, persistence-schema, security or completion-gate change.
+
+**SELECTION BASIS (continuation current-state scan):** after `observability.route-normalization-real-ids` closed, the session/auth lifecycle surface was scanned. The canonical pruning owner exists and is unit-tested but was never invoked by the runtime.
+
+**DISCOVER / INSPECT (done):**
+- `Engines/UserManagementEngine.ts:391` — `cleanupExpiredSessions()` (`DELETE FROM sessions WHERE expires_at <= ?`); `Product/CommercialIdentityService.ts:371` delegates to it.
+- `git grep -n "cleanupExpiredSessions"` → the only caller is `Backend/HBOS/test/UserManagementEngine.test.ts:125`.
+- `CommercialIdentityService.getSession()` only deletes a row lazily, when that exact token is presented again — so unreplayed expired sessions accumulate unbounded.
+- Observed but not bundled: the in-memory `rateLimiterMap` (per-session buckets) is also never evicted.
+
+**REPAIR:** new `CommercialRuntimeOptions.sessionSweepIntervalMs` (default 5 min, `0` disables); the runtime schedules `identity.cleanupExpiredSessions()` on that interval; the timer is `unref()`'d and cleared by the existing `server.once("close", close)` handler; sweep failures are swallowed so maintenance can never take the runtime down.
+
+**EVIDENCE:** new `Backend/HBOS/test/RuntimeSessionLifecycleSweep.test.ts` **3/3 PASS** (expired row reaped even though the token is never replayed; a still-valid session retained; control shows the expired row persists with the sweep disabled), asserted non-destructively via the canonical `UserManagementEngine.getSessionRecord()`; regression 10 runtime/auth/session/persistence suites **72/72 PASS**; changed-file typecheck exit 0; full suite **271/271 suites, 2103/2103 tests PASS, exit 0**. Artifact: `.kilo/evidence/runtime-session-lifecycle-sweep-2026-09-16.txt`; checkpoint: `.kilo/plans/runtime-session-lifecycle-sweep-checkpoint.md`.
+
+**DO-NOT-REPEAT:** do not remove the scheduled sweep, its `unref()`, or the clear-on-close; do not replace it with per-request O(n) cleanup; do not poll with a destructive probe; do not bundle the rate-limiter-map eviction into this knot; do not touch unrelated worktree files.
+
+---
+
 ## Self-replanning rule
 
 After stage 1 verifies, re-audit the affected verification area, refresh this queue, and advance to the next highest-value **safe** stage automatically. Stop only on: all repository-local items VERIFIED COMPLETE; genuine EXTERNAL BLOCKER; required ARCHITECTURE CHANGE CONTROL; or a safety/integrity condition.

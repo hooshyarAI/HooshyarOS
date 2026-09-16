@@ -1,0 +1,117 @@
+RUNTIME SESSION LIFECYCLE SWEEP - KNOT EVIDENCE
+===============================================
+Knot ID            : runtime.session-lifecycle-sweep
+Date               : 2026-09-16
+Branch             : fix/autonomous-product-factory
+Pre-change HEAD    : 3504ee43fe93ccef2b87b7e946788fbcab8a631d
+Closure SHA        : 15b5b63e64c6d9fe303ec786441bbc8e119f0df8
+Remote parity      : local == origin == ls-remote == 15b5b63e64c6d9fe303ec786441bbc8e119f0df8 (verified)
+Classification     : REAL DEFECT (unwired canonical lifecycle owner -> unbounded growth)
+Type               : bounded, non-stage, repository-local knot
+K8                 : VERIFIED/CLOSED, not reopened. B1-B5 classifications unchanged.
+Architecture       : Freeze V4.1 preserved. No new engine; canonical owner reused.
+
+--------------------------------------------------------------------
+1. DISCOVERY (current-state scan)
+--------------------------------------------------------------------
+The canonical session owner already implements expired-session pruning:
+
+  Backend/HBOS/Engines/UserManagementEngine.ts:391
+    cleanupExpiredSessions(): number
+      DELETE FROM sessions WHERE expires_at <= ?
+
+and it is composed by the commercial identity service:
+
+  Backend/HBOS/Product/CommercialIdentityService.ts:371
+    cleanupExpiredSessions(): number
+
+But the only callers in the whole repository are TESTS:
+
+  git grep -n "cleanupExpiredSessions" -- "*.ts" "*.cjs"
+    UserManagementEngine.ts:391          (definition)
+    CommercialIdentityService.ts:371-372 (delegation)
+    UserManagementEngine.test.ts:125     (only caller)
+
+The commercial runtime never invokes it. Its request path only removes a session
+row LAZILY, when that exact token is presented again:
+
+  CommercialIdentityService.getSession()
+    -> UserManagementEngine.getSessionRecord()   (SELECT, no expiry logic)
+    -> if isExpired(record): deleteSession(...)  (only for a presented token)
+
+Consequence: in a long-running commercial deployment every login/register/
+passwordless-bootstrap row whose session expires and whose cookie is never
+presented again stays in the `sessions` table forever. The table grows without
+bound (unbounded disk growth, monotonically slower session lookups) even though
+the canonical owner method that prevents exactly this exists and is unit-tested.
+
+--------------------------------------------------------------------
+2. REPRODUCTION (pre-fix behaviour)
+--------------------------------------------------------------------
+The new control test drives the runtime with `sessionSweepIntervalMs: 0` (no
+sweep), lets the injected clock pass the 60 s session TTL, and reads the canonical
+owner's `sessions` row non-destructively (`getSessionRecord()` applies no expiry
+logic, so a present row proves it was never deleted):
+
+  "leaves expired rows in place when the sweep is disabled" -> row still present
+
+i.e. the pre-fix runtime is exactly the no-sweep path: expired rows accumulate.
+
+--------------------------------------------------------------------
+3. REPAIR (canonical owner, minimal)
+--------------------------------------------------------------------
+`Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts`:
+  - new option `sessionSweepIntervalMs` (default `DEFAULT_SESSION_SWEEP_INTERVAL_MS`
+    = 5 minutes; `0` disables for explicit test control);
+  - the runtime schedules `identity.cleanupExpiredSessions()` on that interval;
+  - the timer is `unref()`'d so it can never hold the process open, and it is
+    cleared by the existing `server.once("close", close)` handler so no handle
+    leaks in tests (the F1/F2 flake class is explicitly avoided);
+  - a sweep failure is swallowed so lifecycle maintenance can never take the
+    runtime down.
+
+No new engine, no second session store, no changed route/contract/criterion. No
+persistence, security or completion-gate change.
+
+--------------------------------------------------------------------
+4. FOCUSED / REGRESSION EVIDENCE
+--------------------------------------------------------------------
+Focused (new suite):
+  jest --runTestsByPath Backend/HBOS/test/RuntimeSessionLifecycleSweep.test.ts
+  -> 1 suite / 3 tests PASS
+     - reaps an expired session even when its token is never presented again
+       (row deleted by the sweep; stale cookie then returns 401)
+     - does not reap a still-valid session (row retained; cookie still 200)
+     - control: with the sweep disabled the expired row persists (proves the
+       scheduled sweep is what removes it, i.e. the guard is meaningful)
+
+Regression (runtime/auth/session/persistence):
+  jest --runTestsByPath RuntimeSessionLifecycleSweep, CommercialRuntimeServer.e2e,
+    CommercialRuntimeServer.rateLimiting, CommercialRuntimeServer.resilience,
+    CommercialRuntimeServer.test, Phase13-RBAC, Phase13-E2E,
+    UserManagementEngine, RuntimeObservability, CommercialRuntimePersistenceRecovery
+  -> 10 suites / 72 tests PASS
+
+Changed-file typecheck:
+  tsc CommercialRuntimeServer.ts   -> exit 0
+  tsc RuntimeSessionLifecycleSweep.test.ts -> exit 0
+
+Full suite:
+  node ./node_modules/jest/bin/jest.js --runInBand
+  -> Test Suites: 271 passed / 271 total
+  -> Tests:       2103 passed / 2103 total
+  -> exit 0   (baseline 270/270 suites, 2100 tests; +1 suite / +3 tests)
+
+--------------------------------------------------------------------
+5. TRUTH BOUNDARY
+--------------------------------------------------------------------
+- No completion flag changed. `productComplete` = FALSE; external dependencies
+  remain BLOCKED_EXTERNAL; B1 remains BLOCKED_HUMAN_APPROVAL.
+- No criterion weakened, no test skipped, no evidence fabricated.
+- Observed but NOT repaired here (recorded for a possible separate knot, not
+  bundled): the in-memory per-session rate-limiter map
+  (`CommercialRuntimeServer.rateLimiterMap`) is also never evicted, so it grows
+  with the number of distinct session tokens over process lifetime. Evicting it
+  needs a read-only session-existence seam and a separately testable observable;
+  different mechanism, so it was not bundled into this change.
+- Unrelated worktree files were not staged or touched.
