@@ -18,6 +18,7 @@ const {
     isSessionRateLimitedPost,
     SESSION_RATE_LIMIT_CAPACITY,
     SESSION_RATE_LIMIT_REFILL_PER_SECOND,
+    SESSION_RATE_LIMIT_PACING_MARGIN_RATIO,
 } = require("../../../scripts/session-rate-limit-pacer.cjs");
 
 const CSV = "date,account,debit,credit,currency\n2026-08-01,Cash,1000,0,IRR\n2026-08-01,Sales,0,1000,IRR";
@@ -63,7 +64,7 @@ const ingest = (server: Server, cookie: string) => request(server, "/api/ingest"
 });
 
 describe("web acceptance session rate-limit pacing", () => {
-    test("pacer admits a full capacity burst then waits exactly one refill window", async () => {
+    test("pacer admits a full capacity burst then waits a refill window plus a safety margin", async () => {
         let nowValue = 1_700_000_000_000;
         const waits: number[] = [];
         const pace = createSessionRateLimitPacer({
@@ -76,7 +77,50 @@ describe("web acceptance session rate-limit pacing", () => {
 
         await pace.acquire();
         expect(waits).toHaveLength(1);
-        expect(waits[0]).toBeGreaterThanOrEqual(1000 / SESSION_RATE_LIMIT_REFILL_PER_SECOND);
+        const refillWindowMs = 1000 / SESSION_RATE_LIMIT_REFILL_PER_SECOND;
+        const marginMs = Math.ceil(refillWindowMs * SESSION_RATE_LIMIT_PACING_MARGIN_RATIO);
+        expect(marginMs).toBeGreaterThan(0);
+        // Strictly more than the exact refill window: waiting exactly the
+        // theoretical minimum leaves no surplus and reproduces the CI 429.
+        expect(waits[0]).toBeGreaterThanOrEqual(refillWindowMs + marginMs);
+    });
+
+    test("pacer margin keeps the authoritative bucket solvent when the mirror clock drifts", async () => {
+        // The mirror runs in a different process than the authoritative bucket,
+        // so its observed elapsed time can exceed the server's. Model a pacer
+        // clock 5% fast against a server bucket using real elapsed time.
+        const drift = 1.05;
+        const simulate = async (pacerOptions: Record<string, unknown>): Promise<number> => {
+            let virtualNow = 1_700_000_000_000;
+            let realNow = virtualNow;
+            const server = { tokens: SESSION_RATE_LIMIT_CAPACITY, lastRefill: realNow };
+            const serverAcquire = (): boolean => {
+                const elapsed = realNow - server.lastRefill;
+                if (elapsed > 0) {
+                    server.tokens = Math.min(SESSION_RATE_LIMIT_CAPACITY, server.tokens + elapsed / 1000);
+                    server.lastRefill = realNow;
+                }
+                if (server.tokens >= 1) { server.tokens -= 1; return true; }
+                return false;
+            };
+            const pace = createSessionRateLimitPacer({
+                now: () => virtualNow,
+                sleep: async (ms: number) => { virtualNow += ms; realNow += ms / drift; },
+                ...pacerOptions,
+            });
+            let rejected = 0;
+            for (let i = 0; i < SESSION_RATE_LIMIT_CAPACITY + 2; i++) {
+                await pace.acquire();
+                if (!serverAcquire()) rejected += 1;
+            }
+            return rejected;
+        };
+
+        // Without the margin the mirror is optimistic and the authoritative
+        // server correctly rejects — the exact CI failure class.
+        expect(await simulate({ marginMs: 0 })).toBeGreaterThan(0);
+        // With the production margin the same drift is absorbed.
+        expect(await simulate({})).toBe(0);
     });
 
     test("route predicate matches exactly the canonical session-limited POST routes", () => {

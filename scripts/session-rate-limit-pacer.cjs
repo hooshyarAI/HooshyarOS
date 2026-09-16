@@ -24,6 +24,20 @@ const SESSION_RATE_LIMIT_CAPACITY = 5;
 const SESSION_RATE_LIMIT_REFILL_PER_SECOND = 1;
 
 /**
+ * Safety cushion applied to a computed refill wait.
+ *
+ * The mirror runs in a different process than the authoritative bucket, so its
+ * measured elapsed time can exceed the server's by scheduling jitter (and the
+ * server only needs to observe marginally under one token to answer 429 — the
+ * comparison is `tokens >= 1` in floating point). Waiting the exact refill
+ * window leaves zero surplus and is therefore not safe: a deterministic drift
+ * probe (pacer clock 2% fast) reproduces the real
+ * `WEB_ACCEPTANCE_XLSX_INGEST_FAILED:429`. A 10% cushion is the same margin the
+ * harness already applied by hand (`sleep(1100)` for a 1000 ms window).
+ */
+const SESSION_RATE_LIMIT_PACING_MARGIN_RATIO = 0.1;
+
+/**
  * The exact set of session-rate-limited POST routes owned by
  * `CommercialRuntimeServer`. Kept method-aware: the same paths are NOT limited
  * for GET. Execution work-item sub-routes are matched by prefix below.
@@ -69,6 +83,8 @@ function createSessionRateLimitPacer(options = {}) {
         if (typeof timer.unref === "function") timer.unref();
     }));
     const refillPerMs = refillPerSecond / 1000;
+    const refillWindowMs = 1000 / refillPerSecond;
+    const marginMs = options.marginMs ?? Math.ceil(refillWindowMs * SESSION_RATE_LIMIT_PACING_MARGIN_RATIO);
     let tokens = capacity;
     let lastRefill = now();
 
@@ -89,16 +105,17 @@ function createSessionRateLimitPacer(options = {}) {
                 return;
             }
             const deficit = 1 - tokens;
-            await sleep(Math.max(1, Math.ceil(deficit / refillPerMs)));
+            await sleep(Math.max(1, Math.ceil(deficit / refillPerMs) + marginMs));
         }
     }
 
-    return { acquire, capacity, refillPerSecond };
+    return { acquire, capacity, refillPerSecond, marginMs };
 }
 
 module.exports = {
     SESSION_RATE_LIMIT_CAPACITY,
     SESSION_RATE_LIMIT_REFILL_PER_SECOND,
+    SESSION_RATE_LIMIT_PACING_MARGIN_RATIO,
     SESSION_RATE_LIMITED_POST_PATHS,
     isSessionRateLimitedPost,
     createSessionRateLimitPacer,
