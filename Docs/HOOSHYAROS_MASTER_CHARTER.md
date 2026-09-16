@@ -509,21 +509,20 @@ A future autonomous cycle MUST be able to answer from this memory:
 4. What is externally blocked?
 5. What is the next dependency-ready knot?
 
-#### 15.1.1 Current Audit Baseline — `stage15-k8-installed-product-acceptance-2026-09-15`
+#### 15.1.1 Current Audit Baseline — `governed-commercialization-b1-b5-truth-2026-09-16`
 
 | Field | Value |
 |---|---|
-| AUDIT ID | `stage15-k8-installed-product-acceptance-2026-09-15` |
-| DATE | 2026-09-15 |
-| AUDIT ARTIFACT (evidence source) | `.kilo/plans/stage15-k8-installed-product-acceptance-checkpoint.md` |
-| EVIDENCE ARTIFACT | `.kilo/evidence/stage15-k8-installed-product-acceptance.txt` |
-| TYPE | Bounded Stage 15 productization-knot verdict (K8 `productization.installed-product-acceptance`); the prior `blocker-b1-b5-readiness-delta-2026-09-14` baseline is preserved in §15.1.1a and §15.1.2 |
-| PRE-CHANGE TRUSTED CHECKPOINT | `14995d7d21b1c97a0083a9aa147793bd9fb2f5fd` |
-| QUEUE STATUS | CURRENT — stages 1–15 COMPLETE; K8 `productization.installed-product-acceptance` EXECUTED and VERIFIED |
+| AUDIT ID | `governed-commercialization-b1-b5-truth-2026-09-16` |
+| DATE | 2026-09-16 |
+| AUDIT ARTIFACT (evidence source) | `.kilo/evidence/governed-commercialization-b1-b5-truth-2026-09-16.txt` |
+| TYPE | Bounded read-only B1–B5 current-truth architecture/security/readiness audit plus the mandated bounded B5 document-consistency correction (no B5 stage created); the prior `stage15-k8-installed-product-acceptance-2026-09-15` baseline is preserved in §15.1.1b and §15.1.2, and `blocker-b1-b5-readiness-delta-2026-09-14` in §15.1.1a |
+| PRE-CHANGE TRUSTED CHECKPOINT | `bc341ab13e2e08b85c2431c5d7d0b6968817b863` |
+| QUEUE STATUS | CURRENT — stages 1–15 COMPLETE; K8 `productization.installed-product-acceptance` VERIFIED (preserved, not reopened); no new stage created |
 | VERIFIED STAGES | Stages 1–15 (through Stage 15 K8) |
 | NEXT DEPENDENCY-READY KNOT | None — K5 `commercial.subscription-entitlements` CONDITIONAL (scope-gated), K6 `assurance.android-build-test-evidence` BLOCKED (environment/host + external device), K7 `assurance.runtime-server-unit-coverage` NOT_NEEDED |
 
-Completion states recorded by this verdict (unchanged from §15.1.1a):
+Completion states recorded by this verdict (unchanged — **verified no state change**):
 
 | State | Value |
 |---|---|
@@ -532,6 +531,45 @@ Completion states recorded by this verdict (unchanged from §15.1.1a):
 | `commercialProductRuntimeComplete` | FALSE |
 | `externalProductionDependenciesComplete` | FALSE |
 | `productComplete` | FALSE |
+
+**B1–B5 current-truth verdict (2026-09-16, baseline `bc341ab1`).** Bounded read-only audit from trusted
+checkpoint `bc341ab1` (local == `origin/fix/autonomous-product-factory` == independent `ls-remote`). K8
+remains VERIFIED. Exactly one classification per blocker:
+
+- **B1 — `BLOCKED_HUMAN_APPROVAL`, ACTIONABLE_NOW=FALSE.** The encryption foundation is committed
+  (`Backend/HBOS/Security/EncryptionService.ts`, commit `1608a7ea`; `Persistence/SQLiteAdapter.ts:110-172`
+  field-level encryption + `encryption_keys`), but the production store `Product/SQLitePersistenceStore.ts`
+  is plaintext and `CommercialRuntimeServer.ts:306-307` constructs it with no `encryption` config;
+  `Persistence/SQLiteAdapter.ts` is referenced only by its own tests. No approved encryption-at-rest /
+  key-management decision exists (`Docs/ARCHITECTURE_DECISIONS/` holds only `KILO_GOVERNED_OPERATOR_DECISION.md`;
+  05C-D1 records the persistence/encryption/key-management/secrets/backup decisions as human-approval items;
+  05C-E records audit encryption `P1` as `REQUIRES_HUMAN_APPROVAL`). No repository-local implementation gap
+  exists that is independent of approval; production wiring was deliberately NOT implemented. Decision-readiness
+  artifact: `.kilo/plans/b1-encryption-at-rest-decision-readiness-2026-09-16.md`.
+- **B2 — `BLOCKED_EXTERNAL` (payment-provider activation) + K5 `commercial.subscription-entitlements` `CONDITIONAL`.**
+  `ExternalProductionDependencyAudit` = BLOCKED unless `HOOSHYAR_PAYMENT_PROVIDER_ACTIVATED=1`; no subscription/
+  plan/entitlement/invoice/checkout/webhook model or fail-closed entitlement gate exists; scope is unconfirmed by
+  `Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md:229`. Not dependency-ready.
+- **B3 — `BLOCKED_EXTERNAL`.** No in-repo TLS/DNS/cloud resources; the local install/start path and deployment
+  contracts exist and are qualified (K8); production configuration fails closed. Not a local coding gap.
+- **B4 — `BLOCKED_ENVIRONMENT`.** `android/` is a 6-file WebView shell (`settings.gradle`, `build.gradle`,
+  `app/build.gradle` AGP 8.7.3, `AndroidManifest.xml`, `MainActivity.java`, `styles.xml`); no test source sets,
+  no signing config, no Gradle wrapper (CI supplies Gradle via `gradle/actions/setup-gradle@v4`, so this is not a
+  CI defect); host probes show `java`/`javac`/`gradle`/`adb` absent and empty `ANDROID_HOME`/`ANDROID_SDK_ROOT`;
+  `PRODUCT_QUALIFICATION_MATRIX.json` `android-release` = `REQUIRES_DEVICE_EXECUTION`. Not a proven coding gap.
+- **B5 — CORRECTED to `AVAILABLE ON THIS HOST`.** `C:\Users\avalipour\AppData\Local\Programs\Inno Setup 6\ISCC.exe`
+  exists (Inno Setup 6; both build entry points already search LocalAppData) and Inno Setup 6.7.3 built the accepted
+  installer. Stale B5 records in the ledger, the K8 checkpoint and the §15.1.2 queue row were reconciled. Code-signing
+  (Authenticode) remains an external prerequisite.
+
+Focused verification for this verdict: jest **4 suites / 53 tests PASS** (`Phase05C-D4`,
+`ExternalProductionDependencyAudit`, `CommercialAcceptanceBarrier`, `InstalledProductPackagingRepair`);
+`node scripts/product-platform-assurance.cjs` = PASS with `productComplete:false`. **No dependency-ready
+repository-local implementation knot exists**; no engine/runtime/test knot was selected and no completion flag changed.
+
+#### 15.1.1b Superseded Baseline — `stage15-k8-installed-product-acceptance-2026-09-15`
+
+Preserved below. K8 remains VERIFIED and is not reopened; its closure and bounded deltas remain valid evidence.
 
 **K8 (Stage 15) closure — `productization.installed-product-acceptance`.** VERIFIED. The real
 installed Windows artifact now qualifies end-to-end: isolated Inno Setup build → silent isolated install
@@ -738,7 +776,8 @@ Only records whose completion is supported by their own artifact and/or a verifi
 | `.kilo/plans/stage15-k8-installed-product-acceptance-checkpoint.md` (baseline `stage15-k8-installed-product-acceptance-2026-09-15`, checkpoint `14995d7d`) | `14995d7d` | SUPERSEDED by future baselines only; K8 `productization.installed-product-acceptance` VERIFIED — real installed Windows artifact acceptance PASS (16/16 checks incl. `restart-recovery`/`persistence`); repaired an acceptance-harness Windows cmd.exe double-quoting defect (product correct, launcher unchanged); focused 4 suites/50 tests PASS; evidence `.kilo/evidence/stage15-k8-installed-product-acceptance.txt` |
 | `.kilo/evidence/stage15-k8-installer-rebuild-installation-ready-2026-09-15.txt` (delta `stage15-k8-installer-rebuild-installation-ready-2026-09-15`, verified commit `6afbd28b`) | `6afbd28b` | Bounded non-stage delta — installation-ready installer rebuilt from the verified commit in a clean isolated worktree and re-accepted against the new artifact (PASS, exit 0, 16/16 incl. `restart-recovery`/`persistence`); B5 corrected to **AVAILABLE ON THIS HOST** (Inno Setup 6.7.3 in LocalAppData); two bounded acceptance-harness robustness repairs (`skipifsilent` on the generated isolated acceptance installer; spawn-time launcher exit capture); K8 remains VERIFIED |
 | `.kilo/evidence/stage15-k8-real-installation-upgrade-2026-09-16.txt` (delta `stage15-k8-real-installation-upgrade-2026-09-16`, final commit `6cc309ab`) | `6cc309ab` | Bounded non-stage delta — the final verified installer was applied to the user's REAL installation `C:\Users\avalipour\AppData\Local\Programs\HooshyarOS` (silent upgrade exit 0) after a timestamped backup, and the canonical installed-product acceptance ran against that real path: **PASS, exit 0, 16/16**; real desktop/Start Menu shortcut and retained `data\hooshyar.sqlite` verified; additive `HOOSHYAR_ACCEPTANCE_INSTALL_DIR` real-target mode added to the single canonical harness; K8 remains VERIFIED, B1–B4 unchanged, B5 AVAILABLE ON THIS HOST, code-signing an external prerequisite |
-| `.kilo/plans/AUTONOMOUS-COMMERCIALIZATION-EXECUTION-QUEUE.md` | derived from ledger | stages 1–15 COMPLETE; no primary repository-local knot remains; B1–B5 BLOCKED; K5–K7 conditional |
+| `.kilo/evidence/governed-commercialization-b1-b5-truth-2026-09-16.txt` + `.kilo/plans/b1-encryption-at-rest-decision-readiness-2026-09-16.md` (audit `governed-commercialization-b1-b5-truth-2026-09-16`, checkpoint `bc341ab1`) | `bc341ab1` | CURRENT baseline (see §15.1.1) — B1 `BLOCKED_HUMAN_APPROVAL` (+ decision-readiness artifact), B2 `BLOCKED_EXTERNAL` (K5 CONDITIONAL), B3 `BLOCKED_EXTERNAL`, B4 `BLOCKED_ENVIRONMENT`, **B5 CORRECTED to AVAILABLE ON THIS HOST**; no dependency-ready repository-local knot; completion flags unchanged; focused 4 suites/53 tests PASS |
+| `.kilo/plans/AUTONOMOUS-COMMERCIALIZATION-EXECUTION-QUEUE.md` | derived from ledger | stages 1–15 COMPLETE; no primary repository-local knot remains; B1/B2/B3/B4 blocked as classified (B5 is AVAILABLE ON THIS HOST, corrected 2026-09-16); K5–K7 conditional |
 | `.kilo/plans/fresh-governed-commercialization-reaudit-2026-09-14.md` (baseline `fresh-governed-commercialization-2026-09-14`, checkpoint `977ea944`) | `977ea944` | SUPERSEDED by `post-k2-offline-sync-reaudit-2026-09-14`; recorded knots K1–K4/K5–K7 and blockers B1–B5; K1 and K2 later closed (Stages 11–12) |
 | `.kilo/plans/phase-11-final-checkpoint.md` | `8ed51f0e` | declared VERIFIED; its `canonicalPlatformConstructionComplete: true` claim is SUPERSEDED by later evidence (`phase-14-final-checkpoint.md` and the 2026-09-14 audit both record FALSE) |
 | `.kilo/plans/phase-12-final-checkpoint.md` | `849f5709` | VERIFIED; local == remote TRUE |

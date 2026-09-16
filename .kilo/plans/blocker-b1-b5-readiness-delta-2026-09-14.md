@@ -1,5 +1,14 @@
 # Blocker Readiness Delta Audit — B1 / B2 / B3 / B4 / B5
 
+> **SUPERSEDED (2026-09-16) — preserved as traceable historical evidence.**
+> This artifact accurately records the 2026-09-14 host state (baseline `a8538ff0`). Its **B5 =
+> `BLOCKED_ENVIRONMENT`** verdict is **CORRECTED**: the probe checked only the two Program Files
+> locations and missed `%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe`. B5 is now
+> **AVAILABLE ON THIS HOST** and Inno Setup 6.7.3 built the accepted installer. Current baseline:
+> Audit Memory §15.1.1 (`governed-commercialization-b1-b5-truth-2026-09-16`), evidence
+> `.kilo/evidence/governed-commercialization-b1-b5-truth-2026-09-16.txt`. All other 2026-09-14
+> findings remain as recorded.
+
 **Type:** Bounded, evidence-backed blocker readiness audit (NOT a 16-layer commercial audit, NOT implementation).
 **Date:** 2026-09-14
 **Branch:** `fix/autonomous-product-factory`

@@ -155,10 +155,13 @@ was invalidated.
 
 ## 7. Remaining blockers / commercial state
 
-Unchanged external/approval blockers: **B1** encryption-at-rest / key management
+External/approval blockers: **B1** encryption-at-rest / key management
 (architecture change control, pending human 05C decisions), **B2** payment
 provider activation, **B3** production cloud/DNS/TLS resources, **B4** Android
-device acceptance, **B5** Inno Setup host on other machines.
+device acceptance. **B5 is CORRECTED (2026-09-16) to AVAILABLE ON THIS HOST** —
+Inno Setup 6.7.3 at `C:\Users\avalipour\AppData\Local\Programs\Inno Setup 6\ISCC.exe`
+(the earlier probe checked only Program Files); only *other* build hosts still need
+Inno Setup 6 installed. Audit: `governed-commercialization-b1-b5-truth-2026-09-16`.
 
 `productComplete` and `externalProductionDependenciesComplete` remain **FALSE**
 (the external production dependencies still block commercial completion).
