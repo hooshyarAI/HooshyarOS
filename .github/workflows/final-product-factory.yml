@@ -124,20 +124,9 @@ jobs:
           disable-animations: false
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: bash scripts/android-product-acceptance.sh
-      - name: Write Android acceptance evidence
+      - name: Verify harness-produced Android acceptance evidence
         shell: bash
-        run: |
-          mkdir -p .hooshyar
-          cat > .hooshyar/android-acceptance-success.json <<EOF
-          {
-            "type": "ANDROID_PRODUCT_ACCEPTANCE_SUCCESS",
-            "version": 1,
-            "status": "PASS",
-            "createdAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "commit": "$(git rev-parse HEAD)",
-            "acceptance": ["apk-build", "emulator-install", "launcher-start", "process-alive", "main-activity-visible"]
-          }
-          EOF
+        run: node scripts/android-acceptance-evidence.cjs verify
       - name: Upload Android acceptance evidence
         if: always()
         uses: actions/upload-artifact@v4
