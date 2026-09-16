@@ -483,6 +483,29 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 
 ---
 
+## Bounded knot — `observability.route-normalization-real-ids`
+
+**State:** COMPLETE
+**Baseline SHA:** `f9d40d13d93ee46d61c517f10838bacef4c70e30`
+**Closure SHA:** `b4a95c443da054857adec3cab2ca4dfcc7dbbe07`
+**Classification:** `REAL DEFECT` (observability cardinality contract violated) + `MISSING REGRESSION GUARD`. No product/runtime route, engine, contract, persistence, security or completion-gate change.
+
+**SELECTION BASIS (continuation current-state scan):** the previous five knots closed; a fresh scan of the runtime observability surface was executed rather than assuming "no knot". `RuntimeObservability.ts` states its contract as "bounded operation counters (requests/errors/duration) per normalized route", so a route normalizer that fails on the real ids is a direct contract violation.
+
+**DISCOVER / INSPECT (done):**
+- `RuntimeObservability.ts:33` — `ID_SEGMENT` matched only pure-hex (`[0-9a-f]{8,}`), hyphenated hex/UUID and decimal segments.
+- Real ids not matched: `ProvenanceTrace.createTraceId()` (`Core/ProvenanceTrace.ts:53`) → `TRACE-<base36>-<base36>-<n>`, used by `OrganizationalExecutionCoordinator.propose` (`Product/OrganizationalExecutionCoordinator.ts:328`) and served at `/api/execution/work-items/:id[/<action>]`; `ReportExportService` (`Product/ReportExportService.ts:122`) → `report-<32 hex>`, served at `/api/report/artifacts/:id/download`.
+- The only guard (`test/RuntimeObservability.test.ts`) asserted synthetic hex (`deadbeefcafe`), which no real endpoint emits.
+- Effect: each distinct work item and each distinct export created a permanent entry in the process-wide `routes` map (unbounded cardinality / memory growth) and those families never aggregated in `/api/diagnostics/metrics`.
+
+**REPAIR:** `ID_SEGMENT` additionally recognizes the two real canonical id shapes (`trace-[0-9a-z]+-[0-9a-z]+-\d+`, `report-[0-9a-f]{32}`), documented against their producers; static segments are not collapsed.
+
+**EVIDENCE:** focused `RuntimeObservability.test.ts` **7/7 PASS** (+2) including a real `ProvenanceTrace` id case, a real `report-<32 hex>` case, and a real HTTP cardinality proof (register → decision workbench → 2 work items → GET each by real `TRACE-` id → analyze → 2 exports → GET each real artifact download → metrics shows exactly one normalized route per family, `requests: 2`, no real id in the payload); regression 8 runtime/persistence/export suites **72/72 PASS**; changed-file typecheck exit 0; full suite **270/270 suites, 2100/2100 tests PASS, exit 0**. Artifact: `.kilo/evidence/observability-route-normalization-real-ids-2026-09-16.txt`; checkpoint: `.kilo/plans/observability-route-normalization-real-ids-checkpoint.md`.
+
+**DO-NOT-REPEAT:** do not narrow `ID_SEGMENT` back to a hex/UUID/decimal-only heuristic; do not guard with synthetic ids instead of the real producer formats; do not let a new dynamic route family ship without a normalization entry and a real-format guard; do not touch unrelated worktree files.
+
+---
+
 ## Self-replanning rule
 
 After stage 1 verifies, re-audit the affected verification area, refresh this queue, and advance to the next highest-value **safe** stage automatically. Stop only on: all repository-local items VERIFIED COMPLETE; genuine EXTERNAL BLOCKER; required ARCHITECTURE CHANGE CONTROL; or a safety/integrity condition.
