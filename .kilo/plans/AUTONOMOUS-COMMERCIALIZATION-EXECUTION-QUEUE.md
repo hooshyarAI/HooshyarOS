@@ -426,6 +426,25 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 
 ---
 
+## Bounded knot — `assurance.android-acceptance-evidence-ownership`
+
+**State:** COMPLETE
+**Baseline SHA:** `3ce244579ebb5497bf16c3bbaa7b4d3c99036369`
+**Closure SHA:** `29ac9dab3a6470998bb8868ad4edb588927de7de`
+**Classification:** `EVIDENCE_INTEGRITY_GAP` — the Android qualification artifact was authored by the CI workflow (a caller) instead of by the harness that performs the real device checks. No product/runtime/engine/architecture/completion-gate change.
+
+**SELECTION BASIS (continuation current-state scan):** the qualification evidence chain was traced from `scripts/cline-runtime-evidence-collector.cjs` (which marks the `android-release` cell `PASS` from `.hooshyar/android-acceptance-success.json` at lines 25/31/53) back to its producer. The producer was a hand-authored heredoc in `.github/workflows/final-product-factory.yml` with a literal `acceptance` marker list, while `scripts/android-product-acceptance.sh` produced no evidence. One coherent root cause ⇒ one bounded change set with one test boundary.
+
+**REPAIR:** new `scripts/android-acceptance-evidence.cjs` (canonical fail-closed owner: `begin`/`record`/`complete`/`fail`/`verify`; `begin` clears prior results so no stale PASS is inherited; `complete` refuses until all 8 real steps are recorded; `fail` deletes the artifact); `scripts/android-product-acceptance.sh` emits its own commit-bound evidence after each real check with an `ERR` trap calling `fail`, plus an explicit APK pre-flight; `.github/workflows/final-product-factory.yml` stops authoring evidence and instead runs `node scripts/android-acceptance-evidence.cjs verify`.
+
+**EVIDENCE:** focused `Backend/HBOS/test/AndroidAcceptanceEvidence.test.ts` **7/7 PASS** (real subprocesses/filesystem, no mocks) including a real shell integration with a fake `adb` producing the harness's own PASS artifact; `bash -n` exit 0; workflow YAML parses with the fabricated step gone; changed-file typecheck exit 0; full suite **269/269 suites, 2096/2096 tests PASS** (two consecutive runs); `product:assurance` PASS with `productComplete:false`; completion gate `evidenceGaps=["external-dependency-blocked"]` only. Real device acceptance NOT run (B4 `BLOCKED_ENVIRONMENT`) and not claimed. Artifact: `.kilo/evidence/android-acceptance-evidence-ownership-2026-09-16.txt`; checkpoint: `.kilo/plans/android-acceptance-evidence-ownership-checkpoint.md`.
+
+**RECORDED, NOT SELECTED:** `.github/workflows/android-release.yml` still carries an inline adb verification copy separate from the canonical harness and emits no evidence — no evidence-consumer impact; future bounded consolidation owner decision.
+
+**DO-NOT-REPEAT:** do not author qualification evidence from a CI workflow or any caller; do not build an acceptance artifact from a hard-coded marker list; do not leave a PASS artifact after a failed acceptance run; do not weaken or reorder the canonical Android verification steps.
+
+---
+
 ## Self-replanning rule
 
 After stage 1 verifies, re-audit the affected verification area, refresh this queue, and advance to the next highest-value **safe** stage automatically. Stop only on: all repository-local items VERIFIED COMPLETE; genuine EXTERNAL BLOCKER; required ARCHITECTURE CHANGE CONTROL; or a safety/integrity condition.
