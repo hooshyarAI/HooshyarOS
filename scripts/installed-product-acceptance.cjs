@@ -165,15 +165,22 @@ function buildIsolatedInstaller() {
   fs.rmSync(workDir, { recursive: true, force: true });
   fs.mkdirSync(installerOut, { recursive: true });
   const appId = `{{${crypto.randomUUID().replace(/-/g, '').toUpperCase()}}}`;
-  const template = fs.readFileSync(path.join(root, 'installer', 'HooshyarOS.iss'), 'utf8');
-  const isolated = template
+  const canonical = fs.readFileSync(path.join(root, 'installer', 'HooshyarOS.iss'), 'utf8');
+  // The canonical installer must itself skip the post-install launch in silent
+  // mode. This harness used to inject that guard into its isolated copy only,
+  // which hid the canonical defect: a real unattended install therefore
+  // auto-launched the product and a browser, holding the caller's stdio and
+  // hanging the release-artifacts CI job until its 45-minute timeout.
+  if (!/skipifsilent/.test(canonical)) {
+    fail('installer/HooshyarOS.iss must guard the post-install [Run] with skipifsilent');
+  }
+  const isolated = canonical
     .replace(/AppId=\{\{[0-9A-Fa-f-]+\}/, `AppId=${appId}`)
     .replace(/DefaultDirName=\{localappdata\}\\Programs\\HooshyarOS\r?\n/, `DefaultDirName={localappdata}\\Programs\\HooshyarOS-Acceptance\n`)
     .replace(/OutputDir=.*\r?\n/, `OutputDir=${installerOut}\n`)
     .replace(/OutputBaseFilename=.*\r?\n/, 'OutputBaseFilename=HooshyarOS-Acceptance-Setup\n')
     .replace(/SetupIconFile=.*\r?\n/, `SetupIconFile=${path.join(payload, 'hooshyaros.ico')}\n`)
-    .replace(/Source: ".*payload\\\*"/, `Source: "${path.join(payload, '*')}"`)
-    .replace(/Flags: runhidden nowait/, 'Flags: runhidden nowait skipifsilent');
+    .replace(/Source: ".*payload\\\*"/, `Source: "${path.join(payload, '*')}"`);
   if (!isolated.includes('HooshyarOS-Acceptance') || !isolated.includes(appId) || !isolated.includes('skipifsilent')) fail('failed to generate the isolated installer definition');
   fs.writeFileSync(isolatedIss, isolated, 'utf8');
 

@@ -28,7 +28,7 @@ Name: "{autoprograms}\HooshyarOS\HooshyarOS"; Filename: "wscript.exe"; Parameter
 Name: "{autodesktop}\HooshyarOS"; Filename: "wscript.exe"; Parameters: """{app}\launch-hooshyar.vbs"""; WorkingDir: "{app}"; IconFilename: "{app}\hooshyaros.ico"; IconIndex: 0
 
 [Run]
-Filename: "wscript.exe"; Parameters: """{app}\launch-hooshyar.vbs"""; Flags: runhidden nowait
+Filename: "wscript.exe"; Parameters: """{app}\launch-hooshyar.vbs"""; Flags: runhidden nowait skipifsilent
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}"
