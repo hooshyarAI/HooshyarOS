@@ -48,6 +48,12 @@ export interface CommercialRuntimeOptions {
     readonly now?: () => number;
     readonly corsOrigin?: string;
     readonly secureCookies?: boolean;
+    /**
+     * Interval for the runtime's expired-session sweep. Defaults to
+     * `DEFAULT_SESSION_SWEEP_INTERVAL_MS`; `0` disables the sweep (used by
+     * tests that drive session lifecycle explicitly).
+     */
+    readonly sessionSweepIntervalMs?: number;
 }
 
 const WEB_ROOT = resolve(process.cwd(), "web");
@@ -58,6 +64,7 @@ const LATEST_EXECUTIVE_WORKBENCH_KEY = "executive-intelligence-workbench:latest"
 const LATEST_DECISION_WORKBENCH_KEY = "decision-workbench:latest";
 const LATEST_ANALYTICS_KEY = "financial-analytics:latest";
 const DEFAULT_SESSION_TTL_MS = 60 * 60 * 1000;
+const DEFAULT_SESSION_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 const DEFAULT_CORS_ORIGIN = "http://localhost:3000";
 const SESSION_COOKIE = "hooshyar_session";
 const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9._:-]{1,255}$/;
@@ -339,6 +346,23 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     identity.setNowProvider(now);
     identity.initialize();
 
+    // The canonical UserManagementEngine owns expired-session pruning, but the
+    // runtime must actually schedule it: `getSession()` only removes a row whose
+    // token is presented again, so without a sweep a long-running deployment
+    // accumulates expired `sessions` rows without bound. The timer is unref'd so
+    // it never holds the process open, and it is cleared when the server closes.
+    const sessionSweepIntervalMs = options.sessionSweepIntervalMs ?? DEFAULT_SESSION_SWEEP_INTERVAL_MS;
+    const sessionSweep = sessionSweepIntervalMs > 0
+        ? setInterval(() => {
+            try {
+                identity.cleanupExpiredSessions();
+            } catch {
+                // Lifecycle maintenance must never take the runtime down.
+            }
+        }, sessionSweepIntervalMs)
+        : null;
+    if (sessionSweep && typeof sessionSweep.unref === "function") sessionSweep.unref();
+
     const cookieAttributes = `HttpOnly; SameSite=Strict; Path=/${options.secureCookies ? "; Secure" : ""}`;
     const sessionCookie = (token: string) => `${SESSION_COOKIE}=${token}; ${cookieAttributes}`;
     const clearedCookie = () => `${SESSION_COOKIE}=; ${cookieAttributes}; Max-Age=0`;
@@ -525,7 +549,10 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
             ? { status: 200, payload: result.workItem }
             : { status: executionErrorStatus(result.code), payload: { error: result.code ?? "EXECUTION_BLOCKED", reason: result.reason } };
 
-    const close = () => persistence.close();
+    const close = () => {
+        if (sessionSweep) clearInterval(sessionSweep);
+        persistence.close();
+    };
     const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
         const requestId = observability.requestId(req.headers["x-request-id"]);
         res.setHeader("X-Request-Id", requestId);
