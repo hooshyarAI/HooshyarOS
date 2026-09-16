@@ -178,6 +178,21 @@ function writeMission(mission) {
   return handoff;
 }
 
+/**
+ * `kilo run` declares the message positional and `-f/--file` as array options.
+ * yargs drains every following value into an array option until it meets another
+ * flag, so `-f <handoff> <prompt>` consumed the prompt as a second "file to
+ * attach": the CLI aborted with `File not found: You are HooshyarOS autonomous
+ * CI repair operator...` and the repair never ran. The message must therefore be
+ * emitted before `-f`, leaving the attach list with exactly one value.
+ */
+function buildKiloInvocation(handoffPath, prompt) {
+  return {
+    command: "kilo",
+    args: ["run", "--auto", "--agent", "hooshyar-repair", prompt, "--file", handoffPath]
+  };
+}
+
 function runKilo(handoffPath) {
   const prompt = [
     "You are HooshyarOS autonomous CI repair operator.",
@@ -187,7 +202,8 @@ function runKilo(handoffPath) {
     "Inspect the exact failure, make the smallest coherent repair, add one focused regression test where appropriate, and run focused verification.",
     "Do not perform unrelated cleanup. Do not rewrite passing product behavior. Stop after focused verification."
   ].join(" ");
-  const result = exec("kilo", ["run", "--auto", "--agent", "hooshyar-repair", "-f", handoffPath, prompt]);
+  const invocation = buildKiloInvocation(handoffPath, prompt);
+  const result = exec(invocation.command, invocation.args);
   return { code: result.status ?? 1, output: (result.stdout || "") + "\n" + (result.stderr || "") };
 }
 
@@ -277,4 +293,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { normalizeCommand, exec };
+module.exports = { normalizeCommand, exec, buildKiloInvocation };
