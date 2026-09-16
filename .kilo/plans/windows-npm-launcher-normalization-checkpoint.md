@@ -17,8 +17,15 @@
 | Field | Value |
 |---|---|
 | Pre-change trusted checkpoint | `50c76a311e1595264c4849320c9acd161070337a` |
-| Knot closure commit | recorded in the follow-up checkpoint-persistence commit |
+| Knot closure commit | `2d7360167ba38d61d18f1b683db20478763575f8` — `fix(launch): normalize canonical Windows npm launchers` |
+| `git rev-parse HEAD` | `2d7360167ba38d61d18f1b683db20478763575f8` |
+| `git rev-parse origin/fix/autonomous-product-factory` | `2d7360167ba38d61d18f1b683db20478763575f8` |
+| `git ls-remote origin refs/heads/fix/autonomous-product-factory` | `2d7360167ba38d61d18f1b683db20478763575f8` |
 | Parity | **HOLDS** — local == origin tracking == independent `ls-remote` |
+
+One implementation commit (the knot). This checkpoint file and its closure SHA are persisted by the
+immediately following docs-only commit (no code change), matching the repository's existing checkpoint
+persistence precedent.
 
 ## 2. Selection basis
 
