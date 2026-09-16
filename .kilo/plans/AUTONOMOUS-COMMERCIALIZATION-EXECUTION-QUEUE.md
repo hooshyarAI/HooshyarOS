@@ -445,6 +445,27 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 
 ---
 
+## Bounded knot — `assurance.test-reference-integrity`
+
+**State:** COMPLETE
+**Baseline SHA:** `94d7debe6cdf7abc68079c9b20e796ce068b39f3`
+**Closure SHA:** `63a735159337a39762d72c07ea6aba920ab625d2`
+**Classification:** `IMPLEMENTATION_GAP` — executable references to relocated test files were never updated. No product/runtime/engine/architecture/completion-gate change.
+
+**SELECTION BASIS (continuation current-state scan):** every `*.test.*` path referenced by `.github/workflows/*`, `scripts/*` and `package.json` was extracted and checked against the filesystem. Two stale references were found and reproduced.
+
+**REPRODUCTION:** `node scripts/final-product-qualification.cjs` → `overall: "BLOCK_INTERNAL"`, `gates: {}`, `missingTests: ["Backend/HBOS/test/EngineRegistry.test.ts"]`, exit 1 (the documented aggregate runner could never run any internal gate); the CI focused list with the stale daemon path → 4 suites/9 tests exit 0 (Jest silently ignores a non-matching positional pattern, so the named gate stopped running).
+
+**REPAIR:** `scripts/final-product-qualification.cjs` `architecture` gate → `Backend/HBOS/test/EngineRegistry.phase-11-1.2.test.ts`; `.github/workflows/hooshyaros-ci.yml` focused autonomous tests → `Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.test.ts`; new regression guard `Backend/HBOS/test/TestReferenceIntegrity.test.ts` (referenced `*.test.*` paths must exist; aggregate qualification gate paths must exist).
+
+**EVIDENCE:** guard **2/2 PASS**; repaired aggregate runner **7/7 internal gates PASS**, `overall: BLOCK_EXTERNAL`, exit 0; corrected CI focused list **5 suites/15 tests PASS**; workflow YAML parses; typecheck exit 0; full suite **270/270 suites, 2098/2098 tests PASS**. Artifact: `.kilo/evidence/test-reference-integrity-2026-09-16.txt`; checkpoint: `.kilo/plans/test-reference-integrity-checkpoint.md`.
+
+**RECORDED, NOT SELECTED:** duplicated inline Android acceptance in `.github/workflows/android-release.yml` and `.github/workflows/release-artifacts.yml` (standardization, no evidence-consumer impact); pre-existing dual `EngineRegistry` (`Core/` vs `Engines/`) — consolidation is a governed architecture change; unreferenced duplicate `scripts/product-web-acceptance.cjs` (`NOT_NEEDED`).
+
+**DO-NOT-REPEAT:** do not reference a test path without verifying it exists; do not treat Jest's non-matching-pattern tolerance as a gate; run the aggregate qualification runner after touching gate lists.
+
+---
+
 ## Self-replanning rule
 
 After stage 1 verifies, re-audit the affected verification area, refresh this queue, and advance to the next highest-value **safe** stage automatically. Stop only on: all repository-local items VERIFIED COMPLETE; genuine EXTERNAL BLOCKER; required ARCHITECTURE CHANGE CONTROL; or a safety/integrity condition.
