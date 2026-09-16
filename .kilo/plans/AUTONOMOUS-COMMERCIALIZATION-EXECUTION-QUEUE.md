@@ -529,6 +529,32 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 
 ---
 
+## Bounded qualification step — application/acceptance evidence refresh (2026-09-16)
+
+**State:** COMPLETE (non-stage; no queue reordering)
+**Baseline SHA:** `e2219e7a9d5fc816437970babf75411cd6bb165d` (head after the two runtime knots)
+**What/why:** the runtime knots changed the commercial runtime, so the commit-bound web/security application evidence (bound to `f9d40d13`) was stale. Re-ran the canonical harnesses at the new HEAD.
+**Result:** `product:web:acceptance` PASS 37 checks (`e2219e7a`); `product:security:acceptance` PASS 15 checks (`e2219e7a`); `product:pdf:acceptance` PASS 6 checks; `scripts/commercial-application-acceptance.cjs` PASS `[web-application, pdf-acquisition, security-application]` (`e2219e7a`); `scripts/final-product-qualification.cjs` 7/7 internal gates PASS, `overall: BLOCK_EXTERNAL`, exit 0; `CommercialProductCompletionAudit` `complete:false`, `applicationEvidence`/`acceptanceEvidence` present+passed+fresh, `evidenceGaps:["external-dependency-blocked"]`.
+**Honest limit:** `product:factory` requires a pristine worktree (`assertCleanRepo()`); pre-existing unrelated user changes were preserved, so the Windows factory cells stay `REQUIRES_EXECUTION` (evidence bound to `ada37eeb`). No criterion weakened; completion flags unchanged (all false except `assistantComplete`).
+
+## Deferred candidates (2026-09-16; observed, not dependency-ready)
+
+Recorded so they are not re-discovered from scratch. Each is deferred with its exact reason; none was invented as filler:
+
+| Candidate | Classification | Why not ready |
+|---|---|---|
+| Shipped runtime does not durably record security events (`securityEventLogger` never constructed at `start-commercial-runtime.ts:10`; canonical `SecurityEventLogger`/`AuditStore` exist) | `ARCHITECTURE CHANGE CONTROL REQUIRED` | needs a persisted audit store/file (persistence decision adjacent to pending 05C decisions) |
+| Dormant duplicate `Auth/CommercialAuthenticationAuthorizationBoundary` (isolated in-memory identity) | duplicate / owner decision | consolidation or deletion requires governance |
+| `UserManagementEngine.setPassword()` does not invalidate existing sessions | latent (no live HTTP path) | only tests call it |
+| `/api/auth/refresh` does not rotate the token | hardening, not a documented defect | no rotation requirement in governing docs |
+| Idempotency `IN_PROGRESS` claim has no stale-recovery after a crash | product decision | documented fail-closed; needs a grace/at-least-once policy |
+| Per-session `rateLimiterMap` never evicted | real but unprovable | no testable observable without exposing internals |
+| Orphan duplicate `scripts/product-web-acceptance.cjs` | `NOT_NEEDED` | deletion is a separate owner decision |
+| Dual `EngineRegistry` (`Core/` vs `Engines/`) | governed architecture change | pre-existing duality asserted by tests |
+| No SQLite schema-migration mechanism | latent | no current schema change pending |
+
+---
+
 ## Self-replanning rule
 
 After stage 1 verifies, re-audit the affected verification area, refresh this queue, and advance to the next highest-value **safe** stage automatically. Stop only on: all repository-local items VERIFIED COMPLETE; genuine EXTERNAL BLOCKER; required ARCHITECTURE CHANGE CONTROL; or a safety/integrity condition.
