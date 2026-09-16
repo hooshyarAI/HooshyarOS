@@ -376,6 +376,8 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 
 **DO-NOT-REPEAT:** do not launch the installed product through `cmd.exe /c "\"<path>\""`; use the real shortcut target with a single unquoted path argument. Do not discard the launcher exit code/stderr or replace the real health check with a fixed delay. Do not weaken the installed acceptance, mock the installed product, or change the launcher to compensate for a harness bug. Do not `git reset`/`clean`/`stash`; do not stage unrelated worktree files.
 
+**Bounded delta (2026-09-16) — `stage15-k8-real-installation-upgrade-2026-09-16` (no new stage).** The final verified installation-ready installer was applied to the user's REAL installation `C:\Users\avalipour\AppData\Local\Programs\HooshyarOS` (timestamped backup first) with silent upgrade exit code 0, and the canonical installed-product acceptance then ran against that real path: **PASS, exit 0, 16/16** (`restart-recovery` and `persistence` included). An additive `HOOSHYAR_ACCEPTANCE_INSTALL_DIR` real-target mode was added to the single canonical harness (no duplicate acceptance framework, no criterion weakened). K8 remains VERIFIED; stage order, other stage states and completion flags are unchanged. Evidence: `.kilo/evidence/stage15-k8-real-installation-upgrade-2026-09-16.txt`; see Audit Memory 15.1.1.
+
 ---
 
 ## Self-replanning rule

@@ -29,9 +29,15 @@ const payload = path.join(appRoot, 'payload');
 const workDir = path.join(root, '.hooshyar', 'installed-product-acceptance');
 const installerOut = path.join(workDir, 'installer-out');
 const isolatedIss = path.join(workDir, 'HooshyarOS-Acceptance.iss');
-const installDir = path.join(process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE || root, 'AppData', 'Local'), 'Programs', 'HooshyarOS-Acceptance');
+const defaultAcceptanceDir = path.join(process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE || root, 'AppData', 'Local'), 'Programs', 'HooshyarOS-Acceptance');
+// HOOSHYAR_ACCEPTANCE_INSTALL_DIR qualifies an already-installed location (for
+// example the real user installation) with the same journey and criteria; the
+// isolated installer build/install steps are skipped and no criterion changes.
+const realTargetDir = process.env.HOOSHYAR_ACCEPTANCE_INSTALL_DIR;
+const realTarget = Boolean(realTargetDir);
+const installDir = realTarget ? path.resolve(realTargetDir) : defaultAcceptanceDir;
 const evidenceDir = path.join(root, '.hooshyar');
-const evidencePath = path.join(evidenceDir, 'installed-product-acceptance.json');
+const evidencePath = path.join(evidenceDir, realTarget ? 'installed-product-acceptance-real.json' : 'installed-product-acceptance.json');
 const isccCandidates = [
   path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Inno Setup 6', 'ISCC.exe'),
   path.join(process.env['ProgramFiles(x86)'] || '', 'Inno Setup 6', 'ISCC.exe'),
@@ -333,8 +339,12 @@ async function main() {
   if (!Number.isInteger(port) || port < 1 || port > 65535) fail(`invalid port ${port}`);
 
   killPort(port);
-  const setup = buildIsolatedInstaller();
-  installIsolated(setup);
+  if (realTarget) {
+    if (!fs.existsSync(path.join(installDir, 'launch-hooshyar.cmd'))) fail(`real installation launcher missing at ${installDir}`);
+  } else {
+    const setup = buildIsolatedInstaller();
+    installIsolated(setup);
+  }
   verifyInstalledPayload();
 
   // The installer's [Run] section may already have launched the product; stop
@@ -357,6 +367,7 @@ async function main() {
   const evidence = {
     type: 'INSTALLED_PRODUCT_ACCEPTANCE',
     version: 1,
+    mode: realTarget ? 'real-installation' : 'isolated-acceptance',
     status: 'PASS',
     createdAt: new Date().toISOString(),
     commit: (() => { try { return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(); } catch { return 'UNKNOWN'; } })(),

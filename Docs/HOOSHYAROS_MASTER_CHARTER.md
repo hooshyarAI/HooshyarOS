@@ -597,6 +597,30 @@ product code and the production installer are unchanged. K8 remains VERIFIED and
 stage/queue/ledger entry was created. Evidence:
 `.kilo/evidence/stage15-k8-installer-rebuild-installation-ready-2026-09-15.txt`.
 
+**Bounded delta (2026-09-16) — `stage15-k8-real-installation-upgrade-2026-09-16`.** A non-stage,
+non-reopening delta applied the final verified installation-ready installer to the user's **real**
+installation `C:\Users\avalipour\AppData\Local\Programs\HooshyarOS` (previously pre-repair) and ran
+the canonical installed-product acceptance against that real path. The final verified commit
+`6cc309ab` was already committed/pushed before the interruption (no duplicate commit), and the
+`6afbd28b → 6cc309ab` delta changed no product code (harness + docs only), so the existing installer
+(57,452,433 bytes, SHA-256 `2235C85648E588B506B38F879709A08DB2E160E4587600895AEA829737796E4F`)
+was reused with payload provenance proven. A timestamped backup was taken first
+(`C:\Users\avalipour\HooshyarOS-Backups\real-install-20260916-080931`; old `data\hooshyar.sqlite`
+12288 bytes preserved, SHA-256 `442955E80388012E5599FBE583556C0E5A3BDD97F8E422FF014C42AA40B5B52B`).
+Silent in-place upgrade exit code **0**; the real desktop and Start Menu shortcuts
+(`wscript.exe "<app>\launch-hooshyar.vbs"`) and the retained/migrated `data\hooshyar.sqlite` were
+verified. Real-installation acceptance = **PASS, exit 0, 16/16** checks (`health`, `ready`,
+`web-shell`, `register`, `session`, `pdf-boundary`, `ingest`, `analysis`, `dashboard`, `sources`,
+`tenant-isolation`, `offline-queue`, `offline-reload`, `offline-reconnect`, `restart-recovery`,
+`persistence`) with `launcherHealthy: true`, `runtimeDependenciesVerified: true`,
+`repairedClientInstalled: true`, `sourceSha256: d74b461f…`, `profit: 200`
+(`.hooshyar/installed-product-acceptance-real.json`, `mode: real-installation`). The bounded,
+additive `HOOSHYAR_ACCEPTANCE_INSTALL_DIR` real-target mode was added to the canonical harness
+(`scripts/installed-product-acceptance.cjs`) — one framework, no duplicate acceptance framework,
+no criterion weakened (focused `CommercialAcceptanceBarrier` + `InstalledProductPackagingRepair`
+= 2 suites / 20 tests PASS). K8 remains VERIFIED and no new stage/queue entry was created.
+Evidence: `.kilo/evidence/stage15-k8-real-installation-upgrade-2026-09-16.txt`.
+
 #### 15.1.1a Superseded Baseline — `blocker-b1-b5-readiness-delta-2026-09-14`
 
 | Field | Value |
@@ -713,6 +737,7 @@ Only records whose completion is supported by their own artifact and/or a verifi
 | `.kilo/plans/blocker-b1-b5-readiness-delta-2026-09-14.md` (baseline `blocker-b1-b5-readiness-delta-2026-09-14`, checkpoint `a8538ff0`) | `a8538ff0` | SUPERSEDED by `stage15-k8-installed-product-acceptance-2026-09-15` (preserved in §15.1.1a); bounded read-only B1–B5 blocker readiness delta — **B1 BLOCKED_HUMAN_APPROVAL** (no approved encryption-at-rest decision; pending 05C change-control), **B2 BLOCKED_EXTERNAL** (payment provider), **B3 BLOCKED_EXTERNAL** (cloud/DNS/TLS), **B4 BLOCKED_ENVIRONMENT** (no Gradle/JDK/Android SDK/adb; external device; not a coding gap), **B5 BLOCKED_ENVIRONMENT** (no Inno Setup 6 host). ACTIONABLE BLOCKER NONE. No source/test/queue/ledger/completion-flag change |
 | `.kilo/plans/stage15-k8-installed-product-acceptance-checkpoint.md` (baseline `stage15-k8-installed-product-acceptance-2026-09-15`, checkpoint `14995d7d`) | `14995d7d` | SUPERSEDED by future baselines only; K8 `productization.installed-product-acceptance` VERIFIED — real installed Windows artifact acceptance PASS (16/16 checks incl. `restart-recovery`/`persistence`); repaired an acceptance-harness Windows cmd.exe double-quoting defect (product correct, launcher unchanged); focused 4 suites/50 tests PASS; evidence `.kilo/evidence/stage15-k8-installed-product-acceptance.txt` |
 | `.kilo/evidence/stage15-k8-installer-rebuild-installation-ready-2026-09-15.txt` (delta `stage15-k8-installer-rebuild-installation-ready-2026-09-15`, verified commit `6afbd28b`) | `6afbd28b` | Bounded non-stage delta — installation-ready installer rebuilt from the verified commit in a clean isolated worktree and re-accepted against the new artifact (PASS, exit 0, 16/16 incl. `restart-recovery`/`persistence`); B5 corrected to **AVAILABLE ON THIS HOST** (Inno Setup 6.7.3 in LocalAppData); two bounded acceptance-harness robustness repairs (`skipifsilent` on the generated isolated acceptance installer; spawn-time launcher exit capture); K8 remains VERIFIED |
+| `.kilo/evidence/stage15-k8-real-installation-upgrade-2026-09-16.txt` (delta `stage15-k8-real-installation-upgrade-2026-09-16`, final commit `6cc309ab`) | `6cc309ab` | Bounded non-stage delta — the final verified installer was applied to the user's REAL installation `C:\Users\avalipour\AppData\Local\Programs\HooshyarOS` (silent upgrade exit 0) after a timestamped backup, and the canonical installed-product acceptance ran against that real path: **PASS, exit 0, 16/16**; real desktop/Start Menu shortcut and retained `data\hooshyar.sqlite` verified; additive `HOOSHYAR_ACCEPTANCE_INSTALL_DIR` real-target mode added to the single canonical harness; K8 remains VERIFIED, B1–B4 unchanged, B5 AVAILABLE ON THIS HOST, code-signing an external prerequisite |
 | `.kilo/plans/AUTONOMOUS-COMMERCIALIZATION-EXECUTION-QUEUE.md` | derived from ledger | stages 1–15 COMPLETE; no primary repository-local knot remains; B1–B5 BLOCKED; K5–K7 conditional |
 | `.kilo/plans/fresh-governed-commercialization-reaudit-2026-09-14.md` (baseline `fresh-governed-commercialization-2026-09-14`, checkpoint `977ea944`) | `977ea944` | SUPERSEDED by `post-k2-offline-sync-reaudit-2026-09-14`; recorded knots K1–K4/K5–K7 and blockers B1–B5; K1 and K2 later closed (Stages 11–12) |
 | `.kilo/plans/phase-11-final-checkpoint.md` | `8ed51f0e` | declared VERIFIED; its `canonicalPlatformConstructionComplete: true` claim is SUPERSEDED by later evidence (`phase-14-final-checkpoint.md` and the 2026-09-14 audit both record FALSE) |
