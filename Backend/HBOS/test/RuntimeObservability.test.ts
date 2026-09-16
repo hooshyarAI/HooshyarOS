@@ -1,5 +1,7 @@
 import { Server } from "node:http";
+import { randomBytes } from "node:crypto";
 import { createCommercialRuntimeServer } from "../Autonomous/Runtime/CommercialRuntimeServer";
+import { ProvenanceTrace } from "../Core/ProvenanceTrace";
 import { normalizeRoute, RuntimeObservability } from "../Autonomous/Runtime/RuntimeObservability";
 
 const listen = (server: ReturnType<typeof createCommercialRuntimeServer>) => new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -15,6 +17,25 @@ const cookieFrom = (response: Response): string => {
   return cookie.split(";")[0];
 };
 
+const DECISION_BODY = {
+  problem: "choose expansion plan",
+  alternatives: ["Alpha", "Beta"],
+  criteria: [
+    { name: "profit", weight: 0.6, direction: "benefit" },
+    { name: "risk", weight: 0.4, direction: "cost" },
+  ],
+  scores: [
+    [8, 4],
+    [6, 3],
+  ],
+};
+
+const LEDGER_CSV = [
+  "date,account,debit,credit,currency",
+  "2026-08-01,Cash,1000,0,IRR",
+  "2026-08-02,Sales,0,1500,IRR",
+].join("\n");
+
 describe("RuntimeObservability", () => {
   test("normalizes identifier-like route segments and strips query strings", () => {
     expect(normalizeRoute("/api/execution/work-items/deadbeefcafe")).toBe("/api/execution/work-items/:id");
@@ -22,6 +43,26 @@ describe("RuntimeObservability", () => {
     expect(normalizeRoute("/api/report/artifacts/deadbeefcafe/download")).toBe("/api/report/artifacts/:id/download");
     expect(normalizeRoute("/api/auth/login?password=hunter2")).toBe("/api/auth/login");
     expect(normalizeRoute("/health")).toBe("/health");
+  });
+
+  test("normalizes the identifier formats the canonical owners actually emit", () => {
+    // Real work-item ids come from ProvenanceTrace (TRACE-<base36>-<base36>-<n>),
+    // not from a synthetic hex string, so a hex-only heuristic leaves every real
+    // work item as its own route forever.
+    const workItemId = ProvenanceTrace.createTraceId();
+    expect(workItemId).toMatch(/^TRACE-[0-9a-z]+-[0-9a-z]+-\d+$/i);
+    expect(normalizeRoute(`/api/execution/work-items/${workItemId}`)).toBe("/api/execution/work-items/:id");
+    expect(normalizeRoute(`/api/execution/work-items/${workItemId}/approve`)).toBe("/api/execution/work-items/:id/approve");
+
+    // Real report artifact ids are `report-<32 hex>` (ReportExportService).
+    const artifactId = `report-${randomBytes(16).toString("hex")}`;
+    expect(artifactId).toMatch(/^report-[a-f0-9]{32}$/);
+    expect(normalizeRoute(`/api/report/artifacts/${artifactId}/download`)).toBe("/api/report/artifacts/:id/download");
+
+    // A content hash (source id) is still normalized, and static segments are not.
+    expect(normalizeRoute(`/api/sources/${randomBytes(32).toString("hex")}`)).toBe("/api/sources/:id");
+    expect(normalizeRoute("/api/execution/work-items")).toBe("/api/execution/work-items");
+    expect(normalizeRoute("/api/report/artifacts")).toBe("/api/report/artifacts");
   });
 
   test("accepts safe inbound request ids and never reflects unsafe input", () => {
@@ -128,5 +169,60 @@ describe("CommercialRuntimeServer request observability", () => {
     const viewerMetrics = await fetch(`${addressOf(server)}/api/diagnostics/metrics`, { headers: { cookie: viewerCookie } });
     expect(viewerMetrics.status).toBe(403);
     expect(await viewerMetrics.json()).toEqual({ error: "INSUFFICIENT_PERMISSIONS" });
+  }, 20_000);
+
+  test("keeps route cardinality bounded for real work items and report artifacts", async () => {
+    await start();
+    const registered = await post("/api/auth/register", { username: "card-owner", organization: "CardCo", password: "Sup3rSecret!" });
+    const cookie = cookieFrom(registered);
+
+    const workbench = await post("/api/decision/workbench", DECISION_BODY, cookie);
+    expect(workbench.status).toBe(200);
+    for (const title of ["card item one", "card item two"]) {
+      const created = await post("/api/execution/work-items", { title }, cookie);
+      expect(created.status).toBe(200);
+    }
+    const listed = await fetch(`${addressOf(server)}/api/execution/work-items`, { headers: { cookie } });
+    const workItems = (await listed.json() as { workItems: Array<{ workItemId: string }> }).workItems;
+    expect(workItems).toHaveLength(2);
+    expect(new Set(workItems.map((item) => item.workItemId)).size).toBe(2);
+    for (const item of workItems) {
+      expect(item.workItemId).toMatch(/^TRACE-/);
+      const read = await fetch(`${addressOf(server)}/api/execution/work-items/${item.workItemId}`, { headers: { cookie } });
+      expect(read.status).toBe(200);
+    }
+
+    const analysis = await post("/api/analyze", { csv: LEDGER_CSV, sourceName: "card-ledger.csv", assets: 10000, liabilities: 2500 }, cookie);
+    expect(analysis.status).toBe(200);
+    const artifactIds: string[] = [];
+    for (const format of ["TXT", "CSV"]) {
+      const exported = await post("/api/report/export", { format }, cookie);
+      expect(exported.status).toBe(201);
+      artifactIds.push((await exported.json() as { artifact: { artifactId: string } }).artifact.artifactId);
+    }
+    expect(artifactIds).toHaveLength(2);
+    expect(new Set(artifactIds).size).toBe(2);
+    for (const artifactId of artifactIds) {
+      expect(artifactId).toMatch(/^report-[a-f0-9]{32}$/);
+      const download = await fetch(`${addressOf(server)}/api/report/artifacts/${artifactId}/download`, { headers: { cookie } });
+      expect(download.status).toBe(200);
+    }
+
+    const metrics = await fetch(`${addressOf(server)}/api/diagnostics/metrics`, { headers: { cookie } });
+    expect(metrics.status).toBe(200);
+    const body = await metrics.json() as { routes: Array<{ method: string; route: string; requests: number }> };
+
+    const workItemRoutes = body.routes.filter((route) => route.route.startsWith("/api/execution/work-items/"));
+    expect(workItemRoutes).toEqual([
+      expect.objectContaining({ method: "GET", route: "/api/execution/work-items/:id", requests: 2 }),
+    ]);
+
+    const artifactRoutes = body.routes.filter((route) => route.route.includes("/api/report/artifacts/"));
+    expect(artifactRoutes).toEqual([
+      expect.objectContaining({ method: "GET", route: "/api/report/artifacts/:id/download", requests: 2 }),
+    ]);
+
+    // The real object ids must never appear in the metrics surface.
+    expect(JSON.stringify(body)).not.toMatch(/TRACE-|report-[a-f0-9]{32}/);
   }, 20_000);
 });

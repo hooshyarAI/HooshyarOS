@@ -30,7 +30,24 @@ export interface ObservabilitySnapshot {
   readonly routes: readonly RouteMetric[];
 }
 
-const ID_SEGMENT = /^(?:[0-9a-f]{8,}|[0-9a-f]{8}-[0-9a-f-]{4,}|\d+)$/i;
+/**
+ * Identifier-like path segments are collapsed so route cardinality stays
+ * bounded. The recognized shapes are the ones the canonical owners actually
+ * emit:
+ *   - content hashes (`/api/sources/:sha`) — 64 hex chars;
+ *   - UUIDs;
+ *   - decimal ids;
+ *   - work-item ids from `ProvenanceTrace.createTraceId()`
+ *     (`TRACE-<base36>-<base36>-<counter>`), used by
+ *     `/api/execution/work-items/:id` and `/api/execution/work-items/:id/<action>`;
+ *   - report artifact ids from `ReportExportService` (`report-<32 hex>`),
+ *     used by `/api/report/artifacts/:id/download`.
+ *
+ * Keeping this list tied to the real producers is what keeps metrics bounded;
+ * a heuristic that only matches synthetic hex ids leaves every real work item
+ * and every real export as its own route forever.
+ */
+const ID_SEGMENT = /^(?:[0-9a-f]{8,}|[0-9a-f]{8}-[0-9a-f-]{4,}|\d+|trace-[0-9a-z]+-[0-9a-z]+-\d+|report-[0-9a-f]{32})$/i;
 
 /** Collapse identifier-like path segments so cardinality stays bounded. */
 export function normalizeRoute(path: string): string {
