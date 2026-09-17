@@ -188,6 +188,16 @@ Repair (canonical owner, minimal):
 Post-repair local verification: focused test 10/10 PASS; changed-file typecheck
 0 errors.
 
+CI confirmation at the repair commit `c9904dcb93026c2156687d12c8326e6ff9159d5e`: the three Linux jobs
+that failed at `e79ac1d5` are green:
+  - Autonomous Builder Validation   success  run 35188955027 (job validate-autonomous-builder)
+  - HooshyarOS Validation           success  run 35188955060 (job validate)
+  - HooshyarOS CI                   success  run 35188955041 (job verify, incl. "Full Jest suite")
+Also green at this SHA: Web Product Acceptance 35188955066, Autonomous Builder Verification
+35188955018, Autonomous Builder Audit 35188955011, Final Product Factory Trigger 35188952210 and
+35188955071. Android Release Verification, HooshyarOS Release Artifacts and the Final Product Factory
+runs were in progress at capture.
+
 ======================================================================
 4. CI RECONCILIATION AT 02a13510 (history preserved, not erased)
 ======================================================================

@@ -104,6 +104,20 @@ analyzer's stray UTF-8 BOM. This is exactly the class of defect a real CI gate
 must catch; the failure is preserved here as evidence, not erased. Post-repair:
 focused 10/10, changed-file typecheck 0 errors.
 
+## 5c. Closure (verified by CI)
+
+- Code closure commit: `c9904dcb93026c2156687d12c8326e6ff9159d5e` (the cross-platform repair; the
+  feature commit was `e79ac1d5`).
+- CI at `c9904dcb` (same-SHA runs, GitHub API): `Autonomous Builder Validation` **success**
+  (35188955027), `HooshyarOS Validation` **success** (35188955060), `HooshyarOS CI` **success**
+  (35188955041 — including the "Full Jest suite" step that failed at `e79ac1d5`), `Web Product
+  Acceptance` **success** (35188955066), `Autonomous Builder Verification` **success** (35188955018),
+  `Autonomous Builder Audit` **success** (35188955011), `Final Product Factory Trigger` **success**
+  (35188952210 / 35188955071). `Android Release Verification`, `HooshyarOS Release Artifacts` and the
+  `Final Product Factory` runs were still in progress at capture.
+- The three Linux gates that failed at `e79ac1d5` are all green at the repair commit, confirming both
+  the defect and the repair from authoritative CI evidence.
+
 ## 6. CI reconciliation (history preserved)
 
 At `02a13510`: 12 of 14 same-SHA runs succeeded. `Final Product Factory`
