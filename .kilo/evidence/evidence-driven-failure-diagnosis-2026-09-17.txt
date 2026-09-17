@@ -154,6 +154,41 @@ Aggregate qualification:
      application + acceptance + CI evidence required"
 
 ======================================================================
+3b. CROSS-PLATFORM DEFECT DETECTED BY CI AND REPAIRED
+======================================================================
+
+The first push of this knot (commit e79ac1d5) passed the local full suite on
+Windows (276/276 suites, 2126/2126 tests, also in --ci --runInBand) but FAILED
+three Linux CI jobs that all run the same Jest suite: Autonomous Builder
+Validation (job validate-autonomous-builder), HooshyarOS Validation (job
+validate) and HooshyarOS CI (job verify -> "Full Jest suite"). The successful
+pre-change runs at 02a13510 had durations comparable to the failing ones
+(HooshyarOS Validation 1.8 min success vs 1.9 min failure), so this was a
+normal deterministic test failure, not an infrastructure crash.
+
+Root cause (proven by reading the code against Linux semantics): the
+reverse-dependency scanner lower-cased the absolute path before probing the
+filesystem (`resolveSpecifier`). On a case-insensitive host (Windows) the
+lower-cased probe still resolves; on a case-sensitive host (Linux) it does not,
+because the mkdtemp/session path contains upper-case characters. The
+reverse-import probe therefore never found the importer and the blast-radius
+assertion failed. The Windows local run masked a real cross-platform defect.
+
+Repair (canonical owner, minimal):
+  - resolveSpecifier now probes the real, case-preserving path and returns
+    undefined when no file exists (no fabricated path).
+  - the target comparison is performed case-insensitively at the CALL SITE
+    (resolved.toLowerCase() vs the lower-cased target set), so probe and
+    compare are separated correctly.
+  - The focused test now builds the fixture under a deterministic mixed-case
+    checkout directory ("CaseSensitiveRepo") so this class is guarded on every
+    host, not only when the temp-name happens to contain upper-case characters.
+  - The analyzer file's spurious UTF-8 BOM was removed.
+
+Post-repair local verification: focused test 10/10 PASS; changed-file typecheck
+0 errors.
+
+======================================================================
 4. CI RECONCILIATION AT 02a13510 (history preserved, not erased)
 ======================================================================
 

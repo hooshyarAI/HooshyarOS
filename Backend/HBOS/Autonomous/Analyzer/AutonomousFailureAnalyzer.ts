@@ -1,4 +1,4 @@
-﻿import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { ProvenanceTrace } from "../../Core/ProvenanceTrace";
 
@@ -404,7 +404,7 @@ export class AutonomousFailureAnalyzer {
             }
             for (const specifier of this.importSpecifiers(source)) {
                 const resolved = this.resolveSpecifier(candidate, specifier);
-                if (resolved && targetAbsolute.has(resolved)) {
+                if (resolved && targetAbsolute.has(resolved.toLowerCase())) {
                     dependents.add(this.normalisePath(candidate));
                     break;
                 }
@@ -455,16 +455,20 @@ export class AutonomousFailureAnalyzer {
 
     private resolveSpecifier(fromFile: string, specifier: string): string | undefined {
         if (!specifier.startsWith(".")) return undefined;
-        const base = resolve(fromFile, "..", specifier).replace(/\\/g, "/").toLowerCase();
+        // Probe the real, case-preserving path: lower-casing before the filesystem
+        // check breaks on case-sensitive filesystems when the checkout path itself
+        // contains upper-case characters. Comparison with the target set happens
+        // case-insensitively at the call site.
+        const base = resolve(fromFile, "..", specifier);
         const extensions = ["", ".ts", ".tsx", ".js", ".cjs", ".mjs", "/index.ts", "/index.js"];
         for (const extension of extensions) {
             const candidate = base + extension;
             try {
-                if (statSync(candidate).isFile()) return candidate;
+                if (statSync(candidate).isFile()) return candidate.replace(/\\/g, "/");
             } catch {
                 continue;
             }
         }
-        return base;
+        return undefined;
     }
 }

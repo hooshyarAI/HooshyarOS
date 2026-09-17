@@ -108,8 +108,13 @@ describe("AutonomousFailureAnalyzer", () => {
     });
 
     it("computes a bounded blast radius from real reverse imports in a repository root", () => {
-        const root = mkdtempSync(join(tmpdir(), "hooshyar-failure-analyzer-"));
+        const base = mkdtempSync(join(tmpdir(), "hooshyar-failure-analyzer-"));
+        // A mixed-case checkout path makes case-sensitive filesystem handling
+        // deterministic: lower-casing before probing the filesystem would miss
+        // these files on Linux while passing on a case-insensitive host.
+        const root = join(base, "CaseSensitiveRepo");
         try {
+            mkdirSync(root, { recursive: true });
             const engine = join(root, "Backend", "HBOS", "Engines", "WidgetEngine.ts");
             const consumer = join(root, "Backend", "HBOS", "Autonomous", "WidgetConsumer.ts");
             mkdirSync(join(root, "Backend", "HBOS", "Engines"), { recursive: true });
@@ -134,7 +139,7 @@ describe("AutonomousFailureAnalyzer", () => {
             expect(diagnosis.blastRadius.capabilities).toEqual(expect.arrayContaining(["platform.widget", "HBOS Core"]));
             expect(diagnosis.blastRadius.bounded).toBe(true);
         } finally {
-            rmSync(root, { recursive: true, force: true });
+            rmSync(base, { recursive: true, force: true });
         }
     });
 

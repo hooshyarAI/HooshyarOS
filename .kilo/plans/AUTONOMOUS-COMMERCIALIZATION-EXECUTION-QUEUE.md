@@ -582,6 +582,14 @@ Repair` `35084681900` failed in its Kilo operator-execution job, not a product g
 knot only if contention recurs with evidence); typed Operational Knowledge Graph (C1) and Audit Context
 Builder (C3) remain stubs.
 
+**CI-CAUGHT CROSS-PLATFORM REPAIR (`e79ac1d5` -> repair commit):** the first push passed the local
+Windows suite (including `--ci --runInBand`) but failed three Linux CI jobs running the same Jest suite
+(Autonomous Builder Validation, HooshyarOS Validation, HooshyarOS CI "Full Jest suite"). Root cause: the
+reverse-dependency scanner lower-cased the absolute path before probing the filesystem, which resolves
+only on a case-insensitive host. Repaired in the same canonical owner (probe the real case-preserving
+path, compare case-insensitively at the call site, deterministic mixed-case fixture, BOM removed).
+Failing CI evidence preserved.
+
 **DO-NOT-REPEAT:** do not replace the evidence-driven diagnosis with a marker/regex-only check; do not emit
 a root cause without a real failure signal (fail-closed); do not introduce a parallel trace-id scheme
 (reuse `ProvenanceTrace`); do not rename the Stage-Bounded Atomic Construction stages/statuses or move the

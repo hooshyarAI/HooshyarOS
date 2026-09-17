@@ -89,6 +89,21 @@ gate or completion flag changed.
 | Aggregate qualification | `node scripts/final-product-qualification.cjs` | `overall: BLOCK_EXTERNAL`, exit 0, 7/7 internal gates PASS |
 | Assurance gate | `npm run product:assurance` | PASS, `productComplete:false` |
 
+## 5b. Cross-platform defect detected by CI and repaired
+
+The first push (`e79ac1d5`) passed the local Windows suite (including
+`--ci --runInBand`) but failed three Linux CI jobs running the same Jest suite
+(Autonomous Builder Validation, HooshyarOS Validation, HooshyarOS CI "Full Jest
+suite"). Cause: the reverse-dependency scanner lower-cased the absolute path
+before probing the filesystem, which resolves on a case-insensitive host but not
+on a case-sensitive one where the temp/session path contains upper-case
+characters. Repair: probe the real case-preserving path, compare
+case-insensitively at the call site, build the focused fixture under a
+deterministic mixed-case directory (`CaseSensitiveRepo`) and remove the
+analyzer's stray UTF-8 BOM. This is exactly the class of defect a real CI gate
+must catch; the failure is preserved here as evidence, not erased. Post-repair:
+focused 10/10, changed-file typecheck 0 errors.
+
 ## 6. CI reconciliation (history preserved)
 
 At `02a13510`: 12 of 14 same-SHA runs succeeded. `Final Product Factory`

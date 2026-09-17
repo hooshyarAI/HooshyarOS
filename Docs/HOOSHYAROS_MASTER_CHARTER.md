@@ -802,7 +802,7 @@ errors remain elsewhere); full suite **276/276 suites, 2126/2126 tests PASS**;
 `node scripts/final-product-qualification.cjs` = `BLOCK_EXTERNAL`, exit 0, 7/7 internal gates PASS;
 `npm run product:assurance` PASS with `productComplete:false`. Artifact:
 `.kilo/evidence/evidence-driven-failure-diagnosis-2026-09-17.txt`; checkpoint:
-`.kilo/plans/evidence-driven-failure-diagnosis-checkpoint.md`.
+`.kilo/plans/evidence-driven-failure-diagnosis-checkpoint.md`. The first push of this knot (`e79ac1d5`) passed the local Windows suite (including `--ci --runInBand`) but failed three Linux CI jobs running the same Jest suite; the real cross-platform defect was the reverse-dependency scanner lower-casing the absolute path before probing the filesystem, which resolves only on a case-insensitive host. It was repaired in the same canonical owner (probe the real case-preserving path, compare case-insensitively at the call site, and guard the class with a deterministic mixed-case fixture), and the failing CI evidence is preserved, not erased. This is a direct demonstration that the repository's CI gate detects defects a single-platform local run cannot.
 
 #### 15.1.2 Historical Audit / Verification Records (evidenced only)
 
