@@ -10,6 +10,7 @@ import { AutonomousWeavingPlanner } from "./AutonomousWeavingPlanner";
 import { AutonomousKnotRecovery } from "./AutonomousKnotRecovery";
 import { createLocalConstructionTools } from "./LocalConstructionToolset";
 import { AutonomousPerformanceBudget } from "./AutonomousPerformanceBudget";
+import { AutonomousFailureAnalyzer } from "../Analyzer/AutonomousFailureAnalyzer";
 
 export interface DaemonOptions {
     knotRecovery?: AutonomousKnotRecovery;
@@ -54,6 +55,7 @@ export class AutonomousBuildDaemon {
     private readonly commercialAudit = new CommercialProductCompletionAudit();
     private readonly weavingPlanner = new AutonomousWeavingPlanner();
     private readonly knotRecovery: AutonomousKnotRecovery;
+    private readonly failureAnalyzer: AutonomousFailureAnalyzer;
     private readonly maxCycles: number;
     private readonly reportEvery: number;
     private readonly performanceBudget: AutonomousPerformanceBudget;
@@ -64,6 +66,7 @@ export class AutonomousBuildDaemon {
         this.continuation = options.continuation ?? new AutonomousPlatformContinuation();
         this.development = options.development ?? new AutonomousDevelopmentLoop(createLocalConstructionTools(this.root));
         this.knotRecovery = options.knotRecovery ?? new AutonomousKnotRecovery();
+        this.failureAnalyzer = new AutonomousFailureAnalyzer({ root: this.root });
         this.maxCycles = options.maxCycles ?? 1000;
         this.reportEvery = options.reportEvery ?? 1;
         this.performanceBudget = options.performanceBudget ?? new AutonomousPerformanceBudget({
@@ -265,8 +268,17 @@ export class AutonomousBuildDaemon {
             history.push({ cycle, commit: before.commit, mission: mission.capability, capabilityId: mission.capabilityId, targetEngine: mission.targetEngine, assistantGatePassed: decision.assistantGatePassed, handoff: decision.kind === "platform-continuation" ? decision.continuation : undefined, weavingPlan, result });
 
             if (!result.result.ok) {
+                const diagnosis = this.failureAnalyzer.diagnose({
+                    output: result.result.details,
+                    issues: result.result.issues,
+                    capabilityId: mission.capabilityId,
+                    targetEngine: mission.targetEngine,
+                    dependencies: mission.dependencies
+                });
+                const failedHistory = history[history.length - 1] as Record<string, unknown> | undefined;
+                if (failedHistory) failedHistory.diagnosis = diagnosis;
                 const recovery = this.knotRecovery.observe({ capabilityId: mission.capabilityId, commit: before.commit }, { capabilityId: mission.capabilityId, executionOk: false, verificationComplete: false, repositoryChanged: false });
-                console.log(JSON.stringify({ type: "AUTONOMOUS_REWEAVE", cycle, recovery }));
+                console.log(JSON.stringify({ type: "AUTONOMOUS_REWEAVE", cycle, recovery, diagnosis }));
                 try {
                     this.knotRecovery.rollback(this.root, recovery.checkpoint);
                     console.log(JSON.stringify({ type: "AUTONOMOUS_ROLLBACK", cycle, checkpoint: recovery.checkpoint.commit, capabilityId: mission.capabilityId }));

@@ -537,6 +537,57 @@ State progression: `PLANNED → READY → EXECUTING → VERIFYING → CHECKPOINT
 **Result:** `product:web:acceptance` PASS 37 checks (`e2219e7a`); `product:security:acceptance` PASS 15 checks (`e2219e7a`); `product:pdf:acceptance` PASS 6 checks; `scripts/commercial-application-acceptance.cjs` PASS `[web-application, pdf-acquisition, security-application]` (`e2219e7a`); `scripts/final-product-qualification.cjs` 7/7 internal gates PASS, `overall: BLOCK_EXTERNAL`, exit 0; `CommercialProductCompletionAudit` `complete:false`, `applicationEvidence`/`acceptanceEvidence` present+passed+fresh, `evidenceGaps:["external-dependency-blocked"]`.
 **Honest limit:** `product:factory` requires a pristine worktree (`assertCleanRepo()`); pre-existing unrelated user changes were preserved, so the Windows factory cells stay `REQUIRES_EXECUTION` (evidence bound to `ada37eeb`). No criterion weakened; completion flags unchanged (all false except `assistantComplete`).
 
+## Bounded knot — `assurance.evidence-driven-failure-diagnosis`
+
+**State:** COMPLETE (non-stage; no queue reordering)
+**Baseline SHA:** `02a13510e2914e7cd0530d9f59cadc49ac069c8c`
+**Classification:** `REAL MISSING IMPLEMENTATION` (construction-plane governed audit/reasoning). No
+product/runtime/engine/route/persistence/security/completion-gate change.
+
+**SELECTION BASIS (continuation audit of the seven delivery-fabric capabilities):** each capability was
+mapped to its existing canonical owner first. Capabilities 5 (repair orchestration under the
+Stage-Bounded Atomic Construction contract) and 6 (evidence-aware completion) are SUFFICIENT and were
+preserved, not duplicated; capabilities 2 (`Core/ProvenanceTrace`) and 7 (§15.1 Permanent Audit &
+Verification Memory + evidence/checkpoint artifacts) are SUFFICIENT; capabilities 1 (typed persisted
+Operational Knowledge Graph) and 3 (Audit Context Builder) exist only as stubs and were recorded, not
+selected, because the frozen architecture and the Commercial Product Completion Contract do not require
+them. Capability 4 was genuinely incomplete: `AutonomousFailureAnalyzer` returned a single
+regex-derived `{type, file, message}` with no chain, causes or blast radius.
+
+**REPAIR (single canonical owner):** `Backend/HBOS/Autonomous/Analyzer/AutonomousFailureAnalyzer.ts` now
+exposes a deterministic, fail-closed `diagnose(FailureEvidence): FailureDiagnosis` — ordered failure chain
+parsed from real tsc/Jest/module/launcher/runtime output; ranked root-cause candidates with their
+evidence; bounded reverse-import blast radius (direct files, canonical owners, dependents, declared
+capabilities); canonical `ProvenanceTrace` trace id. `analyze(output)` retained for the heal orchestrator.
+`Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts` (live consumer) now records the diagnosis in
+its run history and `AUTONOMOUS_REWEAVE` log.
+
+**EVIDENCE:** focused `Backend/HBOS/test/AutonomousFailureAnalyzer.test.ts` **10/10 PASS**; construction
+regression **6 suites/23 tests PASS**; daemon suites PASS; changed-file typecheck **0 errors** (22
+pre-existing unrelated errors elsewhere); full suite **276/276 suites, 2126/2126 tests PASS**;
+`node scripts/final-product-qualification.cjs` = `BLOCK_EXTERNAL`, exit 0, 7/7 internal gates PASS;
+`npm run product:assurance` PASS with `productComplete:false`. Artifact:
+`.kilo/evidence/evidence-driven-failure-diagnosis-2026-09-17.txt`; checkpoint:
+`.kilo/plans/evidence-driven-failure-diagnosis-checkpoint.md`.
+
+**CI reconciliation (history preserved):** at `02a13510`, 12/14 same-SHA runs succeeded. The
+`Final Product Factory` workflow_dispatch run `35084691925` failed only in `web-product-acceptance` (plus
+`release-gate` as a consequence) while the same SHA's `Final Product Factory` `35084685544` and standalone
+`Web Product Acceptance` `35084682056` succeeded → transient/concurrency acceptance contention (two factory
+runs plus the standalone web acceptance ran concurrently against a shared canonical session rate limit,
+commit `5963e4b5`), superseded by same-SHA authoritative successes; recorded, not erased. `Autonomous CI
+Repair` `35084681900` failed in its Kilo operator-execution job, not a product gate.
+
+**RECORDED, NOT SELECTED:** `final-product-factory.yml` has no `concurrency` guard (candidate bounded CI
+knot only if contention recurs with evidence); typed Operational Knowledge Graph (C1) and Audit Context
+Builder (C3) remain stubs.
+
+**DO-NOT-REPEAT:** do not replace the evidence-driven diagnosis with a marker/regex-only check; do not emit
+a root cause without a real failure signal (fail-closed); do not introduce a parallel trace-id scheme
+(reuse `ProvenanceTrace`); do not rename the Stage-Bounded Atomic Construction stages/statuses or move the
+completion gate; do not build a parallel knowledge-graph/context framework while the frozen architecture
+does not require one; do not `git reset`/`clean`/`stash` or stage unrelated worktree files.
+
 ## Deferred candidates (2026-09-16; observed, not dependency-ready)
 
 Recorded so they are not re-discovered from scratch. Each is deferred with its exact reason; none was invented as filler:
