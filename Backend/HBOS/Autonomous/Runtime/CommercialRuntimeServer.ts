@@ -37,8 +37,17 @@ import { Scenario } from "../../Uncertainty/MonteCarloTypes";
 import { ImpactMeasurementService } from "../../Product/ImpactMeasurementService";
 import { ContinuousImprovementEngine } from "../../Assistant/Autonomous/ContinuousImprovementEngine";
 import { RuntimeObservability } from "./RuntimeObservability";
+import { RuntimeDependencyProbe, RuntimeDependencyReport } from "./RuntimeDependencyProbe";
 import { parsePagination, toPageMeta } from "./QueryPagination";
 import type { BaselineMetrics, PostInterventionMetrics } from "../../Product/ImpactMeasurementService";
+import {
+    OrganizationalProblemSolvingService,
+    ProblemBlockCode,
+    ProblemCase,
+    ProblemCategory,
+    ProblemResult,
+    ProblemSeverity,
+} from "../../Product/OrganizationalProblemSolvingService";
 
 export interface CommercialRuntimeOptions {
     readonly databasePath?: string;
@@ -54,6 +63,12 @@ export interface CommercialRuntimeOptions {
      * tests that drive session lifecycle explicitly).
      */
     readonly sessionSweepIntervalMs?: number;
+    /**
+     * Override for the runtime dependency probe (Python reasoning runtime).
+     * Defaults to the process-environment probe; injectable for deterministic
+     * tests of the unavailable path.
+     */
+    readonly dependencyProbe?: RuntimeDependencyProbe;
 }
 
 const WEB_ROOT = resolve(process.cwd(), "web");
@@ -330,6 +345,9 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     const resilience = new ResilienceAnalyticsService();
     const impact = new ImpactMeasurementService();
     const improvement = new ContinuousImprovementEngine();
+    // Canonical owner for the persistent, cross-engine organizational
+    // problem-solving lifecycle (product.organizational-problem-solving).
+    const problemSolving = new OrganizationalProblemSolvingService(persistence);
     const latestResults = new Map<string, StoredAnalysis>();
     const latestWorkbenchResults = new Map<string, ExecutiveIntelligenceWorkbenchResult>();
     const latestDecisionResults = new Map<string, DecisionWorkbenchResult>();
@@ -340,6 +358,11 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     const RATE_LIMIT_REFILL_PER_SECOND = 1;
     const now = options.now ?? (() => Date.now());
     const observability = new RuntimeObservability({ now });
+    const dependencyProbe = options.dependencyProbe ?? new RuntimeDependencyProbe();
+    // Resolved lazily and cached: readiness must report the real reasoning
+    // runtime, and probing must not slow down ordinary request handling.
+    let dependencyReportCache: RuntimeDependencyReport | undefined;
+    const runtimeDependencies = (): RuntimeDependencyReport => (dependencyReportCache ??= dependencyProbe.report());
     const corsOrigin = options.corsOrigin ?? DEFAULT_CORS_ORIGIN;
 
     const identity = new CommercialIdentityService(persistence, sessionTtlMs);
@@ -575,7 +598,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 return res.end();
             }
             if (req.method === "GET" && path === "/health") return corsJson(200, { status: "ok", service: "hooshyar-commercial-runtime" });
-            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "financial-analytics", "ingested-source-analysis", "tenant-scoped-persistence", "offline-sync", "reasoning", "executive-intelligence-workbench", "decision-workbench", "expert-choice", "organizational-execution", "governed-approval", "work-item-lifecycle", "kpi-outcome", "reports", "reports-export", "report-artifact-download", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "auth-rate-limiting", "rbac", "session-lifecycle", "request-observability", "bounded-pagination", "idempotency-keys"] });
+            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", dependencies: runtimeDependencies(), capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "financial-analytics", "ingested-source-analysis", "tenant-scoped-persistence", "offline-sync", "reasoning", "executive-intelligence-workbench", "decision-workbench", "expert-choice", "organizational-execution", "governed-approval", "work-item-lifecycle", "kpi-outcome", "reports", "reports-export", "report-artifact-download", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "auth-rate-limiting", "rbac", "session-lifecycle", "request-observability", "bounded-pagination", "idempotency-keys", "organizational-problem-solving"] });
             if (req.method === "GET" && path === "/") return asset(res, "index.html", "text/html; charset=utf-8");
             if (req.method === "GET" && path === "/app.js") return asset(res, "app.js", "text/javascript; charset=utf-8");
             if (req.method === "GET" && path === "/offline-sync.js") return asset(res, "offline-sync.js", "text/javascript; charset=utf-8");
@@ -751,6 +774,16 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 if (item.approval && actors.includes(item.approval.approvedBy)) return true;
                 if (item.assignment && actors.includes(item.assignment.assigneeId)) return true;
                 return false;
+            };
+
+            /**
+             * Object-level authorization for a problem case: privileged roles
+             * (ADMINISTER) may read any case in their tenant; everyone else may
+             * read only cases they created. Cross-tenant cases never reach here.
+             */
+            const canAccessProblem = (problem: { readonly createdBy: string }): boolean => {
+                if (identity.authorizationsFor(session.role).includes(Authorization.ADMINISTER)) return true;
+                return [session.userId, session.username].includes(problem.createdBy);
             };
 
             /**
@@ -1153,6 +1186,158 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                             return corsJson(404, { error: "NOT_FOUND" });
                     }
                     return executionResponse(result);
+                }
+            }
+
+            const problemErrorStatus = (code: ProblemBlockCode): number => {
+                switch (code) {
+                    case "problem-not-found": return 404;
+                    case "problem-governance-denied": return 403;
+                    case "problem-governance-approval-required": return 409;
+                    default: return 422;
+                }
+            };
+            const problemResponse = (result: ProblemResult<ProblemCase>) =>
+                result.status === "READY"
+                    ? corsJson(200, result.value)
+                    : corsJson(problemErrorStatus(result.code), { error: result.code, reason: result.reason });
+
+            if (path === "/api/problems" && req.method === "POST") {
+                if (!getOrCreateRateLimiter(session.token).tryAcquire()) return corsJson(429, { error: "RATE_LIMIT_EXCEEDED" });
+                if (!ensurePermission("CREATE_DECISION")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                const body = await readJson(req);
+                const title = String(body.title ?? "").trim();
+                if (!title) return corsJson(400, { error: "PROBLEM_TITLE_REQUIRED" });
+                return runIdempotent("problems:open", body, async () => {
+                    const result = await problemSolving.openCase({
+                        tenantId: session.tenantId,
+                        title,
+                        scope: body.scope === undefined ? undefined : String(body.scope),
+                        category: body.category === undefined ? undefined : String(body.category).toUpperCase() as ProblemCategory,
+                        severity: body.severity === undefined ? undefined : String(body.severity).toUpperCase() as ProblemSeverity,
+                        description: body.description === undefined ? undefined : String(body.description),
+                        createdBy: session.userId
+                    });
+                    if (result.status !== "READY") return { status: 422, payload: { error: result.code, reason: result.reason } };
+                    return { status: 201, payload: result.value };
+                });
+            }
+
+            if (req.method === "GET" && path === "/api/problems") {
+                if (!ensurePermission("READ_DASHBOARD")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                const pagination = parsePagination(query);
+                if (pagination.ok === false) return corsJson(400, { error: pagination.error });
+                const page = await problemSolving.listCases(session.tenantId, pagination.page.limit, pagination.page.offset);
+                return corsJson(200, { status: "READY", tenantId: session.tenantId, problems: page.cases, pagination: toPageMeta(pagination.page, { items: page.cases, total: page.total }) });
+            }
+
+            if (path.startsWith("/api/problems/")) {
+                const problemParts = path.slice("/api/problems/".length).split("/").filter(Boolean);
+                const problemId = problemParts[0] ? decodeURIComponent(problemParts[0]) : "";
+                const problemAction = problemParts[1];
+
+                if (req.method === "GET" && !problemAction) {
+                    if (!ensurePermission("READ_DASHBOARD")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                    const problem = await problemSolving.getCase(session.tenantId, problemId);
+                    if (!problem) return corsJson(404, { error: "PROBLEM_NOT_FOUND" });
+                    if (!enforceTenantBoundary(problem, Authorization.READ)) return corsJson(404, { error: "PROBLEM_NOT_FOUND" });
+                    if (!canAccessProblem(problem)) {
+                        options.securityEventLogger?.logAuthorizationDenial({
+                            actorId: session.username,
+                            tenantId: session.tenantId,
+                            target: req.url ?? "unknown",
+                            reason: "PROBLEM_OBJECT_FORBIDDEN",
+                            metadata: { problemId, method: req.method, path: req.url }
+                        });
+                        return corsJson(403, { error: "PROBLEM_FORBIDDEN" });
+                    }
+                    const metrics = await problemSolving.getMetrics(session.tenantId, problemId);
+                    return corsJson(200, { ...problem, metrics });
+                }
+
+                if (req.method === "POST" && problemAction === "advance") {
+                    if (!getOrCreateRateLimiter(session.token).tryAcquire()) return corsJson(429, { error: "RATE_LIMIT_EXCEEDED" });
+                    const body = await readJson(req);
+                    const stage = String(body.stage ?? "").trim().toUpperCase();
+                    const isDecision = stage === "DECIDE";
+                    if (!ensurePermission(isDecision ? "APPROVE_DECISION" : "CREATE_DECISION")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                    const existing = await problemSolving.getCase(session.tenantId, problemId);
+                    if (!existing) return corsJson(404, { error: "PROBLEM_NOT_FOUND" });
+                    if (!enforceTenantBoundary(existing, Authorization.WRITE)) return corsJson(404, { error: "PROBLEM_NOT_FOUND" });
+                    if (!canAccessProblem(existing)) {
+                        options.securityEventLogger?.logAuthorizationDenial({
+                            actorId: session.username,
+                            tenantId: session.tenantId,
+                            target: req.url ?? "unknown",
+                            reason: "PROBLEM_OBJECT_FORBIDDEN",
+                            metadata: { problemId, stage, method: req.method, path: req.url }
+                        });
+                        return corsJson(403, { error: "PROBLEM_FORBIDDEN" });
+                    }
+
+                    let result: ProblemResult<ProblemCase>;
+                    switch (stage) {
+                        case "DEFINE":
+                            result = await problemSolving.defineProblem(session.tenantId, problemId, session.userId, {
+                                statement: String(body.statement ?? ""),
+                                scope: body.scope === undefined ? undefined : String(body.scope),
+                                impactedProcesses: Array.isArray(body.impactedProcesses) ? body.impactedProcesses.map((value) => String(value)) : undefined,
+                                ownerId: body.ownerId === undefined ? undefined : String(body.ownerId),
+                                successCriteria: Array.isArray(body.successCriteria) ? body.successCriteria.map((value) => String(value)) : undefined
+                            });
+                            break;
+                        case "EVIDENCE":
+                            result = await problemSolving.addEvidence(session.tenantId, problemId, session.userId,
+                                Array.isArray(body.evidence) ? body.evidence as { category: never; summary: string; source: string; observedAt?: string }[] : []);
+                            break;
+                        case "HYPOTHESES":
+                            result = await problemSolving.formHypotheses(session.tenantId, problemId, session.userId);
+                            break;
+                        case "ROOT_CAUSE":
+                            result = await problemSolving.analyzeRootCause(session.tenantId, problemId, session.userId);
+                            break;
+                        case "OPTIONS":
+                            result = await problemSolving.evaluateOptions(
+                                session.tenantId,
+                                problemId,
+                                session.userId,
+                                Array.isArray(body.options) ? body.options as never : [],
+                                body.evaluation === undefined ? undefined : body.evaluation as never
+                            );
+                            break;
+                        case "DECIDE":
+                            result = await problemSolving.decide(session.tenantId, problemId, session.userId, {
+                                selectedOptionId: String(body.selectedOptionId ?? ""),
+                                rationale: String(body.rationale ?? ""),
+                                humanApprovalRef: body.humanApprovalRef === undefined ? undefined : String(body.humanApprovalRef)
+                            }, executionContext(session));
+                            break;
+                        case "PLAN":
+                            result = await problemSolving.planActions(session.tenantId, problemId, session.userId, {
+                                objective: String(body.objective ?? ""),
+                                steps: Array.isArray(body.steps) ? body.steps.map((value) => String(value)) : [],
+                                requiredApprovals: Array.isArray(body.requiredApprovals) ? body.requiredApprovals.map((value) => String(value)) : [],
+                                maxDuration: body.maxDuration === undefined ? undefined : Number(body.maxDuration),
+                                maxBudget: body.maxBudget === undefined ? undefined : Number(body.maxBudget)
+                            });
+                            break;
+                        case "EXECUTE":
+                            result = await problemSolving.executeActions(session.tenantId, problemId, session.userId, executionContext(session));
+                            break;
+                        case "OUTCOME":
+                            result = await problemSolving.measureOutcome(session.tenantId, problemId, session.userId, {
+                                baseline: body.baseline as BaselineMetrics,
+                                post: body.post as PostInterventionMetrics,
+                                expected: body.expected === undefined ? undefined : body.expected as never
+                            });
+                            break;
+                        case "LEARN":
+                            result = await problemSolving.captureLearning(session.tenantId, problemId, session.userId);
+                            break;
+                        default:
+                            return corsJson(400, { error: "PROBLEM_STAGE_UNKNOWN" });
+                    }
+                    return problemResponse(result);
                 }
             }
 
