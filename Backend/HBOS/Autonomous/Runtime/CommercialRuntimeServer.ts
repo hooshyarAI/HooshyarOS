@@ -64,9 +64,9 @@ export interface CommercialRuntimeOptions {
      */
     readonly sessionSweepIntervalMs?: number;
     /**
-     * Override for the runtime dependency probe (Python reasoning runtime).
+     * Override for the runtime dependency probe (reasoning provider boundary).
      * Defaults to the process-environment probe; injectable for deterministic
-     * tests of the unavailable path.
+     * tests of the provider resolution paths.
      */
     readonly dependencyProbe?: RuntimeDependencyProbe;
 }

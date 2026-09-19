@@ -299,7 +299,7 @@ describe("ReasoningEngine - REAL Runtime Provenance Integration", () => {
 
         // Full chain fields should be present
         expect(result.provenance?.sourceRef).toBeDefined();
-        expect(result.provenance?.transformationRef).toBe("python-ai-runtime");
+        expect(result.provenance?.transformationRef).toBe("node-evidence-reasoning");
         expect(result.provenance?.reasoningSteps).toBeDefined();
     });
 

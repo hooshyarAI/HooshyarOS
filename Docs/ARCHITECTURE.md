@@ -162,6 +162,13 @@ Responsibilities:
 - Recommendation generation
 
 
+Reasoning provider boundary:
+
+- The canonical provider is a deterministic, in-process, evidence-bound reasoner implemented in TypeScript; it reasons only over verified context values and never invents thresholds, transactions or external facts.
+- The repository-native Python AI Runtime (`Backend/AI_Runtime/reasoning/reasoning_engine.py`) remains an optional provider, selected only when the operator explicitly configures `HOOSHYAR_PYTHON`. An explicitly configured but unusable interpreter fails closed (`reasoning_failed`).
+- The installed product therefore never depends on an external interpreter to reason.
+
+
 
 ---
 

@@ -10,8 +10,9 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
 
 const server = createCommercialRuntimeServer();
 
-// Report the real reasoning runtime dependency at startup so an installed
-// product never silently degrades when the Python runtime is unavailable.
+// Report the real reasoning runtime dependency at startup. Reasoning is served
+// in-process by default (node-native); an explicitly configured Python provider
+// is reported truthfully and fails closed when it cannot be resolved.
 const dependencies = new RuntimeDependencyProbe().report();
 
 const shutdown = () => {

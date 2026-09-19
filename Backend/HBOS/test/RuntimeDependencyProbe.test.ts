@@ -6,28 +6,35 @@ const listen = (server: Server) => new Promise<void>((resolve) => server.listen(
 const close = (server: Server) => new Promise<void>((resolve) => server.close(() => resolve()));
 
 describe("RuntimeDependencyProbe", () => {
-    test("reports unresolved when the configured interpreter is absent", () => {
+    test("reports the in-process provider when no interpreter is configured", () => {
+        const probe = new RuntimeDependencyProbe({ env: {}, probe: () => false });
+        expect(probe.report().reasoningRuntime).toEqual({
+            id: "reasoning-runtime",
+            provider: "node-native",
+            available: true,
+            source: "NODE",
+            detail: "resolved",
+        });
+    });
+
+    test("reports unresolved when the explicitly configured interpreter is absent", () => {
         const probe = new RuntimeDependencyProbe({ env: { HOOSHYAR_PYTHON: "definitely-missing-python" }, probe: () => false });
         expect(probe.report().reasoningRuntime).toEqual({
-            id: "python-reasoning-runtime",
+            id: "reasoning-runtime",
+            provider: "python",
             available: false,
             source: "HOOSHYAR_PYTHON",
             detail: "unresolved",
         });
     });
 
-    test("uses HOOSHYAR_PYTHON as the authoritative source when it resolves", () => {
+    test("uses HOOSHYAR_PYTHON as the authoritative provider when it resolves", () => {
         const probe = new RuntimeDependencyProbe({ env: { HOOSHYAR_PYTHON: "py-custom" }, probe: (command) => command === "py-custom" });
-        expect(probe.reasoningRuntime()).toMatchObject({ available: true, source: "HOOSHYAR_PYTHON", detail: "resolved" });
-    });
-
-    test("falls back to PATH python when no override is configured", () => {
-        const probe = new RuntimeDependencyProbe({ env: {}, probe: (command) => command === "python" });
-        expect(probe.reasoningRuntime()).toMatchObject({ available: true, source: "PATH", detail: "resolved" });
+        expect(probe.reasoningRuntime()).toMatchObject({ provider: "python", available: true, source: "HOOSHYAR_PYTHON", detail: "resolved" });
     });
 
     test("never throws and reports unresolved when the probe itself fails", () => {
-        const probe = new RuntimeDependencyProbe({ env: {}, probe: () => { throw new Error("probe-failure"); } });
+        const probe = new RuntimeDependencyProbe({ env: { HOOSHYAR_PYTHON: "py-custom" }, probe: () => { throw new Error("probe-failure"); } });
         expect(() => probe.report()).not.toThrow();
         expect(probe.reasoningRuntime().available).toBe(false);
     });
@@ -45,7 +52,8 @@ describe("RuntimeDependencyProbe", () => {
             expect(response.status).toBe(200);
             const body = await response.json();
             expect(body.dependencies.reasoningRuntime).toEqual({
-                id: "python-reasoning-runtime",
+                id: "reasoning-runtime",
+                provider: "python",
                 available: false,
                 source: "HOOSHYAR_PYTHON",
                 detail: "unresolved",

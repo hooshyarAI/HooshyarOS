@@ -68,7 +68,7 @@ describe("ReasoningEngine Phase 11-1.7", () => {
             expect(p.timestamp).toBeDefined();
             expect(p.verificationStatus).toBe("VERIFIED");
             expect(p.sourceRef).toBe("unavailable");
-            expect(p.transformationRef).toBe("python-ai-runtime");
+            expect(p.transformationRef).toBe("node-evidence-reasoning");
             expect(Array.isArray(p.reasoningSteps)).toBe(true);
             expect(p.reasoningSteps.length).toBeGreaterThan(0);
         });
@@ -77,7 +77,7 @@ describe("ReasoningEngine Phase 11-1.7", () => {
             const result = engine.reason("test problem");
             expect(result.provenance?.explainability).toBeDefined();
             expect(result.provenance!.explainability!.inputSummary).toContain("test problem");
-            expect(result.provenance!.explainability!.decisionBasis).toContain("AI runtime");
+            expect(result.provenance!.explainability!.decisionBasis).toContain("evidence-bound");
             expect(Array.isArray(result.provenance!.explainability!.limitations)).toBe(true);
         });
 
@@ -137,7 +137,7 @@ describe("ReasoningEngine Phase 11-1.7", () => {
         test("discloses AI reasoning limitations", () => {
             const result = engine.reason("test problem");
             const limitations = result.provenance!.explainability!.limitations!;
-            expect(limitations).toContain("AI reasoning confidence bounded by training data");
+            expect(limitations).toContain("Deterministic explanation derived only from verified context values");
         });
 
         test("explainability is undefined when runtime provides no output", () => {
