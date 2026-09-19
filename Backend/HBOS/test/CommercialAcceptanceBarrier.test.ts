@@ -10,8 +10,8 @@
  *
  * The barrier asserts, against the real commercial runtime and the real web
  * client transport module:
- *   - an unsupported format (DOCX) fails closed with a precise capability error
- *     (never as CSV, never as offline);
+ *   - an unsupported format (RTF; DOCX is now supported) fails closed with a
+ *     precise capability error (never as CSV, never as offline);
  *   - binary formats use the canonical `contentBase64` representation (PDF
  *     included);
  *   - only genuine connectivity failures enter the offline queue;
@@ -88,11 +88,12 @@ describe("commercial acceptance barrier — runtime ingestion (K8)", () => {
   });
 
   test("an authenticated unsupported-format upload fails closed with a precise error", async () => {
-    const docxBytes = Buffer.from("PK\x03\x04 fake docx", "latin1");
+    // RTF remains a DEFERRED format (see CapabilityProviderRegistry); DOCX is
+    // now supported, so it can no longer serve as the unsupported example.
     const response = await ingest(acceptance, {
-      sourceName: "scan.docx",
-      format: "DOCX",
-      contentBase64: docxBytes.toString("base64"),
+      sourceName: "scan.rtf",
+      format: "RTF",
+      content: "{\\rtf1}",
     });
     expect(response.status).toBe(400);
     const payload = (await response.json()) as { error: string };
@@ -212,7 +213,7 @@ describe("commercial acceptance barrier — offline transport vs real runtime (K
         headers: { ...((init.headers as Record<string, string>) || {}), cookie: acceptance.cookie },
       });
     const sync = createOfflineSync({ storage: memoryStorage(), fetchImpl, now: () => 1 });
-    await sync.enqueue({ sourceName: "scan.docx", format: "DOCX", contentBase64: Buffer.from("PK\x03\x04 fake docx").toString("base64") });
+    await sync.enqueue({ sourceName: "scan.rtf", format: "RTF", content: "{\\rtf1}" });
 
     const report = await sync.sync();
     expect(report.status).toBe("ONLINE");

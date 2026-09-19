@@ -50,11 +50,23 @@ export interface PdfTextDocument {
   readonly metadata: PdfMetadata;
   /** Average characters per page. Used to detect scanned-only PDFs. */
   readonly averageCharsPerPage: number;
+  /**
+   * True when the document is image-only (below the text-native threshold).
+   * Only present when the caller opted into `allowScanned`; otherwise a scanned
+   * document is rejected with `ingestion-pdf-scanned-no-ocr-yet`.
+   */
+  readonly scanned?: boolean;
 }
 
 export interface AcquirePdfOptions {
   readonly scannedThresholdCharsPerPage?: number;
   readonly receivedAt?: string;
+  /**
+   * When true, an image-only PDF is returned with `scanned: true` instead of
+   * throwing, so a governed OCR route can consume the page list. Default false
+   * preserves the fail-closed contract for every existing caller.
+   */
+  readonly allowScanned?: boolean;
 }
 
 export function detectPdfMagic(buffer: Buffer): boolean {
@@ -142,7 +154,8 @@ export async function acquirePdf(params: {
   const totalChars = textPages.reduce((sum, p) => sum + (p.text?.length ?? 0), 0);
   const averageCharsPerPage = pageCount > 0 ? totalChars / pageCount : 0;
 
-  if (pageCount === 0 || averageCharsPerPage < threshold) {
+  const isScanned = pageCount === 0 || averageCharsPerPage < threshold;
+  if (isScanned && !params.options?.allowScanned) {
     throw new Error(PDF_ERROR_CODES.SCANNED);
   }
 
@@ -167,5 +180,6 @@ export async function acquirePdf(params: {
     pages,
     metadata,
     averageCharsPerPage,
+    ...(isScanned ? { scanned: true } : {}),
   };
 }

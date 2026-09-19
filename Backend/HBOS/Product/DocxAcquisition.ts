@@ -12,6 +12,7 @@
  */
 import { createHash } from "node:crypto";
 import mammoth from "mammoth";
+import { extractMarkupTables } from "./MarkupTextExtraction";
 
 export const DOCX_ERROR_CODES = {
   EMPTY: "ingestion-docx-empty",
@@ -29,6 +30,13 @@ export interface DocxExtraction {
   readonly byteLength: number;
   readonly receivedAt: string;
   readonly text: string;
+  /**
+   * Tables recovered from the document body (grid of cells), when the provider
+   * can expose them. Empty when the provider cannot — never fabricated.
+   * These feed the canonical table-mapping contract, so a DOCX ledger table
+   * converges on the same normalization path as PDF/HTML tables.
+   */
+  readonly tables: ReadonlyArray<ReadonlyArray<ReadonlyArray<string>>>;
   readonly messages: ReadonlyArray<string>;
 }
 
@@ -85,12 +93,35 @@ export async function acquireDocx(params: {
     throw new Error(`${DOCX_ERROR_CODES.PARSE}:${msg}`);
   }
 
+  // Table recovery is best-effort and additive: if the provider offers HTML
+  // conversion we extract real `<table>` structure from it. A failure here must
+  // not discard the already-extracted raw text, but it is recorded, never
+  // silently swallowed.
+  let tables: Array<Array<Array<string>>> = [];
+  try {
+    const convertToHtml = (mammoth as unknown as {
+      convertToHtml?: (input: { buffer: Buffer }) => Promise<{ readonly value?: string }>;
+    }).convertToHtml;
+    if (typeof convertToHtml === "function") {
+      const htmlResult = await convertToHtml.call(mammoth, { buffer: rawBytes });
+      if (htmlResult?.value) {
+        tables = extractMarkupTables(htmlResult.value).map((table) =>
+          table.rows.map((row) => [...row]),
+        );
+      }
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "unknown";
+    messages.push(`table-extraction-failed:${msg}`);
+  }
+
   return {
     sourceName: sourceName.trim(),
     sha256,
     byteLength: rawBytes.length,
     receivedAt,
     text,
+    tables,
     messages,
   };
 }

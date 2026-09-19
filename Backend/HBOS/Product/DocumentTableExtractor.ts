@@ -122,6 +122,32 @@ function scoreHeaders(headers: string[]): number {
   return matched.length === required.length ? 1.0 : 0.5;
 }
 
+/**
+ * Build a canonical `TableCandidate` from an already-separated grid of cells.
+ * Used by non-text acquisition routes (DOCX tables, HTML tables, repeating XML
+ * rows) so they converge on the SAME table-mapping contract as PDF/text tables
+ * instead of each inventing its own mapper. Returns null when the grid cannot be
+ * a rectangular table.
+ */
+export function buildTableCandidate(
+  rows: ReadonlyArray<ReadonlyArray<string>>,
+  offset = 0,
+): TableCandidate | null {
+  if (!Array.isArray(rows) || rows.length < 2) return null;
+  const columnCount = rows[0].length;
+  if (columnCount < 2) return null;
+  if (!rows.every((row) => row.length === columnCount)) return null;
+  const normalizedRows = rows.map((row) => row.map((cell) => String(cell ?? "").trim()));
+  const headers = normalizedRows[0].map((cell) => normalize(cell));
+  return {
+    offset,
+    columnCount,
+    rows: normalizedRows,
+    headers,
+    headerConfidence: scoreHeaders(headers),
+  };
+}
+
 function matchHeaderIndex(headers: ReadonlyArray<string>, field: string): number {
   const aliases = HEADER_ALIASES[field];
   for (let i = 0; i < headers.length; i += 1) {

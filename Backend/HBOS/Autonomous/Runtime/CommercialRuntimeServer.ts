@@ -189,7 +189,7 @@ const validateIngestBody = (body: Record<string, unknown>): string | null => {
     if (!sourceName) return "SOURCE_NAME_REQUIRED";
     const format = String(body.format ?? "").trim().toUpperCase();
     if (!SUPPORTED_INGESTION_FORMATS.includes(format as IngestionFormat)) return "INGEST_FORMAT_UNSUPPORTED";
-    if (format === "XLSX" || format === "PDF") {
+    if (format === "XLSX" || format === "PDF" || format === "DOCX") {
         if (typeof body.contentBase64 !== "string" || !body.contentBase64.trim()) return "CONTENT_BASE64_REQUIRED";
     } else if (typeof body.content !== "string" || !body.content.trim()) {
         return "CONTENT_REQUIRED";

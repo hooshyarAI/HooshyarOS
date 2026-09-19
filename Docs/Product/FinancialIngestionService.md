@@ -30,26 +30,43 @@ canonical `FinancialDataIngestionAdapter`.
 | `CSV` | `content` (text) | `ingestCsv` | `date, account, debit, credit, currency` |
 | `STRUCTURED` | `content` (JSON text) | `ingestStructured` | `{ transactions: [...] }` |
 | `TXT` | `content` (text) | `ingestTxtBytes` | UTF-8 / UTF-8 BOM / UTF-16 LE / UTF-16 BE |
+| `TSV` | `content` (text) | `ingestTsv` | Tab-delimited ledger; same canonical pipeline as CSV |
+| `HTML` | `content` (text) | `ingestHtml` | Real table extraction first, then bounded visible text; `<script>`/`<style>` never executed |
+| `XML` | `content` (text) | `ingestXml` | Repeating `<transaction>` element contract first, then bounded visible text; `<!DOCTYPE>`/`<!ENTITY>` rejected (XXE defense) |
+| `DOCX` | `contentBase64` | `ingestDocxBytes` | `mammoth` text + table extraction; legacy `.doc` rejected explicitly |
 | `XLSX` | `contentBase64` | `ingestXlsx` | `exceljs-hardened`, formula values only, zip-bomb limits |
 | `PDF` (text-native) | `contentBase64` | `ingestPdfBytes` | `pdf-parse` via `acquirePdf`; extracted text normalized through the canonical ledger (CSV) pipeline; original-byte SHA-256 provenance |
+
+All formats converge on the **one** canonical owner
+(`FinancialDataIngestionAdapter`) and the **one** validation/normalization/
+persistence/provenance pipeline. No format-specific intelligence engine and no
+second adapter exists.
 
 ### Deliberately NOT supported
 
 - **PDF (scanned/image-only)** — text-native PDF is supported. A PDF whose
   average extracted characters per page is below the conservative threshold is
-  rejected with the precise error `ingestion-pdf-scanned-no-ocr-yet` (422). No
-  OCR is performed and no OCR success is ever faked; `tesseract.js` is not a
-  declared dependency. OCR is recorded as `DEFERRED` in the canonical
+  rejected with the precise error `ingestion-pdf-scanned-no-ocr-yet` (422). The
+  governed OCR route (`FinancialDataIngestionAdapter.ingestScannedPdfBytes` +
+  `ScannedPdfRouter` + the admitted `pdf-parse` page rasterizer) exists and is
+  focused-tested through an **injected** OCR adapter, but no OCR **engine**
+  provider is admitted yet, so the commercial runtime never performs OCR and
+  never fakes it. OCR is recorded as `DEFERRED` in the canonical
   capability-provider inventory (`CapabilityProviderRegistry`) with explicit
   unmet admission conditions; see `Docs/HOOSHYAROS_CAPABILITY_PROVIDER_LEVERAGE_LAW.md`.
-- **DOCX / DOC** — same reasoning (`mammoth` helper exists but is not routed by
-  the canonical owner).
-- **XLS** — dependency-blocked legacy binary format.
-- **Images** — require OCR; `ingestFile` returns `ingestion-image-requires-ocr`.
-  `TesseractOcrAdapter` (08-IMG.2) remains a reference contract only: its OCR
-  engine (`tesseract.js`) is **not a declared dependency** and is loaded lazily,
-  so an environment without OCR fails closed with `ingestion-ocr-unsupported`
-  instead of breaking module loading. OCR ingestion is therefore **not claimed**.
+- **DOC** (legacy binary Word) — rejected explicitly with
+  `ingestion-doc-not-supported`; customers convert to DOCX. LibreOffice headless
+  conversion is evaluated and `DEFERRED` (deployment/security footprint).
+- **RTF / ODT / PPTX / EPUB / EML / MSG / DBF / YAML / TIFF** — evaluated and
+  recorded as `DEFERRED` with unmet conditions; none is claimed as supported.
+- **XLS** — dependency-blocked legacy binary format; no hardened reader admitted.
+- **Broader document fallback (Apache Tika)** — evaluated and `DEFERRED`: the
+  JVM runtime/deployment/security footprint is not justified while the direct
+  providers cover the primary commercial input families.
+- **Images via the runtime** — not exposed as an `IngestionFormat` until OCR is
+  admitted; `ingestFile` returns `ingestion-image-requires-ocr`.
+  `FinancialDataIngestionAdapter.ingestImageBytes` is the governed boundary and
+  fails closed with `ingestion-ocr-unsupported` when no engine is available.
 
 ---
 
@@ -118,10 +135,13 @@ Upload/Browser → POST /api/ingest → FinancialIngestionService
    → downstream canonical financial intelligence
 ```
 
-- `sha256` is computed from the **original bytes**. For text-native PDF the
-  extracted text is decoded from those bytes and normalized through the same
+- `sha256` is computed from the **original bytes**. For text-native PDF, DOCX,
+  HTML, XML and TSV the extracted text/tables are normalized through the same
   canonical ledger pipeline, but the canonical model's `source.sha256` remains
-  the original PDF-byte SHA-256.
+  the original source-byte (or original source-text) SHA-256. OCR-derived text
+  (when an admitted engine is supplied programmatically) additionally records
+  `evidence.ocr` with engine identity/version, confidence and language, so
+  OCR-derived evidence is always distinguishable from native text.
 - Identical raw content is naturally deduplicated by content hash.
 - Raw evidence is strictly tenant-scoped; there is no cross-tenant read path.
 
@@ -133,8 +153,8 @@ Unsupported/ambiguous input is rejected before any model is persisted:
 
 | Code | Meaning |
 |------|---------|
-| `INGEST_FORMAT_UNSUPPORTED` (400) | `format` is not CSV/STRUCTURED/XLSX/TXT/PDF |
-| `CONTENT_REQUIRED` / `CONTENT_BASE64_REQUIRED` (400) | payload missing content (PDF requires `contentBase64`) |
+| `INGEST_FORMAT_UNSUPPORTED` (400) | `format` is not CSV/STRUCTURED/XLSX/TXT/TSV/HTML/XML/DOCX/PDF |
+| `CONTENT_REQUIRED` / `CONTENT_BASE64_REQUIRED` (400) | payload missing content (XLSX/PDF/DOCX require `contentBase64`) |
 | `SOURCE_NAME_REQUIRED` (400) | empty source name |
 | `ingestion-pdf-scanned-no-ocr-yet` (422) | scanned/image-only/unextractable PDF — text-native PDF required, no OCR is performed |
 | `ingestion-pdf-unsupported` (422) | bytes lack a valid `%PDF` signature |
@@ -147,9 +167,13 @@ Unsupported/ambiguous input is rejected before any model is persisted:
 
 - One capability = one canonical owner (`FinancialDataIngestionAdapter`).
 - No duplicate engine or alternate adapter.
-- External providers (`pdf-parse`, `exceljs-hardened`) are admitted through the
-  canonical `CapabilityProviderRegistry`; a format whose external provider is not
-  admitted fails closed with `ingestion-provider-not-admitted`
-  (`Docs/HOOSHYAROS_CAPABILITY_PROVIDER_LEVERAGE_LAW.md`).
-- No external parser infrastructure invented.
+- External providers (`pdf-parse` for text extraction and page rasterization,
+  `exceljs-hardened`, `mammoth`) are admitted through the canonical
+  `CapabilityProviderRegistry`; a format whose external provider is not admitted
+  fails closed with `ingestion-provider-not-admitted`
+  (`Docs/HOOSHYAROS_CAPABILITY_PROVIDER_LEVERAGE_LAW.md`). Internal-capability
+  formats (CSV/STRUCTURED/TXT/TSV/HTML/XML) are implemented by the canonical
+  owner with Node built-ins and are not gated by an external provider.
+- No external parser infrastructure invented; no duplicate registry, adapter or
+  ingestion architecture.
 - No test weakened; all prior adapter/runtime tests still pass.

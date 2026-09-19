@@ -182,14 +182,17 @@ describe("Phase 08-09 Operational Closure", () => {
     persistence.close();
   });
 
-  test("DOCX is BLOCKED: no parser route exists", async () => {
+  test("DOCX is routed through the canonical owner: a malformed DOCX fails closed with a parser error", async () => {
     const dbPath = join(dir, "ops.sqlite");
     const persistence = new SQLitePersistenceStore({ databasePath: dbPath });
     const adapter = new FinancialDataIngestionAdapter(persistence);
     const docxPath = join(dir, "report.docx");
+    // Valid ZIP magic, invalid DOCX body: the canonical route must reach the
+    // DOCX provider and fail closed on the parse error (not claim support and
+    // not fall back to the CSV path).
     writeFileSync(docxPath, Buffer.from("PK\x03\x04 fake docx"), "utf8");
 
-    await expect(adapter.ingestFile("tenant-a", docxPath)).rejects.toThrow("ingestion-format-unsupported");
+    await expect(adapter.ingestFile("tenant-a", docxPath)).rejects.toThrow(/ingestion-docx-parse-error/);
     persistence.close();
   });
 

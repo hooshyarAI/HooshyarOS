@@ -29,20 +29,40 @@ import {
   type CapabilityCategory,
 } from "./CapabilityProviderRegistry";
 
-export type IngestionFormat = "CSV" | "STRUCTURED" | "XLSX" | "TXT" | "PDF";
+export type IngestionFormat =
+  | "CSV"
+  | "STRUCTURED"
+  | "XLSX"
+  | "TXT"
+  | "TSV"
+  | "HTML"
+  | "XML"
+  | "DOCX"
+  | "PDF";
 
-export const SUPPORTED_INGESTION_FORMATS: ReadonlyArray<IngestionFormat> = ["CSV", "STRUCTURED", "XLSX", "TXT", "PDF"];
+export const SUPPORTED_INGESTION_FORMATS: ReadonlyArray<IngestionFormat> = [
+  "CSV",
+  "STRUCTURED",
+  "XLSX",
+  "TXT",
+  "TSV",
+  "HTML",
+  "XML",
+  "DOCX",
+  "PDF",
+];
 
 const RAW_SOURCE_PREFIX = "raw-source:";
 
 /**
  * Capability Provider Leverage: external capabilities each runtime format
- * depends on. Internal-only formats (CSV / STRUCTURED / TXT) are implemented by
- * the canonical owner itself and are therefore not gated by an external
- * provider admission.
+ * depends on. Internal-only formats (CSV / STRUCTURED / TXT / TSV / HTML / XML)
+ * are implemented by the canonical owner itself through internal capabilities
+ * and are therefore not gated by an external provider admission.
  */
 const EXTERNAL_PROVIDER_CATEGORY: Partial<Record<IngestionFormat, CapabilityCategory>> = {
   XLSX: "spreadsheet.xlsx.parse",
+  DOCX: "document.docx.text",
   PDF: "document.pdf.text",
 };
 
@@ -90,7 +110,8 @@ interface StoredRawSource {
   readonly content: string;
 }
 
-const isTextFormat = (format: IngestionFormat): boolean => format !== "XLSX" && format !== "PDF";
+const isTextFormat = (format: IngestionFormat): boolean =>
+  format !== "XLSX" && format !== "PDF" && format !== "DOCX";
 
 export class FinancialIngestionService {
   private readonly adapter: FinancialDataIngestionAdapter;
@@ -138,6 +159,18 @@ export class FinancialIngestionService {
         result = txtResult;
         break;
       }
+      case "TSV":
+        result = await this.adapter.ingestTsv(normalizedTenant, sourceName, request.content ?? "");
+        break;
+      case "HTML":
+        result = await this.adapter.ingestHtml(normalizedTenant, sourceName, request.content ?? "");
+        break;
+      case "XML":
+        result = await this.adapter.ingestXml(normalizedTenant, sourceName, request.content ?? "");
+        break;
+      case "DOCX":
+        result = await this.adapter.ingestDocxBytes(normalizedTenant, sourceName, bytes);
+        break;
       case "PDF":
         result = await this.adapter.ingestPdfBytes(normalizedTenant, sourceName, bytes);
         break;

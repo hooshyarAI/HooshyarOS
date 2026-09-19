@@ -5,7 +5,19 @@ import ExcelJS from "exceljs-hardened";
 import { SQLitePersistenceStore } from "./SQLitePersistenceStore";
 import { decodeTextBytes } from "./TextFileDecoder";
 import { acquireImage, type ImageSource } from "./ImageAcquisition";
-import { acquirePdf } from "./PdfAcquisition";
+import { acquirePdf, PDF_ERROR_CODES } from "./PdfAcquisition";
+import { acquireDocx } from "./DocxAcquisition";
+import {
+  assertMarkupWithinLimits,
+  extractMarkupTables,
+  extractRepeatingXmlElements,
+  htmlToText,
+  xmlToText,
+} from "./MarkupTextExtraction";
+import { buildTableCandidate, mapTableToCanonical } from "./DocumentTableExtractor";
+import { createOcrProvenance, type OcrProvenance } from "./OcrProvenance";
+import type { OcrAdapter, OcrResult } from "./OcrAdapter";
+import { routeScannedPdfToOcr } from "./ScannedPdfRouter";
 
 export type TxtEncoding = "UTF-8" | "UTF-8-BOM" | "UTF-16LE" | "UTF-16BE";
 
@@ -13,13 +25,29 @@ export interface TxtIngestionResult extends FinancialIngestionResult {
   readonly encoding: TxtEncoding;
 }
 
-export type SourceType = "CSV" | "STRUCTURED" | "XLS" | "XLSX" | "PDF";
+export type SourceType =
+  | "CSV"
+  | "STRUCTURED"
+  | "XLS"
+  | "XLSX"
+  | "PDF"
+  | "DOCX"
+  | "HTML"
+  | "XML"
+  | "TSV"
+  | "IMAGE";
 
 export interface FinancialSourceEvidence {
   readonly sourceName: string;
   readonly sourceType: SourceType;
   readonly sha256: string;
   readonly receivedAt: string;
+  /**
+   * OCR provenance, present only when the canonical text was produced by an
+   * explicitly supplied OCR provider. Absent for native text routes. Never
+   * fabricated for a route that did not run OCR.
+   */
+  readonly ocr?: OcrProvenance;
 }
 
 export interface FinancialTransaction {
@@ -66,6 +94,18 @@ export interface BatchIngestionResult {
   readonly successfulFiles: number;
   readonly failedFiles: number;
   readonly results: ReadonlyArray<BatchIngestionItem>;
+}
+
+/**
+ * Explicit OCR route for scanned/image-only PDFs. Both the OCR adapter and the
+ * page rasterizer are caller-supplied so the OCR engine and the rasterization
+ * provider remain replaceable and are never a hidden mandatory dependency.
+ */
+export interface ScannedPdfOcrRoute {
+  readonly ocr: OcrAdapter;
+  readonly rasterizePage: (pageNumber: number) => Promise<Buffer>;
+  readonly language?: string;
+  readonly textNativeCharsPerPage?: number;
 }
 
 // ============================================================================
@@ -464,6 +504,26 @@ export class FinancialDataIngestionAdapter {
       return this.ingestTxt(tenantId, sourceName, normalizedPath);
     }
 
+    if (ext === 'tsv') {
+      const content = await readFile(normalizedPath, "utf8");
+      return this.ingestTsv(tenantId, sourceName, content);
+    }
+
+    if (ext === 'html' || ext === 'htm') {
+      const content = await readFile(normalizedPath, "utf8");
+      return this.ingestHtml(tenantId, sourceName, content);
+    }
+
+    if (ext === 'xml') {
+      const content = await readFile(normalizedPath, "utf8");
+      return this.ingestXml(tenantId, sourceName, content);
+    }
+
+    if (ext === 'docx' || ext === 'doc') {
+      const docxBytes = await readFile(normalizedPath);
+      return this.ingestDocxBytes(tenantId, sourceName, docxBytes);
+    }
+
     if (ext === 'pdf') {
       const pdfBytes = await readFile(normalizedPath);
       return this.ingestPdfBytes(tenantId, sourceName, pdfBytes);
@@ -725,6 +785,235 @@ export class FinancialDataIngestionAdapter {
   }
 
   /**
+   * Multi-format canonical route: DOCX. The `mammoth` provider (already a
+   * declared dependency) extracts raw text and, when it can, the real document
+   * tables. Extracted tables are mapped through the canonical table contract
+   * (`DocumentTableExtractor.mapTableToCanonical`); otherwise the text is
+   * normalized through the same canonical ledger pipeline as every text route.
+   * Provenance stays anchored to the ORIGINAL DOCX-byte SHA-256.
+   */
+  async ingestDocxBytes(
+    tenantId: string,
+    sourceName: string,
+    rawBytes: Buffer,
+  ): Promise<FinancialIngestionResult> {
+    const normalizedTenant = tenantId.trim();
+    const normalizedSource = sourceName.trim();
+    if (!normalizedTenant) throw new Error("ingestion-tenant-required");
+    if (!normalizedSource) throw new Error("ingestion-source-required");
+    if (!Buffer.isBuffer(rawBytes) || rawBytes.length === 0) throw new Error("ingestion-source-empty");
+
+    const document = await acquireDocx({ sourceName: normalizedSource, rawBytes });
+    const source: FinancialSourceEvidence = {
+      sourceName: normalizedSource,
+      sourceType: "DOCX",
+      sha256: document.sha256,
+      receivedAt: document.receivedAt,
+    };
+
+    const fromTables = this.mapMarkupTablesToTransactions(document.tables);
+    const transactions = fromTables ?? this.parseAndValidate(document.text);
+    return this.finalize(normalizedTenant, source, transactions);
+  }
+
+  /**
+   * Multi-format canonical route: HTML. Table structure is preserved through
+   * the canonical table contract when a recognizable ledger table exists;
+   * otherwise bounded visible text is extracted (active content discarded) and
+   * normalized through the canonical ledger pipeline.
+   */
+  async ingestHtml(tenantId: string, sourceName: string, html: string): Promise<FinancialIngestionResult> {
+    const normalizedTenant = tenantId.trim();
+    const normalizedSource = sourceName.trim();
+    if (!normalizedTenant) throw new Error("ingestion-tenant-required");
+    if (!normalizedSource) throw new Error("ingestion-source-required");
+    assertMarkupWithinLimits(html);
+
+    const source: FinancialSourceEvidence = {
+      sourceName: normalizedSource,
+      sourceType: "HTML",
+      sha256: createHash("sha256").update(html, "utf8").digest("hex"),
+      receivedAt: new Date().toISOString(),
+    };
+
+    const fromTables = this.mapMarkupTablesToTransactions(
+      extractMarkupTables(html).map((table) => table.rows),
+    );
+    if (fromTables) return this.finalize(normalizedTenant, source, fromTables);
+
+    const text = htmlToText(html);
+    if (!text.trim()) throw new Error("ingestion-html-empty");
+    const transactions = this.parseAndValidate(text);
+    return this.finalize(normalizedTenant, source, transactions);
+  }
+
+  /**
+   * Multi-format canonical route: XML. Unsafe XML (DTD/ENTITY) is rejected
+   * before any processing (XXE / entity-expansion defense). A repeating
+   * `<transaction>` element contract is mapped through the canonical table
+   * contract when present; otherwise bounded visible text is normalized through
+   * the canonical ledger pipeline.
+   */
+  async ingestXml(tenantId: string, sourceName: string, xml: string): Promise<FinancialIngestionResult> {
+    const normalizedTenant = tenantId.trim();
+    const normalizedSource = sourceName.trim();
+    if (!normalizedTenant) throw new Error("ingestion-tenant-required");
+    if (!normalizedSource) throw new Error("ingestion-source-required");
+    assertMarkupWithinLimits(xml);
+
+    const source: FinancialSourceEvidence = {
+      sourceName: normalizedSource,
+      sourceType: "XML",
+      sha256: createHash("sha256").update(xml, "utf8").digest("hex"),
+      receivedAt: new Date().toISOString(),
+    };
+
+    const records = extractRepeatingXmlElements(xml, "transaction");
+    if (records.length > 0) {
+      const rows: string[][] = [
+        ["date", "account", "debit", "credit", "currency"],
+        ...records.map((record) => [
+          record.date ?? "",
+          record.account ?? "",
+          record.debit ?? "",
+          record.credit ?? "",
+          record.currency ?? "",
+        ]),
+      ];
+      const fromElements = this.mapMarkupTablesToTransactions([rows]);
+      if (fromElements) return this.finalize(normalizedTenant, source, fromElements);
+    }
+
+    const text = xmlToText(xml);
+    if (!text.trim()) throw new Error("ingestion-xml-empty");
+    const transactions = this.parseAndValidate(text);
+    return this.finalize(normalizedTenant, source, transactions);
+  }
+
+  /**
+   * Multi-format canonical route: TSV. Tab-delimited ledgers converge on the
+   * SAME canonical validation/normalization pipeline as CSV (only the cell
+   * delimiter differs), so no parallel spreadsheet/text architecture exists.
+   */
+  async ingestTsv(tenantId: string, sourceName: string, tsv: string): Promise<FinancialIngestionResult> {
+    const normalizedTenant = tenantId.trim();
+    const normalizedSource = sourceName.trim();
+    if (!normalizedTenant) throw new Error("ingestion-tenant-required");
+    if (!normalizedSource) throw new Error("ingestion-source-required");
+    if (!tsv.trim()) throw new Error("ingestion-source-empty");
+
+    const source: FinancialSourceEvidence = {
+      sourceName: normalizedSource,
+      sourceType: "TSV",
+      sha256: createHash("sha256").update(tsv, "utf8").digest("hex"),
+      receivedAt: new Date().toISOString(),
+    };
+
+    const transactions = this.parseAndValidate(tsv, "\t");
+    return this.finalize(normalizedTenant, source, transactions);
+  }
+
+  /**
+   * Governed scanned/image-only PDF OCR route (supporting path, NOT the default
+   * PDF route). The caller must explicitly supply an OCR adapter and a page
+   * rasterizer, so no OCR engine can silently become a mandatory runtime
+   * dependency. Until an OCR engine is admitted in
+   * `CapabilityProviderRegistry` (`document.pdf.ocr` remains DEFERRED), the
+   * commercial ingestion service never reaches this method; it fails closed.
+   *
+   * Provenance: the canonical model still uses the ORIGINAL PDF-byte SHA-256,
+   * and the OCR engine identity/version/confidence/language is recorded on the
+   * evidence so OCR-derived text is distinguishable from native text.
+   */
+  async ingestScannedPdfBytes(
+    tenantId: string,
+    sourceName: string,
+    rawBytes: Buffer,
+    route: ScannedPdfOcrRoute,
+  ): Promise<FinancialIngestionResult> {
+    const normalizedTenant = tenantId.trim();
+    const normalizedSource = sourceName.trim();
+    if (!normalizedTenant) throw new Error("ingestion-tenant-required");
+    if (!normalizedSource) throw new Error("ingestion-source-required");
+    if (!Buffer.isBuffer(rawBytes) || rawBytes.length === 0) throw new Error("ingestion-source-empty");
+
+    const document = await acquirePdf({
+      sourceName: normalizedSource,
+      rawBytes,
+      options: {
+        allowScanned: true,
+        scannedThresholdCharsPerPage: route.textNativeCharsPerPage,
+      },
+    });
+    if (document.pages.length === 0) throw new Error(PDF_ERROR_CODES.SCANNED);
+
+    const routed = await routeScannedPdfToOcr(document, route.ocr, {
+      rasterizePage: route.rasterizePage,
+      textNativeCharsPerPage: route.textNativeCharsPerPage,
+      language: route.language,
+    });
+
+    const ocrByPage = new Map<number, OcrResult>();
+    let index = 0;
+    for (const decision of routed.decisions) {
+      if (!decision.needsOcr) continue;
+      const result = routed.ocrResults[index];
+      index += 1;
+      if (result) ocrByPage.set(decision.pageNumber, result);
+    }
+
+    const pageTexts = document.pages
+      .map((page) => ocrByPage.get(page.pageNumber)?.text ?? page.text)
+      .filter((text) => typeof text === "string" && text.trim().length > 0);
+    const text = pageTexts.join("\n\n");
+    if (!text.trim()) throw new Error("ingestion-ocr-empty");
+
+    const transactions = this.parseAndValidate(text);
+    const source: FinancialSourceEvidence = {
+      sourceName: normalizedSource,
+      sourceType: "PDF",
+      sha256: document.sha256,
+      receivedAt: document.receivedAt,
+      ...(routed.ocrResults.length > 0
+        ? { ocr: this.buildOcrProvenance(route.ocr, routed.ocrResults, route.language) }
+        : {}),
+    };
+    return this.finalize(normalizedTenant, source, transactions);
+  }
+
+  /**
+   * Governed image OCR route (supporting path). Requires an explicitly supplied
+   * OCR adapter; fails closed when OCR text cannot be recognized. Provenance is
+   * the ORIGINAL image-byte SHA-256 with OCR engine metadata recorded.
+   */
+  async ingestImageBytes(
+    tenantId: string,
+    sourceName: string,
+    rawBytes: Buffer,
+    ocr: OcrAdapter,
+    language?: string,
+  ): Promise<FinancialIngestionResult> {
+    const normalizedTenant = tenantId.trim();
+    const normalizedSource = sourceName.trim();
+    if (!normalizedTenant) throw new Error("ingestion-tenant-required");
+    if (!normalizedSource) throw new Error("ingestion-source-required");
+
+    const image = acquireImage({ sourceName: normalizedSource, rawBytes });
+    const recognized = await ocr.recognize({ sourceName: image.sourceName, rawBytes, language });
+    if (!recognized.text.trim()) throw new Error("ingestion-ocr-empty");
+
+    const transactions = this.parseAndValidate(recognized.text);
+    const source: FinancialSourceEvidence = {
+      sourceName: normalizedSource,
+      sourceType: "IMAGE",
+      sha256: image.sha256,
+      receivedAt: image.receivedAt,
+      ocr: this.buildOcrProvenance(ocr, [recognized], language),
+    };
+    return this.finalize(normalizedTenant, source, transactions);
+  }
+
+  /**
    * Ingest XLSX bytes using exceljs-hardened
    * Formula evaluation is disabled - only cell values are read.
    * Stage 14-1.1: made public so the commercial runtime can ingest uploaded
@@ -861,18 +1150,18 @@ export class FinancialDataIngestionAdapter {
     return transactions;
   }
 
-  private parseAndValidate(csv: string): FinancialTransaction[] {
+  private parseAndValidate(csv: string, delimiter = ","): FinancialTransaction[] {
     const lines = csv.replace(/^\uFEFF/, "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
     if (lines.length < 2) throw new Error("ingestion-header-and-data-required");
 
-    const header = this.parseLine(lines[0]).map((value) => value.toLowerCase());
+    const header = this.parseLine(lines[0], delimiter).map((value) => value.toLowerCase());
     const expected = ["date", "account", "debit", "credit", "currency"];
     if (header.length !== expected.length || header.some((value, index) => value !== expected[index])) {
       throw new Error("ingestion-schema-invalid");
     }
 
     return lines.slice(1).map((line, index) => {
-      const row = this.parseLine(line);
+      const row = this.parseLine(line, delimiter);
       if (row.length !== expected.length) throw new Error(`ingestion-row-invalid:${index + 2}`);
       const [date, account, debitText, creditText, currency] = row.map((value) => value.trim());
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error(`ingestion-date-invalid:${index + 2}`);
@@ -888,7 +1177,7 @@ export class FinancialDataIngestionAdapter {
     });
   }
 
-  private parseLine(line: string): string[] {
+  private parseLine(line: string, delimiter = ","): string[] {
     const values: string[] = [];
     let current = "";
     let quoted = false;
@@ -897,13 +1186,82 @@ export class FinancialDataIngestionAdapter {
       if (char === '"') {
         if (quoted && line[i + 1] === '"') { current += '"'; i += 1; }
         else quoted = !quoted;
-      } else if (char === "," && !quoted) {
+      } else if (char === delimiter && !quoted) {
         values.push(current); current = "";
       } else current += char;
     }
     if (quoted) throw new Error("ingestion-unterminated-quote");
     values.push(current);
     return values;
+  }
+
+  /**
+   * Map already-extracted document tables to canonical transactions using the
+   * single canonical table contract. Returns null when no table matches the
+   * canonical ledger schema, so the caller can fall back to text extraction
+   * instead of fabricating rows. Never partially maps an ambiguous table.
+   */
+  private mapMarkupTablesToTransactions(
+    tables: ReadonlyArray<ReadonlyArray<ReadonlyArray<string>>>,
+  ): FinancialTransaction[] | null {
+    for (const rows of tables) {
+      const candidate = buildTableCandidate(rows);
+      if (!candidate) continue;
+      try {
+        const mapped = mapTableToCanonical(candidate);
+        if (mapped.length > 0) {
+          return mapped.map((row) => ({
+            date: row.date,
+            account: row.account,
+            debit: row.debit,
+            credit: row.credit,
+            currency: row.currency,
+          }));
+        }
+      } catch {
+        // Ambiguous/invalid candidate: try the next table, never guess.
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Build truthful OCR provenance from real OCR results. Confidence is null
+   * when no word confidences were produced (unknown), never a fabricated 0.
+   */
+  private buildOcrProvenance(
+    ocr: OcrAdapter,
+    results: ReadonlyArray<OcrResult>,
+    language?: string,
+  ): OcrProvenance {
+    const words = results.flatMap((result) => result.words);
+    const confidence = words.length > 0
+      ? words.reduce((sum, word) => sum + word.confidence, 0) / words.length
+      : null;
+    return createOcrProvenance({
+      engine: results[0]?.engine ?? ocr.engine,
+      engineVersion: results[0]?.engineVersion ?? "unknown",
+      confidence,
+      language: language ?? results[0]?.language ?? "unknown",
+    });
+  }
+
+  /** Compute canonical totals and persist a tenant-scoped canonical model. */
+  private async finalize(
+    tenantId: string,
+    source: FinancialSourceEvidence,
+    transactions: FinancialTransaction[],
+  ): Promise<FinancialIngestionResult> {
+    const debit = this.round(transactions.reduce((sum, row) => sum + row.debit, 0));
+    const credit = this.round(transactions.reduce((sum, row) => sum + row.credit, 0));
+    const model: FinancialCanonicalModel = {
+      tenantId,
+      source,
+      transactions,
+      totals: { debit, credit, balance: this.round(debit - credit) },
+    };
+    await this.persistence.write({ tenantId }, `financial-ingestion:${source.sha256}`, model);
+    return { evidence: source, model, persisted: true };
   }
 
   private parseAmount(value: string, row: number, field: string): number {

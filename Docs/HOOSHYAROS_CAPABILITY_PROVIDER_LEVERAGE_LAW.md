@@ -101,4 +101,10 @@ Enforcement is executable, not documentary:
 
 Text-native PDF ingestion is the reference implementation: a standard library extracts text while HooshyarOS owns the canonical model, original-byte SHA-256 provenance, validation and downstream intelligence.
 
-Scanned / image-only PDF is the honest remaining limitation. OCR is recorded as `DEFERRED` with explicit unmet conditions; no OCR provider is installed or claimed until it satisfies this law.
+Multi-format acquisition follows the same pattern and converges on the one canonical owner (`FinancialDataIngestionAdapter`):
+
+- `document.pdf.rasterize` — `pdf-parse` page screenshots behind `Product/PdfPageRasterizer.ts` (INTEGRATED);
+- `document.docx.text` — `mammoth` text + tables behind `Product/DocxAcquisition.ts` (INTEGRATED);
+- `document.html.text` / `document.xml.text` / `text.tsv.parse` — internal capabilities in `Product/MarkupTextExtraction.ts` and the canonical delimiter parser (INTEGRATED).
+
+Scanned / image-only PDF remains the honest limitation. The rendering half and the governed routing path (`FinancialDataIngestionAdapter.ingestScannedPdfBytes` + `ScannedPdfRouter`) exist and are focused-tested through an injected engine, but the OCR **engine** provider (`document.pdf.ocr`, `tesseract.js`) is recorded as `DEFERRED` with explicit unmet conditions; no OCR provider is installed or claimed until it satisfies this law. Long-tail formats (RTF, ODT, PPTX, EPUB, EML, MSG, DBF, YAML, TIFF, legacy XLS) and broad fallbacks (Apache Tika, LibreOffice headless) are recorded as `DEFERRED` with their rejection reasons; none is claimed as supported.

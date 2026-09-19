@@ -181,7 +181,7 @@ describe("Phase 14-1.2 — ingestion runtime endpoints", () => {
         const unsupported = await request(server, "/api/ingest", {
             method: "POST",
             headers: { "content-type": "application/json", cookie },
-            body: JSON.stringify({ sourceName: "ledger.docx", format: "DOCX", content: "x" }),
+            body: JSON.stringify({ sourceName: "ledger.rtf", format: "RTF", content: "{\\rtf1}" }),
         });
         expect(unsupported.status).toBe(400);
         expect((await unsupported.json()).error).toBe("INGEST_FORMAT_UNSUPPORTED");
