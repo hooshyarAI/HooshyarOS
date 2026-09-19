@@ -39,7 +39,9 @@ canonical `FinancialDataIngestionAdapter`.
   average extracted characters per page is below the conservative threshold is
   rejected with the precise error `ingestion-pdf-scanned-no-ocr-yet` (422). No
   OCR is performed and no OCR success is ever faked; `tesseract.js` is not a
-  declared dependency.
+  declared dependency. OCR is recorded as `DEFERRED` in the canonical
+  capability-provider inventory (`CapabilityProviderRegistry`) with explicit
+  unmet admission conditions; see `Docs/HOOSHYAROS_CAPABILITY_PROVIDER_LEVERAGE_LAW.md`.
 - **DOCX / DOC** — same reasoning (`mammoth` helper exists but is not routed by
   the canonical owner).
 - **XLS** — dependency-blocked legacy binary format.
@@ -145,5 +147,9 @@ Unsupported/ambiguous input is rejected before any model is persisted:
 
 - One capability = one canonical owner (`FinancialDataIngestionAdapter`).
 - No duplicate engine or alternate adapter.
+- External providers (`pdf-parse`, `exceljs-hardened`) are admitted through the
+  canonical `CapabilityProviderRegistry`; a format whose external provider is not
+  admitted fails closed with `ingestion-provider-not-admitted`
+  (`Docs/HOOSHYAROS_CAPABILITY_PROVIDER_LEVERAGE_LAW.md`).
 - No external parser infrastructure invented.
 - No test weakened; all prior adapter/runtime tests still pass.

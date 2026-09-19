@@ -24,12 +24,27 @@ import {
   type RawSourceRef,
 } from "./FinancialDataIngestionAdapter";
 import { decodeTextBytes } from "./TextFileDecoder";
+import {
+  CapabilityProviderRegistry,
+  type CapabilityCategory,
+} from "./CapabilityProviderRegistry";
 
 export type IngestionFormat = "CSV" | "STRUCTURED" | "XLSX" | "TXT" | "PDF";
 
 export const SUPPORTED_INGESTION_FORMATS: ReadonlyArray<IngestionFormat> = ["CSV", "STRUCTURED", "XLSX", "TXT", "PDF"];
 
 const RAW_SOURCE_PREFIX = "raw-source:";
+
+/**
+ * Capability Provider Leverage: external capabilities each runtime format
+ * depends on. Internal-only formats (CSV / STRUCTURED / TXT) are implemented by
+ * the canonical owner itself and are therefore not gated by an external
+ * provider admission.
+ */
+const EXTERNAL_PROVIDER_CATEGORY: Partial<Record<IngestionFormat, CapabilityCategory>> = {
+  XLSX: "spreadsheet.xlsx.parse",
+  PDF: "document.pdf.text",
+};
 
 export interface IngestionRequest {
   readonly sourceName: string;
@@ -83,6 +98,7 @@ export class FinancialIngestionService {
   constructor(
     private readonly persistence: SQLitePersistenceStore,
     adapter?: FinancialDataIngestionAdapter,
+    private readonly providers: CapabilityProviderRegistry = new CapabilityProviderRegistry(),
   ) {
     this.adapter = adapter ?? new FinancialDataIngestionAdapter(persistence);
   }
@@ -98,6 +114,8 @@ export class FinancialIngestionService {
     if (!SUPPORTED_INGESTION_FORMATS.includes(format)) {
       throw new Error("ingestion-format-unsupported");
     }
+
+    this.assertProviderAdmitted(format);
 
     const bytes = this.decodeRequestBytes(request);
     const sha256 = computeSourceSha256(bytes);
@@ -139,6 +157,25 @@ export class FinancialIngestionService {
     });
 
     return { tenantId: normalizedTenant, requestedFormat: format, result, rawSourceRef, encoding };
+  }
+
+  /**
+   * Capability Provider Leverage enforcement (fail closed): a runtime format
+   * backed by an external provider must resolve to an admitted, integrated
+   * provider through the canonical registry. The default registry admits the
+   * seeded providers (pdf-parse, exceljs-hardened), so existing behaviour is
+   * unchanged; a withdrawn or unadmitted provider is refused instead of being
+   * used silently.
+   */
+  private assertProviderAdmitted(format: IngestionFormat): void {
+    const category = EXTERNAL_PROVIDER_CATEGORY[format];
+    if (!category) return;
+    try {
+      this.providers.selectProvider(category);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "unknown";
+      throw new Error(`ingestion-provider-not-admitted:${detail}`);
+    }
   }
 
   async listSources(tenantId: string): Promise<SourceSummary[]> {

@@ -8,6 +8,7 @@
 - `Docs/AUTONOMOUS_WEAVING_DOCTRINE.md` — expert knot-by-knot construction and recovery doctrine.
 - `Docs/AUTONOMOUS_7_DAY_BUILD_SLA.md` — permanent seven-day autonomous construction performance law.
 - `Docs/HOOSHYAROS_TOOLCHAIN_OPTIMIZATION_LAW.md` — permanent tool-first, Python-first construction and human-intervention law.
+- `Docs/HOOSHYAROS_CAPABILITY_PROVIDER_LEVERAGE_LAW.md` — permanent standard/tool/adapter-before-native reuse and external-dependency admission law; enforced by `Backend/HBOS/Product/CapabilityProviderRegistry.ts`.
 - `Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md` — canonical commercial-product completion and acceptance contract; mandatory for distinguishing canonical capability completion from real commercial product completion.
 - `Docs/KILO_EXECUTION_OPERATOR_CONTRACT.md` — bounded Kilo Code execution/operator contract.
 - Existing architecture decisions, HBOS engines, capability owners, tests and documentation — inspect before adding anything.

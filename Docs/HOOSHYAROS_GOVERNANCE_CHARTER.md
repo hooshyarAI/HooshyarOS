@@ -71,6 +71,12 @@ This means one coherent capability should be implemented and verified as one arc
 
 Never create a duplicate engine because a new file is convenient. Reuse the existing capability owner when one already exists.
 
+### Capability provider leverage
+
+Reuse standard, mature, open-source or commercially compatible capabilities before building them natively. Evaluate in the canonical order **INDUSTRY_STANDARD -> MATURE_LIBRARY -> INTERNAL_CAPABILITY -> ADAPTER_PROVIDER -> NATIVE_IMPLEMENTATION**, and admit an external provider only when its license, commercial-use compatibility, self-hosting behaviour, maintenance evidence, security considerations, replaceability boundary, and provenance/testing/upgrade/deprecation responsibilities are recorded.
+
+External providers are capability providers, never architecture owners. HooshyarOS retains ownership of canonical models, tenant boundaries, identity, security policy, provenance, audit, validation, business rules and intelligence. The governing law is `Docs/HOOSHYAROS_CAPABILITY_PROVIDER_LEVERAGE_LAW.md`; the canonical executable owner is `Backend/HBOS/Product/CapabilityProviderRegistry.ts`.
+
 ---
 
 ## 4. Permanent Engineering Logic
