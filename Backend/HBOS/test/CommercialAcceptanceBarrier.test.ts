@@ -10,9 +10,10 @@
  *
  * The barrier asserts, against the real commercial runtime and the real web
  * client transport module:
- *   - PDF is a deliberately unsupported ingestion format and fails closed with
- *     a precise capability error (never as CSV, never as offline);
- *   - binary formats use the canonical `contentBase64` representation;
+ *   - an unsupported format (DOCX) fails closed with a precise capability error
+ *     (never as CSV, never as offline);
+ *   - binary formats use the canonical `contentBase64` representation (PDF
+ *     included);
  *   - only genuine connectivity failures enter the offline queue;
  *   - storage quota failures are surfaced, never reclassified as offline;
  *   - unauthenticated and cross-tenant access still fails closed.
@@ -86,12 +87,12 @@ describe("commercial acceptance barrier — runtime ingestion (K8)", () => {
     await close(server);
   });
 
-  test("an authenticated PDF upload fails closed with a precise unsupported-format error", async () => {
-    const pdfBytes = Buffer.from("%PDF-1.7\n1 0 obj\n<<>>\nendobj\n%%EOF\n", "latin1");
+  test("an authenticated unsupported-format upload fails closed with a precise error", async () => {
+    const docxBytes = Buffer.from("PK\x03\x04 fake docx", "latin1");
     const response = await ingest(acceptance, {
-      sourceName: "statement.pdf",
-      format: "PDF",
-      contentBase64: pdfBytes.toString("base64"),
+      sourceName: "scan.docx",
+      format: "DOCX",
+      contentBase64: docxBytes.toString("base64"),
     });
     expect(response.status).toBe(400);
     const payload = (await response.json()) as { error: string };
@@ -203,7 +204,7 @@ describe("commercial acceptance barrier — offline transport vs real runtime (K
     expect(await reloaded.pending()).toEqual([]);
   });
 
-  test("a rejected (400) PDF job is classified as validation, never replayed as offline", async () => {
+  test("a rejected (400) unsupported-format job is classified as validation, never replayed as offline", async () => {
     const acceptance = await bootstrap(server);
     const fetchImpl = (url: string, init: Record<string, unknown> = {}) =>
       fetch(`${acceptance.base}${url}`, {
@@ -211,7 +212,7 @@ describe("commercial acceptance barrier — offline transport vs real runtime (K
         headers: { ...((init.headers as Record<string, string>) || {}), cookie: acceptance.cookie },
       });
     const sync = createOfflineSync({ storage: memoryStorage(), fetchImpl, now: () => 1 });
-    await sync.enqueue({ sourceName: "statement.pdf", format: "PDF", contentBase64: Buffer.from("%PDF-1.7\n%%EOF").toString("base64") });
+    await sync.enqueue({ sourceName: "scan.docx", format: "DOCX", contentBase64: Buffer.from("PK\x03\x04 fake docx").toString("base64") });
 
     const report = await sync.sync();
     expect(report.status).toBe("ONLINE");

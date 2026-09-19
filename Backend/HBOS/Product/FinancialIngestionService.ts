@@ -6,8 +6,8 @@
  * parsing, validation, normalization and persistence of the canonical model all
  * happen inside that owner. This service only:
  *
- *   1. dispatches a runtime-facing payload (CSV / STRUCTURED / XLSX / TXT) to
- *      the canonical adapter's public ingest methods;
+ *   1. dispatches a runtime-facing payload (CSV / STRUCTURED / XLSX / TXT / PDF)
+ *      to the canonical adapter's public ingest methods;
  *   2. persists the tenant-scoped RAW SOURCE EVIDENCE bytes under
  *      `raw-source:<sha256>` through the canonical SQLitePersistenceStore, so
  *      provenance survives independently of the normalized model;
@@ -25,9 +25,9 @@ import {
 } from "./FinancialDataIngestionAdapter";
 import { decodeTextBytes } from "./TextFileDecoder";
 
-export type IngestionFormat = "CSV" | "STRUCTURED" | "XLSX" | "TXT";
+export type IngestionFormat = "CSV" | "STRUCTURED" | "XLSX" | "TXT" | "PDF";
 
-export const SUPPORTED_INGESTION_FORMATS: ReadonlyArray<IngestionFormat> = ["CSV", "STRUCTURED", "XLSX", "TXT"];
+export const SUPPORTED_INGESTION_FORMATS: ReadonlyArray<IngestionFormat> = ["CSV", "STRUCTURED", "XLSX", "TXT", "PDF"];
 
 const RAW_SOURCE_PREFIX = "raw-source:";
 
@@ -36,7 +36,7 @@ export interface IngestionRequest {
   readonly format: IngestionFormat;
   /** Raw text content for CSV / STRUCTURED / TXT. */
   readonly content?: string;
-  /** Base64-encoded bytes for XLSX. */
+  /** Base64-encoded bytes for binary formats (XLSX / PDF). */
   readonly contentBase64?: string;
 }
 
@@ -75,7 +75,7 @@ interface StoredRawSource {
   readonly content: string;
 }
 
-const isTextFormat = (format: IngestionFormat): boolean => format !== "XLSX";
+const isTextFormat = (format: IngestionFormat): boolean => format !== "XLSX" && format !== "PDF";
 
 export class FinancialIngestionService {
   private readonly adapter: FinancialDataIngestionAdapter;
@@ -120,6 +120,9 @@ export class FinancialIngestionService {
         result = txtResult;
         break;
       }
+      case "PDF":
+        result = await this.adapter.ingestPdfBytes(normalizedTenant, sourceName, bytes);
+        break;
       default:
         throw new Error("ingestion-format-unsupported");
     }

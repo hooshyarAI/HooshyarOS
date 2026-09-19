@@ -15,16 +15,17 @@ Canonical multi-format financial data ingestion with tenant isolation and persis
 **Supported Formats:**
 - **CSV** — Standard CSV with columns: date, account, debit, credit, currency
 - **STRUCTURED (JSON)** — JSON with `transactions` array containing financial transactions
+- **TXT** — decoded UTF-8 / UTF-8 BOM / UTF-16 LE / UTF-16 BE text, normalized through the canonical ledger pipeline
 - **XLSX** — Microsoft Excel 2007+ format (.xlsx files) ✅ SUPPORTED
+- **PDF (text-native)** — `.pdf` files with an extractable text layer, via the existing `pdf-parse`-backed `PdfAcquisition` helper (`ingestPdfBytes`); extracted text is normalized through the same canonical ledger (CSV) pipeline. Scanned/image-only PDF is **not supported without OCR** and fails closed with `ingestion-pdf-scanned-no-ocr-yet`.
 - **XLS** — Microsoft Excel 97-2003 format (.xls files) — **BLOCKED** (pending dependency resolution)
-- **PDF** — BLOCKED (pending dependency approval)
 
 ---
 
 ## Architecture
 
 ```
-File Source → CSV/JSON/XLSX Ingestion → Validation → Canonical Normalization
+File Source → CSV/JSON/XLSX/TXT/PDF Ingestion → Validation → Canonical Normalization
     → Tenant-Scoped Persistence → Financial Canonical Model
 ```
 
@@ -103,13 +104,37 @@ File Source → CSV/JSON/XLSX Ingestion → Validation → Canonical Normalizati
 - Pivot tables
 - Charts and drawings
 
+### PDF Format (text-native, `ingestPdfBytes`)
+
+**Dependency:** `pdf-parse@2.4.5` via the existing `PdfAcquisition` helper (no
+second parser is introduced).
+
+**Schema:** The extracted text must match the canonical ledger schema
+(`date,account,debit,credit,currency`), exactly like CSV/TXT.
+
+**Behaviour:**
+- `%PDF` magic signature and `.pdf` extension are validated.
+- Text is extracted deterministically from the original bytes.
+- The canonical model's `source.sha256` is the SHA-256 of the **original PDF
+  bytes**, preserving provenance; raw original bytes are persisted as
+  tenant-scoped evidence by `FinancialIngestionService`.
+- Extraction is rejected when the page count is zero or the average extracted
+  characters per page is below the conservative scanned threshold.
+
+**Failure behaviour (fail closed, truthful):**
+- `ingestion-pdf-scanned-no-ocr-yet` — scanned/image-only/unextractable PDF. No
+  OCR is attempted and no OCR success is faked.
+- `ingestion-pdf-unsupported` — bytes lack a valid `%PDF` signature.
+- `ingestion-pdf-empty` / `ingestion-pdf-corrupt` / `ingestion-pdf-password-protected`.
+- `ingestion-format-mismatch` — extension does not match a PDF payload.
+
 ---
 
 ## API
 
 ### `ingestFile(tenantId, sourcePath)`
 
-Ingest a single file (auto-detects CSV, JSON, or XLSX by extension and magic bytes).
+Ingest a single file (auto-detects CSV, JSON, TXT, PDF, or XLSX by extension and magic bytes).
 
 ### `ingestCsv(tenantId, sourceName, csvContent)`
 
@@ -119,6 +144,18 @@ Ingest CSV content directly.
 
 Ingest JSON/STRUCTURED content directly.
 
+### `ingestTxtBytes(tenantId, sourceName, rawBytes)`
+
+Decode text bytes (UTF-8 / UTF-8 BOM / UTF-16 LE / UTF-16 BE) and ingest
+through the canonical ledger pipeline.
+
+### `ingestPdfBytes(tenantId, sourceName, rawBytes)`
+
+Extract text from a text-native PDF via the `PdfAcquisition` helper and ingest
+through the canonical ledger pipeline. Preserves the original PDF-byte SHA-256
+as the model's `source.sha256`; scanned/image-only PDF fails closed with
+`ingestion-pdf-scanned-no-ocr-yet`.
+
 ### `ingestBatch(tenantId, sourcePaths)`
 
 Ingest multiple files in a single operation.
@@ -126,7 +163,7 @@ Ingest multiple files in a single operation.
 - Continues processing on individual file failure (fail-fast: false)
 - Returns per-file success/failure summary
 - All data remains tenant-scoped
-- Supports mixed formats: CSV, JSON, XLSX
+- Supports mixed formats: CSV, JSON, TXT, PDF, XLSX
 
 **Returns:**
 ```typescript
@@ -181,7 +218,7 @@ interface FinancialCanonicalModel {
 
 Every ingestion includes source evidence:
 - `sourceName` — Original filename
-- `sourceType` — "CSV", "STRUCTURED", or "XLSX"
+- `sourceType` — "CSV", "STRUCTURED", "XLSX", "PDF" (and other routes as added)
 - `sha256` — SHA-256 hash computed from **original raw bytes** (before any parsing)
 - `receivedAt` — ISO 8601 timestamp
 

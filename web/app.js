@@ -78,7 +78,10 @@ function describeFailure(error) {
       return `خطای موقت سرویس: ${message}`;
     case 'VALIDATION_FAILURE':
       if (message === 'INGEST_FORMAT_UNSUPPORTED') {
-        return 'این فرمت فایل در حال حاضر پشتیبانی نمی‌شود (PDF/DOCX/XLS/تصویر)؛ فایل CSV، JSON، TXT یا XLSX انتخاب کنید.';
+        return 'این فرمت فایل در حال حاضر پشتیبانی نمی‌شود (DOCX/XLS/تصویر)؛ فایل CSV، JSON، TXT، XLSX یا PDF متن‌محور انتخاب کنید.';
+      }
+      if (message === 'ingestion-pdf-scanned-no-ocr-yet') {
+        return 'این PDF متن‌محور نیست (تصویری یا اسکن‌شده است) و بدون OCR پشتیبانی نمی‌شود؛ یک PDF متن‌محور یا فایل CSV، JSON، TXT یا XLSX انتخاب کنید.';
       }
       return `ورودی نامعتبر است: ${message}`;
     default:
@@ -217,10 +220,10 @@ async function readFileText(file) {
 
 /**
  * Resolve the canonical ingest representation for a selected file using the
- * shared format table. Binary formats are sent as `contentBase64`; text
- * formats as `content`. PDF is a known-but-unsupported format: it is sent with
- * its correct identifier so the canonical runtime can fail it closed precisely
- * (never as CSV, never as an offline event).
+ * shared format table. Binary formats (XLSX / PDF / ...) are sent as
+ * `contentBase64`; text formats as `content`. Text-native PDF is supported by
+ * the canonical runtime; scanned/image-only PDF fails closed there with a
+ * precise no-OCR error (never as CSV, never as an offline event).
  */
 function resolveIngestRequest(file) {
   const format = syncApi ? syncApi.formatFromSourceName(file.name) : null;

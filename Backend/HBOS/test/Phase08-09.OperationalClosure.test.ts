@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer, IncomingMessage, ServerResponse, Server } from "node:http";
 import ExcelJS from "exceljs-hardened";
+import { PDFParse } from "pdf-parse";
 import { FinancialDataIngestionAdapter } from "../Product/FinancialDataIngestionAdapter";
 import { SQLitePersistenceStore } from "../Product/SQLitePersistenceStore";
 import { decodeTextBytes } from "../Product/TextFileDecoder";
@@ -14,6 +15,11 @@ import { RiskIntelligenceEngine } from "../Engines/RiskIntelligenceEngine";
 import { DecisionIntelligenceEngine } from "../Engines/DecisionIntelligenceEngine";
 import { GenericApiConnector } from "../Product/GenericApiConnector";
 import { createCommercialRuntimeServer } from "../Autonomous/Runtime/CommercialRuntimeServer";
+
+// The Jest VM cannot host pdf.js's worker, so the canonical `acquirePdf` route
+// is exercised with `pdf-parse` mocked (same approach as PdfAcquisition.test.ts).
+jest.mock("pdf-parse", () => ({ PDFParse: jest.fn() }));
+const PDFParseMock = PDFParse as unknown as jest.Mock;
 
 const CSV = `date,account,debit,credit,currency
 2026-08-01,Cash,1000,0,IRR
@@ -32,6 +38,7 @@ describe("Phase 08-09 Operational Closure", () => {
   let dir: string;
 
   beforeEach(() => {
+    PDFParseMock.mockReset();
     dir = mkdtempSync(join(tmpdir(), "hooshyar-ops-closure-"));
   });
 
@@ -140,14 +147,38 @@ describe("Phase 08-09 Operational Closure", () => {
     persistence.close();
   });
 
-  test("PDF is BLOCKED: no parser route exists", async () => {
+  test("PDF text-native is routed through the canonical PDF acquisition owner", async () => {
+    PDFParseMock.mockImplementation(() => ({
+      getInfo: async () => ({ info: {}, metadata: null, total: 1 }),
+      getText: async () => ({ pages: [{ num: 1, text: CSV }], text: CSV, total: 1, getPageText: () => CSV }),
+      destroy: async () => undefined,
+    }));
     const dbPath = join(dir, "ops.sqlite");
     const persistence = new SQLitePersistenceStore({ databasePath: dbPath });
     const adapter = new FinancialDataIngestionAdapter(persistence);
     const pdfPath = join(dir, "report.pdf");
-    writeFileSync(pdfPath, Buffer.from("%PDF-1.4 fake"), "utf8");
+    writeFileSync(pdfPath, Buffer.from("%PDF-1.7\n%%EOF", "latin1"));
 
-    await expect(adapter.ingestFile("tenant-a", pdfPath)).rejects.toThrow("ingestion-header-and-data-required");
+    const result = await adapter.ingestFile("tenant-a", pdfPath);
+    expect(result.persisted).toBe(true);
+    expect(result.evidence.sourceType).toBe("PDF");
+    expect(result.model.transactions).toHaveLength(4);
+    persistence.close();
+  });
+
+  test("PDF scanned-only fails closed with the precise no-OCR limitation", async () => {
+    PDFParseMock.mockImplementation(() => ({
+      getInfo: async () => ({ info: {}, metadata: null, total: 1 }),
+      getText: async () => ({ pages: [{ num: 1, text: "" }], text: "", total: 1, getPageText: () => "" }),
+      destroy: async () => undefined,
+    }));
+    const dbPath = join(dir, "ops.sqlite");
+    const persistence = new SQLitePersistenceStore({ databasePath: dbPath });
+    const adapter = new FinancialDataIngestionAdapter(persistence);
+    const pdfPath = join(dir, "scan.pdf");
+    writeFileSync(pdfPath, Buffer.from("%PDF-1.7\n%%EOF", "latin1"));
+
+    await expect(adapter.ingestFile("tenant-a", pdfPath)).rejects.toThrow("ingestion-pdf-scanned-no-ocr-yet");
     persistence.close();
   });
 

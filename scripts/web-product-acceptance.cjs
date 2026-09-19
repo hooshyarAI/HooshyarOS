@@ -2,6 +2,7 @@ const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const cp = require('node:child_process');
+const { createHash } = require('node:crypto');
 const { isSessionRateLimitedPost, createSessionRateLimitPacer } = require('./session-rate-limit-pacer.cjs');
 
 const root = process.cwd();
@@ -30,6 +31,38 @@ async function createXlsxBase64() {
   worksheet.addRow(['2026-08-06', 'Receivable', 0, 500, 'IRR']);
   const buffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(buffer).toString('base64');
+}
+
+// Deterministic, dependency-free text-native PDF builder for the real PDF
+// ingestion acceptance. No external fixture/network is required.
+function escPdf(value) {
+  return String(value).replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+}
+function buildPdf(contentStream) {
+  const contentBytes = Buffer.from(contentStream, 'latin1');
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
+    `<< /Length ${contentBytes.length} >>\nstream\n${contentStream}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  const chunks = [];
+  let offset = 0;
+  const push = (value) => { const buffer = typeof value === 'string' ? Buffer.from(value, 'latin1') : value; chunks.push(buffer); offset += buffer.length; };
+  push('%PDF-1.4\n');
+  const offsets = [];
+  objects.forEach((object, index) => { offsets.push(offset); push(`${index + 1} 0 obj\n${object}\nendobj\n`); });
+  const xrefOffset = offset;
+  let xref = `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (const off of offsets) xref += `${String(off).padStart(10, '0')} 00000 n \n`;
+  push(xref);
+  push(`trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`);
+  return Buffer.concat(chunks);
+}
+function buildTextPdf(lines) {
+  const body = lines.map((line, index) => `${index === 0 ? '60 760 Td' : '0 -16 Td'} (${escPdf(line)}) Tj`).join('\n');
+  return buildPdf(`BT\n/F1 11 Tf\n${body}\nET`);
 }
 
 async function waitHealth(child) {
@@ -93,12 +126,21 @@ async function main() {
     const xlsxAnalysis = await request('/api/financial/analyze', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceSha256: xlsxIngest.body.evidence.sha256, assets: 10000, liabilities: 4000 }) });
     if (xlsxAnalysis.status !== 200 || xlsxAnalysis.body.ingestedSource?.sourceType !== 'XLSX' || xlsxAnalysis.body.metrics?.profit !== 1000) throw new Error(`WEB_ACCEPTANCE_XLSX_ANALYSIS_FAILED:${xlsxAnalysis.status}`);
 
-    // K8 commercial-acceptance barrier: a real binary PDF must fail closed with a
-    // precise, supported-capability error — never as CSV, never as an offline event.
-    const pdfBase64 = Buffer.from('%PDF-1.7\n1 0 obj\n<<>>\nendobj\n%%EOF\n', 'latin1').toString('base64');
+    // PDF capability: a real text-native PDF must ingest through the canonical
+    // runtime and reach canonical financial analysis; a scanned-only PDF must
+    // fail closed with the precise no-OCR limitation (never as CSV, never offline).
+    const pdfCsv = ['date,account,debit,credit,currency', '2026-08-07,Cash,400,0,IRR', '2026-08-07,Sales,0,400,IRR'].join('\n');
+    const pdfBytes = buildTextPdf(pdfCsv.split('\n'));
+    const pdfSha = createHash('sha256').update(pdfBytes).digest('hex');
     await sleep(1100);
-    const pdfIngest = await request('/api/ingest', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceName: 'web-qa.pdf', format: 'PDF', contentBase64: pdfBase64 }) });
-    if (pdfIngest.status !== 400 || pdfIngest.body.error !== 'INGEST_FORMAT_UNSUPPORTED') throw new Error(`WEB_ACCEPTANCE_PDF_BOUNDARY_FAILED:${pdfIngest.status}:${JSON.stringify(pdfIngest.body)}`);
+    const pdfIngest = await request('/api/ingest', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceName: 'web-qa.pdf', format: 'PDF', contentBase64: pdfBytes.toString('base64') }) });
+    if (pdfIngest.status !== 201 || pdfIngest.body.evidence?.sourceType !== 'PDF' || pdfIngest.body.source?.sha256 !== pdfSha) throw new Error(`WEB_ACCEPTANCE_PDF_INGEST_FAILED:${pdfIngest.status}:${JSON.stringify(pdfIngest.body)}`);
+    await sleep(1100);
+    const pdfAnalysis = await request('/api/financial/analyze', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceSha256: pdfIngest.body.evidence.sha256, assets: 10000, liabilities: 4000 }) });
+    if (pdfAnalysis.status !== 200 || pdfAnalysis.body.status !== 'READY' || pdfAnalysis.body.ingestedSource?.sourceType !== 'PDF') throw new Error(`WEB_ACCEPTANCE_PDF_ANALYSIS_FAILED:${pdfAnalysis.status}:${JSON.stringify(pdfAnalysis.body)}`);
+    await sleep(1100);
+    const scannedPdfIngest = await request('/api/ingest', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceName: 'web-qa-scan.pdf', format: 'PDF', contentBase64: buildPdf('0 0 200 200 re f').toString('base64') }) });
+    if (scannedPdfIngest.status !== 422 || scannedPdfIngest.body.error !== 'ingestion-pdf-scanned-no-ocr-yet') throw new Error(`WEB_ACCEPTANCE_PDF_BOUNDARY_FAILED:${scannedPdfIngest.status}:${JSON.stringify(scannedPdfIngest.body)}`);
 
     // K8: real browser offline transport against the real runtime — network loss
     // queues work durably, reload preserves it, reconnect synchronizes it, and a

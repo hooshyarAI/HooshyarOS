@@ -31,13 +31,15 @@ canonical `FinancialDataIngestionAdapter`.
 | `STRUCTURED` | `content` (JSON text) | `ingestStructured` | `{ transactions: [...] }` |
 | `TXT` | `content` (text) | `ingestTxtBytes` | UTF-8 / UTF-8 BOM / UTF-16 LE / UTF-16 BE |
 | `XLSX` | `contentBase64` | `ingestXlsx` | `exceljs-hardened`, formula values only, zip-bomb limits |
+| `PDF` (text-native) | `contentBase64` | `ingestPdfBytes` | `pdf-parse` via `acquirePdf`; extracted text normalized through the canonical ledger (CSV) pipeline; original-byte SHA-256 provenance |
 
 ### Deliberately NOT supported
 
-- **PDF** — parsers (`PdfAcquisition` + `pdf-parse`) exist, but they are not a
-  declared direct dependency of the canonical ingestion owner, scanned-only PDF
-  cannot be handled (no OCR / `tesseract.js`), and the adapter contract still
-  declares PDF **BLOCKED**. No PDF support is claimed.
+- **PDF (scanned/image-only)** — text-native PDF is supported. A PDF whose
+  average extracted characters per page is below the conservative threshold is
+  rejected with the precise error `ingestion-pdf-scanned-no-ocr-yet` (422). No
+  OCR is performed and no OCR success is ever faked; `tesseract.js` is not a
+  declared dependency.
 - **DOCX / DOC** — same reasoning (`mammoth` helper exists but is not routed by
   the canonical owner).
 - **XLS** — dependency-blocked legacy binary format.
@@ -59,6 +61,7 @@ Permission: `INGEST_DATA`. Rate limited. Body limit: 8 MB.
 { "sourceName": "ledger.xlsx", "format": "XLSX", "contentBase64": "<base64>" }
 { "sourceName": "ledger.csv",  "format": "CSV",  "content": "date,account,..." }
 { "sourceName": "ledger.json", "format": "STRUCTURED", "content": "{\"transactions\":[...]}" }
+{ "sourceName": "ledger.pdf",  "format": "PDF",  "contentBase64": "<base64 text-native PDF>" }
 ```
 
 Success `201`:
@@ -113,7 +116,10 @@ Upload/Browser → POST /api/ingest → FinancialIngestionService
    → downstream canonical financial intelligence
 ```
 
-- `sha256` is computed from the **original bytes**.
+- `sha256` is computed from the **original bytes**. For text-native PDF the
+  extracted text is decoded from those bytes and normalized through the same
+  canonical ledger pipeline, but the canonical model's `source.sha256` remains
+  the original PDF-byte SHA-256.
 - Identical raw content is naturally deduplicated by content hash.
 - Raw evidence is strictly tenant-scoped; there is no cross-tenant read path.
 
@@ -125,9 +131,12 @@ Unsupported/ambiguous input is rejected before any model is persisted:
 
 | Code | Meaning |
 |------|---------|
-| `INGEST_FORMAT_UNSUPPORTED` (400) | `format` is not CSV/STRUCTURED/XLSX/TXT |
-| `CONTENT_REQUIRED` / `CONTENT_BASE64_REQUIRED` (400) | payload missing content |
+| `INGEST_FORMAT_UNSUPPORTED` (400) | `format` is not CSV/STRUCTURED/XLSX/TXT/PDF |
+| `CONTENT_REQUIRED` / `CONTENT_BASE64_REQUIRED` (400) | payload missing content (PDF requires `contentBase64`) |
 | `SOURCE_NAME_REQUIRED` (400) | empty source name |
+| `ingestion-pdf-scanned-no-ocr-yet` (422) | scanned/image-only/unextractable PDF — text-native PDF required, no OCR is performed |
+| `ingestion-pdf-unsupported` (422) | bytes lack a valid `%PDF` signature |
+| `ingestion-pdf-empty` / `ingestion-pdf-corrupt` / `ingestion-pdf-password-protected` (422) | empty, malformed or password-protected PDF |
 | `ingestion-*` (422) | canonical validation/normalization error (e.g. `ingestion-double-sided-row:2`, `ingestion-excel-parse-error`) |
 
 ---

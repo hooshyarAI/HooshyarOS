@@ -5,6 +5,7 @@ import ExcelJS from "exceljs-hardened";
 import { SQLitePersistenceStore } from "./SQLitePersistenceStore";
 import { decodeTextBytes } from "./TextFileDecoder";
 import { acquireImage, type ImageSource } from "./ImageAcquisition";
+import { acquirePdf } from "./PdfAcquisition";
 
 export type TxtEncoding = "UTF-8" | "UTF-8-BOM" | "UTF-16LE" | "UTF-16BE";
 
@@ -12,7 +13,7 @@ export interface TxtIngestionResult extends FinancialIngestionResult {
   readonly encoding: TxtEncoding;
 }
 
-export type SourceType = "CSV" | "STRUCTURED" | "XLS" | "XLSX";
+export type SourceType = "CSV" | "STRUCTURED" | "XLS" | "XLSX" | "PDF";
 
 export interface FinancialSourceEvidence {
   readonly sourceName: string;
@@ -463,6 +464,11 @@ export class FinancialDataIngestionAdapter {
       return this.ingestTxt(tenantId, sourceName, normalizedPath);
     }
 
+    if (ext === 'pdf') {
+      const pdfBytes = await readFile(normalizedPath);
+      return this.ingestPdfBytes(tenantId, sourceName, pdfBytes);
+    }
+
     if (ext === 'png' || ext === 'jpg' || ext === 'jpeg') {
       // Validate via the raw-image acquisition contract, then signal that
       // OCR is required to produce transactions. This preserves the
@@ -672,6 +678,50 @@ export class FinancialDataIngestionAdapter {
     const decoded = decodeTextBytes(rawBytes);
     const result = await this.ingestCsv(normalizedTenant, normalizedSource, decoded.content);
     return { ...result, encoding: decoded.encoding };
+  }
+
+  /**
+   * Stage 08-DOC.2 / PDF capability: byte-based text-native PDF ingestion.
+   *
+   * Reuses the existing `acquirePdf` helper (single `pdf-parse` dependency) to
+   * validate the `%PDF` magic, extract deterministic text and reject
+   * scanned/unextractable PDFs. The extracted text is then normalized through
+   * the same canonical CSV/ledger pipeline as every other text route, so no
+   * alternate financial model and no second adapter are introduced.
+   *
+   * Provenance: the canonical model's `source.sha256` is the SHA-256 of the
+   * ORIGINAL PDF bytes (not the extracted text), so the original-byte identity
+   * survives into `financial-ingestion:<sha256>` and downstream analysis.
+   */
+  async ingestPdfBytes(tenantId: string, sourceName: string, rawBytes: Buffer): Promise<FinancialIngestionResult> {
+    const normalizedTenant = tenantId.trim();
+    const normalizedSource = sourceName.trim();
+    if (!normalizedTenant) throw new Error("ingestion-tenant-required");
+    if (!normalizedSource) throw new Error("ingestion-source-required");
+    if (rawBytes.length === 0) throw new Error("ingestion-source-empty");
+
+    const document = await acquirePdf({ sourceName: normalizedSource, rawBytes });
+
+    const source: FinancialSourceEvidence = {
+      sourceName: normalizedSource,
+      sourceType: "PDF",
+      sha256: document.sha256,
+      receivedAt: document.receivedAt,
+    };
+
+    const transactions = this.parseAndValidate(document.text);
+    const debit = this.round(transactions.reduce((sum, row) => sum + row.debit, 0));
+    const credit = this.round(transactions.reduce((sum, row) => sum + row.credit, 0));
+
+    const model: FinancialCanonicalModel = {
+      tenantId: normalizedTenant,
+      source,
+      transactions,
+      totals: { debit, credit, balance: this.round(debit - credit) },
+    };
+
+    await this.persistence.write({ tenantId: normalizedTenant }, `financial-ingestion:${source.sha256}`, model);
+    return { evidence: source, model, persisted: true };
   }
 
   /**
