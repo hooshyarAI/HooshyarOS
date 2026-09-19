@@ -4,6 +4,7 @@
 - **Status:** VERIFIED
 - **Branch:** `fix/autonomous-product-factory`
 - **Pre-change trusted checkpoint:** `6fabd22aedf2ca9c85953f5b10349b9f81b443ec` (local == origin, `0/0`)
+- **Capability commit:** `8508edbbdcd32059d5fe0225d4dbb0dc319290b6` (pushed; local == origin, `0/0`)
 - **Architecture baseline:** Architecture Freeze V4.1 (no engine added/removed; five-engine freeze preserved)
 - **Knot type:** REQUIRED PRODUCT GAP (installed product could not reason without an interpreter it does not ship)
 - **Next state:** no dependency-ready repository-local knot; external/approval blockers unchanged

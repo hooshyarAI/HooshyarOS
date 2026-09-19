@@ -3,6 +3,7 @@
 Branch: `fix/autonomous-product-factory`
 Pre-change trusted checkpoint (HEAD at start): `6fabd22aedf2ca9c85953f5b10349b9f81b443ec`
 Remote parity at start: local `HEAD` == `origin/fix/autonomous-product-factory` (`git rev-list --left-right --count origin/fix/autonomous-product-factory...HEAD` = `0 0`).
+Capability commit: `8508edbbdcd32059d5fe0225d4dbb0dc319290b6` (pushed; local == `origin/fix/autonomous-product-factory` == `git ls-remote` = `8508edbb`, `0/0`).
 Environment limit: `gh` is not authenticated in this environment, so workflow/run status could not be queried from the GitHub API; `git ls-remote` parity is used instead.
 
 ## 1. Reconciled starting state
