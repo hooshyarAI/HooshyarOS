@@ -10,8 +10,9 @@ export interface PythonReasoningResult {
 
 /**
  * Assistant-facing adapter for the canonical HBOS Reasoning Engine.
- * Python remains the repository-owned execution runtime; this adapter does
- * not duplicate Python process invocation or reasoning ownership.
+ * The canonical engine serves deterministic in-process reasoning by default
+ * and delegates to the repository-native Python runtime only when the operator
+ * explicitly configures it; this adapter never duplicates reasoning ownership.
  */
 export class PythonReasoningAdapter implements ReasoningProvider {
     private readonly engine = new ReasoningEngine();

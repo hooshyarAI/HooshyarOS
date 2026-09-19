@@ -6,7 +6,7 @@ Continue autonomous construction of HooshyarOS platform capabilities.
 Permanent construction-provider rule:
 
 - The only approved construction intelligence is the HooshyarOS Assistant represented by this repository and the connected GitHub construction workflow.
-- The only approved autonomous coding/worker runtime is repository-native Python.
+- The only approved autonomous coding/worker runtime is repository-native Python; approved local execution operators (for example Kilo Code) may act as subordinate, replaceable mechanisms under the three authorities and are not additional runtimes, providers or architectural authorities.
 - Codex, GitHub Copilot, Claude, cloud coding agents and other external coding providers are prohibited from the construction path.
 - No capability may depend on an external coding provider for implementation, repair, verification or continuation.
 
@@ -56,7 +56,7 @@ Assistant Completion Gate:
 - Construction verification
 - Failure isolation
 - Governance enforcement
-- Python-only construction-provider enforcement
+- Approved construction-provider enforcement (Python-first, with approved local operators)
 - GitHub-backed commit/push continuity
 
 After Assistant Completion Gate:

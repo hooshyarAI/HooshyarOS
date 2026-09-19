@@ -38,7 +38,7 @@ function seedCanonicalAssistantEvidence(root: string): void {
     mkdirSync(join(controller, ".."), { recursive: true });
     writeFileSync(controller, "ARCHITECTURE PLAN", "utf8");
 
-    const conductor = join(root, "Backend/HBOS/Autonomous/AutonomousProjectConductor.ts");
+    const conductor = join(root, "Backend/HBOS/Autonomous/AutonomousConstructionBridge.ts");
     mkdirSync(join(conductor, ".."), { recursive: true });
     writeFileSync(conductor, "autonomous-self-healing", "utf8");
 

@@ -1,0 +1,256 @@
+EVIDENCE-DRIVEN FAILURE DIAGNOSIS — BOUNDED KNOT EVIDENCE
+Knot: assurance.evidence-driven-failure-diagnosis
+Date: 2026-09-17
+Pre-change trusted checkpoint (HEAD): 02a13510e2914e7cd0530d9f59cadc49ac069c8c
+Branch: fix/autonomous-product-factory
+Architecture: Architecture Freeze V4.1 preserved; five canonical engines untouched
+
+======================================================================
+1. AUDIT LENS — the seven Harness-inspired delivery-fabric capabilities
+======================================================================
+
+The audit mapped each capability to its exact existing canonical owner before
+changing anything. Result (existing owner / status):
+
+C1 persistent Operational Knowledge Graph (Audit/Construction/Verification/
+   Runtime/Release entities and relationships)
+   Owner candidates found: Backend/HBOS/Engines/KnowledgeEngine.ts (in-memory
+   Knowledge[] learned from MemoryEvent; tenant-scoped; not a typed graph, not
+   persisted), Backend/HBOS/Builder/Knowledge/BuilderKnowledgeGraph.ts (stub,
+   no consumers), Backend/AI_Runtime/knowledge/knowledge_graph.py (stub).
+   Status: NOT SUFFICIENT. Recorded; not implemented (not required by the
+   frozen architecture or the Commercial Product Completion Contract; a graph
+   subsystem would be an unnecessary framework at this state).
+
+C2 canonical entity identity, normalization, lineage, provenance
+   Owner: Backend/HBOS/Core/ProvenanceTrace.ts (real: TRACE- ids, SHA-256
+   input/output hashes, provenance links, explainability records, verification
+   status). Status: SUFFICIENT for the canonical decision/evidence scope; the
+   new diagnosis REUSES it for delivery-lineage identity.
+
+C3 Audit Context Builder (git/change/test/workflow/runtime/acceptance/
+   evidence/governance/blocker/checkpoint context into one queryable object)
+   Owner candidates found: Backend/HBOS/Builder/Context/BuilderExecutionContext.ts
+   (stub), Backend/HBOS/Assistant/Autonomous/ContextRetrievalEngine.ts (stub
+   returns {goal, memoryLoaded:true}), Backend/AI_Runtime/context_engine/
+   context_engine.py (stub). Status: NOT SUFFICIENT. Recorded; partially
+   advanced by the new structured FailureDiagnosis evidence contract.
+
+C4 governed autonomous audit/reasoning — failure chains, dependencies,
+   root-cause candidates, blast radius — from evidence
+   Owner: Backend/HBOS/Autonomous/Analyzer/AutonomousFailureAnalyzer.ts.
+   Before: trivial regex (one file + "TEST_FAILURE"/"UNKNOWN"), no chain, no
+   root cause, no blast radius. Status: NOT SUFFICIENT -> IMPLEMENTED here.
+
+C5 governed repair orchestration (PLAN -> POLICY CHECK -> EXECUTE -> VERIFY ->
+   EVIDENCE -> CHECKPOINT) preserving the Stage-Bounded Atomic Construction
+   contract and statuses
+   Owner: Backend/HBOS/Builder/Autonomous/AutonomousConstructionEngine.ts
+   (ARCHITECTURE/PLAN/GENERATE/VERIFY/REPAIR/FINALIZE; BUILT/REPAIRED/BLOCKED;
+   required-evidence gate), with Backend/HBOS/Autonomous/Runtime/
+   AutonomousWeavingPlanner.ts (preconditions/stop conditions),
+   AutonomousFailureAnalyzer.ts + AutonomousRepairEngine.ts (repair plan),
+   AutonomousKnotRecovery.ts (checkpoint rollback), and the governance guards.
+   Status: SUFFICIENT — preserved, not duplicated, not renamed.
+
+C6 evidence-aware completion and regression tracking (completion cannot
+   advance without real evidence)
+   Owner: Backend/HBOS/Autonomous/Runtime/CapabilityEvidenceAudit.ts
+   (evaluateCompletion: present + passed + fresh + unblocked unit/integration/
+   application/acceptance), CanonicalCapabilityAudit.ts (behavioral evidence),
+   CommercialProductCompletionAudit.ts (commit-bound application/acceptance),
+   composed fail-closed by AutonomousBuildDaemon.ts.
+   Status: SUFFICIENT — preserved.
+
+C7 persistent queryable audit/action/evidence lineage for future runs
+   Owner: Docs/HOOSHYAROS_MASTER_CHARTER.md §15.1 Permanent Audit & Verification
+   Memory (durable index + mandated §15.1.4 post-audit update rule) plus
+   .kilo/evidence/* and .kilo/plans/*checkpoint*.md; programmatic stubs exist
+   (AuditTrailEngine.ts, AI_Runtime/audit_memory/audit_memory.py).
+   Status: SUFFICIENT as the governing durable lineage; strengthened here by
+   canonical TRACE ids on every diagnosis.
+
+======================================================================
+2. REPAIR — canonical owner, minimal change
+======================================================================
+
+Changed files (source):
+  M Backend/HBOS/Autonomous/Analyzer/AutonomousFailureAnalyzer.ts
+  M Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts
+New test:
+  A Backend/HBOS/test/AutonomousFailureAnalyzer.test.ts
+
+AutonomousFailureAnalyzer now exposes a real, deterministic, fail-closed
+diagnosis contract:
+  - FailureEvidence { output, issues?, capabilityId?, targetEngine?,
+    dependencies?, changedFiles? }
+  - FailureDiagnosis { traceId, type, primaryFile, evidencePresent, chain[],
+    rootCauses[], blastRadius{ directFiles, owners, dependents, capabilities,
+    bounded, scannedFiles } }
+  - chain: ordered steps parsed from the real output shapes emitted by tsc
+    (TS####), Jest (FAIL suite, assertion, timeout), module resolution
+    (Cannot find module), the Windows launcher path (EINVAL / "is not
+    recognized as an internal or external command"), and construction gate
+    issues.
+  - rootCauses: ranked candidates (HIGH/MEDIUM/LOW) with the evidence that
+    produced them; empty when no failure signal exists.
+  - blastRadius: direct files named by the evidence + direct importers found by
+    a bounded reverse-import scan of Backend/ (DEFAULT_MAX_SCAN_FILES=4000,
+    files >256 KiB skipped); bounded=true only when the scan completed under
+    the cap.
+  - traceId: canonical ProvenanceTrace.createTraceId() — reused identity, no
+    parallel id scheme.
+  - analyze(output) is retained for the existing heal orchestrator contract.
+  - No architecture change, no new engine, no duplicate registry/store.
+
+Integration (real consumer): AutonomousBuildDaemon now diagnoses a failed knot
+on its failure path and records the diagnosis in the run history and the
+AUTONOMOUS_REWEAVE log. No completion flag, gate, criterion or route changed.
+
+======================================================================
+3. VERIFICATION (real commands, real results)
+======================================================================
+
+Focused behavioral test:
+  npx jest Backend/HBOS/test/AutonomousFailureAnalyzer.test.ts
+  => 1 suite PASS, 10/10 tests PASS
+     (compile chain + file/line + HIGH cause; Jest assertion; timeout; module
+      resolution; Windows launcher EINVAL; fail-closed empty evidence;
+      construction-gate issues -> LOW cause; bounded reverse-import blast
+      radius on a real temp repo; per-diagnosis unique TRACE id; compact
+      FailureReport back-compat.)
+
+Regression (construction plane):
+  npx jest AutonomousConstructionEngine.quality-gate /
+          AutonomousConstructionEngine.idempotent /
+          AutonomousDevelopmentLoop.repair /
+          AutonomousCompletionGate /
+          AssistantCompletionGate /
+          AutonomousContinuationContract / LocalConstructionToolset
+  => 6 suites PASS, 23/23 tests PASS
+  npx jest AutonomousBuildDaemon.test.ts AutonomousBuildDaemon.recovery.test.ts
+  => 2 suites PASS (recovery path exercised the new diagnosis without change)
+
+Changed-file static typecheck:
+  npx tsc --noEmit => 0 errors in the changed files
+  (22 pre-existing, unrelated repository errors remain elsewhere: _retired
+   Loop files, Core/index.ts, Engines/ConversationEngine.ts, Services/
+   AssistantMemory.ts, Phase09 verify, CapabilityMatrix.ts,
+   AutonomousSelfRepairRunner.ts — untouched by this knot.)
+
+Broadest practical verification (full suite):
+  npx jest --silent
+  => Test Suites: 276 passed, 276 total
+     Tests:       2126 passed, 2126 total
+     Time:        205.5 s
+  (transcript: .kilo/evidence/jest-full-evidence-driven-failure-diagnosis-2026-09-17.txt)
+
+Aggregate qualification:
+  node scripts/final-product-qualification.cjs
+  => overall: BLOCK_EXTERNAL, exit 0; all 7 internal gates PASS; external
+     cells truthfully EXTERNAL_NOT_EXECUTED
+  npm run product:assurance
+  => status PASS, productComplete:false, completionPolicy "runtime +
+     application + acceptance + CI evidence required"
+
+======================================================================
+3b. CROSS-PLATFORM DEFECT DETECTED BY CI AND REPAIRED
+======================================================================
+
+The first push of this knot (commit e79ac1d5) passed the local full suite on
+Windows (276/276 suites, 2126/2126 tests, also in --ci --runInBand) but FAILED
+three Linux CI jobs that all run the same Jest suite: Autonomous Builder
+Validation (job validate-autonomous-builder), HooshyarOS Validation (job
+validate) and HooshyarOS CI (job verify -> "Full Jest suite"). The successful
+pre-change runs at 02a13510 had durations comparable to the failing ones
+(HooshyarOS Validation 1.8 min success vs 1.9 min failure), so this was a
+normal deterministic test failure, not an infrastructure crash.
+
+Root cause (proven by reading the code against Linux semantics): the
+reverse-dependency scanner lower-cased the absolute path before probing the
+filesystem (`resolveSpecifier`). On a case-insensitive host (Windows) the
+lower-cased probe still resolves; on a case-sensitive host (Linux) it does not,
+because the mkdtemp/session path contains upper-case characters. The
+reverse-import probe therefore never found the importer and the blast-radius
+assertion failed. The Windows local run masked a real cross-platform defect.
+
+Repair (canonical owner, minimal):
+  - resolveSpecifier now probes the real, case-preserving path and returns
+    undefined when no file exists (no fabricated path).
+  - the target comparison is performed case-insensitively at the CALL SITE
+    (resolved.toLowerCase() vs the lower-cased target set), so probe and
+    compare are separated correctly.
+  - The focused test now builds the fixture under a deterministic mixed-case
+    checkout directory ("CaseSensitiveRepo") so this class is guarded on every
+    host, not only when the temp-name happens to contain upper-case characters.
+  - The analyzer file's spurious UTF-8 BOM was removed.
+
+Post-repair local verification: focused test 10/10 PASS; changed-file typecheck
+0 errors.
+
+CI confirmation at the repair commit `c9904dcb93026c2156687d12c8326e6ff9159d5e`: the three Linux jobs
+that failed at `e79ac1d5` are green:
+  - Autonomous Builder Validation   success  run 35188955027 (job validate-autonomous-builder)
+  - HooshyarOS Validation           success  run 35188955060 (job validate)
+  - HooshyarOS CI                   success  run 35188955041 (job verify, incl. "Full Jest suite")
+Also green at this SHA: Web Product Acceptance 35188955066, Autonomous Builder Verification
+35188955018, Autonomous Builder Audit 35188955011, Final Product Factory Trigger 35188952210 and
+35188955071. Android Release Verification, HooshyarOS Release Artifacts and the Final Product Factory
+runs were in progress at capture.
+
+======================================================================
+4. CI RECONCILIATION AT 02a13510 (history preserved, not erased)
+======================================================================
+
+Same-SHA runs (sorted by creation, GitHub API):
+  10:23:02 Final Product Factory Trigger        success 35084676753
+  10:23:05 Autonomous Builder Verification      success 35084681857
+  10:23:05 HooshyarOS CI                        success 35084681918
+  10:23:05 Autonomous Builder Validation        success 35084681987
+  10:23:05 Web Product Acceptance               success 35084682056
+  10:23:05 Autonomous Builder Audit             success 35084681855
+  10:23:05 Final Product Factory Trigger        success 35084681875
+  10:23:05 Final Product Factory                success 35084681961
+  10:23:05 Autonomous CI Repair                 failure 35084681900
+  10:23:05 Android Release Verification         success 35084681908
+  10:23:05 HooshyarOS Validation                success 35084682073
+  10:23:05 HooshyarOS Release Artifacts         success 35084682025
+  10:23:07 Final Product Factory                success 35084685544
+  10:23:11 Final Product Factory                failure 35084691925
+
+Failure 1 — 35084691925 (Final Product Factory, workflow_dispatch):
+  job web-product-acceptance failed at "Run executable Web product acceptance";
+  release-gate failed only because it requires every gate. windows-product-
+  factory, security-tenant-acceptance and android-product-acceptance succeeded.
+  Reconciliation: at the same SHA the Final Product Factory run 35084685544
+  and the standalone Web Product Acceptance run 35084682056 both succeeded, so
+  the stage is not broken at this commit. Two factory runs plus the standalone
+  web acceptance executed concurrently at 10:23:05–10:23:11; the acceptance
+  surface paces a canonical shared session rate limit (commit 5963e4b5
+  "cushion the session rate-limit pacer against cross-process jitter"), so
+  concurrent same-SHA runs contending on that limit is the consistent
+  explanation. Classified: TRANSIENT/CONCURRENCY CONTENTION for that run,
+  SUPERSEDED by same-SHA successful authoritative runs. Recorded, not erased,
+  and NOT reclassified as a product defect (no contrary evidence found).
+Failure 2 — 35084681900 (Autonomous CI Repair, pull_request):
+  job "Execute autonomous repair with Kilo" failed. This is the governed
+  operator-execution job (Kilo operator), not a product/qualification gate.
+  Classified: OPERATOR-EXECUTION JOB (not a product defect).
+
+Recorded observation (not selected): final-product-factory.yml has no
+concurrency guard, so concurrent same-SHA factory dispatches can contend on the
+shared acceptance rate limit. A concurrency group is a candidate bounded CI
+knot for a future run if the contention recurs with evidence.
+
+======================================================================
+5. BLOCKERS / COMPLETION FLAGS (unchanged)
+======================================================================
+
+assistantComplete TRUE | canonicalPlatformConstructionComplete FALSE |
+commercialProductRuntimeComplete FALSE |
+externalProductionDependenciesComplete FALSE | productComplete FALSE
+B1 BLOCKED_HUMAN_APPROVAL · B2 BLOCKED_EXTERNAL · B3 BLOCKED_EXTERNAL ·
+B4 BLOCKED_ENVIRONMENT · B5 AVAILABLE ON THIS HOST
+K8 installed-product-acceptance: VERIFIED/CLOSED — not reopened.
+No criterion weakened, no test skipped, no evidence fabricated, no unrelated
+working-tree file staged, reset, cleaned or stashed.

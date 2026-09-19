@@ -1,0 +1,80 @@
+# Evidence — Post-audit remaining-gaps execution: reasoning provider product independence (2026-09-19)
+
+Branch: `fix/autonomous-product-factory`
+Pre-change trusted checkpoint (HEAD at start): `6fabd22aedf2ca9c85953f5b10349b9f81b443ec`
+Remote parity at start: local `HEAD` == `origin/fix/autonomous-product-factory` (`git rev-list --left-right --count origin/fix/autonomous-product-factory...HEAD` = `0 0`).
+Capability commit: `8508edbbdcd32059d5fe0225d4dbb0dc319290b6` (pushed; local == `origin/fix/autonomous-product-factory` == `git ls-remote` = `8508edbb`, `0/0`).
+Environment limit: `gh` is not authenticated in this environment, so workflow/run status could not be queried from the GitHub API; `git ls-remote` parity is used instead.
+
+## 1. Reconciled starting state
+
+- HEAD `6fabd22a` == `origin/fix/autonomous-product-factory` == `0/0` parity; working tree had no tracked modifications.
+- Latest verified checkpoint: `product.organizational-problem-solving` (`.kilo/evidence/organizational-problem-solving-intelligence-2026-09-19.txt`).
+- The prior audit/checkpoint recorded one genuine, actionable installed-product dependency gap: the shipped payload provides Node but no Python, while `FinancialStatementAnalysisService.execute` returns `BLOCKED` when reasoning fails — so the core customer analysis journey depended on a Python interpreter the installer does not ship.
+
+## 2. Gap classification and decision (the whole remaining actionable set)
+
+Repository evidence review of the deferred/remaining register (`.kilo/plans/ACTIVE-COMMERCIALIZATION-MASTER-LEDGER.md` §DEFERRED 1–9) found exactly **one** dependency-ready product gap (class B) and **zero** class-A blockers reachable without a governed decision:
+
+| # | Item | Classification | Why now / why not now |
+|---|---|---|---|
+| 1 | Reasoning depends on an external Python runtime the installer does not ship | **REQUIRED PRODUCT GAP — FIXED** | The Python `reasoning_engine.py` is a 50-line deterministic regex/template engine, not genuine AI. TypeScript/Node is canonical where the platform architecture requires it (Master Charter §9), so the core capability belongs in the Node runtime. No architecture change: the `ReasoningEngine` contract and the five-engine freeze are preserved. |
+| 2 | Security-event/audit logger not wired in the shipped runtime | VALIDLY DEFERRED | Requires a persisted audit-store/encryption decision adjacent to the pending 05C human-approval decisions (`ARCHITECTURE CHANGE CONTROL REQUIRED`). |
+| 3 | Dormant duplicate identity boundary (`Auth/CommercialAuthenticationAuthorizationBoundary.ts`) | VALIDLY DEFERRED | Consolidation is a governed decision; not deleted (duplicate rule). |
+| 4 | `UserManagementEngine.setPassword()` does not invalidate existing sessions | VALIDLY DEFERRED | No live HTTP route calls it; latent hardening only. |
+| 5 | `/api/auth/refresh` does not rotate the token | VALIDLY DEFERRED | No documented rotation requirement; hardening, not a defect. |
+| 6 | Idempotency `IN_PROGRESS` claims have no stale-recovery path | VALIDLY DEFERRED | Requires a stale-reclaim product decision (grace window / at-least-once tradeoff). |
+| 7 | Per-session rate-limiter map never evicted | VALIDLY DEFERRED | Real but no testable behavioural observable without exposing internals. |
+| 8 | Unreferenced duplicate `scripts/product-web-acceptance.cjs` | VALIDLY DEFERRED | `NOT_NEEDED`; deletion is a separate owner decision. |
+| 9 | Dual `EngineRegistry` (`Core/` vs `Engines/`) | VALIDLY DEFERRED | Governed architecture change; asserted by `CanonicalIntelligenceEngines.test.ts`. |
+| 10 | No SQLite schema-migration mechanism | VALIDLY DEFERRED | Latent; no schema change pending. |
+| 11 | `CloudDeploymentEngine` / construction tooling use Python | VALIDLY DEFERRED | Not reachable from any commercial-runtime route; cloud deployment is an external production dependency (B3). Construction-plane Python remains approved. |
+
+No work was invented; the single genuine product gap was implemented.
+
+## 3. What was implemented (real runtime capability, not presentation)
+
+**Canonical in-process reasoning provider** — `Backend/HBOS/Engines/ReasoningEngine.ts`:
+- The canonical `ReasoningEngine` now serves a deterministic, in-process, evidence-bound reasoner by default. It reproduces the repository-native Python reasoning contract exactly (same metric labels `Revenue=`/`Profit=`/`ProfitMargin=`/`DebtRatio=`, same Persian evidence-bound narrative, same `%g`/`%.4g` number formatting, same `reasoned`/`invalid_problem` statuses).
+- `HOOSHYAR_PYTHON` becomes an explicitly configured optional provider. When set it is authoritative and **fails closed** (`reasoning_failed`) if unusable, so no silent provider substitution occurs.
+- Provenance is truthful: `transformationRef` is `node-evidence-reasoning` (default) or `python-ai-runtime` (explicit config); `decisionBasis`/`limitations` match the real provider.
+
+**Truthful dependency reporting** — `Backend/HBOS/Autonomous/Runtime/RuntimeDependencyProbe.ts`:
+- Reports `{ id: "reasoning-runtime", provider: "node-native" | "python", available, source: "NODE" | "HOOSHYAR_PYTHON", detail }`.
+- With no override the in-process provider is always available; with an explicit `HOOSHYAR_PYTHON` the report reflects the real resolution and never leaks the interpreter path.
+
+**Wiring/docs:** `start-commercial-runtime.ts` startup log; `CommercialRuntimeServer` probe comment; `Assistant/Autonomous/PythonReasoningAdapter.ts` doc comment; `Docs/ARCHITECTURE.md` §4.1 reasoning-provider boundary.
+
+**Tests reconciled to the real contract (none weakened):**
+- `Backend/HBOS/Engines/ReasoningEngine.test.ts` — in-process reasoning with verified metrics and no interpreter; explicit `HOOSHYAR_PYTHON` fails closed.
+- `Backend/HBOS/test/ReasoningEngine.phase-11-1.7.test.ts` — provider-correct `transformationRef`/`decisionBasis`/`limitations`; Python-unavailable fail-closed path still asserted.
+- `Backend/HBOS/test/ProvenanceTrace.test.ts` — real provider ref.
+- `Backend/HBOS/test/RuntimeDependencyProbe.test.ts` — truthful provider resolution incl. real `/api/ready` with no interpreter-path leakage.
+
+## 4. Fresh verification (post-change)
+
+| Check | Command | Result |
+|---|---|---|
+| Full Jest suite | `node ./node_modules/jest/bin/jest.js --runInBand` | **279/279 suites, 2143/2143 tests PASS**, exit 0 |
+| Focused reasoning/provider tests | jest `Engines/ReasoningEngine.test.ts` + `test/ReasoningEngine.phase-11-1.7.test.ts` + `test/ProvenanceTrace.test.ts` + `test/RuntimeDependencyProbe.test.ts` + `test/PythonReasoningAdapter.test.ts` | 5 suites / 58 tests PASS |
+| Reasoning-consumer regression | jest OrganizationalIntelligence/FinancialStatementAnalysis/OrganizationalProblemSolving/DecisionEngine/AssistantEngine | 10 suites / 91 tests PASS |
+| Web product acceptance (real HTTP E2E) | `npm run product:web:acceptance` | **PASS** — 19 checks incl. `analysis`, `assistant`, `dashboard`, `reportsExport`, `offlineQueue/Reload/Reconnect`; startup log reports `reasoningRuntime` `provider:node-native` `available:true` |
+| Security/tenant acceptance | `npm run product:security:acceptance` | **PASS** — 15 acceptance checks |
+| Aggregate qualification | `node scripts/final-product-qualification.cjs` | 7/7 internal gates PASS, `overall: BLOCK_EXTERNAL`, exit 0 |
+| Assurance gate | `npm run product:assurance` | PASS, `productComplete:false` |
+| Changed-file typecheck | `npx tsc --noEmit` (changed files) | 0 errors |
+
+Observed startup log during web acceptance:
+`{"type":"HOOSHYAR_COMMERCIAL_RUNTIME_STARTED",...,"dependencies":{"reasoningRuntime":{"id":"reasoning-runtime","provider":"node-native","available":true,"source":"NODE","detail":"resolved"}}}`
+
+## 5. Completion flags (unchanged; no flag was toggled to obtain completion)
+
+`assistantComplete` TRUE; `canonicalPlatformConstructionComplete` FALSE; `commercialProductRuntimeComplete` FALSE; `externalProductionDependenciesComplete` FALSE; `productComplete` FALSE.
+`product:assurance` asserts `productComplete` must default `false`; qualification remains `BLOCK_EXTERNAL` because real Windows/browser/Android devices, payment activation and production cloud resources were not executed.
+
+## 6. Not verified in this environment
+
+- Real browser acceptance (only HTTP-level web acceptance executed).
+- Android device/emulator acceptance (B4 `BLOCKED_ENVIRONMENT`).
+- Installed-artifact re-installation with the new provider (requires a full Windows payload/installer rebuild; prior audits recorded the same limitation). The installed-product acceptance harness builds from `dist/productization/windows/payload`, which is produced by a separate build pipeline.
+- Live CI run status (`gh` unauthenticated); Linux/macOS execution of the changed code.

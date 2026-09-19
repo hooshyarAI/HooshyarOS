@@ -1,8 +1,8 @@
 # HooshyarOS Architecture Document
 
 Version: 1.0  
-Architecture: HBOS Core Architecture  
-Status: Architecture Freeze V4
+Architecture: HBOS Core Architecture
+Status: Architecture Freeze V4.1
 
 
 # 1. Overview
@@ -30,13 +30,52 @@ HBOS provides the foundation for:
 
 The main architecture principle:
 
-Everything is an Engine.
+Every canonical product capability must have exactly one canonical owner.
 
+Canonical intelligence capabilities are implemented as canonical Engines.
+Supporting services, platform services, adapters, integrations and infrastructure components are permitted when their responsibility, ownership, interface, authority and dependency boundaries are explicit.
 
-Every capability inside HooshyarOS must be implemented as an independent Engine.
+One Capability
+=
 
+One Canonical Owner
+=
 
-Each Engine must have:
+Explicit Authority
+=
+
+Explicit Contract
+=
+
+Explicit Dependency Direction
+=
+
+Testable Evidence
+
+Canonical Intelligence Engines:
+- ReasoningEngine
+- GovernanceEngine
+- ExecutiveIntelligenceEngine
+- OrganizationalIntelligenceEngine
+- AutonomousOperationsEngine
+
+Supporting Services:
+- MemoryEngine
+- KnowledgeEngine
+- ProjectPilotEngine
+- ReactionEngine
+
+Platform Services (NOT required to implement Engine interface):
+- AssistantEngine
+
+Reasoning Pipeline:
+- IntelligenceEngine (reasoning pipeline composition; registered by `Core/HBOS.ts` and used by `AssistantEngine`). It composes reasoning strategies and is distinct from the domain calculation engines `FinancialIntelligenceEngine`, `RiskIntelligenceEngine` and `BudgetIntelligenceEngine`, which provide domain mathematics rather than pipeline composition.
+
+Legacy/Transitional:
+- DecisionEngine (canonical supporting decision capability)
+- DecisionIntelligenceEngine (implemented decision-intelligence engine: AHP, TOPSIS and decision-tree owner; live consumers are `Product/DecisionWorkbench.ts` and `Product/OrchestratedDecisionIntelligenceService.ts`)
+
+Each canonical Engine must have:
 
 
 - Identity
@@ -49,20 +88,22 @@ Each Engine must have:
 
 Architecture rule:
 
-
 One Capability
-
 =
 
-One Engine
-
+One Canonical Owner
 =
 
-One Test
-
+Explicit Authority
 =
 
-One Commit
+Explicit Contract
+=
+
+Explicit Dependency Direction
+=
+
+Testable Evidence
 
 
 
@@ -119,6 +160,13 @@ Responsibilities:
 - Logical inference
 - Scenario evaluation
 - Recommendation generation
+
+
+Reasoning provider boundary:
+
+- The canonical provider is a deterministic, in-process, evidence-bound reasoner implemented in TypeScript; it reasons only over verified context values and never invents thresholds, transactions or external facts.
+- The repository-native Python AI Runtime (`Backend/AI_Runtime/reasoning/reasoning_engine.py`) remains an optional provider, selected only when the operator explicitly configures `HOOSHYAR_PYTHON`. An explicitly configured but unusable interpreter fails closed (`reasoning_failed`).
+- The installed product therefore never depends on an external interpreter to reason.
 
 
 
@@ -242,7 +290,7 @@ Implemented
 
 Role:
 
-Decision support system.
+Canonical supporting decision capability.
 
 
 Functions:
@@ -294,7 +342,7 @@ Implemented
 
 Role:
 
-Human interaction layer.
+Platform / interaction service.
 
 
 Functions:
@@ -367,7 +415,9 @@ Implemented
 ---
 
 
-## Health Monitor Engine
+## HealthMonitorEngine
+
+Canonical implementation: `Engines/HealthMonitorEngine.ts` (implements `Engine`); consumed by `AutonomousOperationsEngine` for health verification.
 
 
 Role:
@@ -390,6 +440,26 @@ Status:
 Implemented
 
 
+
+---
+
+## DecisionIntelligenceEngine
+
+Canonical implementation: `Engines/DecisionIntelligenceEngine.ts` (implements `Engine`).
+
+Role:
+
+Decision-intelligence engine; owner of the decision mathematics
+(AHP, TOPSIS and decision-tree expected monetary value).
+
+Live consumers:
+
+- `Product/DecisionWorkbench.ts`
+- `Product/OrchestratedDecisionIntelligenceService.ts`
+
+Status:
+
+Implemented
 
 ---
 
@@ -416,12 +486,14 @@ Responsibilities:
 ---
 
 
-## Lifecycle Manager
+## LifecycleManager
+
+Canonical implementation: `Engines/LifecycleManager.ts`.
 
 
 Purpose:
 
-Manage engine lifecycle.
+Manage engine lifecycle and compute the canonical startup/shutdown order.
 
 
 Responsibilities:
@@ -430,10 +502,17 @@ Responsibilities:
 - Initialize engines
 - Update status
 - Monitor states
+- Compute dependency tier order
 
 
+Startup order model:
 
-Lifecycle states:
+`getStartupOrder()` resolves each registered engine against a five-tier
+preferred order declared in `Engines/LifecycleManager.ts`. Tier membership is a
+preferred ordering, not the registry: an unregistered tier name is skipped, and
+a registered engine not named in any tier is appended afterwards. The tier list
+is therefore a superset of the engines registered by `Core/HBOS.ts`.
+`getShutdownOrder()` returns the reverse of the resolved order.
 
 
 ---

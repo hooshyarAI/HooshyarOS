@@ -2,6 +2,7 @@ import { AutonomousProjectMission, Mission } from "./AutonomousProjectMission";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { AutonomousCapabilityDiscovery } from "./AutonomousCapabilityDiscovery";
+import { CommercialCapabilityDiscovery } from "./CommercialCapabilityDiscovery";
 
 export interface PlatformContinuationMission {
     capabilityId: "platform.continuation";
@@ -19,7 +20,10 @@ export type PlatformCapabilityMission = Omit<Mission, "evidence" | "architecture
  * concrete capability.
  */
 export class AutonomousPlatformContinuation {
-    private readonly discovery = new AutonomousCapabilityDiscovery();
+    constructor(
+        private readonly discovery = new AutonomousCapabilityDiscovery(),
+        private readonly commercialDiscovery = new CommercialCapabilityDiscovery()
+    ) {}
 
     createMission(): PlatformContinuationMission {
         return {
@@ -84,6 +88,19 @@ export class AutonomousPlatformContinuation {
 
         for (const extension of extensions) {
             if (!extension.requiredPaths.every(existsSync)) return extension;
+        }
+
+        const commercialGap = this.commercialDiscovery.discover(root);
+        if (commercialGap) {
+            const canonicalProductCapabilityId = commercialGap.capabilityId === "commercial.ingestion.multiformat"
+                ? "product.financial-data-ingestion"
+                : commercialGap.capabilityId;
+            return {
+                capabilityId: canonicalProductCapabilityId,
+                capability: commercialGap.capability,
+                targetEngine: commercialGap.targetEngine,
+                dependencies: commercialGap.dependencies
+            };
         }
 
         const discovered = this.discovery.discover(root);

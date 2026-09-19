@@ -25,7 +25,6 @@ describe("Autonomous Assistant construction handoff", () => {
         } as any;
         assistant.runtime = { execute: async () => ({ goal: "build HooshyarOS" }) } as any;
         assistant.evaluation = { evaluate: () => ({ healthy: true }) } as any;
-        assistant.improvement = { improve: () => ({ improved: false }) } as any;
         assistant.tools = { execute: () => ({ executed: true }) } as any;
         assistant.memory = { record: () => undefined } as any;
 
@@ -35,5 +34,7 @@ describe("Autonomous Assistant construction handoff", () => {
         expect(calls).toBe(1);
         expect(construction).not.toBeNull();
         expect(construction!.status).toBe("completed");
+        expect(result.improvement.status).toBe("NEEDS_DATA");
+        expect(result.improvement.recommendations).toEqual([]);
     });
 });

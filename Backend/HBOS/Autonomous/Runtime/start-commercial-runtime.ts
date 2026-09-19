@@ -1,4 +1,5 @@
 import { createCommercialRuntimeServer } from "./CommercialRuntimeServer";
+import { RuntimeDependencyProbe } from "./RuntimeDependencyProbe";
 
 const host = process.env.HOOSHYAR_HOST ?? "127.0.0.1";
 const port = Number(process.env.HOOSHYAR_PORT ?? "4173");
@@ -8,6 +9,11 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
 }
 
 const server = createCommercialRuntimeServer();
+
+// Report the real reasoning runtime dependency at startup. Reasoning is served
+// in-process by default (node-native); an explicitly configured Python provider
+// is reported truthfully and fails closed when it cannot be resolved.
+const dependencies = new RuntimeDependencyProbe().report();
 
 const shutdown = () => {
     server.close(() => process.exit(0));
@@ -22,5 +28,6 @@ server.listen(port, host, () => {
         host,
         port,
         health: `http://${host}:${port}/health`,
+        dependencies,
     }));
 });

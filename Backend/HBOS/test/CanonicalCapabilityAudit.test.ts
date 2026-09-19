@@ -4,18 +4,40 @@ import { CanonicalCapabilityAudit } from "../Autonomous/Runtime/CanonicalCapabil
 import { AutonomousProjectMission } from "../Autonomous/Runtime/AutonomousProjectMission";
 
 const behaviorByEngine: Record<string, string> = {
-    UserManagementEngine: "registerUser(", OrganizationModelEngine: "createOrganization(", SecurityLayerEngine: "authorize(", APIGatewayEngine: "route(",
-    FinancialIntelligenceEngine: "analyze(", BudgetIntelligenceEngine: "analyze(", TaxIntelligenceEngine: "estimate(", RiskIntelligenceEngine: "assess(",
-    DashboardEngine: "snapshot(", ReportsEngine: "build(", AlertsEngine: "evaluate("
+    UserManagementEngine: "registerUser", OrganizationModelEngine: "createOrganization", SecurityLayerEngine: "authorize", APIGatewayEngine: "route",
+    FinancialIntelligenceEngine: "analyze", BudgetIntelligenceEngine: "analyze", TaxIntelligenceEngine: "estimate", RiskIntelligenceEngine: "assess",
+    DashboardEngine: "snapshot", ReportsEngine: "build", AlertsEngine: "evaluate",
+    ProductionReadinessEngine: "audit", SecurityAuditEngine: "audit", PerformanceTestingEngine: "audit", CustomerTestingEngine: "audit",
+    DeploymentReadinessEngine: "audit", DeploymentContractEngine: "validate", CloudDeploymentEngine: "deploy"
 };
+
+function baseName(relative: string): string {
+    const testMatch = relative.match(/([^\\/]+)\.test\.ts$/);
+    if (testMatch) return testMatch[1];
+    const engineMatch = relative.match(/Engines[\\/]([^\\/]+)\.ts$/);
+    if (engineMatch) return engineMatch[1];
+    const plainMatch = relative.match(/([^\\/]+)\.ts$/);
+    return plainMatch ? plainMatch[1] : "";
+}
 
 function write(root: string, relative: string, content?: string): void {
     const path = join(root, relative);
     mkdirSync(join(path, ".."), { recursive: true });
-    const engineMatch = relative.match(/Engines[\\/]([^\\/]+)\.ts$/);
-    const engine = engineMatch?.[1] ?? "";
-    const behavior = behaviorByEngine[engine] ?? "ok";
-    writeFileSync(path, content ?? `${behavior}\n`, "utf8");
+    let body = content;
+    if (body === undefined) {
+        const name = baseName(relative);
+        const behavior = behaviorByEngine[name] ?? "execute";
+        if (/\.test\.ts$/.test(relative)) {
+            body = `describe("${name}", () => { test("exercises behavior", () => { expect(new ${name}().${behavior}()).toBeTruthy(); }); });\n`;
+        } else if (/\.md$/.test(relative)) {
+            body = `# ${name}\n`;
+        } else if (/\.py$/.test(relative)) {
+            body = `def ${behavior}():\n    return True\n`;
+        } else {
+            body = `export class ${name} { ${behavior}() { return true; } }\n`;
+        }
+    }
+    writeFileSync(path, body, "utf8");
 }
 
 function seedRoadmap(root: string): void {
@@ -28,38 +50,40 @@ function seedRoadmap(root: string): void {
     ].join("\n"));
 }
 
+const artifacts = [
+    "Backend/HBOS/Engines/UserManagementEngine.ts", "Backend/HBOS/test/UserManagementEngine.test.ts", "Docs/Engines/UserManagementEngine.md",
+    "Backend/HBOS/Engines/OrganizationModelEngine.ts", "Backend/HBOS/test/OrganizationModelEngine.test.ts", "Docs/Engines/OrganizationModelEngine.md",
+    "Backend/HBOS/Engines/SecurityLayerEngine.ts", "Backend/HBOS/test/SecurityLayerEngine.test.ts", "Docs/Engines/SecurityLayerEngine.md",
+    "Backend/HBOS/Engines/APIGatewayEngine.ts", "Backend/HBOS/test/APIGatewayEngine.test.ts", "Docs/Engines/APIGatewayEngine.md",
+    "Backend/HBOS/Engines/FinancialIntelligenceEngine.ts", "Backend/HBOS/test/FinancialIntelligenceEngine.test.ts", "Docs/Engines/FinancialIntelligenceEngine.md",
+    "Backend/HBOS/Engines/BudgetIntelligenceEngine.ts", "Backend/HBOS/test/BudgetIntelligenceEngine.test.ts", "Docs/Engines/BudgetIntelligenceEngine.md",
+    "Backend/HBOS/Engines/TaxIntelligenceEngine.ts", "Backend/HBOS/test/TaxIntelligenceEngine.test.ts", "Docs/Engines/TaxIntelligenceEngine.md",
+    "Backend/HBOS/Engines/RiskIntelligenceEngine.ts", "Backend/HBOS/test/RiskIntelligenceEngine.test.ts",
+    "Backend/HBOS/Engines/DashboardEngine.ts", "Backend/HBOS/test/DashboardEngine.test.ts", "Docs/Engines/DashboardEngine.md",
+    "Backend/HBOS/Engines/ReportsEngine.ts", "Backend/HBOS/test/ReportsEngine.test.ts", "Docs/Engines/ReportsEngine.md",
+    "Backend/HBOS/Engines/AlertsEngine.ts", "Backend/HBOS/test/AlertsEngine.test.ts", "Docs/Engines/AlertsEngine.md",
+    "Backend/HBOS/Assistant/Autonomous/HooshyarAutonomousAssistant.ts", "Backend/HBOS/test/HooshyarAutonomousAssistant.test.ts",
+    "Backend/HBOS/Engines/ProductionReadinessEngine.ts", "Backend/HBOS/test/ProductionReadinessEngine.test.ts", "Docs/Engines/ProductionReadinessEngine.md",
+    "Backend/HBOS/Engines/SecurityAuditEngine.ts", "Backend/HBOS/test/SecurityAuditEngine.test.ts", "Docs/Engines/SecurityAuditEngine.md",
+    "Backend/HBOS/Engines/PerformanceTestingEngine.ts", "Backend/HBOS/test/PerformanceTestingEngine.test.ts", "Docs/Engines/PerformanceTestingEngine.md",
+    "Backend/HBOS/Engines/CustomerTestingEngine.ts", "Backend/HBOS/test/CustomerTestingEngine.test.ts", "Docs/Engines/CustomerTestingEngine.md",
+    "Backend/HBOS/Engines/DeploymentReadinessEngine.ts", "Backend/HBOS/test/DeploymentReadinessEngine.test.ts", "Docs/Engines/DeploymentReadinessEngine.md",
+    "Backend/HBOS/Engines/DeploymentContractEngine.ts", "Backend/HBOS/test/DeploymentContractEngine.test.ts", "Docs/Engines/DeploymentContractEngine.md",
+    "Backend/HBOS/Engines/CloudDeploymentEngine.ts", "Backend/HBOS/test/CloudDeploymentEngine.test.ts", "Docs/Engines/CloudDeploymentEngine.md", "Backend/HBOS/Assistant/Autonomous/Production/DeploymentController.ts", "Backend/AI_Runtime/cloud_deployment.py"
+];
+
 describe("CanonicalCapabilityAudit", () => {
-    it("accepts an exhausted roadmap when every repository artifact and semantic behavior exists", () => {
+    it("accepts an exhausted roadmap when every repository artifact and behavioral evidence exists", () => {
         const root = mkdtempSync(join(process.cwd(), "tmp-canonical-audit-"));
         try {
             seedRoadmap(root);
-            const artifacts = [
-                "Backend/HBOS/Engines/UserManagementEngine.ts","Backend/HBOS/test/UserManagementEngine.test.ts","Docs/Engines/UserManagementEngine.md",
-                "Backend/HBOS/Engines/OrganizationModelEngine.ts","Backend/HBOS/test/OrganizationModelEngine.test.ts","Docs/Engines/OrganizationModelEngine.md",
-                "Backend/HBOS/Engines/SecurityLayerEngine.ts","Backend/HBOS/test/SecurityLayerEngine.test.ts","Docs/Engines/SecurityLayerEngine.md",
-                "Backend/HBOS/Engines/APIGatewayEngine.ts","Backend/HBOS/test/APIGatewayEngine.test.ts","Docs/Engines/APIGatewayEngine.md",
-                "Backend/HBOS/Engines/FinancialIntelligenceEngine.ts","Backend/HBOS/test/FinancialIntelligenceEngine.test.ts","Docs/Engines/FinancialIntelligenceEngine.md",
-                "Backend/HBOS/Engines/BudgetIntelligenceEngine.ts","Backend/HBOS/test/BudgetIntelligenceEngine.test.ts","Docs/Engines/BudgetIntelligenceEngine.md",
-                "Backend/HBOS/Engines/TaxIntelligenceEngine.ts","Backend/HBOS/test/TaxIntelligenceEngine.test.ts","Docs/Engines/TaxIntelligenceEngine.md",
-                "Backend/HBOS/Engines/RiskIntelligenceEngine.ts","Backend/HBOS/test/RiskIntelligenceEngine.test.ts",
-                "Backend/HBOS/Engines/DashboardEngine.ts","Backend/HBOS/test/DashboardEngine.test.ts","Docs/Engines/DashboardEngine.md",
-                "Backend/HBOS/Engines/ReportsEngine.ts","Backend/HBOS/test/ReportsEngine.test.ts","Docs/Engines/ReportsEngine.md",
-                "Backend/HBOS/Engines/AlertsEngine.ts","Backend/HBOS/test/AlertsEngine.test.ts","Docs/Engines/AlertsEngine.md",
-                "Backend/HBOS/Assistant/Autonomous/HooshyarAutonomousAssistant.ts","Backend/HBOS/test/HooshyarAutonomousAssistant.test.ts",
-                "Backend/HBOS/Engines/ProductionReadinessEngine.ts","Backend/HBOS/test/ProductionReadinessEngine.test.ts","Docs/Engines/ProductionReadinessEngine.md",
-                "Backend/HBOS/Engines/SecurityAuditEngine.ts","Backend/HBOS/test/SecurityAuditEngine.test.ts","Docs/Engines/SecurityAuditEngine.md",
-                "Backend/HBOS/Engines/PerformanceTestingEngine.ts","Backend/HBOS/test/PerformanceTestingEngine.test.ts","Docs/Engines/PerformanceTestingEngine.md",
-                "Backend/HBOS/Engines/CustomerTestingEngine.ts","Backend/HBOS/test/CustomerTestingEngine.test.ts","Docs/Engines/CustomerTestingEngine.md",
-                "Backend/HBOS/Engines/DeploymentReadinessEngine.ts","Backend/HBOS/test/DeploymentReadinessEngine.test.ts","Docs/Engines/DeploymentReadinessEngine.md",
-                "Backend/HBOS/Engines/DeploymentContractEngine.ts","Backend/HBOS/test/DeploymentContractEngine.test.ts","Docs/Engines/DeploymentContractEngine.md",
-                "Backend/HBOS/Engines/CloudDeploymentEngine.ts","Backend/HBOS/test/CloudDeploymentEngine.test.ts","Docs/Engines/CloudDeploymentEngine.md","Backend/HBOS/Assistant/Autonomous/Production/DeploymentController.ts","Backend/AI_Runtime/cloud_deployment.py"
-            ];
             artifacts.forEach(file => write(root, file));
             const mission = { nextPlatformMission: () => null } as unknown as AutonomousProjectMission;
             const result = new CanonicalCapabilityAudit().audit(root, mission);
             expect(result.complete).toBe(true);
             expect(result.backlogExhausted).toBe(true);
             expect(result.missingArtifacts).toEqual([]);
+            expect(result.nonBehavioralCapabilities).toEqual([]);
             expect(result.nonAutonomousProductionItems).toEqual([]);
         } finally {
             rmSync(root, { recursive: true, force: true });
@@ -75,6 +99,23 @@ describe("CanonicalCapabilityAudit", () => {
             const result = new CanonicalCapabilityAudit().audit(root, mission);
             expect(result.complete).toBe(false);
             expect(result.missingArtifacts.length).toBeGreaterThan(0);
+        } finally {
+            rmSync(root, { recursive: true, force: true });
+        }
+    });
+
+    it("fails closed when a marker and a trivial non-behavioral test exist but real behavioral evidence is missing", () => {
+        const root = mkdtempSync(join(process.cwd(), "tmp-canonical-audit-marker-"));
+        try {
+            seedRoadmap(root);
+            artifacts.forEach(file => write(root, file));
+            // Artifact + marker exist, but the focused test asserts nothing about the owner.
+            write(root, "Backend/HBOS/test/UserManagementEngine.test.ts", "describe('UserManagementEngine', () => { test('noop', () => { expect(true).toBe(true); }); });\n");
+            const mission = { nextPlatformMission: () => null } as unknown as AutonomousProjectMission;
+            const result = new CanonicalCapabilityAudit().audit(root, mission);
+            expect(result.complete).toBe(false);
+            expect(result.nonBehavioralCapabilities).toContain("User Management");
+            expect(result.missingArtifacts).toEqual([]);
         } finally {
             rmSync(root, { recursive: true, force: true });
         }
