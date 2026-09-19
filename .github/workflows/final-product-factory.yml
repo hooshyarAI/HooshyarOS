@@ -122,7 +122,7 @@ jobs:
           profile: pixel_2
           force-avd-creation: true
           disable-animations: false
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: bash scripts/android-product-acceptance.sh
       - name: Verify harness-produced Android acceptance evidence
         shell: bash
