@@ -8,7 +8,7 @@
 - `Docs/AUTONOMOUS_WEAVING_DOCTRINE.md` — expert knot-by-knot construction and recovery doctrine.
 - `Docs/AUTONOMOUS_7_DAY_BUILD_SLA.md` — permanent seven-day autonomous construction performance law.
 - `Docs/HOOSHYAROS_TOOLCHAIN_OPTIMIZATION_LAW.md` — permanent tool-first, Python-first construction and human-intervention law.
-- `Docs/HOOSHYAROS_CAPABILITY_PROVIDER_LEVERAGE_LAW.md` — permanent standard/tool/adapter-before-native reuse and external-dependency admission law; enforced by `Backend/HBOS/Product/CapabilityProviderRegistry.ts`.
+- `Docs/HOOSHYAROS_CAPABILITY_PROVIDER_LEVERAGE_LAW.md` — permanent standard/tool/adapter-before-native reuse and external-dependency admission law (default permitted external class: free + open source + licensed for commercial use + self-hosted/offline); enforced by `Backend/HBOS/Product/CapabilityProviderRegistry.ts`.
 - `Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md` — canonical commercial-product completion and acceptance contract; mandatory for distinguishing canonical capability completion from real commercial product completion.
 - `Docs/KILO_EXECUTION_OPERATOR_CONTRACT.md` — bounded Kilo Code execution/operator contract.
 - Existing architecture decisions, HBOS engines, capability owners, tests and documentation — inspect before adding anything.
@@ -55,6 +55,16 @@ This is a performance constraint, not permission to weaken correctness. All cons
 Therefore the Assistant must actively remove unnecessary serialization, repeated full-suite verification, duplicate generation, false-negative capability detection, blind retry loops and avoidable human intervention. Independent work should be batched or parallelized when dependencies and repository isolation permit it. Verification should be proportional to risk: focused verification for local confidence, periodic integration checkpoints for system confidence, and deep audits when risk or evidence requires them.
 
 The construction fabric must continuously measure generation, verification, repair and cycle time; completed capabilities per hour; retries; queue depth; blocking reasons; and cumulative backlog progress. The seven-day objective must be treated as an engineering constraint and optimized from measured evidence.
+
+### Global knowledge and open-source leverage (reuse before rebuild)
+
+HooshyarOS must intelligently leverage the world's existing science, engineering knowledge, proven methods, standards, mature tools and open-source capabilities instead of unnecessarily rebuilding commodity capabilities from scratch.
+
+Before writing native code for any capability, the construction system must inspect, in order: relevant industry standards and recognized methods; mature free/open-source capabilities; existing HooshyarOS owners, adapters and providers. The canonical evaluation order is `INDUSTRY_STANDARD → MATURE_LIBRARY → INTERNAL_CAPABILITY → ADAPTER_PROVIDER → NATIVE_IMPLEMENTATION`, governed by `Docs/HOOSHYAROS_CAPABILITY_PROVIDER_LEVERAGE_LAW.md` and enforced by `Backend/HBOS/Product/CapabilityProviderRegistry.ts`. This inspection belongs to PLAN and INSPECT, before IMPLEMENT.
+
+Externally sourced software is admissible only when it is **free, open source, licensed for commercial use and suitable for self-hosted/offline operation** where required. Paid-only, proprietary, closed-source and mandatory-cloud dependencies must not be introduced for core capability. Free availability, a free tier, popularity or convenience are not admission evidence; license and commercial-use rights must be verified from authoritative project/license evidence, and an unverifiable candidate is `DEFERRED`, never assumed.
+
+A native implementation is admissible only with recorded evidence that the earlier tiers were unsuitable (incompatible license, insufficient security or functionality, unacceptable maintenance, offline/self-hosted behaviour, performance, reliability, operational complexity, vendor lock-in, a genuinely missing required capability, or a core HooshyarOS differentiator). "We can code it ourselves" is not evidence.
 
 ## Expert weaving contract
 Every construction cycle follows the expert weaving doctrine:
@@ -118,6 +128,9 @@ This restriction is operational, not architectural: the HooshyarOS product may s
 24. Use the best approved tool for each stage before considering additional human intervention.
 25. Before declaring commercial product completion, pass the Commercial Product Completion Contract and keep external production dependencies distinct from repository-native completion.
 26. When Kilo Code is selected, pass a structured handoff, keep the stage scope bounded, prefer Python for deterministic repository-native work, require focused evidence on return, and leave integration/qualification ownership with the outer construction fabric.
+27. Before writing native code, inspect standards, mature free/open-source capabilities, existing owners and adapters in the canonical leverage order, and record the reuse decision as part of PLAN/INSPECT.
+28. Admit external software only when it is free, open source, licensed for commercial use and self-hosted/offline-suitable where required; verify license and commercial-use rights from authoritative evidence; treat unverifiable candidates as `DEFERRED`.
+29. Admit a native implementation only with recorded evidence that every earlier reuse tier was unsuitable; convenience or "we can code it ourselves" is never sufficient.
 
 ## Architecture changes
 Architecture Freeze V4 is the default source of truth. Change it only when an actual contradiction or missing architectural capability is demonstrated by repository evidence. If changed, update the master charter, architecture document, governance charter and affected decisions before continuing construction.

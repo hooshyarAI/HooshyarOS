@@ -1,7 +1,6 @@
----
+﻿---
 description: HooshyarOS governed construction operator
 mode: primary
-model: kilo/kilo-auto/free
 steps: 50
 permission:
   read: allow
@@ -49,6 +48,12 @@ EDIT-FIRST COMPLETION RULE: For an approved edit/repair mission, after reading t
 EXECUTION OBLIGATION RULE:
 AFTER REQUIRED READS (OR AFTER READING DECLARED TARGET FILES FOR EDIT MISSIONS), THE AGENT MUST MAKE THE APPROVED CHANGE AND MAY NOT END THE SESSION WHILE AN APPROVED EDIT MISSION REMAINS UNEXECUTED.
 
+GLOBAL KNOWLEDGE / REUSE-BEFORE-REBUILD RULE:
+Before writing native code for a capability, you MUST inspect the reusable options available for that capability: the existing canonical HooshyarOS owner, the admitted providers/adapters recorded by `Docs/HOOSHYAROS_CAPABILITY_PROVIDER_LEVERAGE_LAW.md`, the canonical admission mechanism `Backend/HBOS/Product/CapabilityProviderRegistry.ts`, and any relevant industry standard named by the mission capsule. Prefer reuse of an existing owner or an admitted provider over new native code. This inspection belongs to PLAN/INSPECT and must precede IMPLEMENT.
+External software is admissible only when it is free, open source, licensed for commercial use and suitable for self-hosted/offline operation where required. Paid-only, proprietary, closed-source and mandatory-cloud dependencies must not be introduced. Free availability, a free tier, popularity or convenience are not admission evidence; license and commercial-use rights must be verified from authoritative project/license evidence, and an unverifiable candidate is `DEFERRED`, never assumed. Do not invent license or commercial-use facts; if you cannot obtain authoritative evidence, report the candidate as `DEFERRED` for governed admission by the outer construction fabric.
+If you implement natively, you MUST record in your final report why every earlier reuse tier was unsuitable (incompatible license, insufficient security or functionality, unacceptable maintenance, offline/self-hosted behaviour, performance, reliability, operational complexity, vendor lock-in, a genuinely missing required capability, or a core HooshyarOS differentiator). "We can code it ourselves" is not a sufficient reason.
+For a bounded edit/repair mission with declared target files, this rule is satisfied by the canonical owner and any admitted provider recorded by the mission capsule; it does not authorize broad repository discovery.
+
 FINANCIAL-DATA-INGESTION MISSION BOUNDARY:
 When Capability ID is `product.financial-data-ingestion`, treat the three required artifacts plus `Backend/HBOS/Product/SQLitePersistenceStore.ts` as sufficient evidence for the first implementation decision. The acceptance contract is to add every format that the EXISTING repository architecture can safely support among EXCEL, PDF, and STRUCTURED. Do not invent external parser infrastructure. If no existing Excel/PDF parser or approved dependency is already exposed by the supplied mission artifacts, implement the safely supportable STRUCTURED evidence path inside `FinancialDataIngestionAdapter.ts`, add focused tests proving it and malformed-input rejection, preserve CSV compatibility, and update the product documentation. Do not investigate package.json, tsconfig, directory trees, filesystem fixtures, or external dependencies to search for parsers.
 
@@ -87,3 +92,4 @@ Operator evidence must be verifiable by Python:
 - or a structured evidence file that Python can parse and re-check.
 
 Python re-verifies the evidence before continuing. If the evidence is incomplete or inconsistent, Python returns to the last trusted checkpoint and reports `BLOCKED` with failure evidence preserved.
+

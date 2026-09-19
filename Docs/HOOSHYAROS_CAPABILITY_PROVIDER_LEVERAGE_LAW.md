@@ -2,6 +2,7 @@
 
 **Status:** PERMANENT / GOVERNING / ANTI-DRIFT
 **Scope:** Product capability construction and external-dependency admission
+**Permitted external software class:** free + open source + commercial use + self-hosted/offline
 **Canonical mechanism:** `Backend/HBOS/Product/CapabilityProviderRegistry.ts`
 **Focused tests:** `Backend/HBOS/test/CapabilityProviderRegistry.test.ts`, `Backend/HBOS/test/FinancialIngestionProviderGovernance.test.ts`
 
@@ -34,6 +35,38 @@ A later tier is admissible only when the earlier tiers are demonstrated to be un
 Selection must weigh, at minimum: maturity; active maintenance; security posture; license compatibility with commercial HooshyarOS; offline/self-hosted capability; data sovereignty; privacy; performance; reliability; replaceability; vendor lock-in risk; Windows/Linux/Android compatibility where relevant; operational complexity; and long-term maintainability.
 
 A dependency is never selected merely because it is free. It must be commercially and architecturally acceptable.
+
+### 3.1 Permitted external software class — DEFAULT
+
+For externally sourced software capabilities the default permitted class is:
+
+```text
+FREE + OPEN SOURCE + LICENSED FOR COMMERCIAL USE + SUITABLE FOR SELF-HOSTED/OFFLINE USE
+```
+
+Paid-only, proprietary, closed-source and mandatory-cloud dependencies must not be introduced under this law when a sufficiently capable free, open-source, self-hosted alternative is available and acceptable. Cloud or proprietary technologies must not silently become architectural owners of a core platform capability.
+
+A technology is **not** admissible merely because it is free to download, offers a free tier, is popular or is easy to use. License and commercial-use rights must be verified from authoritative project/license evidence and recorded with that evidence. This is the first gate every candidate must pass; failing it is a rejection regardless of the candidate's other merits, and the status is `DEFERRED`.
+
+### 3.2 Permitted-class rejection tests
+
+A candidate is rejected (or `DEFERRED`) when any of the following cannot be established from authoritative evidence:
+
+- the project/source is identifiable;
+- the license is identified and grants commercial use;
+- redistribution/attribution obligations are acceptable;
+- the security posture is acceptable;
+- maintenance/maturity is acceptable;
+- self-hosted/offline behaviour is acceptable where HooshyarOS requires it;
+- data-sovereignty compatibility is acceptable;
+- the provider is replaceable behind an adapter boundary;
+- the operational burden is acceptable.
+
+Never guess a license, commercial-use right or project status. `DEFERRED` is the correct state for unverified candidates; silent admission of an apparently open dependency is prohibited.
+
+### 3.3 No mandatory proprietary cloud dependency
+
+Core platform functionality must not be made dependent on a proprietary paid cloud service when a sufficiently capable free, open-source or self-hosted alternative is available and acceptable. For core capabilities prefer self-hosted, offline-capable, replaceable, open, standard and auditable options. Any exception requires an approved architecture decision and recorded evidence, not convenience.
 
 ## 4. Dependency admission criteria
 
@@ -81,7 +114,9 @@ Do not create a duplicate parser, connector, registry or adapter when a canonica
 
 ## 9. Native implementation criteria
 
-A `NATIVE_IMPLEMENTATION` is admissible only when `nativeFallbackCriteria` documents why no earlier tier could satisfy the capability. Native code is not a shortcut for avoiding a dependency review.
+A `NATIVE_IMPLEMENTATION` is admissible only when `nativeFallbackCriteria` documents why no earlier tier could satisfy the capability. Native code is not a shortcut for avoiding a dependency review, and "we can code it ourselves" is not sufficient reason.
+
+The recorded justification must identify at least one concrete unsuitability of every earlier tier: incompatible license; insufficient security; insufficient functionality; unacceptable maintenance state; unacceptable offline/self-hosted behaviour; unacceptable performance; unacceptable reliability; unacceptable operational complexity; unacceptable vendor lock-in; a genuinely missing required capability; or the capability being itself a core HooshyarOS differentiator. The reuse decision and its evidence belong to planning/inspection, before implementation.
 
 ## 10. Architecture Freeze and change control
 
@@ -95,6 +130,7 @@ Enforcement is executable, not documentary:
 - `selectProvider(category)` returns the preferred admitted, integrated provider by the canonical order and fails closed otherwise.
 - `auditDeclaredDependencies(snapshot)` verifies that inventory metadata matches the repository's real declared dependencies and installed licences.
 - The commercial ingestion composition service refuses a format whose external provider is not admitted, so no ungoverned dependency is used silently.
+- A candidate that cannot pass the permitted-class gate in §3.1 is rejected or `DEFERRED`; it is never admitted by default because it appears free or open.
 - Focused tests cover admission, selection, native-fallback, truthfulness and the live fail-closed boundary.
 
 ## 12. Reference implementation and current limitation

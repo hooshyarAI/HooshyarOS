@@ -77,6 +77,18 @@ Reuse standard, mature, open-source or commercially compatible capabilities befo
 
 External providers are capability providers, never architecture owners. HooshyarOS retains ownership of canonical models, tenant boundaries, identity, security policy, provenance, audit, validation, business rules and intelligence. The governing law is `Docs/HOOSHYAROS_CAPABILITY_PROVIDER_LEVERAGE_LAW.md`; the canonical executable owner is `Backend/HBOS/Product/CapabilityProviderRegistry.ts`.
 
+### Permitted external software class — ENFORCEABLE
+
+Externally sourced software is admitted only when it is **free, open source, licensed for commercial use and suitable for the required self-hosted/offline operation**. Paid-only, proprietary, closed-source and mandatory-cloud dependencies must not be introduced for core platform capability when a sufficiently capable free, open-source or self-hosted alternative is available and acceptable.
+
+Free availability, a free tier, popularity or convenience are **not** admission evidence. License and commercial-use rights must be verified from authoritative project/license evidence; an unverifiable candidate is `DEFERRED`, never assumed, and must not be silently admitted because it appears open.
+
+### Enforceable reuse-before-rebuild
+
+Before native implementation of any capability, construction must record the reuse decision: the existing canonical owner, the admitted provider/adapter, or the industry standard that was selected, or the recorded evidence that every earlier tier was unsuitable. Native implementation without recorded justification for rejecting the earlier tiers is a governance violation, not a style preference. "We can code it ourselves" is not sufficient justification.
+
+Enforcement is executable, not documentary: `CapabilityProviderRegistry` owns dependency admission and provider selection and fails closed, and a capability whose external provider is not admitted must not be used. See `Docs/HOOSHYAROS_CAPABILITY_PROVIDER_LEVERAGE_LAW.md` §3.1–§3.3 and §11.
+
 ---
 
 ## 4. Permanent Engineering Logic
@@ -348,7 +360,9 @@ The autonomous construction system must never:
 - combine multiple independently recoverable capabilities into one opaque stage merely for execution convenience;
 - invalidate trusted stage checkpoints without evidence;
 - restart completed verified stages solely because an operator was interrupted;
-- widen a failed stage's repair scope without explicit evidence of dependency impact.
+- widen a failed stage's repair scope without explicit evidence of dependency impact;
+- introduce a paid-only, proprietary, closed-source or mandatory-cloud dependency for core platform capability without an approved architecture decision and a verified assessment that no free/open-source/self-hosted alternative is acceptable;
+- rebuild a mature commodity capability natively without recorded evidence that the earlier reuse tiers were unsuitable.
 
 **Kilo Code may execute governed local construction operations, but it must remain subject to every rule above.**
 
@@ -425,6 +439,12 @@ For the autonomous Assistant itself, DONE additionally means the verified comple
 **PYTHON-FIRST CONSTRUCTION: APPROVED**
 
 **GITHUB REPOSITORY CONTROL: REQUIRED**
+
+**GLOBAL KNOWLEDGE / OPEN-SOURCE LEVERAGE: REQUIRED**
+
+**PERMITTED EXTERNAL SOFTWARE CLASS: FREE + OPEN SOURCE + COMMERCIAL USE + SELF-HOSTED/OFFLINE**
+
+**PAID / PROPRIETARY / CLOSED-SOURCE / MANDATORY-CLOUD DEPENDENCIES FOR CORE CAPABILITY: PROHIBITED**
 
 **KILO CODE: APPROVED LOCAL EXECUTION / OPERATOR LAYER**
 

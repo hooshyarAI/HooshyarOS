@@ -187,6 +187,36 @@ Creating a parallel Agent, duplicate Engine, duplicate business semantic, duplic
 
 The construction fabric must not depend on an external coding agent. Existing product provider integrations may exist only where approved by product architecture; they must never become dependencies of the construction fabric itself.
 
+### 6.3 Global Knowledge and Open-Source Leverage Law — PERMANENT
+
+HooshyarOS must intelligently leverage the world's existing science, engineering knowledge, proven methods, standards, mature tools and open-source capabilities instead of unnecessarily rebuilding commodity capabilities from scratch. This is a permanent governing principle of the whole platform, not a preference and not optional advice.
+
+The canonical engineering order is:
+
+1. `INDUSTRY_STANDARD` — an industry standard, recognized method, protocol or platform built-in;
+2. `MATURE_LIBRARY` — a free and open-source mature capability;
+3. `INTERNAL_CAPABILITY` — an existing canonical HooshyarOS owner, adapter or provider;
+4. `ADAPTER_PROVIDER` — governed integration with an external system through an adapter;
+5. `NATIVE_IMPLEMENTATION` — build it ourselves, only when justified by recorded evidence.
+
+A later tier is admissible only when the earlier tiers are demonstrated to be unavailable, unsuitable, unsafe or non-compliant. The goal is not to use open source blindly; the goal is to select the best permitted existing capability, adapt it correctly, govern it, validate it, integrate it and retain canonical HooshyarOS ownership.
+
+**Default permitted external class.** An externally sourced software capability is admissible only when it is **free, open source, licensed for commercial use and suitable for self-hosted/offline operation** where HooshyarOS requires it. Paid-only, proprietary, closed-source and mandatory-cloud dependencies must not be introduced under this policy. A technology is not admissible merely because it is free to download, offers a free tier, is popular or is easy to use. License and commercial-use rights must be verified from authoritative project/license evidence; when they cannot be verified, the candidate status is `DEFERRED` and is never guessed or silently admitted.
+
+**Ownership.** External tools are capability providers only and never architecture owners. HooshyarOS remains the canonical owner of canonical data models, canonical contracts, tenant boundaries, identity, security policy, provenance, validation, audit, governance, business rules, financial intelligence, organizational intelligence, executive intelligence, reasoning, autonomous operations, decision logic and orchestration.
+
+**Admissibility and evidence.** Every proposed external dependency must pass the admission criteria in `Docs/HOOSHYAROS_CAPABILITY_PROVIDER_LEVERAGE_LAW.md` §4 — identifiable project/source; authoritative license evidence; verified commercial-use permission; acceptable redistribution/attribution obligations; acceptable security posture; maintenance/maturity evidence; self-hosted/offline suitability; data-sovereignty compatibility; replaceability; and acceptable operational burden. A missing mandatory fact is a rejection, never a default (fail closed). Admission and provider selection are owned by the canonical mechanism `Backend/HBOS/Product/CapabilityProviderRegistry.ts`.
+
+**No mandatory proprietary cloud dependency.** Core platform functionality must not depend on a proprietary paid cloud service when a sufficiently capable free, open-source or self-hosted alternative is available and acceptable. Cloud and proprietary technologies must not silently become architectural owners. Core capabilities prefer self-hosted, offline-capable, replaceable, open, standard and auditable options.
+
+**Use knowledge, not only code.** Engineering decisions must actively leverage established algorithms, scientific methods, architectural patterns, security practices, interoperability standards, enterprise integration patterns, mature open-source implementations, proven operational practices, testing methodologies, deployment patterns and international engineering experience. The engineering value is in **DISCOVER → EVALUATE → SELECT → INTEGRATE → ADAPT → GOVERN → VALIDATE → OPERATIONALIZE → IMPROVE**, not in maximizing the amount of code written internally.
+
+**Native implementation criteria.** A `NATIVE_IMPLEMENTATION` is admissible only when recorded evidence documents that no earlier tier could satisfy the capability: incompatible license; insufficient security; insufficient functionality; unacceptable maintenance state; unacceptable offline/self-hosted behavior; unacceptable performance; unacceptable reliability; unacceptable operational complexity; unacceptable vendor lock-in; a genuinely missing required capability; or the capability being itself a core HooshyarOS differentiator. "We can code it ourselves" is not a sufficient reason.
+
+**Commercialization objective.** This law exists to accelerate platform completion, operational readiness, quality, accuracy, reliability, standardization, interoperability, maintainability, enterprise integration, deployment flexibility, commercialization and time-to-market, and to reduce duplicated code, immature internal implementations, unnecessary technical debt, maintenance burden, integration effort, technology risk and time spent rebuilding commodity components.
+
+This law introduces no parallel architecture. It does not mutate Architecture Freeze V4/V4.1 and preserves the five canonical intelligence engines and all existing ownership boundaries. A genuine architectural contradiction must still be routed through the existing Architecture Change Control path and the governing repository memory.
+
 ---
 
 ## 7. Expert Weaving Doctrine — Permanent Platform Law
@@ -893,6 +923,8 @@ Never solve uncertainty by inventing a new architecture.
 
 **Reuse what already exists.**
 
+**Leverage the world's proven knowledge, standards and mature open-source capabilities before rebuilding.**
+
 **Build only what is genuinely missing.**
 
 **Choose the correct engine boundary.**
@@ -955,6 +987,12 @@ When a more specific technical contract defines an implementation detail, follow
 **GITHUB-BASED REPOSITORY CONTROL: REQUIRED**
 
 **PROVIDER-INDEPENDENT CONSTRUCTION: REQUIRED**
+
+**GLOBAL KNOWLEDGE / OPEN-SOURCE LEVERAGE: REQUIRED**
+
+**PERMITTED EXTERNAL SOFTWARE CLASS: FREE + OPEN SOURCE + COMMERCIAL USE + SELF-HOSTED/OFFLINE**
+
+**PAID-ONLY / PROPRIETARY / CLOSED-SOURCE / MANDATORY-CLOUD DEPENDENCIES FOR CORE CAPABILITY: PROHIBITED**
 
 **EXTERNAL CODING AGENTS IN CONSTRUCTION: PROHIBITED**
 
