@@ -117,3 +117,30 @@ No completion flag changed. `productComplete` remains **FALSE**: required extern
 ## 6. Truth boundary
 
 This record contains classification and decision-package statements only. It does not claim any deferred item is fixed, does not claim any governed decision was made, does not claim external blockers resolved, and does not claim `productComplete=true`.
+
+---
+
+## 7. Deep continuation audit — bounded extension (2026-09-20; same-day, later HEAD)
+
+Re-inspection at the deep continuation audit baseline `e2678c88` (evidence: `.kilo/evidence/deep-continuation-audit-2026-09-20.txt`) confirmed every package above unchanged and added the following **evidence-backed extensions to existing packages** (no new package, no new ledger, no implementation):
+
+### DP-6 extension — additional unbounded in-memory maps
+
+- `CommercialRuntimeServer.ts:412-413` (`authClientLimiters`, `authIdentityLimiters`) are insert-only exactly like `rateLimiterMap`, so the auth limiter maps also grow without bound.
+- `CommercialRuntimeServer.ts:351-354` (`latestResults`, `latestWorkbenchResults`, `latestDecisionResults`, `latestAnalyticsResults`) are per-tenant caches that are only added to.
+- These are the **same eviction-policy decision as DP-6** (cap/LRU vs TTL vs session-expiry coupling, plus an observable contract). Not implemented; no separate decision.
+
+### DP-8 extension — Core/ legacy duplicate boundary beyond `EngineRegistry`
+
+- Three `ProjectRegistry` implementations exist: `Core/ProjectRegistry.ts`, `Registry/ProjectRegistry.ts`, `Services/ProjectRegistry.ts`.
+- Two `ProjectPilotEngine` implementations exist: `Core/ProjectPilotEngine.ts` and `Engines/ProjectPilotEngine.ts`. `Core/ProjectPilotEngine` is referenced only by legacy tests (`test/Autonomous.test.ts`, `test/ProjectPilot.test.ts`, `test/Insight.test.ts`); the live commercial runtime's canonical engines use `Engines/ProjectPilotEngine` → `Services/ProjectRegistry`.
+- This is the **same pre-existing `Core/` vs `Engines/` architecture duality as DP-8** and is re-affirmed, not given a new decision or an independent repair. Any consolidation remains an Architecture Change Control decision.
+
+### Latent hardening recorded (not repaired)
+
+- `Product/SQLitePersistenceStore.ts:27` calls `JSON.parse` on the stored value without a guard; only reachable for externally corrupted rows and there is no current failure evidence.
+- `Product/SQLitePersistenceStore.ts` sets no WAL/busy_timeout pragma; the runtime is a single-writer process and the schema-migration gap remains the already-deferred item 9.
+
+### New live finding repaired (not a governance matter)
+
+The commit-bound application/acceptance evidence (`.hooshyar/web-acceptance-success.json`, `.hooshyar/security-acceptance-success.json`) was stale after two documentation-only commits advanced HEAD past the predecessor mission's refresh. This required no governance decision and no architecture change: the canonical harnesses were re-run at the final checkpoint commit with no code change, restoring `applicationEvidence.fresh=true` and `acceptanceEvidence.fresh=true`. Root cause (ordering) and evidence are recorded in `.kilo/evidence/deep-continuation-audit-2026-09-20.txt`.
