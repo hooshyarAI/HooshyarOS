@@ -217,6 +217,67 @@ A later tier is admissible only when the earlier tiers are demonstrated to be un
 
 This law introduces no parallel architecture. It does not mutate Architecture Freeze V4/V4.1 and preserves the five canonical intelligence engines and all existing ownership boundaries. A genuine architectural contradiction must still be routed through the existing Architecture Change Control path and the governing repository memory.
 
+### 6.4 Strategic Renewal and Continuous Innovation Law — PERMANENT
+
+HooshyarOS must never treat its current architecture, product, business model, operating model, capability set or assumptions as permanently correct. Strategy, product scope, design choices and even a previously verified capability can decay as technology, markets, regulation, user needs, data, competitive conditions and internal evidence change. Detecting and responding to that decay is a permanent obligation, not a periodic project.
+
+**Strategic decay awareness.** Any capability, provider, model, process, assumption or business rule may become obsolete, insecure, non-compliant, over-costly or strategically irrelevant. The construction fabric must actively look for decay instead of assuming that a previously correct decision remains correct.
+
+**Continuous strategic renewal.** Renewal is continuous and evidence-driven, not a one-off reorganization. The platform must be able to improve, scale, adapt, replace or retire its own capabilities, providers, models and assumptions when evidence justifies it — while preserving architecture, security, governance, correctness and evidence integrity.
+
+**Future sensing.** Construction and product decisions must consider plausible future conditions (technology, regulation, market, scale, cost, security threats, user behavior), not only current-state convenience. Future-oriented resource consideration is part of planning: investments must balance present delivery against durable future capability.
+
+**Constructive challenge and professional dissent.** Assumptions, plans, generated results and prior decisions must be open to evidence-backed challenge. Constructive professional dissent is legitimate and expected; disagreement supported by evidence must be recorded, never suppressed. Challenge is directed at ideas and evidence, never at governance, safety or architecture authority.
+
+**Bottom-up innovation.** Innovation may originate from any level of the construction fabric or organization, not only from top-down plans. Bounded, evidence-backed proposals from any owner or operator are admissible and must be evaluated through the same governance.
+
+**Controlled experimentation.** Where uncertainty is material, the correct response is a bounded, reversible experiment with an explicit hypothesis, success criteria, scope, stop conditions and measured result — never a speculative rewrite. Experiments must not bypass architecture, security, tenant isolation or governance, and must never be presented as completed capability before measurement.
+
+**Exploration and exploitation.** The construction fabric must deliberately balance exploitation (reliability, scale, efficiency and delivery of known value) with exploration (new capability, new methods, new providers, new business or operating models). Neither is universally correct; the balance must be governed by evidence and risk.
+
+**Innovation portfolio (H1–H2–H3).** Innovation must be considered as a portfolio across horizons — H1 improve the current core; H2 extend into adjacent capability; H3 create genuinely new future options — with explicit allocation and review. The portfolio is a planning concept, not a new subsystem, engine or database.
+
+**Business-model and operating-model innovation.** Renewal is not limited to code. The platform must be able to question and, with evidence, evolve its business model and operating model (delivery, support, deployment, cost structure, scaling approach) within approved commercial scope. Commercial-scope decisions remain governance decisions and are never invented by construction.
+
+**Evidence-driven scaling, adaptation, replacement or retirement.** Every renewal outcome must be one of: improve, scale, adapt, replace or retire — chosen from measured evidence, not preference. Legacy carries no automatic authority: existing implementations, providers and assumptions must justify their continuation on current evidence (anti-legacy-bias). Equally, a retained decision that remains correct must not be discarded for novelty alone.
+
+**Epistemic discipline.** Claims must be labelled and kept distinct:
+
+- **FACT** — verified from authoritative evidence;
+- **ASSUMPTION** — believed but not verified;
+- **HYPOTHESIS** — a falsifiable proposition to test;
+- **EXPERIMENT** — the bounded test of a hypothesis;
+- **MEASURED RESULT** — the observed outcome of an experiment;
+- **DECISION** — the governed choice made from measured results.
+
+An assumption or hypothesis must never be presented as a fact or as a measured result.
+
+**Continuous renewal loop — PERMANENT.**
+
+```text
+OBSERVE → QUESTION → IMAGINE → FORM HYPOTHESIS → EXPERIMENT
+→ MEASURE → LEARN → IMPROVE / SCALE / REPLACE / RETIRE → OBSERVE AGAIN
+```
+
+**Integration with the Global Knowledge and Open-Source Leverage Law (§6.3).** Renewal must first search what already exists before inventing. The combined decision model is:
+
+```text
+UNDERSTAND THE PROBLEM
+→ OBSERVE THE CURRENT SYSTEM
+→ CHALLENGE ASSUMPTIONS
+→ SEARCH EXISTING SCIENCE / STANDARDS / FREE OPEN-SOURCE CAPABILITIES
+→ INVENT ONLY WHERE NECESSARY
+→ EXPERIMENT WHEN UNCERTAINTY IS MATERIAL
+→ MEASURE
+→ GOVERN
+→ INTEGRATE
+→ SCALE OR RETIRE
+```
+
+Externally sourced software admitted through renewal remains subject to the same permanent admission class: **free + open source + licensed for commercial use + suitable for self-hosted/offline operation** where required. An unverifiable license or commercial-use right remains `DEFERRED` and is never assumed. `Docs/HOOSHYAROS_CAPABILITY_PROVIDER_LEVERAGE_LAW.md` remains the governing admission law and `Backend/HBOS/Product/CapabilityProviderRegistry.ts` the canonical mechanism.
+
+**No parallel architecture.** This law introduces no engine, registry, innovation subsystem, strategy database, product runtime, parallel orchestration hierarchy or new governance hierarchy. It does not mutate Architecture Freeze V4/V4.1, does not create a sixth engine, and preserves the five canonical intelligence engines and all ownership boundaries. A genuine architectural contradiction still routes through the existing Architecture Change Control path and the governing repository memory.
+
 ---
 
 ## 7. Expert Weaving Doctrine — Permanent Platform Law
@@ -978,6 +1039,10 @@ Never solve uncertainty by inventing a new architecture.
 
 **Build only what is genuinely missing.**
 
+**Question today's assumptions, sense the future and renew continuously.**
+
+**Improve, scale, adapt, replace or retire from measured evidence — never from preference.**
+
 **Choose the correct engine boundary.**
 
 **Weave one verified knot at a time.**
@@ -1044,6 +1109,10 @@ When a more specific technical contract defines an implementation detail, follow
 **PERMITTED EXTERNAL SOFTWARE CLASS: FREE + OPEN SOURCE + COMMERCIAL USE + SELF-HOSTED/OFFLINE**
 
 **PAID-ONLY / PROPRIETARY / CLOSED-SOURCE / MANDATORY-CLOUD DEPENDENCIES FOR CORE CAPABILITY: PROHIBITED**
+
+**STRATEGIC DECAY AWARENESS / CONTINUOUS STRATEGIC RENEWAL / CONTINUOUS INNOVATION: REQUIRED**
+
+**EPISTEMIC DISCIPLINE (FACT / ASSUMPTION / HYPOTHESIS / EXPERIMENT / MEASURED RESULT / DECISION): REQUIRED**
 
 **EXTERNAL CODING AGENTS IN CONSTRUCTION: PROHIBITED**
 

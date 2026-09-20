@@ -9,6 +9,7 @@
 - `Docs/AUTONOMOUS_7_DAY_BUILD_SLA.md` — permanent seven-day autonomous construction performance law.
 - `Docs/HOOSHYAROS_TOOLCHAIN_OPTIMIZATION_LAW.md` — permanent tool-first, Python-first construction and human-intervention law.
 - `Docs/HOOSHYAROS_CAPABILITY_PROVIDER_LEVERAGE_LAW.md` — permanent standard/tool/adapter-before-native reuse and external-dependency admission law (default permitted external class: free + open source + licensed for commercial use + self-hosted/offline); enforced by `Backend/HBOS/Product/CapabilityProviderRegistry.ts`.
+- Strategic Renewal & Continuous Innovation Law — permanent; embedded in `Docs/HOOSHYAROS_MASTER_CHARTER.md` §6.4, `Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md` §3 and `Docs/HOOSHYAROS_CAPABILITY_PROVIDER_LEVERAGE_LAW.md` §13; no parallel governance document, engine, registry or runtime.
 - `Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md` — canonical commercial-product completion and acceptance contract; mandatory for distinguishing canonical capability completion from real commercial product completion.
 - `Docs/KILO_EXECUTION_OPERATOR_CONTRACT.md` — bounded Kilo Code execution/operator contract.
 - Existing architecture decisions, HBOS engines, capability owners, tests and documentation — inspect before adding anything.
@@ -65,6 +66,37 @@ Before writing native code for any capability, the construction system must insp
 Externally sourced software is admissible only when it is **free, open source, licensed for commercial use and suitable for self-hosted/offline operation** where required. Paid-only, proprietary, closed-source and mandatory-cloud dependencies must not be introduced for core capability. Free availability, a free tier, popularity or convenience are not admission evidence; license and commercial-use rights must be verified from authoritative project/license evidence, and an unverifiable candidate is `DEFERRED`, never assumed.
 
 A native implementation is admissible only with recorded evidence that the earlier tiers were unsuitable (incompatible license, insufficient security or functionality, unacceptable maintenance, offline/self-hosted behaviour, performance, reliability, operational complexity, vendor lock-in, a genuinely missing required capability, or a core HooshyarOS differentiator). "We can code it ourselves" is not evidence.
+
+### Strategic renewal and continuous innovation law
+
+HooshyarOS must never treat its current architecture, product, capability set, providers, business model, operating model or assumptions as permanently correct. Strategy, product scope and even verified capability can decay as technology, markets, regulation, users, data and evidence change. Detecting decay and renewing is a permanent obligation, not a periodic project.
+
+- **Strategic decay awareness and future sensing.** Existing decisions are re-examined against current and plausible future conditions; legacy carries no automatic authority (anti-legacy-bias).
+- **Continuous strategic renewal.** The platform must be able to improve, scale, adapt, replace or retire its own capabilities, providers, models and assumptions when evidence justifies it, without weakening architecture, security, governance, correctness or evidence integrity.
+- **Constructive challenge and professional dissent.** Assumptions, plans and generated results are open to evidence-backed challenge; evidence-backed disagreement is recorded, never suppressed. Challenge is directed at ideas and evidence, never at governance or architecture authority.
+- **Bottom-up innovation and controlled experimentation.** Bounded, reversible experiments with explicit hypothesis, success criteria, scope, stop conditions and measured result are the correct response to material uncertainty. Experiments never bypass architecture, security, tenant isolation or governance and are never presented as completed capability before measurement.
+- **Exploration + exploitation, innovation portfolio (H1–H2–H3).** Balance delivery of known value with new capability: H1 improve the current core, H2 extend into adjacent capability, H3 create new future options, with explicit allocation and review. This is a planning concept, not a new subsystem, engine or database.
+- **Business-model and operating-model innovation** within approved commercial scope; commercial-scope decisions remain governance decisions and are never invented by construction.
+- **Evidence-driven scaling, adaptation, replacement or retirement.** Every renewal outcome is improve, scale, adapt, replace or retire, chosen from measured evidence — never preference.
+- **Epistemic discipline.** Claims are labelled and kept distinct: **FACT** (authoritative evidence), **ASSUMPTION** (believed, unverified), **HYPOTHESIS** (falsifiable proposition), **EXPERIMENT** (bounded test), **MEASURED RESULT** (observed outcome), **DECISION** (governed choice). An assumption or hypothesis must never be presented as a fact or a measured result.
+
+The permanent renewal loop is:
+
+```text
+OBSERVE → QUESTION → IMAGINE → FORM HYPOTHESIS → EXPERIMENT
+→ MEASURE → LEARN → IMPROVE / SCALE / REPLACE / RETIRE → OBSERVE AGAIN
+```
+
+This is integrated with the global knowledge and open-source leverage rule above; renewal first searches existing science, standards and free/open-source capabilities before inventing. The combined decision model is:
+
+```text
+UNDERSTAND THE PROBLEM → OBSERVE THE CURRENT SYSTEM → CHALLENGE ASSUMPTIONS
+→ SEARCH EXISTING SCIENCE / STANDARDS / FREE OPEN-SOURCE CAPABILITIES
+→ INVENT ONLY WHERE NECESSARY → EXPERIMENT WHEN UNCERTAINTY IS MATERIAL
+→ MEASURE → GOVERN → INTEGRATE → SCALE OR RETIRE
+```
+
+Externally sourced software admitted through renewal remains subject to the permanent permitted class: **free + open source + licensed for commercial use + suitable for self-hosted/offline operation** where required. An unverifiable license or commercial-use right remains `DEFERRED`, never assumed. This law introduces no engine, registry, innovation subsystem, strategy database, product runtime or parallel governance/orchestration hierarchy, and does not mutate Architecture Freeze V4/V4.1.
 
 ## Expert weaving contract
 Every construction cycle follows the expert weaving doctrine:
@@ -131,6 +163,10 @@ This restriction is operational, not architectural: the HooshyarOS product may s
 27. Before writing native code, inspect standards, mature free/open-source capabilities, existing owners and adapters in the canonical leverage order, and record the reuse decision as part of PLAN/INSPECT.
 28. Admit external software only when it is free, open source, licensed for commercial use and self-hosted/offline-suitable where required; verify license and commercial-use rights from authoritative evidence; treat unverifiable candidates as `DEFERRED`.
 29. Admit a native implementation only with recorded evidence that every earlier reuse tier was unsuitable; convenience or "we can code it ourselves" is never sufficient.
+30. Treat existing architecture, product, capability set, providers and assumptions as renewable: actively detect strategic decay and re-examine decisions against current and plausible future conditions (anti-legacy-bias).
+31. Where uncertainty is material, run a bounded, reversible experiment with explicit hypothesis, success criteria, scope, stop conditions and measured result instead of a speculative rewrite; never present an unmeasured experiment as completed capability.
+32. Label claims by epistemic status — FACT, ASSUMPTION, HYPOTHESIS, EXPERIMENT, MEASURED RESULT, DECISION — and never present an assumption or hypothesis as a fact or a measured result.
+33. Resolve every renewal outcome to improve, scale, adapt, replace or retire from measured evidence; keep externally sourced software subject to the permanent permitted class and route genuine architectural contradictions through Architecture Change Control.
 
 ## Architecture changes
 Architecture Freeze V4 is the default source of truth. Change it only when an actual contradiction or missing architectural capability is demonstrated by repository evidence. If changed, update the master charter, architecture document, governance charter and affected decisions before continuing construction.

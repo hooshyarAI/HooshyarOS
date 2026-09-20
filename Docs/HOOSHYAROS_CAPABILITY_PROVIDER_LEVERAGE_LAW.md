@@ -144,3 +144,24 @@ Multi-format acquisition follows the same pattern and converges on the one canon
 - `document.html.text` / `document.xml.text` / `text.tsv.parse` — internal capabilities in `Product/MarkupTextExtraction.ts` and the canonical delimiter parser (INTEGRATED).
 
 Scanned / image-only PDF remains the honest limitation. The rendering half and the governed routing path (`FinancialDataIngestionAdapter.ingestScannedPdfBytes` + `ScannedPdfRouter`) exist and are focused-tested through an injected engine, but the OCR **engine** provider (`document.pdf.ocr`, `tesseract.js`) is recorded as `DEFERRED` with explicit unmet conditions; no OCR provider is installed or claimed until it satisfies this law. Long-tail formats (RTF, ODT, PPTX, EPUB, EML, MSG, DBF, YAML, TIFF, legacy XLS) and broad fallbacks (Apache Tika, LibreOffice headless) are recorded as `DEFERRED` with their rejection reasons; none is claimed as supported.
+
+## 13. Strategic renewal integration — PERMANENT
+
+Provider selection and reuse decisions are not permanent truths. Any admitted standard, library, adapter, provider or native implementation may decay because of license change, abandonment, security posture, performance, cost, regulation, data sovereignty, scale or better available alternatives. Under the Strategic Renewal and Continuous Innovation Law (`Docs/HOOSHYAROS_MASTER_CHARTER.md` §6.4) this law must therefore support continuous renewal, not only initial admission.
+
+- **Decay awareness.** An admitted provider must be periodically re-evaluated against its admission facts (§4). A provider whose license, maintenance, security or suitability can no longer be established is `DEFERRED` or replaced behind the same adapter boundary; its failure evidence is preserved, never masked.
+- **Evidence-driven replacement or retirement.** A provider or native implementation is improved, scaled, adapted, replaced or retired only from measured evidence — never from preference or novelty.
+- **Anti-legacy-bias.** Incumbency is not evidence of suitability. A retained provider must justify its continuation on current evidence; an existing native implementation may be replaced by a better earlier-tier capability when evidence supports it.
+- **Future sensing.** Selection must consider plausible future license, maintenance, scale, security, regulatory and operational conditions, not only present suitability.
+- **Epistemic discipline.** License/commercial-use facts are **FACT** only when verified from authoritative evidence. Unverified candidates are labelled **ASSUMPTION** or **HYPOTHESIS** and are `DEFERRED`; they are never admitted or claimed.
+
+The combined decision model for any capability (new or under renewal) is:
+
+```text
+UNDERSTAND THE PROBLEM → OBSERVE THE CURRENT SYSTEM → CHALLENGE ASSUMPTIONS
+→ SEARCH EXISTING SCIENCE / STANDARDS / FREE OPEN-SOURCE CAPABILITIES
+→ INVENT ONLY WHERE NECESSARY → EXPERIMENT WHEN UNCERTAINTY IS MATERIAL
+→ MEASURE → GOVERN → INTEGRATE → SCALE OR RETIRE
+```
+
+Renewal never weakens the permanent admission class of §3.1: externally sourced software remains admissible only when it is **free, open source, licensed for commercial use and suitable for self-hosted/offline operation** where required. An unverifiable license or commercial-use right remains `DEFERRED`, never assumed. This section introduces no new engine, registry, subsystem or parallel governance; `CapabilityProviderRegistry` remains the single canonical admission mechanism.

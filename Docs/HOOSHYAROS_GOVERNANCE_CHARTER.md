@@ -89,6 +89,38 @@ Before native implementation of any capability, construction must record the reu
 
 Enforcement is executable, not documentary: `CapabilityProviderRegistry` owns dependency admission and provider selection and fails closed, and a capability whose external provider is not admitted must not be used. See `Docs/HOOSHYAROS_CAPABILITY_PROVIDER_LEVERAGE_LAW.md` §3.1–§3.3 and §11.
 
+### Strategic renewal and continuous innovation — PERMANENT
+
+Governance must assume that the architecture, product, capability set, providers, business model, operating model and prior assumptions can decay as technology, markets, regulation, users, data and evidence change. Detecting decay and renewing is a permanent obligation, not a periodic project.
+
+- **Strategic decay awareness and future sensing.** Existing decisions are re-examined against current and plausible future conditions; legacy carries no automatic authority.
+- **Constructive challenge and professional dissent.** Assumptions, plans and generated results are open to evidence-backed challenge; dissent supported by evidence is recorded, not suppressed.
+- **Bottom-up innovation and controlled experimentation.** Bounded, reversible experiments with explicit hypothesis, success criteria, scope, stop conditions and measured result are the correct response to material uncertainty. Experiments never bypass architecture, security, tenant isolation or governance.
+- **Exploration + exploitation and an innovation portfolio (H1–H2–H3).** Improve the current core, extend into adjacent capability and create new future options, with explicit allocation and review. This is a planning concept — not a new subsystem, engine or database.
+- **Business-model and operating-model innovation** within approved commercial scope. Commercial-scope decisions remain governance decisions and are never invented by construction.
+- **Evidence-driven scaling, adaptation, replacement or retirement.** Every renewal outcome is improve, scale, adapt, replace or retire, chosen from measured evidence.
+- **Epistemic discipline.** Claims are labelled and kept distinct: **FACT** (authoritative evidence), **ASSUMPTION** (believed, unverified), **HYPOTHESIS** (falsifiable proposition), **EXPERIMENT** (bounded test), **MEASURED RESULT** (observed outcome), **DECISION** (governed choice). An assumption or hypothesis must never be presented as a fact or a measured result.
+
+The permanent renewal loop is:
+
+```text
+OBSERVE → QUESTION → IMAGINE → FORM HYPOTHESIS → EXPERIMENT
+→ MEASURE → LEARN → IMPROVE / SCALE / REPLACE / RETIRE → OBSERVE AGAIN
+```
+
+This is integrated with the capability-provider leverage and reuse-before-rebuild rules above: renewal first searches existing science, standards and free/open-source capabilities before inventing. The combined decision model is:
+
+```text
+UNDERSTAND THE PROBLEM → OBSERVE THE CURRENT SYSTEM → CHALLENGE ASSUMPTIONS
+→ SEARCH EXISTING SCIENCE / STANDARDS / FREE OPEN-SOURCE CAPABILITIES
+→ INVENT ONLY WHERE NECESSARY → EXPERIMENT WHEN UNCERTAINTY IS MATERIAL
+→ MEASURE → GOVERN → INTEGRATE → SCALE OR RETIRE
+```
+
+Externally sourced software admitted through renewal remains subject to the enforceable permitted class (**free + open source + licensed for commercial use + self-hosted/offline-suitable** where required); an unverifiable license or commercial-use right is `DEFERRED`, never assumed. The governing law is `Docs/HOOSHYAROS_CAPABILITY_PROVIDER_LEVERAGE_LAW.md` and the canonical mechanism is `Backend/HBOS/Product/CapabilityProviderRegistry.ts`.
+
+This principle introduces no new engine, registry, innovation subsystem, strategy database, product runtime, parallel orchestration hierarchy or governance hierarchy, and does not mutate Architecture Freeze V4/V4.1. A genuine architectural contradiction still routes through the existing Architecture Change Control path.
+
 ---
 
 ## 4. Permanent Engineering Logic
