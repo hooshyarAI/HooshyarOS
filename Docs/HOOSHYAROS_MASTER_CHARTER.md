@@ -650,6 +650,8 @@ Deferred-item classification (exactly one each, 2026-09-19):
 | Dual `EngineRegistry` (`Core/` vs `Engines/`) | `GOVERNED_DECISION_REQUIRED` (governed architecture change) |
 | SQLite schema-migration mechanism | `VALIDLY_DEFERRED` (latent; no current schema change) |
 
+**Fresh post-renewal audit — 2026-09-20 (non-stage; docs-only).** After the Strategic Renewal and Continuous Innovation Law was added (§6.4, plus Governance Charter §3 and Capability Provider Leverage Law §13), the nine items above were re-inspected at current HEAD `2c751dde` against current code, not copied from the 2026-09-19 audit. All nine classifications were confirmed unchanged and no `IMPLEMENT_NOW` / `HOST_EXECUTABLE_NOW` item exists, so no capability was implemented. The `GOVERNED_DECISION_REQUIRED` items were recorded as bounded decision packages (exact decision, impacted boundary, available evidence, missing information) and kept blocked pending the proper authority. Record: `.kilo/plans/post-renewal-decision-packages-2026-09-20.md`.
+
 #### 15.1.1c Superseded Baseline — `governed-commercialization-b1-b5-truth-2026-09-16`
 
 | Field | Value |
