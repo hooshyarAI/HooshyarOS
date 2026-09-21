@@ -36,24 +36,36 @@ canonical `FinancialDataIngestionAdapter`.
 | `DOCX` | `contentBase64` | `ingestDocxBytes` | `mammoth` text + table extraction; legacy `.doc` rejected explicitly |
 | `XLSX` | `contentBase64` | `ingestXlsx` | `exceljs-hardened`, formula values only, zip-bomb limits |
 | `PDF` (text-native) | `contentBase64` | `ingestPdfBytes` | `pdf-parse` via `acquirePdf`; extracted text normalized through the canonical ledger (CSV) pipeline; original-byte SHA-256 provenance |
+| `PDF` (scanned/image-only) | `contentBase64` | `ingestScannedPdfBytes` | `pdf-parse` page rasterizer + admitted offline `tesseract.js` OCR (`fas+eng`); OCR text normalized through the SAME canonical pipeline; original-byte SHA-256 provenance plus OCR engine/version/confidence provenance |
 
 All formats converge on the **one** canonical owner
 (`FinancialDataIngestionAdapter`) and the **one** validation/normalization/
 persistence/provenance pipeline. No format-specific intelligence engine and no
 second adapter exists.
 
+### OCR (scanned/image-only PDF)
+
+- **Supported.** A PDF whose average extracted characters per page is below the
+  conservative threshold is routed by `FinancialIngestionService` to the
+  canonical OCR route: `PdfPageRasterizer` (admitted `pdf-parse` screenshots)
+  → `ScannedPdfRouter` → `OcrAdapter` (`createCanonicalOcrAdapter`, admitted
+  `tesseract.js`) → the SAME canonical ledger pipeline as native text.
+- **Offline by construction.** The engine runs in-process (WASM core) and reads
+  language data only from the declared `@tesseract.js-data/eng` and
+  `@tesseract.js-data/fas` packages staged into a local directory
+  (`cacheMethod: "none"`); there is no runtime CDN/network fetch.
+- **Bounded.** `PdfPageRasterizer` bounds page count and per-page byte size
+  before OCR; `ScannedPdfRouter` bounds per-page OCR time.
+- **Truthful provenance.** `evidence.ocr` records engine identity/version,
+  measured mean confidence and language; the model's SHA-256 remains the
+  ORIGINAL PDF-byte hash.
+- **Fail-closed.** When the OCR provider is not admitted, scanned PDFs keep the
+  precise `ingestion-pdf-scanned-no-ocr-yet` (422) limitation. When OCR runs but
+  produces no text, the request fails closed with `ingestion-ocr-empty` (422).
+  No text is ever fabricated.
+
 ### Deliberately NOT supported
 
-- **PDF (scanned/image-only)** — text-native PDF is supported. A PDF whose
-  average extracted characters per page is below the conservative threshold is
-  rejected with the precise error `ingestion-pdf-scanned-no-ocr-yet` (422). The
-  governed OCR route (`FinancialDataIngestionAdapter.ingestScannedPdfBytes` +
-  `ScannedPdfRouter` + the admitted `pdf-parse` page rasterizer) exists and is
-  focused-tested through an **injected** OCR adapter, but no OCR **engine**
-  provider is admitted yet, so the commercial runtime never performs OCR and
-  never fakes it. OCR is recorded as `DEFERRED` in the canonical
-  capability-provider inventory (`CapabilityProviderRegistry`) with explicit
-  unmet admission conditions; see `Docs/HOOSHYAROS_CAPABILITY_PROVIDER_LEVERAGE_LAW.md`.
 - **DOC** (legacy binary Word) — rejected explicitly with
   `ingestion-doc-not-supported`; customers convert to DOCX. LibreOffice headless
   conversion is evaluated and `DEFERRED` (deployment/security footprint).
@@ -63,10 +75,11 @@ second adapter exists.
 - **Broader document fallback (Apache Tika)** — evaluated and `DEFERRED`: the
   JVM runtime/deployment/security footprint is not justified while the direct
   providers cover the primary commercial input families.
-- **Images via the runtime** — not exposed as an `IngestionFormat` until OCR is
-  admitted; `ingestFile` returns `ingestion-image-requires-ocr`.
+- **Images via the runtime** — not exposed as an `IngestionFormat`;
+  `ingestFile` returns `ingestion-image-requires-ocr`.
   `FinancialDataIngestionAdapter.ingestImageBytes` is the governed boundary and
-  fails closed with `ingestion-ocr-unsupported` when no engine is available.
+  requires an explicit OCR adapter; it fails closed (`ingestion-ocr-*`) rather
+  than fabricating text.
 
 ---
 
@@ -156,7 +169,9 @@ Unsupported/ambiguous input is rejected before any model is persisted:
 | `INGEST_FORMAT_UNSUPPORTED` (400) | `format` is not CSV/STRUCTURED/XLSX/TXT/TSV/HTML/XML/DOCX/PDF |
 | `CONTENT_REQUIRED` / `CONTENT_BASE64_REQUIRED` (400) | payload missing content (XLSX/PDF/DOCX require `contentBase64`) |
 | `SOURCE_NAME_REQUIRED` (400) | empty source name |
-| `ingestion-pdf-scanned-no-ocr-yet` (422) | scanned/image-only/unextractable PDF — text-native PDF required, no OCR is performed |
+| `ingestion-pdf-scanned-no-ocr-yet` (422) | scanned/image-only PDF when the OCR provider is not admitted; `FinancialIngestionService` otherwise OCRs it |
+| `ingestion-ocr-empty` (422) | OCR ran but produced no text; nothing is fabricated |
+| `ingestion-ocr-unsupported` (422) | OCR engine or its local language data is unavailable (fails closed, never fetches from a CDN) |
 | `ingestion-pdf-unsupported` (422) | bytes lack a valid `%PDF` signature |
 | `ingestion-pdf-empty` / `ingestion-pdf-corrupt` / `ingestion-pdf-password-protected` (422) | empty, malformed or password-protected PDF |
 | `ingestion-*` (422) | canonical validation/normalization error (e.g. `ingestion-double-sided-row:2`, `ingestion-excel-parse-error`) |

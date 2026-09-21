@@ -65,6 +65,11 @@ function buildTextPdf(lines) {
   return buildPdf(`BT\n/F1 11 Tf\n${body}\nET`);
 }
 
+// Real scanned/image-only PDF fixtures (shared with the PDF ingestion
+// acceptance): the page is an image XObject with no text layer, so the runtime
+// must rasterize and OCR it through the admitted tesseract.js provider.
+const { buildLedgerScannedPdf, buildBlankScannedPdf } = require(path.join(root, 'scripts', 'lib', 'scanned-pdf-fixture.cjs'));
+
 async function waitHealth(child) {
   const deadline = Date.now() + 30000;
   while (Date.now() < deadline) {
@@ -127,8 +132,10 @@ async function main() {
     if (xlsxAnalysis.status !== 200 || xlsxAnalysis.body.ingestedSource?.sourceType !== 'XLSX' || xlsxAnalysis.body.metrics?.profit !== 1000) throw new Error(`WEB_ACCEPTANCE_XLSX_ANALYSIS_FAILED:${xlsxAnalysis.status}`);
 
     // PDF capability: a real text-native PDF must ingest through the canonical
-    // runtime and reach canonical financial analysis; a scanned-only PDF must
-    // fail closed with the precise no-OCR limitation (never as CSV, never offline).
+    // runtime and reach canonical financial analysis; a real scanned/image-only
+    // PDF must be rasterized and OCR'd (offline tesseract.js) into the same
+    // canonical model, and an image-only PDF with no recognizable text must
+    // fail closed precisely (never as CSV, never offline).
     const pdfCsv = ['date,account,debit,credit,currency', '2026-08-07,Cash,400,0,IRR', '2026-08-07,Sales,0,400,IRR'].join('\n');
     const pdfBytes = buildTextPdf(pdfCsv.split('\n'));
     const pdfSha = createHash('sha256').update(pdfBytes).digest('hex');
@@ -138,9 +145,16 @@ async function main() {
     await sleep(1100);
     const pdfAnalysis = await request('/api/financial/analyze', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceSha256: pdfIngest.body.evidence.sha256, assets: 10000, liabilities: 4000 }) });
     if (pdfAnalysis.status !== 200 || pdfAnalysis.body.status !== 'READY' || pdfAnalysis.body.ingestedSource?.sourceType !== 'PDF') throw new Error(`WEB_ACCEPTANCE_PDF_ANALYSIS_FAILED:${pdfAnalysis.status}:${JSON.stringify(pdfAnalysis.body)}`);
+
+    const scannedBytes = buildLedgerScannedPdf(pdfCsv.split('\n'));
+    const scannedSha = createHash('sha256').update(scannedBytes).digest('hex');
     await sleep(1100);
-    const scannedPdfIngest = await request('/api/ingest', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceName: 'web-qa-scan.pdf', format: 'PDF', contentBase64: buildPdf('0 0 200 200 re f').toString('base64') }) });
-    if (scannedPdfIngest.status !== 422 || scannedPdfIngest.body.error !== 'ingestion-pdf-scanned-no-ocr-yet') throw new Error(`WEB_ACCEPTANCE_PDF_BOUNDARY_FAILED:${scannedPdfIngest.status}:${JSON.stringify(scannedPdfIngest.body)}`);
+    const scannedPdfIngest = await request('/api/ingest', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceName: 'web-qa-scan.pdf', format: 'PDF', contentBase64: scannedBytes.toString('base64') }) });
+    if (scannedPdfIngest.status !== 201 || scannedPdfIngest.body.evidence?.sha256 !== scannedSha || scannedPdfIngest.body.transactionCount !== 2) throw new Error(`WEB_ACCEPTANCE_SCANNED_PDF_OCR_FAILED:${scannedPdfIngest.status}:${JSON.stringify(scannedPdfIngest.body)}`);
+    if (scannedPdfIngest.body.evidence?.ocr?.ocrEngine !== 'tesseract.js') throw new Error(`WEB_ACCEPTANCE_SCANNED_PDF_OCR_PROVENANCE_FAILED:${JSON.stringify(scannedPdfIngest.body.evidence?.ocr)}`);
+    await sleep(1100);
+    const blankScannedIngest = await request('/api/ingest', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceName: 'web-qa-blank-scan.pdf', format: 'PDF', contentBase64: buildBlankScannedPdf().toString('base64') }) });
+    if (blankScannedIngest.status !== 422 || blankScannedIngest.body.error !== 'ingestion-ocr-empty') throw new Error(`WEB_ACCEPTANCE_SCANNED_PDF_BOUNDARY_FAILED:${blankScannedIngest.status}:${JSON.stringify(blankScannedIngest.body)}`);
 
     // K8: real browser offline transport against the real runtime — network loss
     // queues work durably, reload preserves it, reconnect synchronizes it, and a

@@ -140,10 +140,11 @@ Text-native PDF ingestion is the reference implementation: a standard library ex
 Multi-format acquisition follows the same pattern and converges on the one canonical owner (`FinancialDataIngestionAdapter`):
 
 - `document.pdf.rasterize` — `pdf-parse` page screenshots behind `Product/PdfPageRasterizer.ts` (INTEGRATED);
+- `document.pdf.ocr` — `tesseract.js` (Apache-2.0) behind `Product/OcrAdapter.ts`, with language data from the declared `@tesseract.js-data/eng` and `@tesseract.js-data/fas` packages staged into a local directory (INTEGRATED, fully offline: no runtime CDN/network fetch);
 - `document.docx.text` — `mammoth` text + tables behind `Product/DocxAcquisition.ts` (INTEGRATED);
 - `document.html.text` / `document.xml.text` / `text.tsv.parse` — internal capabilities in `Product/MarkupTextExtraction.ts` and the canonical delimiter parser (INTEGRATED).
 
-Scanned / image-only PDF remains the honest limitation. The rendering half and the governed routing path (`FinancialDataIngestionAdapter.ingestScannedPdfBytes` + `ScannedPdfRouter`) exist and are focused-tested through an injected engine, but the OCR **engine** provider (`document.pdf.ocr`, `tesseract.js`) is recorded as `DEFERRED` with explicit unmet conditions; no OCR provider is installed or claimed until it satisfies this law. Long-tail formats (RTF, ODT, PPTX, EPUB, EML, MSG, DBF, YAML, TIFF, legacy XLS) and broad fallbacks (Apache Tika, LibreOffice headless) are recorded as `DEFERRED` with their rejection reasons; none is claimed as supported.
+Scanned / image-only PDF is now supported end-to-end. `FinancialIngestionService` routes an image-only PDF through the admitted rasterizer → `ScannedPdfRouter` → `OcrAdapter` (`createCanonicalOcrAdapter`) → the same canonical ledger pipeline, preserving the ORIGINAL-byte SHA-256 and recording OCR engine/version/confidence provenance. When the OCR provider is not admitted the precise `ingestion-pdf-scanned-no-ocr-yet` limitation is preserved, and when OCR yields no text the request fails closed with `ingestion-ocr-empty`; no OCR result is ever faked. Long-tail formats (RTF, ODT, PPTX, EPUB, EML, MSG, DBF, YAML, TIFF, legacy XLS) and broad fallbacks (Apache Tika, LibreOffice headless) remain recorded as `DEFERRED` with their rejection reasons; none is claimed as supported.
 
 ## 13. Strategic renewal integration — PERMANENT
 

@@ -103,7 +103,7 @@ describe("CapabilityProviderRegistry — governed reuse/admission", () => {
       expect(assessment.admitted).toBe(false);
       expect(assessment.reasons).toContain(`status-not-approved:${candidate.status}`);
     }
-    expect(registry.assess("pdf-ocr-tesseract").requiredActions.length).toBeGreaterThan(0);
+    expect(registry.assess("document-xls-legacy").requiredActions.length).toBeGreaterThan(0);
   });
 
   test("fails closed when an external provider has no verified license", () => {
@@ -137,10 +137,18 @@ describe("CapabilityProviderRegistry — governed reuse/admission", () => {
     expect(registry.selectProvider("document.pdf.text").capabilityId).toBe("pdf-text-native");
   });
 
-  test("fails closed when the only provider for a capability is deferred (OCR)", () => {
+  test("selects the admitted integrated OCR provider for scanned PDFs", () => {
     const registry = new CapabilityProviderRegistry();
-    expect(() => registry.selectProvider("document.pdf.ocr"))
-      .toThrow(`${CAPABILITY_PROVIDER_ERROR_CODES.NOT_ADMITTED}:document.pdf.ocr`);
+    const provider = registry.selectProvider("document.pdf.ocr");
+    expect(provider.capabilityId).toBe("pdf-ocr-tesseract");
+    expect(provider.integration).toBe("INTEGRATED");
+    expect(provider.selfHostedOffline).toBe(true);
+  });
+
+  test("fails closed when the only provider for a capability is deferred (legacy XLS)", () => {
+    const registry = new CapabilityProviderRegistry();
+    expect(() => registry.selectProvider("document.xls.parse"))
+      .toThrow(`${CAPABILITY_PROVIDER_ERROR_CODES.NOT_ADMITTED}:document.xls.parse`);
   });
 
   test("selection prefers the earliest admissible reuse tier", () => {

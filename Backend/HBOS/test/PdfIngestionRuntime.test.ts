@@ -9,17 +9,51 @@
  *
  * The real `pdf-parse` byte->text behaviour is qualified separately under tsx
  * by `scripts/pdf-ingestion-acceptance.ts`.
+ *
+ * Scanned PDFs now exercise the REAL OCR path: the mocked parser yields a
+ * canvas-rendered page image and the REAL tesseract.js engine with REAL local
+ * language data (no network) recognizes it into the canonical model.
  */
 import { createHash } from "node:crypto";
 import { Server } from "node:http";
+import { createRequire } from "node:module";
+import { join, resolve } from "node:path";
 import { PDFParse } from "pdf-parse";
 import { SQLitePersistenceStore } from "../Product/SQLitePersistenceStore";
 import { FinancialIngestionService } from "../Product/FinancialIngestionService";
+import {
+  CapabilityProviderRegistry,
+  HOOSHYAROS_CAPABILITY_PROVIDER_INVENTORY,
+  type CapabilityProviderCandidate,
+} from "../Product/CapabilityProviderRegistry";
 import { createCommercialRuntimeServer } from "../Autonomous/Runtime/CommercialRuntimeServer";
 
 jest.mock("pdf-parse", () => ({ PDFParse: jest.fn() }));
 
+const REPO_ROOT = resolve(__dirname, "..", "..", "..");
+const nodeRequire = createRequire(join(REPO_ROOT, "package.json"));
+
 const PDFParseMock = PDFParse as unknown as jest.Mock;
+
+/** Render ledger lines to a real PNG so the admitted OCR engine has real input. */
+function renderLedgerPng(lines: string[]): Buffer {
+  const canvas = nodeRequire("@napi-rs/canvas").createCanvas(900, 70 + lines.length * 50);
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#000000";
+  ctx.font = "30px sans-serif";
+  lines.forEach((line, index) => ctx.fillText(line, 15, 55 + index * 45));
+  return canvas.toBuffer("image/png");
+}
+
+function blankPng(): Buffer {
+  const canvas = nodeRequire("@napi-rs/canvas").createCanvas(240, 120);
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, 240, 120);
+  return canvas.toBuffer("image/png");
+}
 
 const PDF_CSV = [
   "date,account,debit,credit,currency",
@@ -46,12 +80,24 @@ function mockTextPdf(text: string): void {
   }));
 }
 
-function mockScannedPdf(): void {
+function mockScannedPdf(rendered?: Buffer): void {
+  const image = rendered ?? blankPng();
   PDFParseMock.mockImplementation(() => ({
     getInfo: async () => ({ info: {}, metadata: null, total: 1 }),
     getText: async () => ({ pages: [{ num: 1, text: "" }], text: "", total: 1, getPageText: () => "" }),
+    getScreenshot: async () => ({ pages: [{ data: image, width: 900, height: 300 }] }),
     destroy: async () => undefined,
   }));
+}
+
+/** Registry where the OCR capability is not admitted (its prior deferred state). */
+function registryWithoutOcr(): CapabilityProviderRegistry {
+  const inventory = HOOSHYAROS_CAPABILITY_PROVIDER_INVENTORY.map((entry) =>
+    entry.capabilityId === "pdf-ocr-tesseract"
+      ? ({ ...entry, status: "DEFERRED", integration: "NOT_INTEGRATED" } as CapabilityProviderCandidate)
+      : entry,
+  );
+  return new CapabilityProviderRegistry(inventory);
 }
 
 describe("PDF canonical ingestion — composition service", () => {
@@ -118,7 +164,32 @@ describe("PDF canonical ingestion — composition service", () => {
     persistence.close();
   });
 
-  test("scanned/image-only PDF fails closed with the precise no-OCR error and persists nothing", async () => {
+  test("a scanned/image-only PDF is OCR'd into the canonical model with truthful provenance", async () => {
+    mockScannedPdf(renderLedgerPng(PDF_CSV.split("\n")));
+    const persistence = new SQLitePersistenceStore({ databasePath: ":memory:" });
+    const service = new FinancialIngestionService(persistence);
+    const bytes = makePdfBytes("scan-ocr");
+
+    const outcome = await service.ingest("tenant-a", {
+      sourceName: "scan.pdf",
+      format: "PDF",
+      contentBase64: bytes.toString("base64"),
+    });
+
+    // OCR-derived text is normalized through the SAME canonical validation as
+    // native text, and provenance stays anchored to the ORIGINAL PDF bytes.
+    expect(outcome.result.evidence.sourceType).toBe("PDF");
+    expect(outcome.result.evidence.sha256).toBe(SHA(bytes));
+    expect(outcome.result.model.transactions).toHaveLength(4);
+    expect(outcome.result.model.totals).toEqual({ debit: 1250, credit: 1250, balance: 0 });
+    expect(outcome.result.evidence.ocr?.ocrEngine).toBe("tesseract.js");
+    expect(outcome.result.evidence.ocr?.ocrLanguage).toBe("fas+eng");
+    expect(outcome.result.evidence.ocr?.ocrConfidence).not.toBeNull();
+
+    persistence.close();
+  }, 120000);
+
+  test("a scanned PDF with no recognizable text fails closed and persists nothing", async () => {
     mockScannedPdf();
     const persistence = new SQLitePersistenceStore({ databasePath: ":memory:" });
     const service = new FinancialIngestionService(persistence);
@@ -126,7 +197,22 @@ describe("PDF canonical ingestion — composition service", () => {
     await expect(service.ingest("tenant-a", {
       sourceName: "scan.pdf",
       format: "PDF",
-      contentBase64: makePdfBytes("scan").toString("base64"),
+      contentBase64: makePdfBytes("scan-blank").toString("base64"),
+    })).rejects.toThrow("ingestion-ocr-empty");
+
+    expect(await service.listSources("tenant-a")).toHaveLength(0);
+    persistence.close();
+  }, 120000);
+
+  test("preserves the precise no-OCR limitation when the OCR provider is not admitted", async () => {
+    mockScannedPdf(renderLedgerPng(PDF_CSV.split("\n")));
+    const persistence = new SQLitePersistenceStore({ databasePath: ":memory:" });
+    const service = new FinancialIngestionService(persistence, undefined, registryWithoutOcr());
+
+    await expect(service.ingest("tenant-a", {
+      sourceName: "scan.pdf",
+      format: "PDF",
+      contentBase64: makePdfBytes("scan-deferred").toString("base64"),
     })).rejects.toThrow("ingestion-pdf-scanned-no-ocr-yet");
 
     expect(await service.listSources("tenant-a")).toHaveLength(0);
@@ -232,18 +318,37 @@ describe("PDF ingestion — real HTTP runtime endpoints", () => {
     expect((await evidence.json()).source.contentEncoding).toBe("base64");
   });
 
-  test("POST /api/ingest rejects a scanned-only PDF with the precise no-OCR error", async () => {
-    mockScannedPdf();
+  test("POST /api/ingest OCRs a scanned PDF into the canonical model", async () => {
+    mockScannedPdf(renderLedgerPng(PDF_CSV.split("\n")));
     const cookie = await register("pdf-scan-owner", "PDF Scan Org");
+    const bytes = makePdfBytes("scan-http-ocr");
 
     const ingested = await request("/api/ingest", {
       method: "POST",
       headers: { "content-type": "application/json", cookie },
-      body: JSON.stringify({ sourceName: "scan.pdf", format: "PDF", contentBase64: makePdfBytes("scan").toString("base64") }),
+      body: JSON.stringify({ sourceName: "scan.pdf", format: "PDF", contentBase64: bytes.toString("base64") }),
+    });
+    expect(ingested.status).toBe(201);
+    const body = await ingested.json();
+    expect(body.evidence.sourceType).toBe("PDF");
+    expect(body.evidence.sha256).toBe(SHA(bytes));
+    expect(body.evidence.ocr.ocrEngine).toBe("tesseract.js");
+    expect(body.transactionCount).toBe(4);
+    expect(body.totals).toEqual({ debit: 1250, credit: 1250, balance: 0 });
+  }, 120000);
+
+  test("POST /api/ingest fails closed when a scanned PDF yields no OCR text", async () => {
+    mockScannedPdf();
+    const cookie = await register("pdf-scan-blank-owner", "PDF Scan Blank Org");
+
+    const ingested = await request("/api/ingest", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ sourceName: "scan.pdf", format: "PDF", contentBase64: makePdfBytes("scan-blank-http").toString("base64") }),
     });
     expect(ingested.status).toBe(422);
-    expect((await ingested.json()).error).toBe("ingestion-pdf-scanned-no-ocr-yet");
-  });
+    expect((await ingested.json()).error).toBe("ingestion-ocr-empty");
+  }, 120000);
 
   test("POST /api/ingest requires base64 content for PDF (never text content)", async () => {
     const cookie = await register("pdf-content-owner", "PDF Content Org");

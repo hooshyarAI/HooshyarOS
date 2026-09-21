@@ -914,12 +914,14 @@ export class FinancialDataIngestionAdapter {
   }
 
   /**
-   * Governed scanned/image-only PDF OCR route (supporting path, NOT the default
-   * PDF route). The caller must explicitly supply an OCR adapter and a page
-   * rasterizer, so no OCR engine can silently become a mandatory runtime
-   * dependency. Until an OCR engine is admitted in
-   * `CapabilityProviderRegistry` (`document.pdf.ocr` remains DEFERRED), the
-   * commercial ingestion service never reaches this method; it fails closed.
+   * Governed scanned/image-only PDF OCR route (supporting path). The caller
+   * supplies the OCR adapter and page rasterizer explicitly, so no OCR engine
+   * becomes a hidden mandatory dependency of the text-native route.
+   * `FinancialIngestionService` assembles this route from the admitted
+   * `document.pdf.ocr` provider (`Product/OcrAdapter.createCanonicalOcrAdapter`)
+   * and the admitted `document.pdf.rasterize` rasterizer; when no OCR provider
+   * is admitted the text-native route keeps failing closed with
+   * `ingestion-pdf-scanned-no-ocr-yet`.
    *
    * Provenance: the canonical model still uses the ORIGINAL PDF-byte SHA-256,
    * and the OCR engine identity/version/confidence/language is recorded on the

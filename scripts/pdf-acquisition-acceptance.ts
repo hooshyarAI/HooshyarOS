@@ -8,11 +8,14 @@
  * Proves:
  *   - a real text-native PDF yields extracted text and canonical transactions
  *     (it is NOT misclassified as scanned);
- *   - an image-only page fails closed with the precise scanned limitation;
- *   - no OCR is faked and no runtime PDF support is claimed.
+ *   - an image-only page fails closed with the precise scanned limitation at
+ *     the acquisition boundary (the runtime composition service routes scanned
+ *     PDFs to the admitted OCR path, qualified separately);
+ *   - no OCR is faked and no unsupported PDF claim is made here.
  *
- * PDF runtime ingestion remains deliberately unsupported (PRD boundary); this
- * script qualifies the existing acquisition helper, nothing more.
+ * This script qualifies the `PdfAcquisition` boundary only. Runtime PDF
+ * ingestion and the real scanned-PDF OCR path are qualified end-to-end by
+ * `scripts/pdf-ingestion-acceptance.ts`.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -101,11 +104,14 @@ async function main() {
 
   const evidence = {
     type: "PDF_ACQUISITION_ACCEPTANCE",
-    version: 1,
+    version: 2,
     status: "PASS",
     createdAt: new Date().toISOString(),
-    runtimePdfSupportClaimed: false,
+    scope: "PdfAcquisition text-native extraction boundary",
+    runtimePdfSupportClaimed: true,
+    runtimePdfQualifiedBy: "scripts/pdf-ingestion-acceptance.ts",
     ocrClaimed: false,
+    ocrQualifiedBy: "scripts/pdf-ingestion-acceptance.ts",
     checks,
     pageCount: document.pageCount,
     averageCharsPerPage: document.averageCharsPerPage,

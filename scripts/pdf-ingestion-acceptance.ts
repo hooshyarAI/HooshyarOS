@@ -10,15 +10,36 @@
  *     -> canonical financial model persisted under the ORIGINAL-byte SHA-256
  *     -> real HTTP POST /api/financial/analyze
  *     -> canonical Financial Intelligence Engine READY result;
- *   and a scanned/image-only PDF fails closed with the precise no-OCR error.
  *
- * No OCR is faked and no external network is used.
+ * and the REAL scanned/image-only PDF path introduced by the admitted OCR
+ * provider (tesseract.js + local language data):
+ *
+ *   real image-only PDF (no text layer)
+ *     -> real HTTP POST /api/ingest
+ *     -> canonical rasterizer (pdf-parse screenshots) per page
+ *     -> canonical OcrAdapter (tesseract.js, fully offline) recognize
+ *     -> OCR text normalized through the SAME canonical ledger pipeline
+ *     -> canonical financial model persisted under the ORIGINAL-byte SHA-256
+ *     -> real HTTP POST /api/financial/analyze -> READY;
+ *   and an image-only PDF with no recognizable text fails closed precisely.
+ *
+ * No OCR is faked, no stub engine is used and no external network is used.
  */
 import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import type { Server } from "node:http";
-import { resolve } from "node:path";
+import { createRequire } from "node:module";
+import { join, resolve } from "node:path";
 import { createCommercialRuntimeServer } from "../Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer";
+
+const nodeRequire = createRequire(join(resolve(__dirname, ".."), "package.json"));
+const {
+  buildLedgerScannedPdf,
+  buildBlankScannedPdf,
+} = nodeRequire("./scripts/lib/scanned-pdf-fixture.cjs") as {
+  buildLedgerScannedPdf: (lines: string[]) => Buffer;
+  buildBlankScannedPdf: () => Buffer;
+};
 
 function esc(value: string): string {
   return value.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
@@ -136,31 +157,81 @@ async function main(): Promise<void> {
     if (analyzeBody.metrics?.profit !== 0 || analyzeBody.metrics?.debtRatio !== 0.2) fail(`unexpected metrics: ${JSON.stringify(analyzeBody.metrics)}`);
     checks.push("pdf-financial-analysis-ready");
 
-    const scanned = buildPdf("0 0 200 200 re f");
+    const scannedLines = pdfCsv.split("\n");
+    const scanned = buildLedgerScannedPdf(scannedLines);
+    const scannedSha = createHash("sha256").update(scanned).digest("hex");
     const scannedIngest = await fetch(`${base}/api/ingest`, {
       method: "POST",
       headers: { "content-type": "application/json", cookie },
       body: JSON.stringify({ sourceName: "scan.pdf", format: "PDF", contentBase64: scanned.toString("base64") }),
     });
-    const scannedBody = await scannedIngest.json() as { error?: string };
-    if (scannedIngest.status !== 422 || scannedBody.error !== "ingestion-pdf-scanned-no-ocr-yet") {
-      fail(`scanned PDF did not fail closed precisely: ${scannedIngest.status}:${JSON.stringify(scannedBody)}`);
+    const scannedBody = await scannedIngest.json() as {
+      error?: string;
+      evidence?: { sourceType?: string; sha256?: string; ocr?: { ocrEngine?: string; ocrLanguage?: string; ocrConfidence?: number | null } };
+      source?: { sha256?: string };
+      totals?: { debit?: number; credit?: number };
+      transactionCount?: number;
+    };
+    if (scannedIngest.status !== 201) fail(`scanned PDF OCR ingest failed: ${scannedIngest.status}:${JSON.stringify(scannedBody)}`);
+    if (scannedBody.evidence?.sourceType !== "PDF") fail(`scanned PDF sourceType not preserved: ${JSON.stringify(scannedBody.evidence)}`);
+    if (scannedBody.evidence?.sha256 !== scannedSha) fail("scanned PDF original-byte SHA-256 provenance mismatch");
+    if (scannedBody.transactionCount !== 4) fail(`expected 4 OCR transactions, got ${scannedBody.transactionCount}`);
+    if (scannedBody.totals?.debit !== 1250 || scannedBody.totals?.credit !== 1250) fail(`unexpected OCR totals: ${JSON.stringify(scannedBody.totals)}`);
+    const scannedOcr = scannedBody.evidence?.ocr;
+    if (scannedOcr?.ocrEngine !== "tesseract.js") fail(`OCR engine not recorded: ${JSON.stringify(scannedOcr)}`);
+    if (scannedOcr?.ocrLanguage !== "fas+eng") fail(`OCR language not recorded: ${JSON.stringify(scannedOcr)}`);
+    if (!(typeof scannedOcr?.ocrConfidence === "number" && (scannedOcr.ocrConfidence ?? 0) > 0)) {
+      fail(`OCR confidence not measured: ${JSON.stringify(scannedOcr)}`);
     }
-    checks.push("scanned-pdf-precise-no-ocr-limitation");
+    checks.push("scanned-pdf-ocr-201", "scanned-pdf-original-byte-provenance", "scanned-pdf-ocr-provenance", "scanned-pdf-canonical-transactions");
+
+    const scannedAnalyze = await fetch(`${base}/api/financial/analyze`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ sourceSha256: scannedBody.evidence.sha256, assets: 5000, liabilities: 1000 }),
+    });
+    const scannedAnalyzeBody = await scannedAnalyze.json() as {
+      status?: string;
+      targetEngine?: string;
+      ingestedSource?: { sourceType?: string; transactionCount?: number };
+      metrics?: { profit?: number; debtRatio?: number };
+    };
+    if (scannedAnalyze.status !== 200 || scannedAnalyzeBody.status !== "READY") fail(`scanned PDF analysis failed: ${scannedAnalyze.status}:${JSON.stringify(scannedAnalyzeBody)}`);
+    if (scannedAnalyzeBody.ingestedSource?.transactionCount !== 4) fail("scanned PDF source not carried into analysis");
+    if (scannedAnalyzeBody.metrics?.profit !== 0 || scannedAnalyzeBody.metrics?.debtRatio !== 0.2) fail(`unexpected scanned metrics: ${JSON.stringify(scannedAnalyzeBody.metrics)}`);
+    checks.push("scanned-pdf-financial-analysis-ready");
+
+    const blankScanned = buildBlankScannedPdf();
+    const blankIngest = await fetch(`${base}/api/ingest`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ sourceName: "blank-scan.pdf", format: "PDF", contentBase64: blankScanned.toString("base64") }),
+    });
+    const blankBody = await blankIngest.json() as { error?: string };
+    if (blankIngest.status !== 422 || blankBody.error !== "ingestion-ocr-empty") {
+      fail(`blank scanned PDF did not fail closed precisely: ${blankIngest.status}:${JSON.stringify(blankBody)}`);
+    }
+    checks.push("blank-scanned-pdf-precise-fail-closed");
 
     const evidence = {
       type: "PDF_INGESTION_ACCEPTANCE",
-      version: 1,
+      version: 2,
       status: "PASS",
       createdAt: new Date().toISOString(),
       runtime: "real-node-tsx",
       pdfTextSupported: true,
-      ocrClaimed: false,
+      scannedPdfOcrSupported: true,
+      ocrClaimed: true,
+      ocrEngine: scannedOcr?.ocrEngine,
+      ocrLanguage: scannedOcr?.ocrLanguage,
       checks,
       originalSha256: expectedSha,
       transactionCount: ingestBody.transactionCount,
       analyzedEngine: analyzeBody.targetEngine,
-      scannedErrorCode: scannedBody.error,
+      scannedSha256: scannedSha,
+      scannedTransactionCount: scannedBody.transactionCount,
+      scannedConfidence: scannedOcr?.ocrConfidence,
+      blankScannedErrorCode: blankBody.error,
     };
     mkdirSync(resolve(process.cwd(), ".hooshyar"), { recursive: true });
     writeFileSync(resolve(process.cwd(), ".hooshyar", "pdf-ingestion-acceptance.json"), JSON.stringify(evidence, null, 2), "utf8");

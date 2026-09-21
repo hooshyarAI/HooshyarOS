@@ -22,12 +22,16 @@ import {
   SourceType,
   computeSourceSha256,
   type RawSourceRef,
+  type ScannedPdfOcrRoute,
 } from "./FinancialDataIngestionAdapter";
 import { decodeTextBytes } from "./TextFileDecoder";
 import {
   CapabilityProviderRegistry,
   type CapabilityCategory,
 } from "./CapabilityProviderRegistry";
+import { createCanonicalOcrAdapter, type OcrAdapter } from "./OcrAdapter";
+import { createPdfPageRasterizer } from "./PdfPageRasterizer";
+import { PDF_ERROR_CODES } from "./PdfAcquisition";
 
 export type IngestionFormat =
   | "CSV"
@@ -113,6 +117,23 @@ interface StoredRawSource {
 const isTextFormat = (format: IngestionFormat): boolean =>
   format !== "XLSX" && format !== "PDF" && format !== "DOCX";
 
+/**
+ * A resolved scanned-PDF OCR route plus its cleanup hook. The route is
+ * assembled from the admitted OCR provider (`document.pdf.ocr`) and the
+ * admitted rasterizer (`document.pdf.rasterize`); `null` means the capability
+ * is not admitted, in which case the original precise no-OCR limitation is
+ * preserved (nothing is faked).
+ */
+export interface ScannedPdfOcrRouteHandle {
+  readonly route: ScannedPdfOcrRoute;
+  dispose(): Promise<void>;
+}
+
+export type ScannedPdfOcrRouteFactory = (rawBytes: Buffer) => ScannedPdfOcrRouteHandle | null;
+
+/** Default OCR language set for the commercial ingestion path. */
+export const DEFAULT_OCR_LANGUAGE = "fas+eng";
+
 export class FinancialIngestionService {
   private readonly adapter: FinancialDataIngestionAdapter;
 
@@ -120,6 +141,7 @@ export class FinancialIngestionService {
     private readonly persistence: SQLitePersistenceStore,
     adapter?: FinancialDataIngestionAdapter,
     private readonly providers: CapabilityProviderRegistry = new CapabilityProviderRegistry(),
+    private readonly scannedPdfOcrRoute?: ScannedPdfOcrRouteFactory,
   ) {
     this.adapter = adapter ?? new FinancialDataIngestionAdapter(persistence);
   }
@@ -172,7 +194,7 @@ export class FinancialIngestionService {
         result = await this.adapter.ingestDocxBytes(normalizedTenant, sourceName, bytes);
         break;
       case "PDF":
-        result = await this.adapter.ingestPdfBytes(normalizedTenant, sourceName, bytes);
+        result = await this.ingestPdfDocument(normalizedTenant, sourceName, bytes);
         break;
       default:
         throw new Error("ingestion-format-unsupported");
@@ -209,6 +231,59 @@ export class FinancialIngestionService {
       const detail = error instanceof Error ? error.message : "unknown";
       throw new Error(`ingestion-provider-not-admitted:${detail}`);
     }
+  }
+
+  /**
+   * Canonical PDF ingestion. Text-native PDFs take the accepted route
+   * unchanged. A scanned/image-only PDF is routed to OCR only when the OCR
+   * capability is admitted and a route can be assembled; otherwise the precise
+   * `ingestion-pdf-scanned-no-ocr-yet` limitation is preserved (never faked).
+   */
+  private async ingestPdfDocument(
+    tenantId: string,
+    sourceName: string,
+    bytes: Buffer,
+  ): Promise<FinancialIngestionResult> {
+    try {
+      return await this.adapter.ingestPdfBytes(tenantId, sourceName, bytes);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (!message.includes(PDF_ERROR_CODES.SCANNED)) throw error;
+
+      const factory = this.scannedPdfOcrRoute ?? ((raw: Buffer) => this.createDefaultScannedPdfOcrRoute(raw));
+      const handle = factory(bytes);
+      if (!handle) throw error;
+
+      try {
+        return await this.adapter.ingestScannedPdfBytes(tenantId, sourceName, bytes, handle.route);
+      } finally {
+        await handle.dispose();
+      }
+    }
+  }
+
+  /**
+   * Assemble the scanned-PDF OCR route from the canonical provider registry.
+   * Returns `null` when `document.pdf.ocr` is not admitted, so scanned PDFs
+   * keep failing closed with the documented limitation instead of attempting a
+   * provider that has not passed admission.
+   */
+  private createDefaultScannedPdfOcrRoute(rawBytes: Buffer): ScannedPdfOcrRouteHandle | null {
+    try {
+      this.providers.selectProvider("document.pdf.ocr");
+    } catch {
+      return null;
+    }
+    const ocr: OcrAdapter = createCanonicalOcrAdapter({ language: DEFAULT_OCR_LANGUAGE });
+    const rasterizer = createPdfPageRasterizer({ rawBytes });
+    return {
+      route: {
+        ocr,
+        rasterizePage: (pageNumber: number) => rasterizer.rasterizePage(pageNumber),
+        language: DEFAULT_OCR_LANGUAGE,
+      },
+      dispose: () => rasterizer.destroy(),
+    };
   }
 
   async listSources(tenantId: string): Promise<SourceSummary[]> {

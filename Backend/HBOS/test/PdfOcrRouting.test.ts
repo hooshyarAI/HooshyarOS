@@ -8,8 +8,10 @@
  *     provenance anchored to the ORIGINAL bytes;
  *   - fail-closed behaviour when no OCR engine is available (no fake OCR).
  *
- * OCR remains DEFERRED in the provider inventory: these tests exercise the
- * route through an injected engine, never a claimed production engine.
+ * OCR is an admitted, integrated provider (`pdf-ocr-tesseract`, tesseract.js):
+ * these tests exercise the route through an injected engine and verify the
+ * engine-independent fail-closed boundaries; the real engine + real language
+ * data are covered by `OcrAdapter.test.ts` and `OcrProviderAdmission.test.ts`.
  */
 import { createHash } from "node:crypto";
 import { PDFParse } from "pdf-parse";
@@ -146,7 +148,7 @@ describe("FinancialDataIngestionAdapter — governed OCR routes", () => {
     expect(result.evidence.ocr?.ocrLanguage).toBe("eng");
   });
 
-  test("image OCR is ingested with original-image provenance and fails closed without an engine", async () => {
+  test("image OCR is ingested with original-image provenance and fails closed when recognition fails", async () => {
     const png = Buffer.concat([
       Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
       Buffer.alloc(32, 0xab),
@@ -159,8 +161,11 @@ describe("FinancialDataIngestionAdapter — governed OCR routes", () => {
     expect(result.evidence.sha256).toBe(createHash("sha256").update(png).digest("hex"));
     expect(result.evidence.ocr?.ocrEngine).toBe("stub-ocr");
 
-    const missingEngine = new TesseractOcrAdapter();
-    await expect(adapter.ingestImageBytes("t1", "scan.png", png, missingEngine))
-      .rejects.toThrow(/ingestion-ocr-unsupported/);
+    // Fail closed when the engine cannot recognize: no text may be fabricated.
+    const failingEngine = new TesseractOcrAdapter({
+      engine: { recognize: async () => { throw new Error("ocr-engine-unavailable"); } },
+    });
+    await expect(adapter.ingestImageBytes("t1", "scan.png", png, failingEngine))
+      .rejects.toThrow(/ingestion-ocr-recognize-failed/);
   });
 });

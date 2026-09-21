@@ -246,8 +246,11 @@ describe("CapabilityProviderRegistry — multi-format provider admission", () =>
     expect(registry.selectProvider("text.tsv.parse").capabilityId).toBe("text-tsv-internal");
   });
 
-  test("OCR engine remains fail-closed (no admitted provider)", () => {
-    expect(() => registry.selectProvider("document.pdf.ocr")).toThrow(/capability-provider-not-admitted/);
+  test("selects the admitted OCR provider for scanned PDFs", () => {
+    const provider = registry.selectProvider("document.pdf.ocr");
+    expect(provider.capabilityId).toBe("pdf-ocr-tesseract");
+    expect(provider.integration).toBe("INTEGRATED");
+    expect(provider.selfHostedOffline).toBe(true);
   });
 
   test("long-tail formats are recorded but never admitted", () => {

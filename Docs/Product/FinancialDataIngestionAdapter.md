@@ -17,7 +17,7 @@ Canonical multi-format financial data ingestion with tenant isolation and persis
 - **STRUCTURED (JSON)** — JSON with `transactions` array containing financial transactions
 - **TXT** — decoded UTF-8 / UTF-8 BOM / UTF-16 LE / UTF-16 BE text, normalized through the canonical ledger pipeline
 - **XLSX** — Microsoft Excel 2007+ format (.xlsx files) ✅ SUPPORTED
-- **PDF (text-native)** — `.pdf` files with an extractable text layer, via the existing `pdf-parse`-backed `PdfAcquisition` helper (`ingestPdfBytes`); extracted text is normalized through the same canonical ledger (CSV) pipeline. Scanned/image-only PDF is **not supported without OCR** and fails closed with `ingestion-pdf-scanned-no-ocr-yet`.
+- **PDF (text-native)** — `.pdf` files with an extractable text layer, via the existing `pdf-parse`-backed `PdfAcquisition` helper (`ingestPdfBytes`); extracted text is normalized through the same canonical ledger (CSV) pipeline. Scanned/image-only PDF is supported through the governed OCR route (`ingestScannedPdfBytes` with the admitted offline `tesseract.js` provider), and fails closed precisely when OCR is unavailable or yields no text.
 - **XLS** — Microsoft Excel 97-2003 format (.xls files) — **BLOCKED** (pending dependency resolution)
 
 ---
@@ -122,8 +122,10 @@ second parser is introduced).
   characters per page is below the conservative scanned threshold.
 
 **Failure behaviour (fail closed, truthful):**
-- `ingestion-pdf-scanned-no-ocr-yet` — scanned/image-only/unextractable PDF. No
-  OCR is attempted and no OCR success is faked.
+- `ingestion-pdf-scanned-no-ocr-yet` — scanned/image-only/unextractable PDF
+  reaching `ingestPdfBytes` (the text-native route). The runtime composition
+  service routes such a document to the admitted OCR route
+  (`ingestScannedPdfBytes`) instead of failing; no OCR success is ever faked.
 - `ingestion-pdf-unsupported` — bytes lack a valid `%PDF` signature.
 - `ingestion-pdf-empty` / `ingestion-pdf-corrupt` / `ingestion-pdf-password-protected`.
 - `ingestion-format-mismatch` — extension does not match a PDF payload.
@@ -154,7 +156,17 @@ through the canonical ledger pipeline.
 Extract text from a text-native PDF via the `PdfAcquisition` helper and ingest
 through the canonical ledger pipeline. Preserves the original PDF-byte SHA-256
 as the model's `source.sha256`; scanned/image-only PDF fails closed with
-`ingestion-pdf-scanned-no-ocr-yet`.
+`ingestion-pdf-scanned-no-ocr-yet` (the runtime composition service routes
+scanned PDFs to `ingestScannedPdfBytes` instead).
+
+### `ingestScannedPdfBytes(tenantId, sourceName, rawBytes, route)`
+
+OCR route for scanned/image-only PDFs: `PdfPageRasterizer` renders the pages,
+`ScannedPdfRouter` decides per page, and the caller-supplied `OcrAdapter`
+recognizes them. OCR text is normalized through the SAME canonical ledger
+pipeline, the model's `source.sha256` stays the ORIGINAL PDF-byte hash, and
+`source.ocr` records engine identity/version, measured mean confidence and
+language. Fails closed when OCR yields no text (`ingestion-ocr-empty`).
 
 ### `ingestBatch(tenantId, sourcePaths)`
 
