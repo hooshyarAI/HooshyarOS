@@ -267,6 +267,23 @@ async function runCustomerJourney() {
   }
   checks.push('pdf-boundary');
 
+  // Regression guard for scanned PDFs whose Base64 JSON envelope exceeds the old 8 MiB request cap.
+  // The payload is intentionally malformed/unsupported; this test proves the request reaches the
+  // ingestion contract instead of being rejected solely by the transport-size ceiling.
+  const transportSizedPdf = Buffer.concat([
+    Buffer.from('%PDF-1.7\\n', 'latin1'),
+    Buffer.alloc(7 * 1024 * 1024, 0x25),
+    Buffer.from('\\n%%EOF\\n', 'latin1'),
+  ]);
+  const transportSized = await request('/api/ingest', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', cookie },
+    body: JSON.stringify({ sourceName: 'transport-sized.pdf', format: 'PDF', contentBase64: transportSizedPdf.toString('base64') }),
+  });
+  if (transportSized.status === 413) fail('installed large-PDF transport regressed to 413 Payload Too Large');
+  if (transportSized.status !== 422) fail(`installed large-PDF transport boundary unexpected: ${transportSized.status}:${transportSized.body.error ?? 'missing-error'}`);
+  checks.push('large-pdf-transport-boundary');
+
   const csv = ['date,account,debit,credit,currency', '2026-08-01,Cash,1000,0,IRR', '2026-08-02,Sales,0,1500,IRR', '2026-08-03,Expense,300,0,IRR'].join('\n');
   await sleep(1100);
   const ingest = await request('/api/ingest', {

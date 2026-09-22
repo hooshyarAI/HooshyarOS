@@ -73,7 +73,7 @@ export interface CommercialRuntimeOptions {
 
 const WEB_ROOT = resolve(process.cwd(), "web");
 const MAX_BODY_BYTES = 1024 * 1024;
-const INGEST_BODY_BYTES = 8 * 1024 * 1024;
+const INGEST_BODY_BYTES = 32 * 1024 * 1024; // Base64 JSON transport supports scanned PDFs up to ~24 MiB raw bytes.
 const LATEST_ANALYSIS_KEY = "financial-analysis:latest";
 const LATEST_EXECUTIVE_WORKBENCH_KEY = "executive-intelligence-workbench:latest";
 const LATEST_DECISION_WORKBENCH_KEY = "decision-workbench:latest";

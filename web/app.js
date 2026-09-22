@@ -77,6 +77,9 @@ function describeFailure(error) {
     case 'HTTP_5XX':
       return `خطای موقت سرویس: ${message}`;
     case 'VALIDATION_FAILURE':
+      if (message === 'request-body-too-large') {
+        return 'حجم فایل برای ارسال بیشتر از سقف مجاز است؛ فایل کوچک‌تر یا نسخه فشرده‌تر انتخاب کنید.';
+      }
       if (message === 'INGEST_FORMAT_UNSUPPORTED') {
         return 'این فرمت فایل در حال حاضر پشتیبانی نمی‌شود (DOCX/XLS/تصویر)؛ فایل CSV، JSON، TXT، XLSX یا PDF متن‌محور انتخاب کنید.';
       }
