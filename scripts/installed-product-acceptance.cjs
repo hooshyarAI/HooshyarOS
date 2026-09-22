@@ -262,7 +262,9 @@ async function runCustomerJourney() {
     headers: { 'content-type': 'application/json', cookie },
     body: JSON.stringify({ sourceName: 'installed.pdf', format: 'PDF', contentBase64: Buffer.from('%PDF-1.7\n%%EOF\n', 'latin1').toString('base64') }),
   });
-  if (pdfIngest.status !== 400 || pdfIngest.body.error !== 'INGEST_FORMAT_UNSUPPORTED') fail(`installed PDF boundary failed: ${pdfIngest.status}`);
+  if (pdfIngest.status !== 422 || typeof pdfIngest.body.error !== 'string' || !pdfIngest.body.error.startsWith('ingestion-')) {
+    fail(`installed PDF invalid-input boundary failed: ${pdfIngest.status}:${pdfIngest.body.error ?? 'missing-error'}`);
+  }
   checks.push('pdf-boundary');
 
   const csv = ['date,account,debit,credit,currency', '2026-08-01,Cash,1000,0,IRR', '2026-08-02,Sales,0,1500,IRR', '2026-08-03,Expense,300,0,IRR'].join('\n');
