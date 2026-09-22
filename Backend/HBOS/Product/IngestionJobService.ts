@@ -24,6 +24,10 @@ import { SQLitePersistenceStore } from "./SQLitePersistenceStore";
 import type {
   FinancialSourceEvidence,
 } from "./FinancialDataIngestionAdapter";
+import {
+  summarizeFinancialDocument,
+  type FinancialDocumentSummary,
+} from "./FinancialDocumentUnderstanding";
 import type { IngestionOutcome, IngestionRequest } from "./FinancialIngestionService";
 import {
   ingestionFailureMessageFa,
@@ -53,6 +57,11 @@ export interface IngestionJobResultSummary {
   readonly totals: { readonly debit: number; readonly credit: number; readonly balance: number };
   readonly rawSourcePersistenceKey: string;
   readonly evidence: FinancialSourceEvidence;
+  /**
+   * Present when the source was a multi-section financial report/workbook. The
+   * transaction count may then be zero without the job being a failure.
+   */
+  readonly document?: FinancialDocumentSummary;
 }
 
 interface IngestionJobRecord {
@@ -375,6 +384,7 @@ export class IngestionJobService {
   }
 
   private summary(outcome: IngestionOutcome): IngestionJobResultSummary {
+    const document = outcome.result.model.document;
     return {
       sha256: outcome.result.evidence.sha256,
       sourceName: outcome.result.evidence.sourceName,
@@ -383,6 +393,7 @@ export class IngestionJobService {
       totals: outcome.result.model.totals,
       rawSourcePersistenceKey: outcome.rawSourceRef.persistenceKey,
       evidence: outcome.result.evidence,
+      ...(document ? { document: summarizeFinancialDocument(document) } : {}),
     };
   }
 

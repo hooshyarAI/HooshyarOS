@@ -278,7 +278,7 @@ export function mapTableToCanonical(
 const PERSIAN_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
 const ARABIC_INDIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
 
-function toAsciiDigits(value: string): string {
+export function toAsciiDigits(value: string): string {
   let out = "";
   for (const char of value) {
     const persian = PERSIAN_DIGITS.indexOf(char);

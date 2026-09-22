@@ -331,6 +331,77 @@ async function runCustomerJourney() {
   }
   checks.push('statement-financial-analysis');
 
+  // Legacy .xls financial-statement workbook through the governed provider and
+  // the unified document-understanding boundary (real user Excel path).
+  const xlsPath = path.join(root, 'Backend', 'HBOS', 'test', 'fixtures', 'synthetic', 'financial_report_1402.xls');
+  const xlsBytes = fs.readFileSync(xlsPath);
+  const xlsSha = crypto.createHash('sha256').update(xlsBytes).digest('hex');
+  const xlsIngest = await request('/api/ingest', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', cookie },
+    body: JSON.stringify({ sourceName: 'financial_report_1402.xls', format: 'XLS', contentBase64: xlsBytes.toString('base64') }),
+  });
+  if (xlsIngest.status !== 201) fail(`installed XLS ingest failed: ${xlsIngest.status}:${JSON.stringify(xlsIngest.body)}`);
+  if (xlsIngest.body.evidence?.sourceType !== 'XLS' || xlsIngest.body.evidence?.sha256 !== xlsSha) fail('installed XLS provenance not preserved');
+  if (xlsIngest.body.document?.status !== 'COMPLETED' || (xlsIngest.body.document?.factCount ?? 0) < 8) {
+    fail(`installed XLS statement normalization failed: ${JSON.stringify(xlsIngest.body.document)}`);
+  }
+  checks.push('xls-statement-ingest', 'xls-original-byte-provenance');
+
+  const xlsAnalysis = await request('/api/financial/analyze', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', cookie },
+    body: JSON.stringify({ sourceSha256: xlsSha }),
+  });
+  if (xlsAnalysis.status !== 200 || xlsAnalysis.body.ingestedSource?.document?.status !== 'COMPLETED') {
+    fail(`installed XLS analysis from facts failed: ${xlsAnalysis.status}:${JSON.stringify(xlsAnalysis.body)}`);
+  }
+  checks.push('xls-statement-analysis');
+
+  // XLSX financial-statement workbook through the durable job API.
+  const ExcelJS = require('exceljs-hardened');
+  const workbook = new ExcelJS.Workbook();
+  const balanceSheet = workbook.addWorksheet('ترازنامه');
+  [
+    ['صورت وضعیت مالی'],
+    ['(ارقام به میلیون ریال)'],
+    ['شرح', '1402', '1401'],
+    ['جمع دارایی‌ها', 1965000, 1798000],
+    ['جمع بدهی‌ها', 820000, 880000],
+    ['جمع حقوق مالکانه', 1145000, 918000],
+  ].forEach((row) => balanceSheet.addRow(row));
+  const incomeStatement = workbook.addWorksheet('سود و زیان');
+  [
+    ['صورت سود و زیان'],
+    ['(ارقام به میلیون ریال)'],
+    ['شرح', '1402', '1401'],
+    ['درآمد عملیاتی', 2400000, 2100000],
+    ['سود (زیان) خالص', 220000, 170000],
+  ].forEach((row) => incomeStatement.addRow(row));
+  const xlsxBytes = Buffer.from(await workbook.xlsx.writeBuffer());
+  const xlsxStart = await request('/api/ingest/jobs', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', cookie, 'idempotency-key': 'installed-xlsx-statement-1' },
+    body: JSON.stringify({ sourceName: 'financial_report_1402.xlsx', format: 'XLSX', contentBase64: xlsxBytes.toString('base64') }),
+  });
+  if (xlsxStart.status !== 202 || !xlsxStart.body.jobId) fail(`installed XLSX statement job creation failed: ${xlsxStart.status}:${JSON.stringify(xlsxStart.body)}`);
+  let xlsxJob = null;
+  for (let attempt = 0; attempt < 300; attempt += 1) {
+    const status = await request(`/api/ingest/jobs/${xlsxStart.body.jobId}`, { headers: { cookie } });
+    xlsxJob = status.body.job;
+    if (xlsxJob && (xlsxJob.status === 'COMPLETED' || xlsxJob.status === 'FAILED')) break;
+    await sleep(200);
+  }
+  if (!xlsxJob || xlsxJob.status !== 'COMPLETED') fail(`installed XLSX statement job did not complete: ${JSON.stringify(xlsxJob)}`);
+  if (xlsxJob.result?.transactionCount !== 0 || xlsxJob.result?.document?.status !== 'COMPLETED') {
+    fail(`installed XLSX statement normalization failed: ${JSON.stringify(xlsxJob.result)}`);
+  }
+  const xlsxSectionTypes = (xlsxJob.result?.document?.sections ?? []).map((section) => section.type);
+  if (!xlsxSectionTypes.includes('BALANCE_SHEET') || !xlsxSectionTypes.includes('INCOME_STATEMENT')) {
+    fail(`installed XLSX section detection failed: ${JSON.stringify(xlsxSectionTypes)}`);
+  }
+  checks.push('xlsx-statement-job', 'xlsx-section-detection');
+
   const csv = ['date,account,debit,credit,currency', '2026-08-01,Cash,1000,0,IRR', '2026-08-02,Sales,0,1500,IRR', '2026-08-03,Expense,300,0,IRR'].join('\n');
   await sleep(1100);
   const ingest = await request('/api/ingest', {

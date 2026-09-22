@@ -253,8 +253,16 @@ describe("CapabilityProviderRegistry — multi-format provider admission", () =>
     expect(provider.selfHostedOffline).toBe(true);
   });
 
+  test("selects the admitted integrated provider for legacy XLS", () => {
+    const provider = registry.selectProvider("document.xls.parse");
+    expect(provider.capabilityId).toBe("document-xls-legacy");
+    expect(provider.provider).toBe("xls-reader");
+    expect(provider.integration).toBe("INTEGRATED");
+    expect(provider.selfHostedOffline).toBe(true);
+  });
+
   test("long-tail formats are recorded but never admitted", () => {
-    for (const id of ["document-broad-tika", "office-libreoffice-convert", "image-tiff-decode", "document-xls-legacy"]) {
+    for (const id of ["document-broad-tika", "office-libreoffice-convert", "image-tiff-decode"]) {
       expect(registry.assess(id).admitted).toBe(false);
       expect(registry.assess(id).reasons).toContain("status-not-approved:DEFERRED");
     }

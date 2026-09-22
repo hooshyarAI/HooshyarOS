@@ -126,9 +126,15 @@ export class FinancialStatementAnalysisService {
     }
 
     const source = input.source;
+    // Accept every canonical ingestion source type, including the governed
+    // legacy XLS route and the document/report formats, so a verified canonical
+    // source is never rejected merely for its acquisition format.
+    const acceptedSourceTypes: ReadonlyArray<FinancialSourceEvidence["sourceType"]> = [
+      "CSV", "STRUCTURED", "XLSX", "XLS", "PDF", "DOCX", "HTML", "XML", "TSV", "IMAGE",
+    ];
     if (
       !source?.sourceName?.trim() ||
-      (source.sourceType !== "CSV" && source.sourceType !== "STRUCTURED" && source.sourceType !== "XLSX" && source.sourceType !== "PDF") ||
+      !acceptedSourceTypes.includes(source.sourceType) ||
       !/^[a-f0-9]{64}$/i.test(source.sha256) ||
       !source.receivedAt?.trim()
     ) {

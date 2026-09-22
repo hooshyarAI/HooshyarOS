@@ -2,6 +2,7 @@
 import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import ExcelJS from "exceljs-hardened";
+import { readXls } from "xls-reader";
 import { SQLitePersistenceStore } from "./SQLitePersistenceStore";
 import { decodeTextBytes } from "./TextFileDecoder";
 import { acquireImage, type ImageSource } from "./ImageAcquisition";
@@ -22,11 +23,18 @@ import {
   isCanonicalStatementHeader,
   mapStatementToCanonical,
   mapTableToCanonical,
+  parseStatementAmount,
 } from "./DocumentTableExtractor";
+import {
+  buildFinancialDocumentUnderstanding,
+  FINANCIAL_DOCUMENT_ERROR_CODES,
+  hasFinancialDocumentFacts,
+  type FinancialDocumentUnderstanding,
+} from "./FinancialDocumentUnderstanding";
 import { createOcrProvenance, type OcrProvenance } from "./OcrProvenance";
 import type { OcrAdapter, OcrResult } from "./OcrAdapter";
 import { routeScannedPdfToOcr } from "./ScannedPdfRouter";
-import type { IngestionProgressObserver } from "./IngestionProgress";
+import type { IngestionProgressEvent, IngestionProgressObserver } from "./IngestionProgress";
 
 export type TxtEncoding = "UTF-8" | "UTF-8-BOM" | "UTF-16LE" | "UTF-16BE";
 
@@ -76,6 +84,14 @@ export interface FinancialCanonicalModel {
     readonly credit: number;
     readonly balance: number;
   };
+  /**
+   * Unified multi-section document understanding, present when the source was a
+   * financial report / statement workbook rather than a single transaction
+   * ledger. The 5-column transaction model remains canonical for real ledgers;
+   * this optional view carries the extracted statement facts for reports whose
+   * sections (balance sheet, income statement, cash flow, ...) are not ledgers.
+   */
+  readonly document?: FinancialDocumentUnderstanding;
 }
 
 export interface FinancialIngestionResult {
@@ -122,15 +138,17 @@ export interface ScannedPdfOcrRoute {
 // Supporting contract under the existing FinancialDataIngestionAdapter.
 // Defines the canonical pre-ingestion representation that all current and
 // future acquisition routes (CSV, JSON/STRUCTURED, XLSX, and future TXT/PDF/
-// image/API/DB sources) can share. XLS is NOT included â€” it remains a local
-// dependency blocker (see 08-S.5). This contract is intentionally minimal
-// and does not create a new Engine or duplicate ingestion ownership.
+// image/API/DB sources) can share. Legacy XLS is handled by the governed
+// `ingestXlsBytes` route (see `document.xls.parse` in the provider registry)
+// and is intentionally not part of this pre-ingestion FileSource union, which
+// remains the minimal shared representation for the internal-text routes.
 // ============================================================================
 
 /**
- * File source types currently supported by the canonical ingestion owner.
- * XLS is deliberately absent â€” it is BLOCKED on dependency resolution.
- * The union is open to extension as new format routes are added.
+ * File source types represented by the universal FileSource contract.
+ * Legacy XLS is admitted through `ingestXlsBytes` (governed `xls-reader`
+ * provider) rather than this internal-text union; the richer XLS acquisition
+ * evidence lives on the canonical `FinancialSourceEvidence` instead.
  */
 export type FileSourceType = "CSV" | "STRUCTURED" | "XLSX" | "IMAGE";
 
@@ -572,8 +590,8 @@ export class FinancialDataIngestionAdapter {
       if (detectedFormat === "XLSX") {
         return this.ingestXlsx(tenantId, sourceName, rawBytes);
       }
-      // XLS detection but wrong extension handled above
-      throw new Error("ingestion-format-unsupported");
+      // Legacy OLE2 BIFF workbook: governed `xls-reader` route.
+      return this.ingestXlsBytes(tenantId, sourceName, rawBytes);
     }
 
     // For other extensions (csv, txt, etc.), do magic byte check first
@@ -762,13 +780,19 @@ export class FinancialDataIngestionAdapter {
    * ORIGINAL PDF bytes (not the extracted text), so the original-byte identity
    * survives into `financial-ingestion:<sha256>` and downstream analysis.
    */
-  async ingestPdfBytes(tenantId: string, sourceName: string, rawBytes: Buffer): Promise<FinancialIngestionResult> {
+  async ingestPdfBytes(
+    tenantId: string,
+    sourceName: string,
+    rawBytes: Buffer,
+    observer?: IngestionProgressObserver,
+  ): Promise<FinancialIngestionResult> {
     const normalizedTenant = tenantId.trim();
     const normalizedSource = sourceName.trim();
     if (!normalizedTenant) throw new Error("ingestion-tenant-required");
     if (!normalizedSource) throw new Error("ingestion-source-required");
     if (rawBytes.length === 0) throw new Error("ingestion-source-empty");
 
+    observer?.({ stage: "DOCUMENT_DETECTION" });
     const document = await acquirePdf({ sourceName: normalizedSource, rawBytes });
 
     const source: FinancialSourceEvidence = {
@@ -778,19 +802,12 @@ export class FinancialDataIngestionAdapter {
       receivedAt: document.receivedAt,
     };
 
-    const transactions = this.parseAndValidate(document.text);
-    const debit = this.round(transactions.reduce((sum, row) => sum + row.debit, 0));
-    const credit = this.round(transactions.reduce((sum, row) => sum + row.credit, 0));
-
-    const model: FinancialCanonicalModel = {
-      tenantId: normalizedTenant,
-      source,
-      transactions,
-      totals: { debit, credit, balance: this.round(debit - credit) },
-    };
-
-    await this.persistence.write({ tenantId: normalizedTenant }, `financial-ingestion:${source.sha256}`, model);
-    return { evidence: source, model, persisted: true };
+    observer?.({ stage: "NORMALIZING" });
+    const paged = document.pages.length > 0
+      ? this.buildPagedLines(document.pages.map((page) => ({ pageNumber: page.pageNumber, text: page.text })))
+      : { text: document.text, pageNumbers: undefined as number[] | undefined };
+    const normalized = this.normalizeFinancialReportText(paged.text, observer, paged.pageNumbers);
+    return this.finalize(normalizedTenant, source, normalized.transactions, normalized.document);
   }
 
   /**
@@ -975,15 +992,17 @@ export class FinancialDataIngestionAdapter {
       if (result) ocrByPage.set(decision.pageNumber, result);
     }
 
-    const pageTexts = document.pages
-      .map((page) => ocrByPage.get(page.pageNumber)?.text ?? page.text)
-      .filter((text) => typeof text === "string" && text.trim().length > 0);
-    const text = pageTexts.join("\n\n");
+    const paged = this.buildPagedLines(
+      document.pages.map((page) => ({
+        pageNumber: page.pageNumber,
+        text: ocrByPage.get(page.pageNumber)?.text ?? page.text,
+      })),
+    );
+    const text = paged.text;
     if (!text.trim()) throw new Error("ingestion-ocr-empty");
 
     observer?.({ stage: "NORMALIZING" });
-    const transactions = this.normalizeExtractedDocument(text);
-    observer?.({ stage: "CANONICAL_VALIDATION" });
+    const normalized = this.normalizeFinancialReportText(text, observer, paged.pageNumbers);
     const source: FinancialSourceEvidence = {
       sourceName: normalizedSource,
       sourceType: "PDF",
@@ -994,7 +1013,7 @@ export class FinancialDataIngestionAdapter {
         : {}),
     };
     observer?.({ stage: "PERSISTING" });
-    return this.finalize(normalizedTenant, source, transactions);
+    return this.finalize(normalizedTenant, source, normalized.transactions, normalized.document);
   }
 
   /**
@@ -1021,8 +1040,7 @@ export class FinancialDataIngestionAdapter {
     if (!recognized.text.trim()) throw new Error("ingestion-ocr-empty");
 
     observer?.({ stage: "NORMALIZING" });
-    const transactions = this.normalizeExtractedDocument(recognized.text);
-    observer?.({ stage: "CANONICAL_VALIDATION" });
+    const normalized = this.normalizeFinancialReportText(recognized.text, observer);
     const source: FinancialSourceEvidence = {
       sourceName: normalizedSource,
       sourceType: "IMAGE",
@@ -1030,7 +1048,7 @@ export class FinancialDataIngestionAdapter {
       receivedAt: image.receivedAt,
       ocr: this.buildOcrProvenance(ocr, [recognized], language),
     };
-    return this.finalize(normalizedTenant, source, transactions);
+    return this.finalize(normalizedTenant, source, normalized.transactions, normalized.document);
   }
 
   /**
@@ -1039,7 +1057,12 @@ export class FinancialDataIngestionAdapter {
    * Stage 14-1.1: made public so the commercial runtime can ingest uploaded
    * bytes through the canonical owner without writing untrusted data to disk.
    */
-  async ingestXlsx(tenantId: string, sourceName: string, rawBytes: Buffer): Promise<FinancialIngestionResult> {
+  async ingestXlsx(
+    tenantId: string,
+    sourceName: string,
+    rawBytes: Buffer,
+    observer?: IngestionProgressObserver,
+  ): Promise<FinancialIngestionResult> {
     const normalizedTenant = tenantId.trim();
     const normalizedSource = sourceName.trim();
     if (!normalizedTenant) throw new Error("ingestion-tenant-required");
@@ -1056,28 +1079,126 @@ export class FinancialDataIngestionAdapter {
       receivedAt,
     };
 
-    // Parse with timeout and error handling
-    let transactions: FinancialTransaction[];
+    observer?.({ stage: "DOCUMENT_DETECTION" });
+    const workbook = await this.loadXlsxWorkbook(rawBytes);
+
+    const worksheet = workbook.getWorksheet(1);
+    if (!worksheet) throw new Error("ingestion-empty-workbook");
+
+    const headerValues = this.readLedgerHeaderCells(worksheet);
+
+    // The real 5-column transaction ledger keeps its exact existing behavior.
+    if (this.isLedgerHeader(headerValues)) {
+      const transactions = this.extractXlsxLedgerTransactions(worksheet);
+      if (transactions.length === 0) throw new Error("ingestion-empty-workbook");
+      observer?.({ stage: "EVIDENCE_VALIDATION" });
+      return this.finalize(normalizedTenant, source, transactions);
+    }
+
+    // A genuinely intended-but-malformed ledger still fails precisely.
+    if (this.looksLikeLedgerHeader(headerValues)) throw new Error("ingestion-schema-invalid");
+
+    // Otherwise the workbook is treated as a financial-statement workbook and
+    // routed through the SAME unified boundary as PDF reports.
+    const grids = workbook.worksheets.map((sheet) => ({
+      name: sheet.name,
+      rows: this.xlsxWorksheetGrid(sheet),
+    }));
+    const document = this.buildSpreadsheetDocument(grids, observer);
+    observer?.({ stage: "EVIDENCE_VALIDATION" });
+    if (hasFinancialDocumentFacts(document) || document.status !== "FAILED") {
+      return this.finalize(normalizedTenant, source, [], document);
+    }
+    throw new Error(FINANCIAL_DOCUMENT_ERROR_CODES.SPREADSHEET_STATEMENT_AMBIGUOUS);
+  }
+
+  /**
+   * Legacy binary .xls (OLE2 / BIFF8) route through the admitted, governed
+   * `xls-reader` provider. Values only are read (no macro or formula executes);
+   * input identity, size and tenant isolation stay canonical, and the resulting
+   * workbook converges on the same unified statement/ledger boundary as XLSX.
+   */
+  async ingestXlsBytes(
+    tenantId: string,
+    sourceName: string,
+    rawBytes: Buffer,
+    observer?: IngestionProgressObserver,
+  ): Promise<FinancialIngestionResult> {
+    const normalizedTenant = tenantId.trim();
+    const normalizedSource = sourceName.trim();
+    if (!normalizedTenant) throw new Error("ingestion-tenant-required");
+    if (!normalizedSource) throw new Error("ingestion-source-required");
+    if (!Buffer.isBuffer(rawBytes) || rawBytes.length === 0) throw new Error("ingestion-source-empty");
+    if (rawBytes.length > this.config.xlsMaxSizeBytes) throw new Error("ingestion-file-too-large");
+    if (!detectFormatFromMagicBytes(rawBytes)) throw new Error("ingestion-format-unsupported");
+    if (detectFormatFromMagicBytes(rawBytes) !== "XLS") throw new Error("ingestion-format-mismatch");
+
+    const sha256 = createHash("sha256").update(rawBytes).digest("hex");
+    const receivedAt = new Date().toISOString();
+    const source: FinancialSourceEvidence = {
+      sourceName: normalizedSource,
+      sourceType: "XLS",
+      sha256,
+      receivedAt,
+    };
+
+    observer?.({ stage: "DOCUMENT_DETECTION" });
+    let workbook: ReturnType<typeof readXls>;
     try {
-      const parsePromise = this.parseXlsx(rawBytes);
+      workbook = readXls(new Uint8Array(rawBytes));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (/encrypt|password|FilePass|RC4|XOR/i.test(message)) throw new Error("xls-encrypted-unsupported");
+      throw new Error("xls-malformed");
+    }
+    if (!workbook.sheets || workbook.sheets.length === 0) throw new Error("xls-malformed");
 
-      // Create timeout promise
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("ingestion-parse-timeout")), this.config.xlsParseBudgetMs);
+    const grids = workbook.sheets.map((sheet) => ({
+      name: sheet.name,
+      rows: sheet.rows.map((row) => row.map((cell) => this.spreadsheetCellToString(cell))),
+    }));
+    const first = grids[0];
+    if (!first) throw new Error("ingestion-empty-workbook");
+
+    if (this.isLedgerHeader(first.rows[0] ?? [])) {
+      const transactions = this.gridToLedgerTransactions(first.rows);
+      observer?.({ stage: "EVIDENCE_VALIDATION" });
+      return this.finalize(normalizedTenant, source, transactions);
+    }
+    if (this.looksLikeLedgerHeader(first.rows[0] ?? [])) throw new Error("ingestion-schema-invalid");
+
+    const document = this.buildSpreadsheetDocument(grids, observer);
+    observer?.({ stage: "EVIDENCE_VALIDATION" });
+    if (hasFinancialDocumentFacts(document) || document.status !== "FAILED") {
+      return this.finalize(normalizedTenant, source, [], document);
+    }
+    throw new Error(FINANCIAL_DOCUMENT_ERROR_CODES.SPREADSHEET_STATEMENT_AMBIGUOUS);
+  }
+
+  /**
+   * Load an XLSX workbook with the hardened resource limits and a parse-time
+   * budget. No formula is evaluated; only cached cell values are read.
+   */
+  private async loadXlsxWorkbook(rawBytes: Buffer): Promise<ExcelJS.Workbook> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const load = (async (): Promise<ExcelJS.Workbook> => {
+      const workbook = new ExcelJS.Workbook();
+      const buffer = rawBytes as unknown as ArrayBuffer;
+      await workbook.xlsx.load(buffer, {
+        maxEntryUncompressedSize: this.config.xlsxZipEntryLimitBytes,
+        maxTotalUncompressedSize: this.config.xlsxTotalUncompressedLimitBytes,
       });
-
-      transactions = await Promise.race([parsePromise, timeoutPromise]);
+      return workbook;
+    })();
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error("ingestion-parse-timeout")), this.config.xlsParseBudgetMs);
+    });
+    try {
+      return await Promise.race([load, timeout]);
     } catch (error) {
       if (error instanceof Error) {
-        // Let validation errors propagate with their original codes
-        if (error.message.startsWith("ingestion-")) {
-          throw error;
-        }
-        // Timeout error
-        if (error.message === "ingestion-parse-timeout") {
-          throw error;
-        }
-        // Zip parse errors (corrupted zip, etc.) - convert to excel parse error
+        if (error.message === "ingestion-parse-timeout") throw error;
+        if (error.message.startsWith("ingestion-")) throw error;
         if (error.message.includes("Corrupted zip") ||
             error.message.includes("can't find end of central directory") ||
             error.message.includes("Invalid signature") ||
@@ -1085,89 +1206,47 @@ export class FinancialDataIngestionAdapter {
           throw new Error("ingestion-excel-parse-error");
         }
       }
-      // Unknown error - convert to excel parse error
       throw new Error("ingestion-excel-parse-error");
+    } finally {
+      if (timer) clearTimeout(timer);
     }
-
-    if (transactions.length === 0) {
-      throw new Error("ingestion-empty-workbook");
-    }
-
-    const debit = this.round(transactions.reduce((sum, row) => sum + row.debit, 0));
-    const credit = this.round(transactions.reduce((sum, row) => sum + row.credit, 0));
-
-    const model: FinancialCanonicalModel = {
-      tenantId: normalizedTenant,
-      source,
-      transactions,
-      totals: { debit, credit, balance: this.round(debit - credit) },
-    };
-
-    await this.persistence.write({ tenantId: normalizedTenant }, `financial-ingestion:${source.sha256}`, model);
-    return { evidence: source, model, persisted: true };
   }
 
-  /**
-   * Parse XLSX content using exceljs-hardened
-   * Formulas are treated as untrusted input - only values are extracted
-   */
-  private async parseXlsx(rawBytes: Buffer): Promise<FinancialTransaction[]> {
-    const workbook = new ExcelJS.Workbook();
-
-    // Type assertion needed because Node.js Buffer and exceljs-hardened Buffer types differ
-    const buffer = rawBytes as unknown as ArrayBuffer;
-
-    // exceljs-hardened security features:
-    // - CVE fix for decompression bombs (maxEntryUncompressedSize, maxTotalUncompressedSize)
-    // - No formula evaluation by default - only cached values are read
-    await workbook.xlsx.load(buffer, {
-      // Security: Limit zip entry uncompressed size to 128MB (CWE-409)
-      maxEntryUncompressedSize: this.config.xlsxZipEntryLimitBytes,
-      // Security: Limit total uncompressed size to 512MB (CWE-409)
-      maxTotalUncompressedSize: this.config.xlsxTotalUncompressedLimitBytes,
-    });
-
-    const worksheet = workbook.getWorksheet(1);
-    if (!worksheet) {
-      throw new Error("ingestion-empty-workbook");
-    }
-
-    // Validate header row first
-    // ExcelJS uses sparse arrays - values start at index 1, index 0 is often undefined
+  /** Read the first five header cells of a worksheet exactly as the ledger contract expects. */
+  private readLedgerHeaderCells(worksheet: ExcelJS.Worksheet): string[] {
     const firstRow = worksheet.getRow(1);
     const headerValues = (firstRow.values || []) as (string | number | boolean | null | undefined)[];
-
-    // Filter out undefined/null values and get actual header values
-    // Headers should be at indices 1-5 (date, account, debit, credit, currency)
     const headers: string[] = [];
-    for (let i = 1; i <= 5; i++) {
-      const value = headerValues[i];
-      headers.push(String(value ?? "").toLowerCase().trim());
+    for (let i = 1; i <= 5; i += 1) {
+      headers.push(String(headerValues[i] ?? "").toLowerCase().trim());
     }
+    return headers;
+  }
 
-    const expected = ["date", "account", "debit", "credit", "currency"];
-
-    if (headers.length !== expected.length || headers.some((value, index) => value !== expected[index])) {
-      throw new Error("ingestion-schema-invalid");
-    }
-
+  /** Canonical 5-column ledger extraction (unchanged semantics). */
+  private extractXlsxLedgerTransactions(worksheet: ExcelJS.Worksheet): FinancialTransaction[] {
     const transactions: FinancialTransaction[] = [];
-
     worksheet.eachRow((row, rowIndex) => {
-      // Skip header row
       if (rowIndex === 1) return;
-
       const txn = worksheetRowToTransaction(row, rowIndex);
-      if (txn) {
-        transactions.push(txn);
-      }
+      if (txn) transactions.push(txn);
     });
-
-    if (transactions.length === 0) {
-      throw new Error("ingestion-empty-workbook");
-    }
-
     return transactions;
+  }
+
+  /** Convert a worksheet into a bounded rectangular grid of text cells. */
+  private xlsxWorksheetGrid(worksheet: ExcelJS.Worksheet): string[][] {
+    const columnCount = Math.min(Math.max(worksheet.columnCount, 0), 64);
+    const rows: string[][] = [];
+    worksheet.eachRow({ includeEmpty: false }, (row) => {
+      const values = (row.values || []) as unknown[];
+      const cells: string[] = [];
+      for (let c = 1; c <= columnCount; c += 1) {
+        cells.push(this.spreadsheetCellToString(values[c]));
+      }
+      rows.push(cells);
+    });
+    return rows;
   }
 
   private parseAndValidate(csv: string, delimiter = ","): FinancialTransaction[] {
@@ -1261,6 +1340,185 @@ export class FinancialDataIngestionAdapter {
   }
 
   /**
+   * Unified normalization for extracted document text (text-native PDF, scanned
+   * PDF OCR, image OCR).
+   *
+   * The canonical ledger/statement transaction route is tried first so a real
+   * ledger or ledger-like statement is unchanged. When that route cannot map the
+   * text and the document is a multi-section financial report, the SAME unified
+   * `FinancialDocumentUnderstanding` boundary used by XLSX/XLS produces the
+   * canonical statement facts, so a full annual report no longer fails merely
+   * because it is not a single transaction ledger. Fail closed: if neither route
+   * yields evidence, the precise original error is preserved.
+   */
+  private normalizeFinancialReportText(
+    text: string,
+    observer?: IngestionProgressObserver,
+    pageNumbers?: ReadonlyArray<number>,
+  ): { readonly transactions: FinancialTransaction[]; readonly document?: FinancialDocumentUnderstanding } {
+    let transactions: FinancialTransaction[] | null = null;
+    let transactionError: Error | null = null;
+    try {
+      transactions = this.normalizeExtractedDocument(text);
+    } catch (error) {
+      transactionError = error instanceof Error ? error : new Error(String(error));
+    }
+    if (transactions && transactions.length > 0) {
+      observer?.({ stage: "CANONICAL_VALIDATION" });
+      return { transactions };
+    }
+
+    const document = buildFinancialDocumentUnderstanding([
+      {
+        rows: text.split(/\r?\n/).map((line) => [line.replace(/\u00a0/g, " ").trimEnd()]),
+        ...(pageNumbers ? { pageNumbers } : {}),
+      },
+    ]);
+    this.emitDocumentStages(document, observer);
+    observer?.({ stage: "EVIDENCE_VALIDATION" });
+
+    if (hasFinancialDocumentFacts(document) || document.status !== "FAILED") {
+      return { transactions: [], document };
+    }
+    throw transactionError ?? new Error(FINANCIAL_DOCUMENT_ERROR_CODES.INSUFFICIENT_EVIDENCE);
+  }
+
+  /**
+   * Reconstruct the canonical document text from paged text while keeping a
+   * parallel, index-aligned page-number array so section page ranges come from
+   * real evidence. Page separation matches `acquirePdf` (pages joined by "\n\n").
+   */
+  private buildPagedLines(
+    pages: ReadonlyArray<{ readonly pageNumber: number; readonly text: string }>,
+  ): { readonly text: string; readonly pageNumbers: number[] } {
+    const lines: string[] = [];
+    const pageNumbers: number[] = [];
+    pages.forEach((page, index) => {
+      if (index > 0) {
+        lines.push("");
+        pageNumbers.push(page.pageNumber);
+      }
+      for (const line of String(page.text ?? "").split(/\r?\n/)) {
+        lines.push(line);
+        pageNumbers.push(page.pageNumber);
+      }
+    });
+    return { text: lines.join("\n"), pageNumbers };
+  }
+
+  /**
+   * Emit the real section stages the unified boundary actually detected. Only
+   * sections that exist in the evidence produce an event; nothing is faked.
+   */
+  private emitDocumentStages(document: FinancialDocumentUnderstanding, observer?: IngestionProgressObserver): void {
+    if (!observer || document.sections.length === 0) return;
+    const stageByType: Record<string, string> = {
+      AUDITOR_REPORT: "SECTION_AUDITOR_REPORT",
+      BOARD_REPORT: "SECTION_BOARD_REPORT",
+      BALANCE_SHEET: "SECTION_BALANCE_SHEET",
+      INCOME_STATEMENT: "SECTION_INCOME_STATEMENT",
+      CASH_FLOW_STATEMENT: "SECTION_CASH_FLOW",
+      CHANGES_IN_EQUITY: "SECTION_EQUITY",
+      NOTES: "SECTION_NOTES",
+    };
+    const emitted = new Set<string>();
+    for (const section of document.sections) {
+      const stage = stageByType[section.type];
+      if (!stage || emitted.has(stage)) continue;
+      emitted.add(stage);
+      observer({ stage: stage as IngestionProgressEvent["stage"], code: section.type });
+    }
+  }
+
+  /** Convert spreadsheet cells/rows into plain trimmed text cells. */
+  private spreadsheetCellToString(value: unknown): string {
+    if (value === null || value === undefined) return "";
+    if (value instanceof Date) return Number.isFinite(value.getTime()) ? value.toISOString().slice(0, 10) : "";
+    if (typeof value === "number") return Number.isFinite(value) ? String(value) : "";
+    if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+    if (typeof value === "object") {
+      const record = value as Record<string, unknown>;
+      // ExcelJS formula cell: read the cached RESULT only, never evaluate.
+      if ("result" in record) return this.spreadsheetCellToString(record.result);
+      if ("error" in record) return "";
+      if (Array.isArray(record.richText)) {
+        return (record.richText as Array<{ text?: unknown }>).map((part) => String(part?.text ?? "")).join("").trim();
+      }
+      if (typeof record.text === "string") return record.text.trim();
+      if (typeof record.hyperlink === "string" && typeof record.text === "string") return record.text.trim();
+      return "";
+    }
+    return String(value).trim();
+  }
+
+  /**
+   * Canonical spreadsheet statement route shared by XLSX and legacy XLS. It
+   * builds the unified document understanding from worksheet name + rows, so a
+   * financial-statement workbook (multiple sheets, Persian labels, units and
+   * comparative periods) reaches the same canonical facts as a PDF report.
+   */
+  private buildSpreadsheetDocument(
+    sheets: ReadonlyArray<{ readonly name: string; readonly rows: ReadonlyArray<ReadonlyArray<string>> }>,
+    observer?: IngestionProgressObserver,
+  ): FinancialDocumentUnderstanding {
+    observer?.({ stage: "DOCUMENT_DETECTION" });
+    const document = buildFinancialDocumentUnderstanding(
+      sheets.map((sheet) => ({ name: sheet.name, rows: sheet.rows, positioned: true })),
+    );
+    observer?.({ stage: "SECTION_DETECTION" });
+    this.emitDocumentStages(document, observer);
+    return document;
+  }
+
+  /**
+   * Ledger-intent detection for a worksheet grid: the header declares at least
+   * three canonical ledger fields. Used to keep the precise
+   * `ingestion-schema-invalid` error for a genuinely intended-but-malformed
+   * ledger instead of the less specific spreadsheet-statement error.
+   */
+  private looksLikeLedgerHeader(header: ReadonlyArray<string>): boolean {
+    const normalized = header.map((cell) => String(cell ?? "").trim().toLowerCase());
+    const canonical = ["date", "account", "debit", "credit", "currency"];
+    const matched = canonical.filter((field) => normalized.includes(field)).length;
+    return matched >= 3;
+  }
+
+  private isLedgerHeader(header: ReadonlyArray<string>): boolean {
+    const normalized = header.map((cell) => String(cell ?? "").trim().toLowerCase());
+    const canonical = ["date", "account", "debit", "credit", "currency"];
+    return normalized.length >= canonical.length && canonical.every((field, index) => normalized[index] === field);
+  }
+
+  /**
+   * Parse an already-decoded ledger grid (used by the legacy XLS route, where
+   * cell values are plain strings) into canonical transactions, failing closed
+   * with the same precise codes as the CSV/XLSX ledger routes.
+   */
+  private gridToLedgerTransactions(rows: ReadonlyArray<ReadonlyArray<string>>): FinancialTransaction[] {
+    if (rows.length < 2) throw new Error("ingestion-header-and-data-required");
+    const header = rows[0].map((cell) => String(cell ?? "").trim().toLowerCase());
+    if (!this.isLedgerHeader(header)) throw new Error("ingestion-schema-invalid");
+
+    const transactions: FinancialTransaction[] = [];
+    for (let r = 1; r < rows.length; r += 1) {
+      const row = rows[r].map((cell) => String(cell ?? "").trim());
+      const rowNumber = r + 1;
+      const [date, account, debitText, creditText, currency] = row;
+      if (!date || !account || !currency) throw new Error(`ingestion-row-invalid:${rowNumber}`);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error(`ingestion-date-invalid:${rowNumber}`);
+      const debit = debitText ? parseStatementAmount(debitText) : 0;
+      const credit = creditText ? parseStatementAmount(creditText) : 0;
+      if (debit === null || debit < 0) throw new Error(`ingestion-amount-invalid:debit:${rowNumber}`);
+      if (credit === null || credit < 0) throw new Error(`ingestion-amount-invalid:credit:${rowNumber}`);
+      if (debit === 0 && credit === 0) throw new Error(`ingestion-zero-row:${rowNumber}`);
+      if (debit > 0 && credit > 0) throw new Error(`ingestion-double-sided-row:${rowNumber}`);
+      transactions.push({ date, account, debit: this.round(debit), credit: this.round(credit), currency });
+    }
+    if (transactions.length === 0) throw new Error("ingestion-empty-workbook");
+    return transactions;
+  }
+
+  /**
    * Map already-extracted document tables to canonical transactions using the
    * single canonical table contract. Returns null when no table matches the
    * canonical ledger schema, so the caller can fall back to text extraction
@@ -1316,6 +1574,7 @@ export class FinancialDataIngestionAdapter {
     tenantId: string,
     source: FinancialSourceEvidence,
     transactions: FinancialTransaction[],
+    document?: FinancialDocumentUnderstanding,
   ): Promise<FinancialIngestionResult> {
     const debit = this.round(transactions.reduce((sum, row) => sum + row.debit, 0));
     const credit = this.round(transactions.reduce((sum, row) => sum + row.credit, 0));
@@ -1324,6 +1583,7 @@ export class FinancialDataIngestionAdapter {
       source,
       transactions,
       totals: { debit, credit, balance: this.round(debit - credit) },
+      ...(document ? { document } : {}),
     };
     await this.persistence.write({ tenantId }, `financial-ingestion:${source.sha256}`, model);
     return { evidence: source, model, persisted: true };

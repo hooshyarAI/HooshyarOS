@@ -38,6 +38,7 @@ export type IngestionFormat =
   | "CSV"
   | "STRUCTURED"
   | "XLSX"
+  | "XLS"
   | "TXT"
   | "TSV"
   | "HTML"
@@ -49,6 +50,7 @@ export const SUPPORTED_INGESTION_FORMATS: ReadonlyArray<IngestionFormat> = [
   "CSV",
   "STRUCTURED",
   "XLSX",
+  "XLS",
   "TXT",
   "TSV",
   "HTML",
@@ -67,8 +69,14 @@ const RAW_SOURCE_PREFIX = "raw-source:";
  */
 const EXTERNAL_PROVIDER_CATEGORY: Partial<Record<IngestionFormat, CapabilityCategory>> = {
   XLSX: "spreadsheet.xlsx.parse",
+  XLS: "document.xls.parse",
   DOCX: "document.docx.text",
   PDF: "document.pdf.text",
+};
+
+/** Precise user-facing code when a required external provider is not admitted. */
+const PROVIDER_UNAVAILABLE_ERROR: Partial<Record<IngestionFormat, string>> = {
+  XLS: "xls-provider-unavailable",
 };
 
 export interface IngestionRequest {
@@ -116,7 +124,7 @@ interface StoredRawSource {
 }
 
 const isTextFormat = (format: IngestionFormat): boolean =>
-  format !== "XLSX" && format !== "PDF" && format !== "DOCX";
+  format !== "XLSX" && format !== "XLS" && format !== "PDF" && format !== "DOCX";
 
 /**
  * A resolved scanned-PDF OCR route plus its cleanup hook. The route is
@@ -175,7 +183,12 @@ export class FinancialIngestionService {
         result = await this.adapter.ingestStructured(normalizedTenant, sourceName, request.content ?? "");
         break;
       case "XLSX":
-        result = await this.adapter.ingestXlsx(normalizedTenant, sourceName, bytes);
+        observer?.({ stage: "READING_FILE" });
+        result = await this.adapter.ingestXlsx(normalizedTenant, sourceName, bytes, observer);
+        break;
+      case "XLS":
+        observer?.({ stage: "READING_FILE" });
+        result = await this.adapter.ingestXlsBytes(normalizedTenant, sourceName, bytes, observer);
         break;
       case "TXT": {
         const txtResult = await this.adapter.ingestTxtBytes(normalizedTenant, sourceName, bytes);
@@ -232,6 +245,8 @@ export class FinancialIngestionService {
       this.providers.selectProvider(category);
     } catch (error) {
       const detail = error instanceof Error ? error.message : "unknown";
+      const code = PROVIDER_UNAVAILABLE_ERROR[format];
+      if (code) throw new Error(`${code}:${detail}`);
       throw new Error(`ingestion-provider-not-admitted:${detail}`);
     }
   }
@@ -250,7 +265,7 @@ export class FinancialIngestionService {
   ): Promise<FinancialIngestionResult> {
     observer?.({ stage: "READING_PDF" });
     try {
-      return await this.adapter.ingestPdfBytes(tenantId, sourceName, bytes);
+      return await this.adapter.ingestPdfBytes(tenantId, sourceName, bytes, observer);
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       if (!message.includes(PDF_ERROR_CODES.SCANNED)) throw error;

@@ -7,6 +7,11 @@ import { ExecutiveIntelligenceEngine } from "../../Engines/ExecutiveIntelligence
 import { ReasoningEngine } from "../../Engines/ReasoningEngine";
 import { ReportsEngine, SUPPORTED_REPORT_FORMATS, type ReportFormat, type ReportSection } from "../../Engines/ReportsEngine";
 import { FinancialDataIngestionAdapter, type FinancialCanonicalModel, type FinancialSourceEvidence } from "../../Product/FinancialDataIngestionAdapter";
+import {
+    deriveAnalysisInput,
+    isCompleteRatioStatement,
+    summarizeFinancialDocument,
+} from "../../Product/FinancialDocumentUnderstanding";
 import { FinancialIngestionService, IngestionFormat, SUPPORTED_INGESTION_FORMATS } from "../../Product/FinancialIngestionService";
 import { IngestionJobService } from "../../Product/IngestionJobService";
 import { isTerminalIngestionStage } from "../../Product/IngestionProgress";
@@ -191,7 +196,7 @@ const validateIngestBody = (body: Record<string, unknown>): string | null => {
     if (!sourceName) return "SOURCE_NAME_REQUIRED";
     const format = String(body.format ?? "").trim().toUpperCase();
     if (!SUPPORTED_INGESTION_FORMATS.includes(format as IngestionFormat)) return "INGEST_FORMAT_UNSUPPORTED";
-    if (format === "XLSX" || format === "PDF" || format === "DOCX") {
+    if (format === "XLSX" || format === "XLS" || format === "PDF" || format === "DOCX") {
         if (typeof body.contentBase64 !== "string" || !body.contentBase64.trim()) return "CONTENT_BASE64_REQUIRED";
     } else if (typeof body.content !== "string" || !body.content.trim()) {
         return "CONTENT_REQUIRED";
@@ -228,8 +233,10 @@ const validateDecisionBody = (body: Record<string, unknown>): string | null => {
 const validateFinancialAnalyzeBody = (body: Record<string, unknown>): string | null => {
     const sourceSha256 = String(body.sourceSha256 ?? "").trim().toLowerCase();
     if (!/^[a-f0-9]{64}$/.test(sourceSha256)) return "SOURCE_SHA256_REQUIRED";
-    if (!Number.isFinite(Number(body.assets))) return "BALANCE_SHEET_FIELDS_REQUIRED";
-    if (!Number.isFinite(Number(body.liabilities))) return "BALANCE_SHEET_FIELDS_REQUIRED";
+    // assets/liabilities may be omitted when the ingested source carries
+    // canonical statement facts; they are then derived from real evidence.
+    if (body.assets !== undefined && !Number.isFinite(Number(body.assets))) return "BALANCE_SHEET_FIELDS_REQUIRED";
+    if (body.liabilities !== undefined && !Number.isFinite(Number(body.liabilities))) return "BALANCE_SHEET_FIELDS_REQUIRED";
     return null;
 };
 
@@ -912,12 +919,20 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const sourceSha256 = String(body.sourceSha256).trim().toLowerCase();
                 const model = await loadIngestedModel(session.tenantId, sourceSha256);
                 if (!model) return corsJson(422, { error: "INGESTED_SOURCE_REQUIRED" });
+                const derived = model.document ? deriveAnalysisInput(model.document) : null;
+                const suppliedAssets = body.assets === undefined ? undefined : Number(body.assets);
+                const suppliedLiabilities = body.liabilities === undefined ? undefined : Number(body.liabilities);
+                const assets = suppliedAssets !== undefined ? suppliedAssets : derived?.assets;
+                const liabilities = suppliedLiabilities !== undefined ? suppliedLiabilities : derived?.liabilities;
+                if (assets === undefined || liabilities === undefined) {
+                    return corsJson(400, { error: "BALANCE_SHEET_FIELDS_REQUIRED" });
+                }
                 const result = analysis.execute({
                     tenantId: session.tenantId,
-                    revenue: model.totals.credit,
-                    expenses: model.totals.debit,
-                    assets: Number(body.assets),
-                    liabilities: Number(body.liabilities),
+                    revenue: derived && !derived.missingMeasures.includes("REVENUE") ? derived.revenue : model.totals.credit,
+                    expenses: derived && !derived.missingMeasures.includes("EXPENSES") ? derived.expenses : model.totals.debit,
+                    assets,
+                    liabilities,
                     source: model.source
                 });
                 if (result.status !== "READY") return corsJson(422, result);
@@ -925,7 +940,13 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 latestResults.set(session.tenantId, result);
                 return corsJson(200, {
                     ...result,
-                    ingestedSource: { sha256: sourceSha256, sourceName: model.source.sourceName, sourceType: model.source.sourceType, transactionCount: model.transactions.length }
+                    ingestedSource: {
+                        sha256: sourceSha256,
+                        sourceName: model.source.sourceName,
+                        sourceType: model.source.sourceType,
+                        transactionCount: model.transactions.length,
+                        ...(model.document ? { document: summarizeFinancialDocument(model.document) } : {}),
+                    },
                 });
             }
 
@@ -954,7 +975,10 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                                 evidence: outcome.result.evidence,
                                 source: outcome.rawSourceRef,
                                 transactionCount: outcome.result.model.transactions.length,
-                                totals: outcome.result.model.totals
+                                totals: outcome.result.model.totals,
+                                ...(outcome.result.model.document
+                                    ? { document: summarizeFinancialDocument(outcome.result.model.document) }
+                                    : {}),
                             }
                         };
                     } catch (error) {
@@ -1121,8 +1145,9 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 if (analyticsError) return corsJson(400, { error: analyticsError });
 
                 let sourceEvidence: FinancialSourceEvidence | undefined;
-                let ingestedSource: { sha256: string; sourceName: string; sourceType: string; transactionCount: number } | undefined;
+                let ingestedSource: { sha256: string; sourceName: string; sourceType: string; transactionCount: number; document?: ReturnType<typeof summarizeFinancialDocument> } | undefined;
                 let series = Array.isArray(body.series) ? (body.series as number[]) : undefined;
+                let statement = body.statement as FinancialAnalyticsInput["statement"];
 
                 if (body.sourceSha256 !== undefined) {
                     const sourceSha256 = String(body.sourceSha256).trim().toLowerCase();
@@ -1134,15 +1159,22 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                         sha256: sourceSha256,
                         sourceName: model.source.sourceName,
                         sourceType: model.source.sourceType,
-                        transactionCount: model.transactions.length
+                        transactionCount: model.transactions.length,
+                        ...(model.document ? { document: summarizeFinancialDocument(model.document) } : {})
                     };
                     if (!series) series = model.transactions.map((transaction) => transaction.credit - transaction.debit);
+                    if (!statement && model.document) {
+                        const derived = deriveAnalysisInput(model.document).statement;
+                        // Only a complete statement can feed the existing ratio
+                        // analytics; a partial derivation stays BLOCKED honestly.
+                        if (isCompleteRatioStatement(derived)) statement = derived as FinancialAnalyticsInput["statement"];
+                    }
                 }
 
                 const result = financialAnalytics.execute({
                     tenantId: session.tenantId,
                     series,
-                    statement: body.statement as FinancialAnalyticsInput["statement"],
+                    statement,
                     priorStatement: body.priorStatement as FinancialAnalyticsInput["priorStatement"],
                     breakEven: body.breakEven as FinancialAnalyticsInput["breakEven"],
                     movingAverageWindow: body.movingAverageWindow === undefined ? undefined : Number(body.movingAverageWindow)

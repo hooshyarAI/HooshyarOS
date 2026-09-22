@@ -23,6 +23,11 @@
  *     -> real HTTP POST /api/financial/analyze -> READY;
  *   and an image-only PDF with no recognizable text fails closed precisely.
  *
+ * It also qualifies the unified MULTI-SECTION report path: a scanned annual
+ * report (auditor report, board report, balance sheet, income statement, cash
+ * flow, notes) is OCR'd, its sections detected and its statement facts
+ * normalized into canonical financial facts that the existing analysis consumes.
+ *
  * No OCR is faked, no stub engine is used and no external network is used.
  */
 import { createHash } from "node:crypto";
@@ -36,10 +41,12 @@ const nodeRequire = createRequire(join(resolve(__dirname, ".."), "package.json")
 const {
   buildLedgerScannedPdf,
   buildFinancialStatementScannedPdf,
+  buildFinancialReportScannedPdf,
   buildBlankScannedPdf,
 } = nodeRequire("./scripts/lib/scanned-pdf-fixture.cjs") as {
   buildLedgerScannedPdf: (lines: string[]) => Buffer;
   buildFinancialStatementScannedPdf: () => Buffer;
+  buildFinancialReportScannedPdf: () => Buffer;
   buildBlankScannedPdf: () => Buffer;
 };
 
@@ -235,6 +242,13 @@ async function main(): Promise<void> {
         transactionCount?: number;
         totals?: { debit?: number; credit?: number };
         evidence?: { ocr?: { ocrEngine?: string; ocrLanguage?: string } };
+        document?: {
+          status?: string;
+          currency?: string | null;
+          unitMultiplier?: number;
+          factCount?: number;
+          sections?: Array<{ type?: string; state?: string; factCount?: number }>;
+        };
       };
     };
     let statementJob: JobView | undefined;
@@ -295,6 +309,81 @@ async function main(): Promise<void> {
     }
     checks.push("statement-financial-analysis-ready");
 
+    /**
+     * Scenario E — a scanned MULTI-SECTION annual financial report (auditor
+     * report, board report, statement of financial position, statement of profit
+     * or loss, statement of cash flows, notes). This is NOT a transaction ledger:
+     * it exercises the unified document-understanding boundary (section detection
+     * + statement-fact normalization + canonical facts) reached through the SAME
+     * real OCR path.
+     */
+    const reportBytes = buildFinancialReportScannedPdf();
+    const reportSha = createHash("sha256").update(reportBytes).digest("hex");
+    const reportStart = await fetch(`${base}/api/ingest/jobs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie, "idempotency-key": "report-job-1" },
+      body: JSON.stringify({ sourceName: "annual_report.pdf", format: "PDF", contentBase64: reportBytes.toString("base64") }),
+    });
+    if (reportStart.status !== 202) fail(`report job creation failed: ${reportStart.status}:${JSON.stringify(await reportStart.json())}`);
+    const startedReportJob = await reportStart.json() as { jobId?: string };
+    if (!startedReportJob.jobId) fail("report job id missing");
+
+    let reportJob: JobView | undefined;
+    for (let attempt = 0; attempt < 900; attempt += 1) {
+      const statusResponse = await fetch(`${base}/api/ingest/jobs/${startedReportJob.jobId}`, { headers: { cookie } });
+      const statusBody = await statusResponse.json() as { job?: JobView };
+      reportJob = statusBody.job;
+      if (reportJob && (reportJob.status === "COMPLETED" || reportJob.status === "FAILED")) break;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    if (!reportJob || reportJob.status !== "COMPLETED") fail(`report job did not complete: ${JSON.stringify(reportJob)}`);
+    const reportDocument = reportJob.result?.document;
+    if (!reportDocument) fail("report document understanding is missing");
+    if (reportDocument.status !== "COMPLETED" && reportDocument.status !== "PARTIAL") {
+      fail(`report document status unexpected: ${reportDocument.status}`);
+    }
+    if ((reportDocument.factCount ?? 0) < 8) fail(`report statement facts missing: ${reportDocument.factCount}`);
+    if (reportDocument.currency !== "IRR" || reportDocument.unitMultiplier !== 1000000) {
+      fail(`report unit/currency not preserved: ${JSON.stringify(reportDocument)}`);
+    }
+    const reportSections = reportDocument.sections ?? [];
+    const sectionTypes = reportSections.map((section) => section.type);
+    for (const required of ["AUDITOR_REPORT", "BALANCE_SHEET", "INCOME_STATEMENT", "CASH_FLOW_STATEMENT"]) {
+      if (!sectionTypes.includes(required)) fail(`report section missing: ${required} (${JSON.stringify(sectionTypes)})`);
+    }
+    const balance = reportSections.find((section) => section.type === "BALANCE_SHEET");
+    if (balance?.state !== "COMPLETED") fail(`balance sheet not completed: ${JSON.stringify(balance)}`);
+    if (reportJob.result?.sha256 !== reportSha) fail("report original-byte SHA-256 provenance mismatch");
+    if (reportJob.result?.evidence?.ocr?.ocrEngine !== "tesseract.js") fail("report OCR provenance missing");
+    checks.push(
+      "report-job-202",
+      "report-section-detection",
+      "report-statement-normalization",
+      "report-canonical-facts",
+      "report-original-byte-provenance",
+    );
+
+    const reportAnalyze = await fetch(`${base}/api/financial/analyze`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ sourceSha256: reportSha }),
+    });
+    const reportAnalyzeBody = await reportAnalyze.json() as {
+      status?: string;
+      metrics?: { debtRatio?: number };
+      ingestedSource?: { document?: { status?: string; factCount?: number } };
+    };
+    if (reportAnalyze.status !== 200 || reportAnalyzeBody.status !== "READY") {
+      fail(`report financial analysis failed: ${reportAnalyze.status}:${JSON.stringify(reportAnalyzeBody)}`);
+    }
+    if (reportAnalyzeBody.ingestedSource?.document?.status !== "COMPLETED") {
+      fail(`report document not carried into analysis: ${JSON.stringify(reportAnalyzeBody.ingestedSource)}`);
+    }
+    if (Math.abs((reportAnalyzeBody.metrics?.debtRatio ?? 0) - 820000 / 1965000) > 0.001) {
+      fail(`report analysis did not use canonical facts: ${JSON.stringify(reportAnalyzeBody.metrics)}`);
+    }
+    checks.push("report-financial-analysis-ready");
+
     const blankScanned = buildBlankScannedPdf();
     const blankIngest = await fetch(`${base}/api/ingest`, {
       method: "POST",
@@ -309,13 +398,14 @@ async function main(): Promise<void> {
 
     const evidence = {
       type: "PDF_INGESTION_ACCEPTANCE",
-      version: 3,
+      version: 4,
       status: "PASS",
       createdAt: new Date().toISOString(),
       runtime: "real-node-tsx",
       pdfTextSupported: true,
       scannedPdfOcrSupported: true,
       statementNormalizationSupported: true,
+      financialReportUnderstandingSupported: true,
       ingestionJobStatusSupported: true,
       ocrClaimed: true,
       ocrEngine: scannedOcr?.ocrEngine,
@@ -331,6 +421,10 @@ async function main(): Promise<void> {
       statementSha256: statementSha,
       statementTransactionCount: statementJob?.result?.transactionCount,
       statementProgress: statementJob?.progress ?? null,
+      reportSha256: reportSha,
+      reportDocumentStatus: reportJob?.result?.document?.status,
+      reportFactCount: reportJob?.result?.document?.factCount,
+      reportSections: reportJob?.result?.document?.sections ?? [],
     };
     mkdirSync(resolve(process.cwd(), ".hooshyar"), { recursive: true });
     writeFileSync(resolve(process.cwd(), ".hooshyar", "pdf-ingestion-acceptance.json"), JSON.stringify(evidence, null, 2), "utf8");

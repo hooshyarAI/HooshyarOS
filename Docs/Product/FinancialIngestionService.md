@@ -35,9 +35,10 @@ canonical `FinancialDataIngestionAdapter`.
 | `HTML` | `content` (text) | `ingestHtml` | Real table extraction first, then bounded visible text; `<script>`/`<style>` never executed |
 | `XML` | `content` (text) | `ingestXml` | Repeating `<transaction>` element contract first, then bounded visible text; `<!DOCTYPE>`/`<!ENTITY>` rejected (XXE defense) |
 | `DOCX` | `contentBase64` | `ingestDocxBytes` | `mammoth` text + table extraction; legacy `.doc` rejected explicitly |
-| `XLSX` | `contentBase64` | `ingestXlsx` | `exceljs-hardened`, formula values only, zip-bomb limits |
-| `PDF` (text-native) | `contentBase64` | `ingestPdfBytes` | `pdf-parse` via `acquirePdf`; extracted text normalized through the canonical ledger (CSV) pipeline; original-byte SHA-256 provenance |
-| `PDF` (scanned/image-only) | `contentBase64` | `ingestScannedPdfBytes` | `pdf-parse` page rasterizer + admitted offline `tesseract.js` OCR (`fas+eng`); OCR text normalized through the canonical document-table boundary (realistic statement layouts) with the strict CSV pipeline only as a fallback; original-byte SHA-256 provenance plus OCR engine/version/confidence provenance |
+| `XLSX` | `contentBase64` | `ingestXlsx` | `exceljs-hardened`, formula values only, zip-bomb limits; a worksheet that is not the 5-column ledger is routed through the unified document/statement boundary across all sheets |
+| `XLS` | `contentBase64` | `ingestXlsBytes` | legacy OLE2/BIFF8 workbook read by the governed `xls-reader` provider (values only; no macro/formula execution); converges on the same unified document/statement boundary |
+| `PDF` (text-native) | `contentBase64` | `ingestPdfBytes` | `pdf-parse` via `acquirePdf`; extracted text is tried as a canonical ledger first, then normalized through the unified document/statement boundary; original-byte SHA-256 provenance |
+| `PDF` (scanned/image-only) | `contentBase64` | `ingestScannedPdfBytes` | `pdf-parse` page rasterizer + admitted offline `tesseract.js` OCR (`fas+eng`); OCR text is tried as a canonical ledger first, then normalized through the unified document/statement boundary; original-byte SHA-256 provenance plus OCR engine/version/confidence provenance |
 
 All formats converge on the **one** canonical owner
 (`FinancialDataIngestionAdapter`) and the **one** validation/normalization/
@@ -94,7 +95,7 @@ partially applied.
   conversion is evaluated and `DEFERRED` (deployment/security footprint).
 - **RTF / ODT / PPTX / EPUB / EML / MSG / DBF / YAML / TIFF** — evaluated and
   recorded as `DEFERRED` with unmet conditions; none is claimed as supported.
-- **XLS** — dependency-blocked legacy binary format; no hardened reader admitted.
+- **XLS** — legacy binary format supported via the governed `xls-reader` provider (`document.xls.parse`); the workbook converges on the same unified document/statement boundary as XLSX and PDF, and fails closed with `xls-provider-unavailable` when the provider is not admitted.
 - **Broader document fallback (Apache Tika)** — evaluated and `DEFERRED`: the
   JVM runtime/deployment/security footprint is not justified while the direct
   providers cover the primary commercial input families.
@@ -229,8 +230,8 @@ Unsupported/ambiguous input is rejected before any model is persisted:
 
 | Code | Meaning |
 |------|---------|
-| `INGEST_FORMAT_UNSUPPORTED` (400) | `format` is not CSV/STRUCTURED/XLSX/TXT/TSV/HTML/XML/DOCX/PDF |
-| `CONTENT_REQUIRED` / `CONTENT_BASE64_REQUIRED` (400) | payload missing content (XLSX/PDF/DOCX require `contentBase64`) |
+| `INGEST_FORMAT_UNSUPPORTED` (400) | `format` is not CSV/STRUCTURED/XLSX/XLS/TXT/TSV/HTML/XML/DOCX/PDF |
+| `CONTENT_REQUIRED` / `CONTENT_BASE64_REQUIRED` (400) | payload missing content (XLSX/XLS/PDF/DOCX require `contentBase64`) |
 | `SOURCE_NAME_REQUIRED` (400) | empty source name |
 | `ingestion-pdf-scanned-no-ocr-yet` (422) | scanned/image-only PDF when the OCR provider is not admitted; `FinancialIngestionService` otherwise OCRs it |
 | `ingestion-ocr-empty` (422) | OCR ran but produced no text; nothing is fabricated |

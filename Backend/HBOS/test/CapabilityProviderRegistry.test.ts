@@ -103,7 +103,7 @@ describe("CapabilityProviderRegistry — governed reuse/admission", () => {
       expect(assessment.admitted).toBe(false);
       expect(assessment.reasons).toContain(`status-not-approved:${candidate.status}`);
     }
-    expect(registry.assess("document-xls-legacy").requiredActions.length).toBeGreaterThan(0);
+    expect(registry.assess("document-rtf-text").requiredActions.length).toBeGreaterThan(0);
   });
 
   test("fails closed when an external provider has no verified license", () => {
@@ -145,10 +145,20 @@ describe("CapabilityProviderRegistry — governed reuse/admission", () => {
     expect(provider.selfHostedOffline).toBe(true);
   });
 
-  test("fails closed when the only provider for a capability is deferred (legacy XLS)", () => {
+  test("selects the admitted integrated provider for legacy XLS", () => {
     const registry = new CapabilityProviderRegistry();
-    expect(() => registry.selectProvider("document.xls.parse"))
-      .toThrow(`${CAPABILITY_PROVIDER_ERROR_CODES.NOT_ADMITTED}:document.xls.parse`);
+    const provider = registry.selectProvider("document.xls.parse");
+    expect(provider.capabilityId).toBe("document-xls-legacy");
+    expect(provider.provider).toBe("xls-reader");
+    expect(provider.integration).toBe("INTEGRATED");
+    expect(provider.license).toBe("MIT");
+    expect(provider.selfHostedOffline).toBe(true);
+  });
+
+  test("fails closed when the only provider for a capability is deferred (RTF)", () => {
+    const registry = new CapabilityProviderRegistry();
+    expect(() => registry.selectProvider("document.rtf.text"))
+      .toThrow(`${CAPABILITY_PROVIDER_ERROR_CODES.NOT_ADMITTED}:document.rtf.text`);
   });
 
   test("selection prefers the earliest admissible reuse tier", () => {

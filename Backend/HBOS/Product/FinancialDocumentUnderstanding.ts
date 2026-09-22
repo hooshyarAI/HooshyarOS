@@ -1,0 +1,828 @@
+/**
+ * HooshyarOS — Unified financial document understanding (supporting boundary).
+ *
+ * One Product-level normalization boundary shared by PDF (native + OCR), XLSX and
+ * legacy XLS. It is NOT a new Engine, NOT a second ingestion path and NOT a
+ * second canonical financial model: it produces *canonical financial facts*
+ * (statement measures with provenance) that attach to the existing canonical
+ * `FinancialCanonicalModel` under the optional `document` field, and it derives
+ * the existing analysis inputs from those facts.
+ *
+ * The existing 5-column transaction model remains the correct representation for
+ * a real transaction ledger. A complete annual financial report is NOT a ledger:
+ * it is a set of sections (auditor report, board report, balance sheet, income
+ * statement, cash flow, equity, notes). This boundary represents those sections
+ * and normalizes statement tables into typed facts, never guessing an ambiguous
+ * column or label.
+ *
+ * Truthfulness rules:
+ *   - a section is reported COMPLETED / PARTIAL / FAILED from real extraction;
+ *   - narrative sections never fail the report merely for not being tables;
+ *   - an unrecognized label yields no fact (it is never guessed);
+ *   - every fact retains its source line, raw text, period and unit;
+ *   - no percentage or fact is fabricated.
+ */
+import {
+  extractDeclaredCurrency,
+  parseStatementAmount,
+  toAsciiDigits,
+} from "./DocumentTableExtractor";
+import type { RatioStatement } from "./RatioAnalysisService";
+
+export type FinancialSectionType =
+  | "AUDITOR_REPORT"
+  | "BOARD_REPORT"
+  | "BALANCE_SHEET"
+  | "INCOME_STATEMENT"
+  | "CASH_FLOW_STATEMENT"
+  | "CHANGES_IN_EQUITY"
+  | "NOTES"
+  | "UNKNOWN";
+
+export type FinancialSectionState = "COMPLETED" | "PARTIAL" | "FAILED";
+
+export type FinancialDocumentStatus = "COMPLETED" | "PARTIAL" | "FAILED";
+
+export type StatementMeasure =
+  | "ASSETS"
+  | "CURRENT_ASSETS"
+  | "NON_CURRENT_ASSETS"
+  | "LIABILITIES"
+  | "CURRENT_LIABILITIES"
+  | "NON_CURRENT_LIABILITIES"
+  | "EQUITY"
+  | "REVENUE"
+  | "COGS"
+  | "GROSS_PROFIT"
+  | "OPERATING_EXPENSES"
+  | "OPERATING_PROFIT"
+  | "EXPENSES"
+  | "NET_PROFIT"
+  | "OPERATING_CASH_FLOW"
+  | "INVESTING_CASH_FLOW"
+  | "FINANCING_CASH_FLOW"
+  | "NET_CASH_FLOW";
+
+export const STATEMENT_MEASURES: ReadonlyArray<StatementMeasure> = [
+  "ASSETS",
+  "CURRENT_ASSETS",
+  "NON_CURRENT_ASSETS",
+  "LIABILITIES",
+  "CURRENT_LIABILITIES",
+  "NON_CURRENT_LIABILITIES",
+  "EQUITY",
+  "REVENUE",
+  "COGS",
+  "GROSS_PROFIT",
+  "OPERATING_EXPENSES",
+  "OPERATING_PROFIT",
+  "EXPENSES",
+  "NET_PROFIT",
+  "OPERATING_CASH_FLOW",
+  "INVESTING_CASH_FLOW",
+  "FINANCING_CASH_FLOW",
+  "NET_CASH_FLOW",
+];
+
+/** Measures a complete statement of each type is expected to expose. */
+const PRIMARY_MEASURES: Partial<Record<FinancialSectionType, ReadonlyArray<StatementMeasure>>> = {
+  BALANCE_SHEET: ["ASSETS", "LIABILITIES", "EQUITY"],
+  INCOME_STATEMENT: ["REVENUE", "NET_PROFIT"],
+  CASH_FLOW_STATEMENT: ["OPERATING_CASH_FLOW"],
+  CHANGES_IN_EQUITY: ["EQUITY"],
+};
+
+const NARRATIVE_SECTIONS: ReadonlySet<FinancialSectionType> = new Set([
+  "AUDITOR_REPORT",
+  "BOARD_REPORT",
+  "NOTES",
+]);
+
+export interface FinancialFactEvidence {
+  /** 1-based line index inside the whole document. */
+  readonly line: number;
+  /** 1-based page index when the source was paged (PDF); absent otherwise. */
+  readonly page?: number;
+  /** The raw source line/cells that produced the fact. */
+  readonly text: string;
+}
+
+export interface FinancialStatementFact {
+  readonly measure: StatementMeasure;
+  readonly section: FinancialSectionType;
+  /** Original (normalized-for-display) label text from the document. */
+  readonly label: string;
+  /** Period label from the column header, or the positional fallback. */
+  readonly periodLabel: string;
+  /** Column index of the period inside the statement grid. */
+  readonly periodIndex: number;
+  /** Value exactly as printed (positive hundreds as declared, signed). */
+  readonly rawValue: number;
+  /** rawValue already scaled by the declared unit multiplier. */
+  readonly value: number;
+  /** Declared unit multiplier (1, 1e3, 1e6, 1e9). */
+  readonly unitMultiplier: number;
+  /** Currency code (IRR / IRT / declared ISO code); empty when undeclared. */
+  readonly currency: string;
+  /** 1 when the row/columns mapped exactly; lower when columns were inferred. */
+  readonly confidence: number;
+  readonly evidence: FinancialFactEvidence;
+}
+
+export interface FinancialDocumentSection {
+  readonly type: FinancialSectionType;
+  readonly state: FinancialSectionState;
+  readonly startLine: number;
+  readonly endLine: number;
+  readonly pageStart?: number;
+  readonly pageEnd?: number;
+  readonly facts: ReadonlyArray<FinancialStatementFact>;
+  /** Precise, non-fabricated notes (e.g. ambiguous columns, undeclared unit). */
+  readonly notes: ReadonlyArray<string>;
+  /** Precise technical code when the section could not be completed. */
+  readonly failureCode?: string;
+}
+
+export interface FinancialDocumentUnderstanding {
+  readonly status: FinancialDocumentStatus;
+  readonly currency: string | null;
+  readonly unitMultiplier: number;
+  readonly sections: ReadonlyArray<FinancialDocumentSection>;
+  readonly facts: ReadonlyArray<FinancialStatementFact>;
+}
+
+export const FINANCIAL_DOCUMENT_ERROR_CODES = {
+  INSUFFICIENT_EVIDENCE: "financial-report-insufficient-evidence",
+  AMBIGUOUS_TABLE: "financial-report-ambiguous-table",
+  PARTIAL_SUCCESS: "financial-report-partial-success",
+  SPREADSHEET_STATEMENT_AMBIGUOUS: "spreadsheet-statement-ambiguous",
+} as const;
+
+/* ------------------------------------------------------------------------- *
+ * Label normalization
+ * ------------------------------------------------------------------------- */
+
+const ARABIC_TO_PERSIAN: ReadonlyArray<readonly [RegExp, string]> = [
+  [/[\u064a\u0649]/g, "ی"],
+  [/[\u0643]/g, "ک"],
+  [/[\u0629]/g, "ه"],
+  [/[\u0623\u0625\u0622\u0671]/g, "ا"],
+];
+
+/** Normalize a document label for deterministic, non-fuzzy alias matching. */
+export function normalizeStatementLabel(value: string): string {
+  if (typeof value !== "string") return "";
+  // Drop zero-width joiners/marks so "دارایی‌ها" and "داراییها" are identical.
+  let out = toAsciiDigits(value).replace(/[\u200c\u200e\u200f]/g, "").replace(/\u00a0/g, " ");
+  for (const [pattern, replacement] of ARABIC_TO_PERSIAN) out = out.replace(pattern, replacement);
+  out = out
+    .replace(/[()\[\]{}«»"'`.,،؛:;|_\-–—−/\\]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+  // Drop a leading note marker ("1-", "۱ -") and a trailing note reference.
+  out = out.replace(/^\d+\s*/, "").replace(/\s+\d+$/, "").trim();
+  return out;
+}
+
+const stripSpaces = (value: string): string => value.replace(/\s+/g, "");
+const matchKey = (value: string): string => stripSpaces(normalizeStatementLabel(value));
+
+function buildAliasMap(
+  entries: ReadonlyArray<readonly [StatementMeasure, ReadonlyArray<string>]>,
+): Map<string, StatementMeasure> {
+  const map = new Map<string, StatementMeasure>();
+  for (const [measure, aliases] of entries) {
+    for (const alias of aliases) {
+      const key = matchKey(alias);
+      if (key) map.set(key, measure);
+    }
+  }
+  return map;
+}
+
+const MEASURE_ALIASES = buildAliasMap([
+  ["ASSETS", ["جمع دارایی‌ها", "جمع کل دارایی‌ها", "مجموع دارایی‌ها", "total assets", "assets"]],
+  ["CURRENT_ASSETS", ["جمع دارایی‌های جاری", "دارایی‌های جاری", "total current assets", "current assets"]],
+  ["NON_CURRENT_ASSETS", ["جمع دارایی‌های غیرجاری", "دارایی‌های غیرجاری", "دارایی‌های ثابت", "total non-current assets", "non-current assets", "fixed assets"]],
+  ["LIABILITIES", ["جمع بدهی‌ها", "مجموع بدهی‌ها", "total liabilities", "liabilities"]],
+  ["CURRENT_LIABILITIES", ["جمع بدهی‌های جاری", "بدهی‌های جاری", "total current liabilities", "current liabilities"]],
+  ["NON_CURRENT_LIABILITIES", ["جمع بدهی‌های غیرجاری", "بدهی‌های غیرجاری", "total non-current liabilities", "non-current liabilities"]],
+  ["EQUITY", ["جمع حقوق مالکانه", "حقوق مالکانه", "مجموع حقوق مالکانه", "total equity", "equity"]],
+  ["REVENUE", ["درآمد عملیاتی", "درآمدهای عملیاتی", "فروش", "درآمد", "revenue", "sales", "operating revenue"]],
+  ["COGS", ["بهای تمام شده کالای فروش رفته", "بهای تمام‌شده کالای فروش رفته", "بهای تمام شده", "cost of goods sold", "cost of sales"]],
+  ["GROSS_PROFIT", ["سود ناخالص", "زیان ناخالص", "gross profit", "gross loss"]],
+  ["OPERATING_EXPENSES", ["هزینه‌های فروش اداری و عمومی", "هزینه‌های عملیاتی", "هزینه‌های فروش و اداری و عمومی", "operating expenses", "selling general and administrative expenses"]],
+  ["OPERATING_PROFIT", ["سود زیان عملیاتی", "سود عملیاتی", "زیان عملیاتی", "operating profit", "operating income", "operating loss"]],
+  ["EXPENSES", ["جمع هزینه‌ها", "مجموع هزینه‌ها", "هزینه‌ها", "total expenses", "expenses"]],
+  ["NET_PROFIT", ["سود زیان خالص", "سود خالص", "زیان خالص", "سود زیان پس از مالیات", "net profit", "net income", "net loss", "profit for the year"]],
+  ["OPERATING_CASH_FLOW", ["جریان نقدی عملیاتی", "جریان‌های نقدی عملیاتی", "خالص جریان‌های نقدی عملیاتی", "جریان نقدینگی عملیاتی", "net cash from operating activities", "net cash provided by operating activities", "cash flows from operating activities"]],
+  ["INVESTING_CASH_FLOW", ["جریان نقدی سرمایه‌گذاری", "جریان‌های نقدی سرمایه‌گذاری", "خالص جریان‌های نقدی سرمایه‌گذاری", "net cash from investing activities", "cash flows from investing activities"]],
+  ["FINANCING_CASH_FLOW", ["جریان نقدی تامین مالی", "جریان‌های نقدی تامین مالی", "خالص جریان‌های نقدی تامین مالی", "net cash from financing activities", "cash flows from financing activities"]],
+  ["NET_CASH_FLOW", ["خالص افزایش کاهش نقد", "خالص جریان نقدی", "افزایش کاهش خالص نقد", "net increase in cash", "net decrease in cash", "net cash flow"]],
+]);
+
+/** Map a statement label to a canonical measure, or null when unrecognized. */
+export function matchStatementMeasure(label: string): StatementMeasure | null {
+  const key = matchKey(label);
+  if (!key) return null;
+  return MEASURE_ALIASES.get(key) ?? null;
+}
+
+/* ------------------------------------------------------------------------- *
+ * Units and currency
+ * ------------------------------------------------------------------------- */
+
+export interface StatementUnitDeclaration {
+  readonly multiplier: number;
+  readonly currency: string | null;
+}
+
+/**
+ * Detect the declared statement unit and currency. Only an explicit declaration
+ * is accepted; a bare number is never assumed to be thousands/millions.
+ */
+export function detectStatementUnit(text: string): StatementUnitDeclaration {
+  const normalized = toAsciiDigits(typeof text === "string" ? text : "").replace(/[\u200c\u200e\u200f]/g, " ");
+  const compact = normalized.replace(/\s+/g, " ");
+
+  let multiplier = 1;
+  if (/میلیارد\s*ریال/.test(compact) || /(billion|میلیارد)\s*(rial|irr)/i.test(compact)) multiplier = 1_000_000_000;
+  else if (/میلیون\s*ریال/.test(compact) || /(million|میلیون)\s*(rial|irr)/i.test(compact)) multiplier = 1_000_000;
+  else if (/هزار\s*ریال/.test(compact) || /(thousand|هزار)\s*(rial|irr)/i.test(compact)) multiplier = 1_000;
+
+  let currency: string | null = null;
+  if (/تومان/.test(compact)) currency = "IRT";
+  else if (/ریال/.test(compact)) currency = "IRR";
+  const declared = extractDeclaredCurrency(compact);
+  if (declared) currency = declared;
+  if (!currency) {
+    // An explicit unit phrase followed by a code ("figures in million IRR").
+    const unitCurrency = compact.match(/(?:million|thousand|billion|هزار|میلیون|میلیارد)\s*(rials?|irr|tomans?|irt)\b/i);
+    if (unitCurrency) currency = /toman|irt/i.test(unitCurrency[1]) ? "IRT" : "IRR";
+  }
+
+  return { multiplier, currency };
+}
+
+/* ------------------------------------------------------------------------- *
+ * Section detection
+ * ------------------------------------------------------------------------- */
+
+interface SectionAliasGroup {
+  readonly type: FinancialSectionType;
+  readonly aliases: ReadonlyArray<string>;
+}
+
+const SECTION_ALIAS_GROUPS: ReadonlyArray<SectionAliasGroup> = [
+  { type: "BALANCE_SHEET", aliases: ["صورت وضعیت مالی", "صورت‌های وضعیت مالی", "ترازنامه", "statement of financial position", "balance sheet"] },
+  { type: "INCOME_STATEMENT", aliases: ["صورت سود و زیان", "صورت سود و زیان جامع", "سود و زیان", "income statement", "statement of profit or loss", "profit and loss"] },
+  { type: "CASH_FLOW_STATEMENT", aliases: ["صورت جریان‌های نقدی", "صورت جریان وجوه نقد", "جریان وجوه نقد", "جریان‌های نقدی", "cash flow statement", "statement of cash flows"] },
+  { type: "CHANGES_IN_EQUITY", aliases: ["صورت تغییرات در حقوق مالکانه", "تغییرات در حقوق مالکانه", "changes in equity", "statement of changes in equity"] },
+  { type: "AUDITOR_REPORT", aliases: ["گزارش حسابرس مستقل", "گزارش حسابرسان مستقل", "گزارش حسابرس", "independent auditor", "auditor's report", "auditors report"] },
+  { type: "BOARD_REPORT", aliases: ["گزارش هیئت مدیره", "گزارش هیئت‌مدیره", "گزارش مدیران", "گزارش فعالیت هیئت مدیره", "board of directors report", "directors report", "management report"] },
+  { type: "NOTES", aliases: ["یادداشت‌های توضیحی", "یادداشت توضیحی", "یادداشت‌ها", "notes to the financial statements", "notes to financial statements"] },
+];
+
+const SECTION_ALIAS_KEYS: ReadonlyArray<{ type: FinancialSectionType; key: string }> = SECTION_ALIAS_GROUPS
+  .flatMap((group) => group.aliases.map((alias) => ({ type: group.type, key: stripSpaces(normalizeStatementLabel(alias)) })))
+  .sort((a, b) => b.key.length - a.key.length);
+
+/**
+ * Match a document line to a section type. A heading is a short line that
+ * contains a section alias; the longest alias wins so overlapping titles stay
+ * deterministic. Narrative mentions inside long sentences are not headings.
+ */
+export function matchFinancialSectionHeading(line: string): FinancialSectionType | null {
+  if (typeof line !== "string") return null;
+  const raw = line.trim();
+  if (!raw || raw.length > 120) return null;
+  const key = stripSpaces(normalizeStatementLabel(raw));
+  if (!key) return null;
+
+  let matched: FinancialSectionType | null = null;
+  for (const alias of SECTION_ALIAS_KEYS) {
+    if (key === alias.key || key.startsWith(alias.key)) {
+      matched = alias.type;
+      break;
+    }
+  }
+  if (matched) return matched;
+
+  // OCR may attach a short suffix ("... ( ادامه )") or prefix ("صورت مالی ...").
+  const tokenCount = raw.split(/\s+/).filter(Boolean).length;
+  if (tokenCount <= 8) {
+    for (const alias of SECTION_ALIAS_KEYS) {
+      if (alias.key.length >= 6 && key.includes(alias.key)) return alias.type;
+    }
+  }
+  return null;
+}
+
+/* ------------------------------------------------------------------------- *
+ * Row/column primitives
+ * ------------------------------------------------------------------------- */
+
+/** Split one document text line into cells. Handles OCR single-space output. */
+export function splitStatementRow(line: string): string[] {
+  if (typeof line !== "string") return [];
+  const trimmed = line.replace(/\u00a0/g, " ").trim();
+  if (!trimmed) return [];
+  if (trimmed.includes("|")) return trimmed.split("|").map((cell) => cell.trim());
+  if (trimmed.includes("\t")) return trimmed.split("\t").map((cell) => cell.trim());
+  const wide = trimmed.split(/\s{2,}/).map((cell) => cell.trim()).filter(Boolean);
+  if (wide.length >= 2) return wide;
+  return trimmed.split(/\s+/).map((cell) => cell.trim());
+}
+
+const YEAR_RE = /^\d{4}$/;
+const RELATIVE_PERIOD_KEYS = new Set([
+  "دورهجاری", "سالجاری", "جاری", "current", "currentyear", "دورهقبل", "سالقبل", "قبل", "prior", "previous", "comparative", "دورهبعد",
+]);
+
+function isYearToken(cell: string): boolean {
+  const digits = toAsciiDigits(String(cell ?? "")).replace(/[^\d]/g, "");
+  if (!YEAR_RE.test(digits)) return false;
+  const year = Number(digits);
+  return (year >= 1300 && year <= 1500) || (year >= 1900 && year <= 2100);
+}
+
+function isPeriodToken(cell: string): boolean {
+  if (isYearToken(cell)) return true;
+  return RELATIVE_PERIOD_KEYS.has(stripSpaces(normalizeStatementLabel(cell)));
+}
+
+function isNumericCell(cell: string): boolean {
+  const trimmed = String(cell ?? "").trim();
+  if (!trimmed) return false;
+  return parseStatementAmount(trimmed) !== null;
+}
+
+const DEFAULT_PERIOD_LABELS = ["current", "prior", "prior-2", "prior-3"] as const;
+
+interface StatementGrid {
+  /** Index of the first value column (label columns are before it). */
+  readonly labelEnd: number;
+  readonly periodColumns: ReadonlyArray<number>;
+  readonly periodLabels: ReadonlyArray<string>;
+  readonly hasHeader: boolean;
+}
+
+/**
+ * Locate the period columns of a statement grid. A header row is the first row
+ * whose first cell is not itself a period and that declares at least one period
+ * token in a later cell. When no header exists, the grid is treated as freeform
+ * and the rows are read from their trailing numeric tokens.
+ */
+function locateStatementGrid(rows: ReadonlyArray<ReadonlyArray<string>>): StatementGrid {
+  for (let r = 0; r < Math.min(rows.length, 6); r += 1) {
+    const row = rows[r];
+    if (!row || row.length < 2) continue;
+    if (isPeriodToken(row[0] ?? "")) continue;
+    const periodColumns: number[] = [];
+    const periodLabels: string[] = [];
+    for (let c = 1; c < row.length; c += 1) {
+      const cell = String(row[c] ?? "").trim();
+      if (!cell) continue;
+      if (isPeriodToken(cell)) {
+        periodColumns.push(c);
+        periodLabels.push(cell);
+      }
+    }
+    if (periodColumns.length > 0) {
+      return { labelEnd: periodColumns[0], periodColumns, periodLabels, hasHeader: true };
+    }
+  }
+  return { labelEnd: 1, periodColumns: [1], periodLabels: [DEFAULT_PERIOD_LABELS[0]], hasHeader: false };
+}
+
+function valueFromCell(cell: string | undefined): number | null {
+  const trimmed = String(cell ?? "").trim();
+  if (!trimmed) return null;
+  return parseStatementAmount(trimmed);
+}
+
+function joinRowText(row: ReadonlyArray<string>): string {
+  return row.map((cell) => String(cell ?? "").trim()).filter(Boolean).join(" ").slice(0, 300);
+}
+
+/* ------------------------------------------------------------------------- *
+ * Fact extraction
+ * ------------------------------------------------------------------------- */
+
+interface FactExtractionResult {
+  readonly facts: ReadonlyArray<FinancialStatementFact>;
+  readonly notes: ReadonlyArray<string>;
+}
+
+function extractSectionFacts(
+  rows: ReadonlyArray<ReadonlyArray<string>>,
+  sectionType: FinancialSectionType,
+  unit: StatementUnitDeclaration,
+  lineOffset: number,
+  positional: boolean,
+  pageNumbers?: ReadonlyArray<number | undefined>,
+): FactExtractionResult {
+  const grid = locateStatementGrid(rows);
+  const facts: FinancialStatementFact[] = [];
+  const notes: string[] = [];
+  if (!unit.currency) notes.push("currency-undeclared");
+  if (unit.multiplier === 1) notes.push("unit-not-declared-assumed-rial");
+
+  let pendingLabel = "";
+  let inferredColumns = false;
+
+  for (let r = 0; r < rows.length; r += 1) {
+    const row = rows[r];
+    if (!row || row.length === 0) continue;
+    const cells = row.map((cell) => String(cell ?? "").trim());
+    // A single text cell is the raw OCR/document line: tokenize it so the
+    // label is everything before the trailing numeric value run.
+    const effective = cells.length === 1 && /\s/.test(cells[0]) ? splitStatementRow(cells[0]) : cells;
+
+    let label = "";
+    let periodValues: Array<{ index: number; label: string; value: number; confidence: number }> = [];
+
+    if (positional && grid.hasHeader) {
+      label = String(effective[0] ?? "").trim();
+      grid.periodColumns.forEach((column, index) => {
+        const value = valueFromCell(effective[column]);
+        if (value === null) return;
+        periodValues.push({
+          index,
+          label: grid.periodLabels[index] ?? DEFAULT_PERIOD_LABELS[index] ?? `period-${index}`,
+          value,
+          confidence: 1,
+        });
+      });
+    } else if (positional) {
+      const nonEmpty = effective.filter(Boolean);
+      label = nonEmpty[0] ?? "";
+      const valueCells = effective.slice(1).filter(Boolean);
+      const numeric = valueCells.filter(isNumericCell);
+      if (numeric.length > 0) {
+        if (numeric.length !== valueCells.length) inferredColumns = true;
+        periodValues = numeric.map((cell, index) => ({
+          index,
+          label: grid.periodLabels[index] ?? DEFAULT_PERIOD_LABELS[index] ?? `period-${index}`,
+          value: parseStatementAmount(cell) as number,
+          confidence: 1,
+        }));
+      }
+    } else {
+      const tokens = effective.filter(Boolean);
+      const trailing: number[] = [];
+      for (let t = tokens.length - 1; t >= 0; t -= 1) {
+        const parsed = parseStatementAmount(tokens[t]);
+        if (parsed === null) break;
+        trailing.unshift(parsed);
+      }
+      if (trailing.length > 0) {
+        inferredColumns = true;
+        label = tokens.slice(0, tokens.length - trailing.length).join(" ").trim();
+        periodValues = trailing.slice(0, 4).map((value, index) => ({
+          index,
+          label: grid.periodLabels[index] ?? DEFAULT_PERIOD_LABELS[index] ?? `period-${index}`,
+          value,
+          confidence: trailing.length === 1 ? 0.9 : 0.75,
+        }));
+      } else {
+        label = tokens.join(" ").trim();
+      }
+    }
+
+    const effectiveLabel = label || pendingLabel;
+    if (periodValues.length === 0) {
+      if (effectiveLabel) pendingLabel = effectiveLabel;
+      continue;
+    }
+    pendingLabel = "";
+
+    const measure = matchStatementMeasure(effectiveLabel);
+    if (!measure) continue;
+    if (!isMeasureForSection(measure, sectionType)) continue;
+
+    for (const entry of periodValues) {
+      const page = pageNumbers?.[r];
+      facts.push({
+        measure,
+        section: sectionType,
+        label: effectiveLabel,
+        periodLabel: entry.label,
+        periodIndex: entry.index,
+        rawValue: entry.value,
+        value: entry.value * unit.multiplier,
+        unitMultiplier: unit.multiplier,
+        currency: unit.currency ?? "",
+        confidence: entry.confidence,
+        evidence: { line: lineOffset + r + 1, text: joinRowText(row), ...(typeof page === "number" ? { page } : {}) },
+      });
+    }
+  }
+
+  if (inferredColumns) notes.push("period-columns-inferred-from-trailing-values");
+  return { facts, notes };
+}
+
+function isMeasureForSection(measure: StatementMeasure, sectionType: FinancialSectionType): boolean {
+  if (sectionType === "BALANCE_SHEET") {
+    return ["ASSETS", "CURRENT_ASSETS", "NON_CURRENT_ASSETS", "LIABILITIES", "CURRENT_LIABILITIES", "NON_CURRENT_LIABILITIES", "EQUITY"].includes(measure);
+  }
+  if (sectionType === "INCOME_STATEMENT") {
+    return ["REVENUE", "COGS", "GROSS_PROFIT", "OPERATING_EXPENSES", "OPERATING_PROFIT", "EXPENSES", "NET_PROFIT"].includes(measure);
+  }
+  if (sectionType === "CASH_FLOW_STATEMENT") {
+    return ["OPERATING_CASH_FLOW", "INVESTING_CASH_FLOW", "FINANCING_CASH_FLOW", "NET_CASH_FLOW"].includes(measure);
+  }
+  if (sectionType === "CHANGES_IN_EQUITY") return measure === "EQUITY";
+  return false;
+}
+
+function sectionState(
+  type: FinancialSectionType,
+  facts: ReadonlyArray<FinancialStatementFact>,
+  rowCount: number,
+): { state: FinancialSectionState; failureCode?: string } {
+  if (NARRATIVE_SECTIONS.has(type)) {
+    // A narrative section is never "failed" for lacking tables; it is complete
+    // when it actually contains content.
+    return rowCount > 0 ? { state: "COMPLETED" } : { state: "FAILED", failureCode: FINANCIAL_DOCUMENT_ERROR_CODES.INSUFFICIENT_EVIDENCE };
+  }
+  if (facts.length === 0) return { state: "FAILED", failureCode: FINANCIAL_DOCUMENT_ERROR_CODES.AMBIGUOUS_TABLE };
+  const primary = PRIMARY_MEASURES[type] ?? [];
+  const present = new Set(facts.map((fact) => fact.measure));
+  const complete = primary.every((measure) => present.has(measure));
+  return complete ? { state: "COMPLETED" } : { state: "PARTIAL", failureCode: FINANCIAL_DOCUMENT_ERROR_CODES.PARTIAL_SUCCESS };
+}
+
+/* ------------------------------------------------------------------------- *
+ * Document assembly
+ * ------------------------------------------------------------------------- */
+
+export interface DocumentSectionInput {
+  /** Section hint from a worksheet name; used only when no heading is found. */
+  readonly name?: string;
+  readonly rows: ReadonlyArray<ReadonlyArray<string>>;
+  /** 1-based line offset of the first row inside the whole document. */
+  readonly lineOffset?: number;
+  /**
+   * True when `rows` come from a spreadsheet grid whose columns are meaningful
+   * (XLSX / XLS). False for freeform text (PDF / OCR) where values are read from
+   * the trailing numeric run of each line.
+   */
+  readonly positioned?: boolean;
+  /**
+   * 1-based page number for each row, aligned by index. Only supplied when the
+   * source is paged (PDF), so section page ranges come from real evidence.
+   */
+  readonly pageNumbers?: ReadonlyArray<number>;
+}
+
+interface DocumentLine {
+  readonly text: string;
+  readonly row: ReadonlyArray<string>;
+  readonly line: number;
+  readonly page?: number;
+}
+
+function buildLines(input: DocumentSectionInput, startLine: number): DocumentLine[] {
+  return input.rows.map((row, index) => {
+    const page = input.pageNumbers?.[index];
+    return {
+      text: joinRowText(row.length > 0 ? row : [""]),
+      row,
+      line: startLine + index,
+      ...(typeof page === "number" ? { page } : {}),
+    };
+  });
+}
+
+function segmentByHeadings(lines: ReadonlyArray<DocumentLine>, nameHint?: string): Array<{ type: FinancialSectionType; lines: DocumentLine[] }> {
+  const segments: Array<{ type: FinancialSectionType; lines: DocumentLine[] }> = [];
+  const hintType = nameHint ? matchFinancialSectionHeading(nameHint) : null;
+  let current: { type: FinancialSectionType; lines: DocumentLine[] } = { type: "UNKNOWN", lines: [] };
+
+  for (const line of lines) {
+    const heading = matchFinancialSectionHeading(line.text);
+    if (heading && heading !== current.type && current.lines.length > 0) {
+      segments.push(current);
+      current = { type: heading, lines: [line] };
+    } else if (heading && current.lines.length === 0) {
+      current = { type: heading, lines: [line] };
+    } else {
+      current.lines.push(line);
+    }
+  }
+  if (current.lines.length > 0) segments.push(current);
+
+  // A worksheet whose name identifies a section but whose rows carry no heading
+  // is still that section; never leave it UNKNOWN when the name is evidenced.
+  if (hintType) {
+    for (const segment of segments) {
+      if (segment.type === "UNKNOWN") segment.type = hintType;
+    }
+  }
+  return segments.filter((segment) => segment.type !== "UNKNOWN" || segment.lines.length > 0);
+}
+
+/**
+ * Build the unified document understanding from one or more blocks (PDF pages
+ * or worksheets). The same boundary is used for every source so PDF, XLSX and
+ * XLS cannot diverge.
+ */
+export function buildFinancialDocumentUnderstanding(blocks: ReadonlyArray<DocumentSectionInput>): FinancialDocumentUnderstanding {
+  const sections: FinancialDocumentSection[] = [];
+  const allFacts: FinancialStatementFact[] = [];
+  const documentText = blocks
+    .flatMap((block) => block.rows.map((row) => row.join(" ")))
+    .join("\n");
+  const documentUnit = detectStatementUnit(documentText);
+
+  let cursor = 1;
+  for (const block of blocks) {
+    const blockUnit = detectStatementUnit(block.rows.map((row) => row.join(" ")).join("\n"));
+    const unit: StatementUnitDeclaration = {
+      multiplier: blockUnit.multiplier !== 1 || documentUnit.multiplier === 1 ? blockUnit.multiplier : documentUnit.multiplier,
+      currency: blockUnit.currency ?? documentUnit.currency,
+    };
+    const lines = buildLines(block, block.lineOffset ?? cursor);
+    cursor = (block.lineOffset ?? cursor) + block.rows.length;
+    if (lines.length === 0) continue;
+
+    for (const segment of segmentByHeadings(lines, block.name)) {
+      const rows = segment.lines.map((line) => line.row);
+      const { facts, notes } = extractSectionFacts(
+        rows,
+        segment.type,
+        unit,
+        segment.lines[0].line - 1,
+        block.positioned === true,
+        segment.lines.map((line) => line.page),
+      );
+      const { state, failureCode } = sectionState(segment.type, facts, rows.length);
+      const pages = segment.lines.map((line) => line.page).filter((page): page is number => typeof page === "number");
+      sections.push({
+        type: segment.type,
+        state,
+        startLine: segment.lines[0].line,
+        endLine: segment.lines[segment.lines.length - 1].line,
+        ...(pages.length > 0 ? { pageStart: Math.min(...pages), pageEnd: Math.max(...pages) } : {}),
+        facts,
+        notes: notes.filter((note, index, array) => array.indexOf(note) === index),
+        ...(failureCode ? { failureCode } : {}),
+      });
+      allFacts.push(...facts);
+    }
+  }
+
+  const statementSections = sections.filter((section) => !NARRATIVE_SECTIONS.has(section.type) && section.type !== "UNKNOWN");
+  const narrativeContent = sections.some((section) => NARRATIVE_SECTIONS.has(section.type) && section.state === "COMPLETED");
+
+  let status: FinancialDocumentStatus;
+  if (allFacts.length === 0 && !narrativeContent) status = "FAILED";
+  else if (allFacts.length === 0) status = "PARTIAL";
+  else if (statementSections.some((section) => section.state !== "COMPLETED")) status = "PARTIAL";
+  else status = "COMPLETED";
+
+  return {
+    status,
+    currency: documentUnit.currency,
+    unitMultiplier: documentUnit.multiplier,
+    sections,
+    facts: allFacts,
+  };
+}
+
+/* ------------------------------------------------------------------------- *
+ * Derived views for the existing analysis/analytics owners
+ * ------------------------------------------------------------------------- */
+
+export interface DerivedAnalysisInput {
+  readonly revenue: number;
+  readonly expenses: number;
+  readonly assets: number;
+  readonly liabilities: number;
+  readonly equity: number;
+  /** Partial statement for the existing ratio analytics; missing keys are absent. */
+  readonly statement: Partial<RatioStatement>;
+  /** Explicit derivation notes (which measures were absent). */
+  readonly missingMeasures: ReadonlyArray<StatementMeasure>;
+}
+
+function latestValue(facts: ReadonlyArray<FinancialStatementFact>, measure: StatementMeasure): number | null {
+  const matches = facts.filter((fact) => fact.measure === measure);
+  if (matches.length === 0) return null;
+  // Period index 0 is the current period in every supported layout.
+  const current = matches.find((fact) => fact.periodIndex === 0);
+  return (current ?? matches[0]).value;
+}
+
+/**
+ * Derive the existing analysis inputs from canonical statement facts. Only
+ * measures that were actually extracted are used; nothing is invented and the
+ * absent measures are reported so a downstream engine can fail closed honestly.
+ */
+export function deriveAnalysisInput(document: FinancialDocumentUnderstanding): DerivedAnalysisInput {
+  const facts = document.facts;
+  const assets = latestValue(facts, "ASSETS");
+  const liabilities = latestValue(facts, "LIABILITIES");
+  const equity = latestValue(facts, "EQUITY");
+  const revenue = latestValue(facts, "REVENUE");
+  const expenses = latestValue(facts, "EXPENSES") ?? latestValue(facts, "OPERATING_EXPENSES");
+  const netProfit = latestValue(facts, "NET_PROFIT");
+  const grossProfit = latestValue(facts, "GROSS_PROFIT");
+  const operatingProfit = latestValue(facts, "OPERATING_PROFIT");
+  const cogs = latestValue(facts, "COGS");
+  const currentAssets = latestValue(facts, "CURRENT_ASSETS");
+  const currentLiabilities = latestValue(facts, "CURRENT_LIABILITIES");
+  const operatingCashFlow = latestValue(facts, "OPERATING_CASH_FLOW");
+  const investingCashFlow = latestValue(facts, "INVESTING_CASH_FLOW");
+  const financingCashFlow = latestValue(facts, "FINANCING_CASH_FLOW");
+
+  const statement: Partial<RatioStatement> = {};
+  if (revenue !== null) statement.revenue = revenue;
+  if (cogs !== null) statement.cogs = cogs;
+  if (grossProfit !== null) statement.grossProfit = grossProfit;
+  if (expenses !== null) statement.operatingExpenses = expenses;
+  if (operatingProfit !== null) statement.operatingIncome = operatingProfit;
+  if (netProfit !== null) statement.netIncome = netProfit;
+  if (currentAssets !== null) statement.currentAssets = currentAssets;
+  if (assets !== null) statement.totalAssets = assets;
+  if (currentLiabilities !== null) statement.currentLiabilities = currentLiabilities;
+  if (liabilities !== null) statement.totalLiabilities = liabilities;
+  if (equity !== null) statement.equity = equity;
+
+  const missing: StatementMeasure[] = [];
+  if (assets === null) missing.push("ASSETS");
+  if (liabilities === null) missing.push("LIABILITIES");
+  if (revenue === null) missing.push("REVENUE");
+  if (expenses === null) missing.push("EXPENSES");
+
+  return {
+    revenue: revenue ?? 0,
+    expenses: expenses ?? 0,
+    assets: assets ?? 0,
+    liabilities: liabilities ?? 0,
+    equity: equity ?? 0,
+    statement,
+    missingMeasures: missing,
+  };
+}
+
+export interface FinancialDocumentSummary {
+  readonly status: FinancialDocumentStatus;
+  readonly currency: string | null;
+  readonly unitMultiplier: number;
+  readonly sectionCount: number;
+  readonly factCount: number;
+  readonly sections: ReadonlyArray<{
+    readonly type: FinancialSectionType;
+    readonly state: FinancialSectionState;
+    readonly factCount: number;
+    readonly pageStart?: number;
+    readonly pageEnd?: number;
+    readonly failureCode?: string;
+  }>;
+}
+
+/** Compact, truthful projection of the document for job/API responses. */
+export function summarizeFinancialDocument(document: FinancialDocumentUnderstanding): FinancialDocumentSummary {
+  return {
+    status: document.status,
+    currency: document.currency,
+    unitMultiplier: document.unitMultiplier,
+    sectionCount: document.sections.length,
+    factCount: document.facts.length,
+    sections: document.sections.map((section) => ({
+      type: section.type,
+      state: section.state,
+      factCount: section.facts.length,
+      ...(section.pageStart !== undefined ? { pageStart: section.pageStart } : {}),
+      ...(section.pageEnd !== undefined ? { pageEnd: section.pageEnd } : {}),
+      ...(section.failureCode ? { failureCode: section.failureCode } : {}),
+    })),
+  };
+}
+
+export function hasFinancialDocumentFacts(document: FinancialDocumentUnderstanding | undefined): boolean {
+  return !!document && document.facts.length > 0;
+}
+
+/** Every numeric field the existing ratio analytics requires for a statement. */
+const RATIO_STATEMENT_FIELDS: ReadonlyArray<keyof RatioStatement> = [
+  "revenue", "cogs", "grossProfit", "operatingExpenses", "operatingIncome", "interest",
+  "preTaxIncome", "taxes", "netIncome", "cash", "receivables", "inventory", "currentAssets",
+  "ppe", "totalAssets", "payables", "shortTermDebt", "currentLiabilities", "longTermDebt",
+  "totalLiabilities", "equity",
+];
+
+/**
+ * True only when every ratio-statement field was actually derived from evidence.
+ * The existing ratio analytics requires the complete statement, so a partial
+ * derivation must stay BLOCKED rather than be padded with fabricated zeros.
+ */
+export function isCompleteRatioStatement(statement: Partial<RatioStatement>): boolean {
+  return RATIO_STATEMENT_FIELDS.every(
+    (field) => typeof (statement as Record<string, unknown>)[field] === "number",
+  );
+}

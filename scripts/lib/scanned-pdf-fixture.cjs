@@ -127,6 +127,65 @@ function buildBlankScannedPdf() {
   return buildScannedPdf(deflateSync(Buffer.alloc(width * height * 3, 0)), width, height);
 }
 
+/**
+ * A realistic scanned MULTI-SECTION annual financial report: independent auditor
+ * report, board report, statement of financial position, statement of profit or
+ * loss, statement of cash flows and notes. It is rendered in English because the
+ * admitted offline OCR engine reads the Latin script reliably at this size; the
+ * Persian label/digit/unit handling is covered by the focused Jest fixtures and
+ * the real Persian .xls/.xlsx statement workbooks.
+ */
+function financialReportLines() {
+  return [
+    "Independent Auditor's Report",
+    "To the shareholders of Sample Company",
+    "We have audited the financial statements for the year ended 1402.",
+    "",
+    "Board of Directors Report",
+    "The Board presents the activities of the Company for the financial year.",
+    "",
+    "Statement of Financial Position",
+    "(Figures in million IRR)",
+    "Description 1402 1401",
+    "Total current assets 465000 398000",
+    "Total assets 1965000 1798000",
+    "Total liabilities 820000 880000",
+    "Total equity 1145000 918000",
+    "",
+    "Statement of Profit or Loss",
+    "(Figures in million IRR)",
+    "Description 1402 1401",
+    "Revenue 2400000 2100000",
+    "Cost of goods sold 1600000 1400000",
+    "Gross profit 800000 700000",
+    "Operating expenses 430000 400000",
+    "Operating profit 370000 300000",
+    "Net profit 220000 170000",
+    "",
+    "Statement of Cash Flows",
+    "(Figures in million IRR)",
+    "Description 1402 1401",
+    "Net cash from operating activities 310000 250000",
+    "Net cash from investing activities 180000 150000",
+    "Net cash from financing activities 95000 40000",
+    "",
+    "Notes to the Financial Statements",
+    "The reporting currency is IRR and amounts are stated in millions.",
+  ];
+}
+
+/** A scanned PDF whose page renders the multi-section annual financial report. */
+function buildFinancialReportScannedPdf() {
+  const { rgbZlib, width, height } = renderLedgerRgb(financialReportLines(), {
+    width: 1800,
+    fontSize: 26,
+    lineHeight: 40,
+    topMargin: 60,
+    rowHeight: 42,
+  });
+  return buildScannedPdf(rgbZlib, width, height);
+}
+
 module.exports = {
   buildScannedPdf,
   renderLedgerRgb,
@@ -134,4 +193,6 @@ module.exports = {
   buildFinancialStatementScannedPdf,
   financialStatementLines,
   buildBlankScannedPdf,
+  financialReportLines,
+  buildFinancialReportScannedPdf,
 };

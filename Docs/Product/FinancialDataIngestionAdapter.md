@@ -14,21 +14,23 @@ Canonical multi-format financial data ingestion with tenant isolation and persis
 
 **OCR/document normalization boundary:** OCR-derived (and other extracted) document text is normalized through the canonical `DocumentTableExtractor` statement boundary before the strict CSV contract is considered. Realistic statement layouts (synonym headers such as `description`/`narration`, extra `balance`/`reference` columns, a declared document currency, multi-word descriptions, thousands-separated amounts) map to the canonical `date | account | debit | credit | currency` model. Ambiguity or unsafety fails closed with `ingestion-ambiguous-table-mapping` / `ingestion-table-schema-invalid`; the strict CSV parser is a fallback only for text that genuinely matches it.
 
+**Unified financial document understanding:** a complete annual financial report (or a financial-statement workbook) is not a transaction ledger. When the ledger/statement transaction route cannot map a document, the SAME `Product/FinancialDocumentUnderstanding.ts` boundary used by PDF, XLSX and legacy XLS detects the report sections (auditor, board, balance sheet, income statement, cash flow, equity, notes) and normalizes statement tables into canonical facts, which are attached to the one canonical model as an optional `document` field. The 5-column transaction model remains canonical for real ledgers. See `Docs/Product/FinancialDocumentUnderstanding.md`.
+
 **Supported Formats:**
 - **CSV** — Standard CSV with columns: date, account, debit, credit, currency
 - **STRUCTURED (JSON)** — JSON with `transactions` array containing financial transactions
 - **TXT** — decoded UTF-8 / UTF-8 BOM / UTF-16 LE / UTF-16 BE text, normalized through the canonical ledger pipeline
 - **XLSX** — Microsoft Excel 2007+ format (.xlsx files) ✅ SUPPORTED
 - **PDF (text-native)** — `.pdf` files with an extractable text layer, via the existing `pdf-parse`-backed `PdfAcquisition` helper (`ingestPdfBytes`); extracted text is normalized through the same canonical ledger (CSV) pipeline. Scanned/image-only PDF is supported through the governed OCR route (`ingestScannedPdfBytes` with the admitted offline `tesseract.js` provider), and fails closed precisely when OCR is unavailable or yields no text.
-- **XLS** — Microsoft Excel 97-2003 format (.xls files) — **BLOCKED** (pending dependency resolution)
+- **XLS** — Microsoft Excel 97-2003 format (.xls files) — **SUPPORTED** via the governed `xls-reader` provider (`document.xls.parse`); magic-byte validated, size-bounded, offline, values-only (no macro/formula execution)
 
 ---
 
 ## Architecture
 
 ```
-File Source → CSV/JSON/XLSX/TXT/PDF Ingestion → Validation → Canonical Normalization
-    → Tenant-Scoped Persistence → Financial Canonical Model
+File Source → CSV/JSON/XLSX/XLS/TXT/PDF Ingestion → Validation → Canonical Normalization
+    → Tenant-Scoped Persistence → Financial Canonical Model (+ optional document understanding)
 ```
 
 ---
@@ -279,7 +281,7 @@ All data is persisted under tenant scope. Cross-tenant access is rejected.
 | Sub-Stage | Status | Notes |
 |-----------|--------|-------|
 | 08-D.1 | ✅ COMPLETE | XLSX acquisition via exceljs-hardened |
-| 08-D.2 | ⏳ PENDING | XLS acquisition (BLOCKED - xlsx@0.20.3 unavailable) |
+| 08-D.2 | ✅ COMPLETE | XLS acquisition via the admitted `xls-reader` provider (OLE2/BIFF8), converging on the unified document/statement boundary |
 
 ---
 
