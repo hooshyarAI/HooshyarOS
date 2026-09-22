@@ -224,6 +224,9 @@ function verifyInstalledPayload() {
   if (!installedApp.includes('resolveIngestRequest') || installedApp.includes("error instanceof TypeError")) {
     fail('installed web app does not contain the repaired representation/classification logic');
   }
+  if (!installedApp.includes('/api/ingest/jobs') || !installedApp.includes('analysis-progress')) {
+    fail('installed web app does not contain the governed ingestion job/progress client');
+  }
 }
 
 async function runCustomerJourney() {
@@ -283,6 +286,50 @@ async function runCustomerJourney() {
   if (transportSized.status === 413) fail('installed large-PDF transport regressed to 413 Payload Too Large');
   if (transportSized.status !== 422) fail(`installed large-PDF transport boundary unexpected: ${transportSized.status}:${transportSized.body.error ?? 'missing-error'}`);
   checks.push('large-pdf-transport-boundary');
+
+  // Realistic scanned financial statement through the governed job/status API.
+  // This is the real user path: scanned PDF -> OCR -> structural normalization
+  // -> canonical transactions, observed through durable job status.
+  const statementBytes = require(path.join(root, 'scripts', 'lib', 'scanned-pdf-fixture.cjs')).buildFinancialStatementScannedPdf();
+  const statementSha = crypto.createHash('sha256').update(statementBytes).digest('hex');
+  const statementStart = await request('/api/ingest/jobs', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', cookie, 'idempotency-key': 'installed-statement-1' },
+    body: JSON.stringify({ sourceName: 'statement.pdf', format: 'PDF', contentBase64: statementBytes.toString('base64') }),
+  });
+  if (statementStart.status !== 202 || !statementStart.body.jobId) fail(`installed statement job creation failed: ${statementStart.status}:${JSON.stringify(statementStart.body)}`);
+  let statementJob = null;
+  for (let attempt = 0; attempt < 900; attempt += 1) {
+    const status = await request(`/api/ingest/jobs/${statementStart.body.jobId}`, { headers: { cookie } });
+    statementJob = status.body.job;
+    if (statementJob && (statementJob.status === 'COMPLETED' || statementJob.status === 'FAILED')) break;
+    await sleep(500);
+  }
+  if (!statementJob || statementJob.status !== 'COMPLETED') fail(`installed statement job did not complete: ${JSON.stringify(statementJob)}`);
+  if (statementJob.result?.transactionCount !== 3) fail(`installed statement normalization expected 3 transactions, got ${statementJob.result?.transactionCount}`);
+  if (statementJob.result?.sourceType !== 'PDF' || statementJob.result?.sha256 !== statementSha) fail('installed statement provenance not preserved');
+  if (!statementJob.progress || statementJob.progress.percent !== 100 || statementJob.progress.pages !== 1) fail(`installed statement job progress is not real: ${JSON.stringify(statementJob.progress)}`);
+  checks.push('ingest-job-status', 'statement-ocr-normalization', 'statement-job-real-progress', 'statement-original-byte-provenance');
+
+  const statementReplay = await request('/api/ingest/jobs', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', cookie, 'idempotency-key': 'installed-statement-1' },
+    body: JSON.stringify({ sourceName: 'statement.pdf', format: 'PDF', contentBase64: statementBytes.toString('base64') }),
+  });
+  if (statementReplay.body.jobId !== statementStart.body.jobId || statementReplay.body.replayed !== true) {
+    fail(`installed statement idempotent replay failed: ${JSON.stringify(statementReplay.body)}`);
+  }
+  checks.push('ingest-job-idempotent-replay');
+
+  const statementAnalysis = await request('/api/financial/analyze', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', cookie },
+    body: JSON.stringify({ sourceSha256: statementJob.result.sha256, assets: 5000, liabilities: 1000 }),
+  });
+  if (statementAnalysis.status !== 200 || statementAnalysis.body.ingestedSource?.transactionCount !== 3) {
+    fail(`installed statement analysis failed: ${statementAnalysis.status}:${JSON.stringify(statementAnalysis.body)}`);
+  }
+  checks.push('statement-financial-analysis');
 
   const csv = ['date,account,debit,credit,currency', '2026-08-01,Cash,1000,0,IRR', '2026-08-02,Sales,0,1500,IRR', '2026-08-03,Expense,300,0,IRR'].join('\n');
   await sleep(1100);
@@ -392,7 +439,7 @@ async function main() {
   const installedClient = fs.readFileSync(path.join(installDir, 'web', 'offline-sync.js'), 'utf8');
   const evidence = {
     type: 'INSTALLED_PRODUCT_ACCEPTANCE',
-    version: 1,
+    version: 2,
     mode: realTarget ? 'real-installation' : 'isolated-acceptance',
     status: 'PASS',
     createdAt: new Date().toISOString(),
@@ -402,6 +449,8 @@ async function main() {
     launcherHealthy,
     runtimeDependenciesVerified: true,
     repairedClientInstalled: installedClient.includes('STORAGE_QUOTA_FAILURE'),
+    ingestionJobStatusSupported: true,
+    statementNormalizationSupported: true,
     checks: [...journey.checks, ...recoveryChecks],
     sourceSha256: journey.sourceSha256,
     profit: journey.profit,

@@ -14,10 +14,19 @@ import {
   htmlToText,
   xmlToText,
 } from "./MarkupTextExtraction";
-import { buildTableCandidate, mapTableToCanonical } from "./DocumentTableExtractor";
+import {
+  buildTableCandidate,
+  detectOcrStatementTables,
+  detectStatementTables,
+  extractDeclaredCurrency,
+  isCanonicalStatementHeader,
+  mapStatementToCanonical,
+  mapTableToCanonical,
+} from "./DocumentTableExtractor";
 import { createOcrProvenance, type OcrProvenance } from "./OcrProvenance";
 import type { OcrAdapter, OcrResult } from "./OcrAdapter";
 import { routeScannedPdfToOcr } from "./ScannedPdfRouter";
+import type { IngestionProgressObserver } from "./IngestionProgress";
 
 export type TxtEncoding = "UTF-8" | "UTF-8-BOM" | "UTF-16LE" | "UTF-16BE";
 
@@ -932,6 +941,7 @@ export class FinancialDataIngestionAdapter {
     sourceName: string,
     rawBytes: Buffer,
     route: ScannedPdfOcrRoute,
+    observer?: IngestionProgressObserver,
   ): Promise<FinancialIngestionResult> {
     const normalizedTenant = tenantId.trim();
     const normalizedSource = sourceName.trim();
@@ -953,6 +963,7 @@ export class FinancialDataIngestionAdapter {
       rasterizePage: route.rasterizePage,
       textNativeCharsPerPage: route.textNativeCharsPerPage,
       language: route.language,
+      onPageProgress: (info) => observer?.({ stage: "OCR", page: info.done, pages: info.total, percent: info.percent }),
     });
 
     const ocrByPage = new Map<number, OcrResult>();
@@ -970,7 +981,9 @@ export class FinancialDataIngestionAdapter {
     const text = pageTexts.join("\n\n");
     if (!text.trim()) throw new Error("ingestion-ocr-empty");
 
-    const transactions = this.parseAndValidate(text);
+    observer?.({ stage: "NORMALIZING" });
+    const transactions = this.normalizeExtractedDocument(text);
+    observer?.({ stage: "CANONICAL_VALIDATION" });
     const source: FinancialSourceEvidence = {
       sourceName: normalizedSource,
       sourceType: "PDF",
@@ -980,6 +993,7 @@ export class FinancialDataIngestionAdapter {
         ? { ocr: this.buildOcrProvenance(route.ocr, routed.ocrResults, route.language) }
         : {}),
     };
+    observer?.({ stage: "PERSISTING" });
     return this.finalize(normalizedTenant, source, transactions);
   }
 
@@ -994,6 +1008,7 @@ export class FinancialDataIngestionAdapter {
     rawBytes: Buffer,
     ocr: OcrAdapter,
     language?: string,
+    observer?: IngestionProgressObserver,
   ): Promise<FinancialIngestionResult> {
     const normalizedTenant = tenantId.trim();
     const normalizedSource = sourceName.trim();
@@ -1001,10 +1016,13 @@ export class FinancialDataIngestionAdapter {
     if (!normalizedSource) throw new Error("ingestion-source-required");
 
     const image = acquireImage({ sourceName: normalizedSource, rawBytes });
+    observer?.({ stage: "OCR" });
     const recognized = await ocr.recognize({ sourceName: image.sourceName, rawBytes, language });
     if (!recognized.text.trim()) throw new Error("ingestion-ocr-empty");
 
-    const transactions = this.parseAndValidate(recognized.text);
+    observer?.({ stage: "NORMALIZING" });
+    const transactions = this.normalizeExtractedDocument(recognized.text);
+    observer?.({ stage: "CANONICAL_VALIDATION" });
     const source: FinancialSourceEvidence = {
       sourceName: normalizedSource,
       sourceType: "IMAGE",
@@ -1195,6 +1213,51 @@ export class FinancialDataIngestionAdapter {
     if (quoted) throw new Error("ingestion-unterminated-quote");
     values.push(current);
     return values;
+  }
+
+  /**
+   * Canonical normalization for OCR-extracted document text.
+   *
+   * Real scanned financial statements do not match the synthetic 5-column
+   * ledger CSV. This routes the extracted text through the canonical
+   * document-table boundary (`DocumentTableExtractor`) FIRST: every detected
+   * statement table whose header declares the canonical fields is mapped with
+   * the document's declared currency. The strict CSV contract is used only as
+   * a fallback for text that genuinely matches it (e.g. a rendered ledger line
+   * that OCR recovered verbatim), so real-world OCR output is never forced
+   * through the synthetic schema.
+   *
+   * Fail-closed: if a canonical statement header was detected but no row could
+   * be mapped safely, the precise typed table error is rethrown instead of
+   * degrading to the less precise `ingestion-schema-invalid`.
+   */
+  private normalizeExtractedDocument(text: string): FinancialTransaction[] {
+    const declaredCurrency = extractDeclaredCurrency(text) ?? undefined;
+    const candidates = [...detectStatementTables(text), ...detectOcrStatementTables(text)];
+    let headerMatched = false;
+    let firstError: Error | null = null;
+
+    for (const candidate of candidates) {
+      if (!isCanonicalStatementHeader(candidate.headers)) continue;
+      headerMatched = true;
+      try {
+        const mapped = mapStatementToCanonical(candidate, { defaultCurrency: declaredCurrency });
+        if (mapped.length > 0) {
+          return mapped.map((row) => ({
+            date: row.date,
+            account: row.account,
+            debit: row.debit,
+            credit: row.credit,
+            currency: row.currency,
+          }));
+        }
+      } catch (error) {
+        if (!firstError) firstError = error instanceof Error ? error : new Error(String(error));
+      }
+    }
+
+    if (headerMatched) throw firstError ?? new Error("ingestion-table-schema-invalid");
+    return this.parseAndValidate(text);
   }
 
   /**

@@ -35,9 +35,11 @@ import { createCommercialRuntimeServer } from "../Backend/HBOS/Autonomous/Runtim
 const nodeRequire = createRequire(join(resolve(__dirname, ".."), "package.json"));
 const {
   buildLedgerScannedPdf,
+  buildFinancialStatementScannedPdf,
   buildBlankScannedPdf,
 } = nodeRequire("./scripts/lib/scanned-pdf-fixture.cjs") as {
   buildLedgerScannedPdf: (lines: string[]) => Buffer;
+  buildFinancialStatementScannedPdf: () => Buffer;
   buildBlankScannedPdf: () => Buffer;
 };
 
@@ -201,6 +203,98 @@ async function main(): Promise<void> {
     if (scannedAnalyzeBody.metrics?.profit !== 0 || scannedAnalyzeBody.metrics?.debtRatio !== 0.2) fail(`unexpected scanned metrics: ${JSON.stringify(scannedAnalyzeBody.metrics)}`);
     checks.push("scanned-pdf-financial-analysis-ready");
 
+    /**
+     * REALISTIC scanned financial statement through the durable job API.
+     *
+     * This is the exact defect class: an image-only statement with a realistic
+     * layout (title currency declaration, canonical header plus a running
+     * balance column, thousands-style amounts) whose OCR text is single-space
+     * separated. It must normalize structurally (not through the synthetic
+     * 5-column CSV parser) and expose real stage/OCR progress.
+     */
+    const statementBytes = buildFinancialStatementScannedPdf();
+    const statementSha = createHash("sha256").update(statementBytes).digest("hex");
+    const statementStart = await fetch(`${base}/api/ingest/jobs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie, "idempotency-key": "statement-job-1" },
+      body: JSON.stringify({ sourceName: "statement.pdf", format: "PDF", contentBase64: statementBytes.toString("base64") }),
+    });
+    if (statementStart.status !== 202) fail(`statement job creation failed: ${statementStart.status}:${JSON.stringify(await statementStart.json())}`);
+    const startedJob = await statementStart.json() as { jobId?: string };
+    if (!startedJob.jobId) fail("statement job id missing");
+
+    type JobView = {
+      status?: string;
+      stage?: string;
+      code?: string;
+      message?: string;
+      progress?: { page?: number; pages?: number; percent?: number } | null;
+      result?: {
+        sha256?: string;
+        sourceType?: string;
+        transactionCount?: number;
+        totals?: { debit?: number; credit?: number };
+        evidence?: { ocr?: { ocrEngine?: string; ocrLanguage?: string } };
+      };
+    };
+    let statementJob: JobView | undefined;
+    for (let attempt = 0; attempt < 900; attempt += 1) {
+      const statusResponse = await fetch(`${base}/api/ingest/jobs/${startedJob.jobId}`, { headers: { cookie } });
+      const statusBody = await statusResponse.json() as { job?: JobView };
+      statementJob = statusBody.job;
+      if (statementJob && (statementJob.status === "COMPLETED" || statementJob.status === "FAILED")) break;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    if (!statementJob || statementJob.status !== "COMPLETED") fail(`statement job did not complete: ${JSON.stringify(statementJob)}`);
+    if (statementJob.result?.transactionCount !== 3) fail(`statement normalization expected 3 transactions, got ${statementJob.result?.transactionCount}`);
+    if (statementJob.result?.totals?.debit !== 120000 || statementJob.result?.totals?.credit !== 750000) {
+      fail(`statement totals wrong: ${JSON.stringify(statementJob.result?.totals)}`);
+    }
+    if (statementJob.result?.sourceType !== "PDF") fail(`statement sourceType not preserved: ${statementJob.result?.sourceType}`);
+    if (statementJob.result?.sha256 !== statementSha) fail("statement original-byte SHA-256 provenance mismatch");
+    if (statementJob.result?.evidence?.ocr?.ocrEngine !== "tesseract.js") fail(`statement OCR provenance missing: ${JSON.stringify(statementJob.result?.evidence?.ocr)}`);
+    if (!statementJob.progress || statementJob.progress.percent !== 100 || statementJob.progress.pages !== 1) {
+      fail(`statement job progress is not real/complete: ${JSON.stringify(statementJob.progress)}`);
+    }
+    checks.push(
+      "statement-job-202",
+      "statement-ocr-normalization",
+      "statement-job-real-progress",
+      "statement-original-byte-provenance",
+      "statement-ocr-provenance",
+    );
+
+    const statementReplay = await fetch(`${base}/api/ingest/jobs`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie, "idempotency-key": "statement-job-1" },
+      body: JSON.stringify({ sourceName: "statement.pdf", format: "PDF", contentBase64: statementBytes.toString("base64") }),
+    });
+    const statementReplayBody = await statementReplay.json() as { jobId?: string; replayed?: boolean; diagnostics?: { idempotency?: string } };
+    if (statementReplayBody.jobId !== startedJob.jobId || statementReplayBody.replayed !== true) {
+      fail(`statement idempotent replay failed: ${JSON.stringify(statementReplayBody)}`);
+    }
+    if (statementReplayBody.diagnostics?.idempotency !== "IDEMPOTENCY_REPLAYED") {
+      fail(`statement replay diagnostics missing: ${JSON.stringify(statementReplayBody.diagnostics)}`);
+    }
+    checks.push("statement-job-idempotent-replay");
+
+    const statementAnalyze = await fetch(`${base}/api/financial/analyze`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ sourceSha256: statementSha, assets: 5000, liabilities: 1000 }),
+    });
+    const statementAnalyzeBody = await statementAnalyze.json() as {
+      status?: string;
+      ingestedSource?: { transactionCount?: number; sourceType?: string };
+    };
+    if (statementAnalyze.status !== 200 || statementAnalyzeBody.status !== "READY") {
+      fail(`statement financial analysis failed: ${statementAnalyze.status}:${JSON.stringify(statementAnalyzeBody)}`);
+    }
+    if (statementAnalyzeBody.ingestedSource?.transactionCount !== 3 || statementAnalyzeBody.ingestedSource?.sourceType !== "PDF") {
+      fail(`statement source not carried into analysis: ${JSON.stringify(statementAnalyzeBody.ingestedSource)}`);
+    }
+    checks.push("statement-financial-analysis-ready");
+
     const blankScanned = buildBlankScannedPdf();
     const blankIngest = await fetch(`${base}/api/ingest`, {
       method: "POST",
@@ -215,12 +309,14 @@ async function main(): Promise<void> {
 
     const evidence = {
       type: "PDF_INGESTION_ACCEPTANCE",
-      version: 2,
+      version: 3,
       status: "PASS",
       createdAt: new Date().toISOString(),
       runtime: "real-node-tsx",
       pdfTextSupported: true,
       scannedPdfOcrSupported: true,
+      statementNormalizationSupported: true,
+      ingestionJobStatusSupported: true,
       ocrClaimed: true,
       ocrEngine: scannedOcr?.ocrEngine,
       ocrLanguage: scannedOcr?.ocrLanguage,
@@ -232,6 +328,9 @@ async function main(): Promise<void> {
       scannedTransactionCount: scannedBody.transactionCount,
       scannedConfidence: scannedOcr?.ocrConfidence,
       blankScannedErrorCode: blankBody.error,
+      statementSha256: statementSha,
+      statementTransactionCount: statementJob?.result?.transactionCount,
+      statementProgress: statementJob?.progress ?? null,
     };
     mkdirSync(resolve(process.cwd(), ".hooshyar"), { recursive: true });
     writeFileSync(resolve(process.cwd(), ".hooshyar", "pdf-ingestion-acceptance.json"), JSON.stringify(evidence, null, 2), "utf8");

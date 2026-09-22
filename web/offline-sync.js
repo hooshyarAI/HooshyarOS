@@ -255,6 +255,59 @@
     return status === 401 || status === 403 || status === 409 || status === 429 || status >= 500;
   }
 
+  /**
+   * Canonical, human-readable Persian ingestion stage labels. The technical
+   * stage code stays available for diagnostics; the label is the primary
+   * user-facing message.
+   */
+  const INGEST_STAGE_LABELS_FA = {
+    RECEIVED: "دریافت شد",
+    VALIDATING: "در حال اعتبارسنجی ورودی",
+    READING_PDF: "در حال خواندن فایل PDF",
+    SCANNED_DETECTED: "فایل اسکن‌شده شناسایی شد؛ آماده‌سازی تشخیص متن",
+    OCR: "در حال تشخیص متن تصویر (OCR)",
+    NORMALIZING: "در حال نرمال‌سازی ساختار سند",
+    CANONICAL_VALIDATION: "در حال اعتبارسنجی مدل مالی کانونی",
+    PERSISTING: "در حال ذخیره‌سازی نتیجه",
+    COMPLETED: "تکمیل شد",
+    FAILED: "پردازش ناموفق بود",
+  };
+
+  function ingestStageLabelFa(stage) {
+    return INGEST_STAGE_LABELS_FA[stage] || String(stage || "");
+  }
+
+  /**
+   * Describe a durable ingestion job for display. Progress is truthful: a
+   * percentage is only returned for real OCR page progress, otherwise null
+   * (never a timer-based fake). `elapsedSeconds` is derived from real
+   * timestamps.
+   */
+  function describeIngestProgress(job, nowMs) {
+    const current = job || {};
+    const stage = current.stage || "RECEIVED";
+    const progress = current.progress || null;
+    const isOcr = stage === "OCR";
+    const percent = isOcr && progress && typeof progress.percent === "number" ? progress.percent : null;
+    const page = isOcr && progress && typeof progress.page === "number" ? progress.page : null;
+    const pages = isOcr && progress && typeof progress.pages === "number" ? progress.pages : null;
+    let message = current.message || ingestStageLabelFa(stage);
+    if (page !== null && pages !== null) message = `${message} — صفحه ${page} از ${pages}`;
+    const from = Date.parse(current.receivedAt || "");
+    const to = current.completedAt ? Date.parse(current.completedAt) : Number(nowMs);
+    const elapsedSeconds = Number.isFinite(from) && Number.isFinite(to) ? Math.max(0, Math.round((to - from) / 1000)) : null;
+    return {
+      stage,
+      stageLabel: ingestStageLabelFa(stage),
+      message,
+      percent,
+      page,
+      pages,
+      elapsedSeconds,
+      terminal: stage === "COMPLETED" || stage === "FAILED",
+    };
+  }
+
   function createOfflineSync(options) {
     options = options || {};
     const queueStore = resolveQueueStore(options.storage, options.indexedDB);
@@ -473,6 +526,9 @@
     DEFAULT_MAX_JOB_BYTES,
     FAILURE_KINDS,
     FORMAT_BY_EXTENSION,
+    INGEST_STAGE_LABELS_FA,
+    ingestStageLabelFa,
+    describeIngestProgress,
     memoryStorage,
     memoryQueueStore,
     localStorageQueue,

@@ -8,6 +8,8 @@ import { ReasoningEngine } from "../../Engines/ReasoningEngine";
 import { ReportsEngine, SUPPORTED_REPORT_FORMATS, type ReportFormat, type ReportSection } from "../../Engines/ReportsEngine";
 import { FinancialDataIngestionAdapter, type FinancialCanonicalModel, type FinancialSourceEvidence } from "../../Product/FinancialDataIngestionAdapter";
 import { FinancialIngestionService, IngestionFormat, SUPPORTED_INGESTION_FORMATS } from "../../Product/FinancialIngestionService";
+import { IngestionJobService } from "../../Product/IngestionJobService";
+import { isTerminalIngestionStage } from "../../Product/IngestionProgress";
 import { SyncStateStore } from "../../Product/SyncStateStore";
 import { FinancialStatementAnalysisService } from "../../Product/FinancialStatementAnalysisService";
 import { SecurityEventLogger } from "../../Entities/SecurityEventLogger";
@@ -365,6 +367,14 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     const runtimeDependencies = (): RuntimeDependencyReport => (dependencyReportCache ??= dependencyProbe.report());
     const corsOrigin = options.corsOrigin ?? DEFAULT_CORS_ORIGIN;
 
+    // Durable, tenant-scoped ingestion job/status owner (Stage 15-ING.2). Wired
+    // here so the web client can observe real stage/OCR page progress for
+    // long-running scans without blocking the request or faking progress.
+    const ingestionJobs = new IngestionJobService(persistence, {
+        now,
+        runner: (tenantId, request, observer) => ingestionService.ingest(tenantId, request, observer),
+    });
+
     const identity = new CommercialIdentityService(persistence, sessionTtlMs);
     identity.setNowProvider(now);
     identity.initialize();
@@ -598,7 +608,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 return res.end();
             }
             if (req.method === "GET" && path === "/health") return corsJson(200, { status: "ok", service: "hooshyar-commercial-runtime" });
-            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", dependencies: runtimeDependencies(), capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "financial-analytics", "ingested-source-analysis", "tenant-scoped-persistence", "offline-sync", "reasoning", "executive-intelligence-workbench", "decision-workbench", "expert-choice", "organizational-execution", "governed-approval", "work-item-lifecycle", "kpi-outcome", "reports", "reports-export", "report-artifact-download", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "auth-rate-limiting", "rbac", "session-lifecycle", "request-observability", "bounded-pagination", "idempotency-keys", "organizational-problem-solving"] });
+            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", dependencies: runtimeDependencies(), capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "financial-analytics", "ingested-source-analysis", "tenant-scoped-persistence", "offline-sync", "reasoning", "executive-intelligence-workbench", "decision-workbench", "expert-choice", "organizational-execution", "governed-approval", "work-item-lifecycle", "kpi-outcome", "reports", "reports-export", "report-artifact-download", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "auth-rate-limiting", "rbac", "session-lifecycle", "request-observability", "bounded-pagination", "idempotency-keys", "organizational-problem-solving", "ingestion-job-status", "scanned-statement-normalization"] });
             if (req.method === "GET" && path === "/") return asset(res, "index.html", "text/html; charset=utf-8");
             if (req.method === "GET" && path === "/app.js") return asset(res, "app.js", "text/javascript; charset=utf-8");
             if (req.method === "GET" && path === "/offline-sync.js") return asset(res, "offline-sync.js", "text/javascript; charset=utf-8");
@@ -954,6 +964,71 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                         }
                         return { status: 422, payload: { error: message } };
                     }
+                });
+            }
+
+            /**
+             * Long-running ingestion job creation (Stage 15-ING.2). Returns
+             * immediately with a durable job id; the canonical ingestion runs
+             * in the background and reports REAL stage/OCR progress through
+             * `GET /api/ingest/jobs/:jobId`. A duplicate submission with the
+             * same `Idempotency-Key` resolves to the SAME job (never a second
+             * side effect) and carries `IDEMPOTENCY_IN_PROGRESS` in diagnostics
+             * while it is still running.
+             */
+            if (req.method === "POST" && path === "/api/ingest/jobs") {
+                if (!getOrCreateRateLimiter(session.token).tryAcquire()) return corsJson(429, { error: "RATE_LIMIT_EXCEEDED" });
+                if (!ensurePermission("INGEST_DATA")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                const body = await readJson(req, INGEST_BODY_BYTES);
+                const ingestError = validateIngestBody(body);
+                if (ingestError) return corsJson(400, { error: ingestError });
+                const rawHeader = req.headers["idempotency-key"];
+                const rawKey = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
+                if (rawKey !== undefined && !IDEMPOTENCY_KEY_PATTERN.test(rawKey.trim())) {
+                    return corsJson(400, { error: "IDEMPOTENCY_KEY_INVALID" });
+                }
+                const { job, replayed } = await ingestionJobs.start(
+                    session.tenantId,
+                    session.userId,
+                    {
+                        sourceName: String(body.sourceName),
+                        format: String(body.format).trim().toUpperCase() as IngestionFormat,
+                        content: body.content === undefined ? undefined : String(body.content),
+                        contentBase64: body.contentBase64 === undefined ? undefined : String(body.contentBase64),
+                    },
+                    rawKey?.trim(),
+                );
+                const inProgress = !isTerminalIngestionStage(job.stage);
+                return corsJson(202, {
+                    status: job.status === "COMPLETED" ? "READY" : inProgress ? "IN_PROGRESS" : "FAILED",
+                    jobId: job.jobId,
+                    replayed,
+                    job,
+                    diagnostics: {
+                        ...(job.code ? { code: job.code } : {}),
+                        ...(replayed ? { idempotency: inProgress ? "IDEMPOTENCY_IN_PROGRESS" : "IDEMPOTENCY_REPLAYED" } : {}),
+                    },
+                });
+            }
+
+            if (req.method === "GET" && path === "/api/ingest/jobs") {
+                if (!ensurePermission("INGEST_DATA")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                const pagination = parsePagination(query);
+                if (pagination.ok === false) return corsJson(400, { error: pagination.error });
+                const page = await ingestionJobs.list(session.tenantId, pagination.page.limit, pagination.page.offset);
+                return corsJson(200, { status: "READY", tenantId: session.tenantId, jobs: page.items, pagination: toPageMeta(pagination.page, page) });
+            }
+
+            if (req.method === "GET" && path.startsWith("/api/ingest/jobs/")) {
+                if (!ensurePermission("INGEST_DATA")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                const jobId = decodeURIComponent(path.slice("/api/ingest/jobs/".length));
+                const job = await ingestionJobs.get(session.tenantId, jobId);
+                if (!job) return corsJson(404, { error: "INGESTION_JOB_NOT_FOUND" });
+                const inProgress = !isTerminalIngestionStage(job.stage);
+                return corsJson(200, {
+                    status: job.status === "COMPLETED" ? "READY" : inProgress ? "IN_PROGRESS" : "FAILED",
+                    job,
+                    diagnostics: { ...(job.code ? { code: job.code } : {}) },
                 });
             }
 

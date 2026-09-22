@@ -4,13 +4,15 @@
 
 **Implementation Path:** `Backend/HBOS/Product/FinancialDataIngestionAdapter.ts`
 
-**Test Path:** `Backend/HBOS/test/FinancialDataIngestionAdapter.test.ts`
+**Test Path:** `Backend/HBOS/test/FinancialDataIngestionAdapter.test.ts`, `Backend/HBOS/test/IngestionDocumentNormalization.test.ts`
 
 ---
 
 ## Capability Contract
 
 Canonical multi-format financial data ingestion with tenant isolation and persistence.
+
+**OCR/document normalization boundary:** OCR-derived (and other extracted) document text is normalized through the canonical `DocumentTableExtractor` statement boundary before the strict CSV contract is considered. Realistic statement layouts (synonym headers such as `description`/`narration`, extra `balance`/`reference` columns, a declared document currency, multi-word descriptions, thousands-separated amounts) map to the canonical `date | account | debit | credit | currency` model. Ambiguity or unsafety fails closed with `ingestion-ambiguous-table-mapping` / `ingestion-table-schema-invalid`; the strict CSV parser is a fallback only for text that genuinely matches it.
 
 **Supported Formats:**
 - **CSV** — Standard CSV with columns: date, account, debit, credit, currency

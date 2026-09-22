@@ -96,4 +96,27 @@ describe("ScannedPdfRouter (Stage 08-IMG.4)", () => {
       rasterizePage: async () => Buffer.alloc(1), perPageOcrTimeoutMs: 50,
     })).rejects.toThrow(/ingestion-ocr-page-timeout/);
   });
+
+  test("reports real per-page OCR progress derived from routed pages", async () => {
+    const pdf = makePdf([
+      { pageNumber: 1, text: "x".repeat(500) },
+      { pageNumber: 2, text: "" },
+      { pageNumber: 3, text: "" },
+    ]);
+    const ocr = makeOcrStub((n) => ({
+      sourceName: `p${n}`, sha256: "x".repeat(64), byteLength: 10,
+      receivedAt: "2026-01-01", text: `ocr p${n}`, meanConfidence: 70, words: [],
+      engine: "stub", engineVersion: "0", language: "eng",
+    }));
+    const progress: Array<{ pageNumber: number; done: number; total: number; percent: number }> = [];
+    await routeScannedPdfToOcr(pdf, ocr, {
+      rasterizePage: async () => Buffer.alloc(1),
+      onPageProgress: (info) => progress.push(info),
+    });
+
+    expect(progress).toEqual([
+      { pageNumber: 2, done: 1, total: 2, percent: 50 },
+      { pageNumber: 3, done: 2, total: 2, percent: 100 },
+    ]);
+  });
 });

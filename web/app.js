@@ -244,56 +244,205 @@ function resolveIngestRequest(file) {
   return { format, binary };
 }
 
+/**
+ * Long-running ingestion is observed through the canonical durable job API
+ * (`POST/GET /api/ingest/jobs`). The UI renders the REAL server-side stage,
+ * page progress and elapsed time — never a timer-based fake percentage. A
+ * duplicate submission resolves to the same job and is shown as "in progress",
+ * not as a failure.
+ */
+const INGEST_JOB_STORAGE_KEY = 'hooshyar.ingest.job.v1';
+const INGEST_STAGE_LABELS_FA = {
+  RECEIVED: 'دریافت شد',
+  VALIDATING: 'در حال اعتبارسنجی ورودی',
+  READING_PDF: 'در حال خواندن فایل PDF',
+  SCANNED_DETECTED: 'فایل اسکن‌شده شناسایی شد؛ آماده‌سازی تشخیص متن',
+  OCR: 'در حال تشخیص متن تصویر (OCR)',
+  NORMALIZING: 'در حال نرمال‌سازی ساختار سند',
+  CANONICAL_VALIDATION: 'در حال اعتبارسنجی مدل مالی کانونی',
+  PERSISTING: 'در حال ذخیره‌سازی نتیجه',
+  COMPLETED: 'تکمیل شد',
+  FAILED: 'پردازش ناموفق بود'
+};
+let lastIngestJob = null;
+
+function formatElapsedSeconds(fromIso, toIso) {
+  const from = Date.parse(fromIso);
+  if (!Number.isFinite(from)) return '';
+  const parsedTo = toIso ? Date.parse(toIso) : Date.now();
+  const to = Number.isFinite(parsedTo) ? parsedTo : Date.now();
+  const seconds = Math.max(0, Math.round((to - from) / 1000));
+  return `زمان سپری‌شده: ${seconds.toLocaleString('fa-IR')} ثانیه`;
+}
+
+function describeJob(job) {
+  if (syncApi && syncApi.describeIngestProgress) return syncApi.describeIngestProgress(job, Date.now());
+  const stage = job.stage || 'RECEIVED';
+  return {
+    stage,
+    stageLabel: INGEST_STAGE_LABELS_FA[stage] || stage,
+    message: job.message || INGEST_STAGE_LABELS_FA[stage] || '',
+    percent: null,
+    page: null,
+    pages: null,
+    elapsedSeconds: null,
+    terminal: stage === 'COMPLETED' || stage === 'FAILED'
+  };
+}
+
+function renderIngestJob(job) {
+  if (!job) return;
+  lastIngestJob = job;
+  const container = document.querySelector('#analysis-progress');
+  if (!container) return;
+  container.hidden = false;
+  const described = describeJob(job);
+  document.querySelector('#analysis-progress-stage').textContent = described.stageLabel;
+  document.querySelector('#analysis-progress-elapsed').textContent = described.elapsedSeconds === null
+    ? formatElapsedSeconds(job.receivedAt, job.completedAt)
+    : `زمان سپری‌شده: ${described.elapsedSeconds.toLocaleString('fa-IR')} ثانیه`;
+
+  const bar = document.querySelector('#analysis-progress-bar');
+  // A percentage is shown ONLY for real OCR page progress.
+  if (described.stage === 'OCR' && described.percent !== null) {
+    bar.hidden = false;
+    bar.value = described.percent;
+  } else {
+    bar.hidden = true;
+  }
+
+  document.querySelector('#analysis-progress-message').textContent = described.message;
+  document.querySelector('#analysis-progress-code').textContent = job.code ? `کد تشخیص: ${job.code}` : '';
+}
+
+function persistIngestJob(entry) {
+  try { localStorage.setItem(INGEST_JOB_STORAGE_KEY, JSON.stringify(entry)); } catch { /* storage is optional */ }
+}
+
+function readPersistedIngestJob() {
+  try {
+    const raw = localStorage.getItem(INGEST_JOB_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearPersistedIngestJob() {
+  try { localStorage.removeItem(INGEST_JOB_STORAGE_KEY); } catch { /* storage is optional */ }
+}
+
+async function pollIngestJob(jobId) {
+  const elapsedTimer = setInterval(() => renderIngestJob(lastIngestJob), 1000);
+  try {
+    for (;;) {
+      const payload = await getJson(`/api/ingest/jobs/${encodeURIComponent(jobId)}`);
+      renderIngestJob(payload.job);
+      if (payload.job && (payload.job.status === 'COMPLETED' || payload.job.status === 'FAILED')) return payload.job;
+      await new Promise((resolve) => setTimeout(resolve, 800));
+    }
+  } finally {
+    clearInterval(elapsedTimer);
+  }
+}
+
+async function finishIngestJob(job, entry) {
+  const result = document.querySelector('#analysis-result');
+  if (!job || job.status !== 'COMPLETED' || !job.result) {
+    const code = job && job.code ? ` (کد تشخیص: ${job.code})` : '';
+    result.textContent = `${job && job.message ? job.message : 'پردازش ناموفق بود.'}${code}`;
+    clearPersistedIngestJob();
+    return;
+  }
+  const analysis = await getJson('/api/financial/analyze', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      sourceSha256: job.result.sha256,
+      assets: Number(entry.assets),
+      liabilities: Number(entry.liabilities)
+    })
+  });
+  result.textContent = `تحلیل موفق (${job.result.sourceType}): ${Number(job.result.transactionCount).toLocaleString('fa-IR')} تراکنش، سود ${Number(analysis.metrics.profit).toLocaleString('fa-IR')}، نسبت بدهی ${Number(analysis.metrics.debtRatio * 100).toLocaleString('fa-IR')}٪. وضعیت: ${analysis.status}`;
+  clearPersistedIngestJob();
+  await refreshDashboard();
+}
+
 document.querySelector('#analysis-form').addEventListener('submit', async event => {
   event.preventDefault();
   const result = document.querySelector('#analysis-result');
   const file = document.querySelector('#csv-file').files[0];
   if (!file) return;
+  result.textContent = '';
   try {
     const { format, binary } = resolveIngestRequest(file);
     const ingestBody = { sourceName: file.name, format };
     if (binary) ingestBody.contentBase64 = await fileToBase64(file);
     else ingestBody.content = await readFileText(file);
-    let ingested;
+
+    const entry = {
+      jobId: null,
+      sourceName: file.name,
+      format,
+      assets: Number(document.querySelector('#assets').value),
+      liabilities: Number(document.querySelector('#liabilities').value),
+      createdAt: new Date().toISOString()
+    };
+    renderIngestJob({ stage: 'RECEIVED', message: INGEST_STAGE_LABELS_FA.RECEIVED, receivedAt: entry.createdAt, progress: null });
+
+    let created;
     try {
-      ingested = await getJson('/api/ingest', {
+      created = await getJson('/api/ingest/jobs', {
         method: 'POST',
-        headers: { 'content-type': 'application/json', 'idempotency-key': idempotencyKey('ingest') },
+        headers: { 'content-type': 'application/json', 'idempotency-key': idempotencyKey('ingest:job') },
         body: JSON.stringify(ingestBody)
       });
-      rotateIdempotencyKey('ingest');
     } catch (error) {
       if (offlineSync && isConnectivityError(error)) {
         try {
           await offlineSync.enqueue({
             ...ingestBody,
             baseWatermark: lastSyncCursors.get(file.name) || null,
-            idempotencyKey: idempotencyKey('ingest')
+            idempotencyKey: idempotencyKey('ingest:job')
           });
         } catch (storageError) {
           result.textContent = `ذخیره در صف آفلاین ناموفق بود: ${describeFailure(storageError)} فایل حفظ شد؛ پس از برقراری اتصال دوباره تلاش کنید.`;
           return;
         }
-        rotateIdempotencyKey('ingest');
+        rotateIdempotencyKey('ingest:job');
         result.textContent = 'اتصال در دسترس نیست؛ کار در صف آفلاین ذخیره شد و پس از برقراری اتصال خودکار همگام‌سازی می‌شود.';
         return;
       }
       throw error;
     }
-    const analysis = await getJson('/api/financial/analyze', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        sourceSha256: ingested.evidence.sha256,
-        assets: Number(document.querySelector('#assets').value),
-        liabilities: Number(document.querySelector('#liabilities').value)
-      })
-    });
-    result.textContent = `تحلیل موفق (${format}): سود ${Number(analysis.metrics.profit).toLocaleString('fa-IR')}، نسبت بدهی ${Number(analysis.metrics.debtRatio * 100).toLocaleString('fa-IR')}٪. وضعیت: ${analysis.status}`;
-    await refreshDashboard();  } catch (error) {
+
+    entry.jobId = created.jobId;
+    persistIngestJob(entry);
+
+    if (created.replayed && created.diagnostics && created.diagnostics.idempotency === 'IDEMPOTENCY_IN_PROGRESS') {
+      result.textContent = 'این درخواست هم‌اکنون در حال پردازش است…';
+    }
+
+    const job = await pollIngestJob(created.jobId);
+    rotateIdempotencyKey('ingest:job');
+    await finishIngestJob(job, entry);
+  } catch (error) {
     result.textContent = `تحلیل ناموفق بود: ${describeFailure(error)}`;
   }
 });
+
+/** Resume an in-flight ingest after an ordinary page refresh. */
+async function resumePersistedIngestJob() {
+  const entry = readPersistedIngestJob();
+  if (!entry || !entry.jobId) return;
+  try {
+    renderIngestJob({ stage: 'RECEIVED', message: 'بازیابی وضعیت پردازش…', receivedAt: entry.createdAt, progress: null });
+    const job = await pollIngestJob(entry.jobId);
+    await finishIngestJob(job, entry);
+  } catch {
+    clearPersistedIngestJob();
+  }
+}
 
 document.querySelector('#executive-form').addEventListener('submit', async event => {
   event.preventDefault();
@@ -718,3 +867,4 @@ if (typeof window !== 'undefined') window.addEventListener('online', () => { flu
 refreshSessionState();
 refreshDashboard();
 refreshSyncState();
+resumePersistedIngestJob();

@@ -59,16 +59,20 @@ function buildScannedPdf(rgbZlib, width, height) {
 }
 
 /** Render ledger lines into lossless RGB FlateDecode bytes. */
-function renderLedgerRgb(lines) {
-  const width = 1000;
-  const height = 70 + lines.length * 50;
+function renderLedgerRgb(lines, options) {
+  const opts = options || {};
+  const width = opts.width || 1000;
+  const fontSize = opts.fontSize || 32;
+  const lineHeight = opts.lineHeight || 45;
+  const topMargin = opts.topMargin || 70;
+  const height = topMargin + lines.length * (opts.rowHeight || 50);
   const canvas = nodeRequire('@napi-rs/canvas').createCanvas(width, height);
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, width, height);
   ctx.fillStyle = '#000000';
-  ctx.font = '32px sans-serif';
-  lines.forEach((line, index) => ctx.fillText(line, 15, 55 + index * 45));
+  ctx.font = `${fontSize}px sans-serif`;
+  lines.forEach((line, index) => ctx.fillText(line, 15, topMargin - 15 + index * lineHeight));
   const { data } = ctx.getImageData(0, 0, width, height);
   const rgb = Buffer.alloc(width * height * 3);
   for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
@@ -85,6 +89,37 @@ function buildLedgerScannedPdf(lines) {
   return buildScannedPdf(rgbZlib, width, height);
 }
 
+/**
+ * A realistic scanned financial-statement page: a title line declaring the
+ * document currency, a canonical statement header (date/description/debit/
+ * credit plus a non-canonical running-balance column) and aligned
+ * multi-thousand amount rows. This is deliberately NOT the synthetic
+ * 5-column ledger CSV rendered as an image: it exercises the real
+ * OCR -> structural/table normalization path.
+ */
+function financialStatementLines() {
+  const pad = (value, width) => String(value).padEnd(width, ' ');
+  return [
+    'Bank Statement - Account 1234567890 (Currency: IRR)',
+    pad('Date', 14) + pad('Description', 30) + pad('Debit', 20) + pad('Credit', 20) + 'Balance',
+    pad('2024-01-15', 14) + pad('Opening deposit', 30) + pad('0.00', 20) + pad('500000.00', 20) + '500000.00',
+    pad('2024-01-16', 14) + pad('Cash withdrawal', 30) + pad('120000.00', 20) + pad('0.00', 20) + '380000.00',
+    pad('2024-01-17', 14) + pad('Customer payment', 30) + pad('0.00', 20) + pad('250000.00', 20) + '630000.00',
+  ];
+}
+
+/** A scanned PDF whose page renders a realistic financial statement. */
+function buildFinancialStatementScannedPdf() {
+  const { rgbZlib, width, height } = renderLedgerRgb(financialStatementLines(), {
+    width: 1600,
+    fontSize: 30,
+    lineHeight: 48,
+    topMargin: 70,
+    rowHeight: 52,
+  });
+  return buildScannedPdf(rgbZlib, width, height);
+}
+
 /** An image-only PDF with no recognizable text (solid black page). */
 function buildBlankScannedPdf() {
   const width = 120;
@@ -92,4 +127,11 @@ function buildBlankScannedPdf() {
   return buildScannedPdf(deflateSync(Buffer.alloc(width * height * 3, 0)), width, height);
 }
 
-module.exports = { buildScannedPdf, renderLedgerRgb, buildLedgerScannedPdf, buildBlankScannedPdf };
+module.exports = {
+  buildScannedPdf,
+  renderLedgerRgb,
+  buildLedgerScannedPdf,
+  buildFinancialStatementScannedPdf,
+  financialStatementLines,
+  buildBlankScannedPdf,
+};

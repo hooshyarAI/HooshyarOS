@@ -28,6 +28,17 @@ export interface ScannedRoutingOptions {
    * be backed by pdf.js page renderToBuffer.
    */
   readonly rasterizePage: (pageNumber: number) => Promise<Buffer>;
+  /**
+   * Real per-page OCR progress. Called after each routed page's OCR result is
+   * available, with the count of pages actually routed to OCR (never a timer
+   * estimate). `done` is 1-based; `percent` is derived from real results.
+   */
+  readonly onPageProgress?: (progress: {
+    readonly pageNumber: number;
+    readonly done: number;
+    readonly total: number;
+    readonly percent: number;
+  }) => void;
 }
 
 export interface ScannedPageDecision {
@@ -76,6 +87,8 @@ export async function routeScannedPdfToOcr(
   }
   const decisions = decideScannedPages(pdf, threshold);
   const ocrResults: OcrResult[] = [];
+  const routedTotal = decisions.filter((d) => d.needsOcr).length;
+  let routedDone = 0;
   for (const d of decisions) {
     if (!d.needsOcr) continue;
     const imageBytes = await options.rasterizePage(d.pageNumber);
@@ -90,6 +103,15 @@ export async function routeScannedPdfToOcr(
       }),
     ]);
     ocrResults.push(result);
+    routedDone += 1;
+    if (options.onPageProgress && routedTotal > 0) {
+      options.onPageProgress({
+        pageNumber: d.pageNumber,
+        done: routedDone,
+        total: routedTotal,
+        percent: Math.round((routedDone / routedTotal) * 100),
+      });
+    }
   }
   return { decisions, ocrResults, anyRoutedToOcr: ocrResults.length > 0 };
 }

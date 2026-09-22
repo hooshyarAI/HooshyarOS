@@ -32,6 +32,7 @@ import {
 import { createCanonicalOcrAdapter, type OcrAdapter } from "./OcrAdapter";
 import { createPdfPageRasterizer } from "./PdfPageRasterizer";
 import { PDF_ERROR_CODES } from "./PdfAcquisition";
+import type { IngestionProgressObserver } from "./IngestionProgress";
 
 export type IngestionFormat =
   | "CSV"
@@ -146,7 +147,8 @@ export class FinancialIngestionService {
     this.adapter = adapter ?? new FinancialDataIngestionAdapter(persistence);
   }
 
-  async ingest(tenantId: string, request: IngestionRequest): Promise<IngestionOutcome> {
+  async ingest(tenantId: string, request: IngestionRequest, observer?: IngestionProgressObserver): Promise<IngestionOutcome> {
+    observer?.({ stage: "VALIDATING" });
     const normalizedTenant = tenantId?.trim() ?? "";
     if (!normalizedTenant) throw new Error("ingestion-tenant-required");
 
@@ -194,12 +196,13 @@ export class FinancialIngestionService {
         result = await this.adapter.ingestDocxBytes(normalizedTenant, sourceName, bytes);
         break;
       case "PDF":
-        result = await this.ingestPdfDocument(normalizedTenant, sourceName, bytes);
+        result = await this.ingestPdfDocument(normalizedTenant, sourceName, bytes, observer);
         break;
       default:
         throw new Error("ingestion-format-unsupported");
     }
 
+    observer?.({ stage: "PERSISTING" });
     const rawSourceRef = await this.persistRawSource(normalizedTenant, {
       sourceName,
       format,
@@ -243,19 +246,22 @@ export class FinancialIngestionService {
     tenantId: string,
     sourceName: string,
     bytes: Buffer,
+    observer?: IngestionProgressObserver,
   ): Promise<FinancialIngestionResult> {
+    observer?.({ stage: "READING_PDF" });
     try {
       return await this.adapter.ingestPdfBytes(tenantId, sourceName, bytes);
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       if (!message.includes(PDF_ERROR_CODES.SCANNED)) throw error;
 
+      observer?.({ stage: "SCANNED_DETECTED" });
       const factory = this.scannedPdfOcrRoute ?? ((raw: Buffer) => this.createDefaultScannedPdfOcrRoute(raw));
       const handle = factory(bytes);
       if (!handle) throw error;
 
       try {
-        return await this.adapter.ingestScannedPdfBytes(tenantId, sourceName, bytes, handle.route);
+        return await this.adapter.ingestScannedPdfBytes(tenantId, sourceName, bytes, handle.route, observer);
       } finally {
         await handle.dispose();
       }

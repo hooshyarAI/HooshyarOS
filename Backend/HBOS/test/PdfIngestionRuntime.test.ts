@@ -55,6 +55,31 @@ function blankPng(): Buffer {
   return canvas.toBuffer("image/png");
 }
 
+/**
+ * Render a realistic financial-statement layout (canonical header plus an
+ * extra running-balance column) to a real PNG, matching the shared acceptance
+ * fixture layout exactly, so the admitted OCR engine has real input.
+ */
+function renderStatementPng(lines: string[]): Buffer {
+  const width = 1600;
+  const fontSize = 30;
+  const lineHeight = 48;
+  const topMargin = 70;
+  const height = topMargin + lines.length * 52;
+  const canvas = nodeRequire("@napi-rs/canvas").createCanvas(width, height);
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = "#000000";
+  ctx.font = `${fontSize}px sans-serif`;
+  lines.forEach((line, index) => ctx.fillText(line, 15, topMargin - 15 + index * lineHeight));
+  return canvas.toBuffer("image/png");
+}
+
+const { financialStatementLines } = nodeRequire("./scripts/lib/scanned-pdf-fixture.cjs") as {
+  financialStatementLines: () => string[];
+};
+
 const PDF_CSV = [
   "date,account,debit,credit,currency",
   "2026-08-01,Cash,1000,0,IRR",
@@ -188,6 +213,31 @@ describe("PDF canonical ingestion — composition service", () => {
 
     persistence.close();
   }, 120000);
+
+  test("a realistic scanned financial statement normalizes through the canonical table boundary", async () => {
+    const lines = financialStatementLines();
+    mockScannedPdf(renderStatementPng(lines));
+    const persistence = new SQLitePersistenceStore({ databasePath: ":memory:" });
+    const service = new FinancialIngestionService(persistence);
+    const bytes = makePdfBytes("scan-statement");
+
+    const outcome = await service.ingest("tenant-a", {
+      sourceName: "statement.pdf",
+      format: "PDF",
+      contentBase64: bytes.toString("base64"),
+    });
+
+    // Real OCR -> structural/table normalization -> canonical transactions.
+    expect(outcome.result.evidence.sourceType).toBe("PDF");
+    expect(outcome.result.evidence.sha256).toBe(SHA(bytes));
+    expect(outcome.result.evidence.ocr?.ocrEngine).toBe("tesseract.js");
+    expect(outcome.result.model.transactions).toHaveLength(3);
+    expect(outcome.result.model.transactions.every((txn) => txn.currency === "IRR")).toBe(true);
+    expect(outcome.result.model.totals.debit).toBe(120000);
+    expect(outcome.result.model.totals.credit).toBe(750000);
+
+    persistence.close();
+  }, 180000);
 
   test("a scanned PDF with no recognizable text fails closed and persists nothing", async () => {
     mockScannedPdf();

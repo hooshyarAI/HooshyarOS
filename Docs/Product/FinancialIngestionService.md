@@ -4,7 +4,8 @@
 **Canonical owner:** `Backend/HBOS/Product/FinancialDataIngestionAdapter.ts`
 **Runtime composition service:** `Backend/HBOS/Product/FinancialIngestionService.ts`
 **Runtime surface:** `Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts`
-**Focused tests:** `Backend/HBOS/test/Phase14-IngestionRuntime.test.ts`
+**Durable job/status owner:** `Backend/HBOS/Product/IngestionJobService.ts`
+**Focused tests:** `Backend/HBOS/test/Phase14-IngestionRuntime.test.ts`, `Backend/HBOS/test/IngestionJobStatus.test.ts`, `Backend/HBOS/test/IngestionDocumentNormalization.test.ts`, `Backend/HBOS/test/IngestionJobProgressClient.test.ts`
 
 ---
 
@@ -36,12 +37,34 @@ canonical `FinancialDataIngestionAdapter`.
 | `DOCX` | `contentBase64` | `ingestDocxBytes` | `mammoth` text + table extraction; legacy `.doc` rejected explicitly |
 | `XLSX` | `contentBase64` | `ingestXlsx` | `exceljs-hardened`, formula values only, zip-bomb limits |
 | `PDF` (text-native) | `contentBase64` | `ingestPdfBytes` | `pdf-parse` via `acquirePdf`; extracted text normalized through the canonical ledger (CSV) pipeline; original-byte SHA-256 provenance |
-| `PDF` (scanned/image-only) | `contentBase64` | `ingestScannedPdfBytes` | `pdf-parse` page rasterizer + admitted offline `tesseract.js` OCR (`fas+eng`); OCR text normalized through the SAME canonical pipeline; original-byte SHA-256 provenance plus OCR engine/version/confidence provenance |
+| `PDF` (scanned/image-only) | `contentBase64` | `ingestScannedPdfBytes` | `pdf-parse` page rasterizer + admitted offline `tesseract.js` OCR (`fas+eng`); OCR text normalized through the canonical document-table boundary (realistic statement layouts) with the strict CSV pipeline only as a fallback; original-byte SHA-256 provenance plus OCR engine/version/confidence provenance |
 
 All formats converge on the **one** canonical owner
 (`FinancialDataIngestionAdapter`) and the **one** validation/normalization/
 persistence/provenance pipeline. No format-specific intelligence engine and no
 second adapter exists.
+
+### Scanned financial-statement normalization
+
+Real scanned statements rarely match the synthetic 5-column ledger CSV. OCR text
+is therefore normalized through the canonical `DocumentTableExtractor` boundary
+(`detectStatementTables` for space-aligned layouts, `detectOcrStatementTables`
+for single-space OCR output), which reconstructs the canonical
+`date | account | debit | credit | currency` mapping from:
+
+- a header declaring the canonical fields (synonyms such as
+  `description`/`narration`/`particulars` for account are accepted);
+- extra non-canonical columns (`balance`, `reference`, …) which are **ignored**,
+  never guessed;
+- a document-level currency declaration (e.g. `Currency: IRR`, `ارز: IRR`);
+- multi-word account/description text and thousands-separated amounts.
+
+The strict CSV parser remains a **fallback only** for text that genuinely
+matches the canonical CSV shape. Ambiguity or unsafety fails closed with a
+precise typed error (`ingestion-ambiguous-table-mapping`,
+`ingestion-table-schema-invalid`) instead of degrading to
+`ingestion-schema-invalid`; no row is fabricated and no ambiguous mapping is
+partially applied.
 
 ### OCR (scanned/image-only PDF)
 
@@ -87,7 +110,7 @@ second adapter exists.
 
 ### `POST /api/ingest`
 
-Permission: `INGEST_DATA`. Rate limited. Body limit: 8 MB.
+Permission: `INGEST_DATA`. Rate limited. Body limit: 32 MB (Base64 JSON transport for scanned PDFs).
 
 ```json
 { "sourceName": "ledger.xlsx", "format": "XLSX", "contentBase64": "<base64>" }
@@ -109,6 +132,46 @@ Success `201`:
   "totals": { "debit": 1000, "credit": 1000, "balance": 0 }
 }
 ```
+
+### `POST /api/ingest/jobs` (long-running ingestion status)
+
+Permission: `INGEST_DATA`. Rate limited. Body limit: 32 MB. Accepts the same
+body as `POST /api/ingest` and returns `202` immediately with a durable job id.
+
+```json
+{ "status": "IN_PROGRESS", "jobId": "<uuid>", "replayed": false, "job": { "stage": "RECEIVED", "message": "دریافت شد", "progress": null } }
+```
+
+- The canonical ingestion runs in the background; the durable job record
+  (`ingestion-job:<jobId>`, tenant-scoped, `SQLitePersistenceStore`) is updated
+  with real stage transitions (`RECEIVED → VALIDATING → READING_PDF →
+  SCANNED_DETECTED → OCR → NORMALIZING → CANONICAL_VALIDATION → PERSISTING →
+  COMPLETED / FAILED`).
+- OCR progress is **real**: `job.progress = { page, pages, percent }` is derived
+  from pages actually routed to and completed by OCR. No timer-based fake
+  percentage is ever reported.
+- `Idempotency-Key` is supported. A duplicate submission resolves to the SAME
+  job (never a second side effect); while it is still running the response
+  carries `diagnostics.idempotency = "IDEMPOTENCY_IN_PROGRESS"`, after
+  completion `IDEMPOTENCY_REPLAYED`. The primary user message remains
+  human-readable Persian.
+- A job whose run fails records the precise technical `code` together with a
+  Persian `message`, and releases its idempotency claim so a legitimate retry
+  can proceed.
+- A job started by a previous process can never be reported as still running: on
+  read it is reconciled to a durable `ingestion-job-interrupted` failure.
+
+### `GET /api/ingest/jobs/:jobId`
+
+Permission: `INGEST_DATA`. Returns the tenant-scoped durable job view
+(`status`, `stage`, `message`, `code`, `progress`, timestamps, `result`).
+Cross-tenant or unknown ids return `404 INGESTION_JOB_NOT_FOUND`. This is what
+lets an ordinary page refresh resume an in-flight ingestion from durable
+evidence.
+
+### `GET /api/ingest/jobs`
+
+Permission: `INGEST_DATA`. Bounded, paginated list of the tenant's jobs.
 
 ### `GET /api/sources`
 
@@ -174,6 +237,9 @@ Unsupported/ambiguous input is rejected before any model is persisted:
 | `ingestion-ocr-unsupported` (422) | OCR engine or its local language data is unavailable (fails closed, never fetches from a CDN) |
 | `ingestion-pdf-unsupported` (422) | bytes lack a valid `%PDF` signature |
 | `ingestion-pdf-empty` / `ingestion-pdf-corrupt` / `ingestion-pdf-password-protected` (422) | empty, malformed or password-protected PDF |
+| `ingestion-ambiguous-table-mapping` (422) | a detected statement table cannot be mapped unambiguously to the canonical schema (missing/duplicated field, undeclared currency); nothing is guessed |
+| `ingestion-table-schema-invalid` (422) | a statement row is unsafe (unparseable/negative amount, both debit and credit, zero row, bad date/account/currency); nothing is persisted |
+| `ingestion-job-interrupted` (job status `FAILED`) | a job started by a previous process cannot still be running; surfaced honestly instead of a false "in progress" |
 | `ingestion-*` (422) | canonical validation/normalization error (e.g. `ingestion-double-sided-row:2`, `ingestion-excel-parse-error`) |
 
 ---

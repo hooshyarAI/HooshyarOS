@@ -4,8 +4,14 @@
 import {
   CANONICAL_FINANCIAL_SCHEMA,
   TABLE_ERROR_CODES,
+  detectOcrStatementTables,
+  detectStatementTables,
   detectTables,
+  extractDeclaredCurrency,
+  isCanonicalStatementHeader,
+  mapStatementToCanonical,
   mapTableToCanonical,
+  parseStatementAmount,
 } from "../Product/DocumentTableExtractor";
 
 describe("DocumentTableExtractor (Stage 08-DOC.4)", () => {
@@ -104,5 +110,117 @@ describe("DocumentTableExtractor (Stage 08-DOC.4)", () => {
     expect(CANONICAL_FINANCIAL_SCHEMA.headers).toEqual([
       "date", "account", "debit", "credit", "currency",
     ]);
+  });
+});
+
+describe("DocumentTableExtractor — realistic financial statement normalization (Stage 15-DOC.5)", () => {
+  const STATEMENT = [
+    "Bank Statement - Account 1234567890 (Currency: IRR)",
+    "Date        Description            Debit          Credit         Balance",
+    "2024-01-15  Opening deposit        0.00           500,000.00     500,000.00",
+    "2024-01-16  Cash withdrawal        120,000.00     0.00           380,000.00",
+    "2024-01-17  Customer payment       0.00           250,000.00     630,000.00",
+  ].join("\n");
+
+  test("detects a statement header and maps it despite an extra balance column", () => {
+    const tables = detectStatementTables(STATEMENT);
+    expect(tables).toHaveLength(1);
+    expect(isCanonicalStatementHeader(tables[0].headers)).toBe(true);
+
+    const declared = extractDeclaredCurrency(STATEMENT);
+    expect(declared).toBe("IRR");
+
+    const transactions = mapStatementToCanonical(tables[0], { defaultCurrency: declared ?? undefined });
+    expect(transactions).toHaveLength(3);
+    expect(transactions[0]).toEqual({
+      date: "2024-01-15",
+      account: "Opening deposit",
+      debit: 0,
+      credit: 500000,
+      currency: "IRR",
+    });
+    expect(transactions[1].debit).toBe(120000);
+    expect(transactions[2].credit).toBe(250000);
+  });
+
+  test("does not misread a CSV line as a statement table", () => {
+    expect(detectStatementTables("date,account,debit,credit,currency\n2024-01-15,Cash,1,0,IRR")).toEqual([]);
+  });
+
+  test("extractDeclaredCurrency only accepts an explicit declaration", () => {
+    expect(extractDeclaredCurrency("current account 1234 has no currency")).toBeNull();
+    expect(extractDeclaredCurrency("نمونه صورت‌حساب (واحد پول: USD)")).toBe("USD");
+  });
+
+  test("fails closed when no currency column and no declared currency exist", () => {
+    const text = [
+      "Date        Description            Debit          Credit",
+      "2024-01-15  Opening deposit        0.00           500000.00",
+    ].join("\n");
+    const [table] = detectStatementTables(text);
+    expect(isCanonicalStatementHeader(table.headers)).toBe(true);
+    expect(() => mapStatementToCanonical(table)).toThrow(TABLE_ERROR_CODES.AMBIGUOUS);
+  });
+
+  test("fails closed precisely on a double-sided row and on an unparseable amount", () => {
+    const doubleSided = [
+      "Date        Description            Debit          Credit",
+      "2024-01-15  Bad row                100.00         100.00",
+    ].join("\n");
+    const [a] = detectStatementTables(doubleSided);
+    expect(() => mapStatementToCanonical(a, { defaultCurrency: "IRR" }))
+      .toThrow(/double-sided-row/);
+
+    const unparseable = [
+      "Date        Description            Debit          Credit",
+      "2024-01-15  Bad amount             abc            0.00",
+    ].join("\n");
+    const [b] = detectStatementTables(unparseable);
+    expect(() => mapStatementToCanonical(b, { defaultCurrency: "IRR" }))
+      .toThrow(/ingestion-table-schema-invalid:debit/);
+  });
+
+  test("parseStatementAmount handles separators, parentheses and Persian digits", () => {
+    expect(parseStatementAmount("1,234,567.89")).toBe(1234567.89);
+    expect(parseStatementAmount("(500)")).toBe(-500);
+    expect(parseStatementAmount("-")).toBe(0);
+    expect(parseStatementAmount("")).toBe(0);
+    expect(parseStatementAmount("۱۲۳۴")).toBe(1234);
+    expect(parseStatementAmount("not-a-number")).toBeNull();
+  });
+
+  test("detectOcrStatementTables rebuilds the grid from single-space OCR output", () => {
+    // Exactly the shape real OCR produces (column gaps collapsed to one space).
+    const ocrText = [
+      "Bank Statement - Account 1234567890 (Currency: IRR)",
+      "",
+      "Date Description Debit Credit Balance",
+      "",
+      "2024-01-15 Opening deposit 0.00 500000.00 500000.00",
+      "2024-01-16 Cash withdrawal 120000.00 0.00 380000.00",
+      "2024-01-17 Customer payment 0.00 250000.00 630000.00",
+    ].join("\n");
+
+    const tables = detectOcrStatementTables(ocrText);
+    expect(tables).toHaveLength(1);
+    expect(tables[0].headers).toEqual(["date", "description", "debit", "credit", "balance"]);
+
+    const transactions = mapStatementToCanonical(tables[0], { defaultCurrency: extractDeclaredCurrency(ocrText) ?? undefined });
+    expect(transactions).toHaveLength(3);
+    expect(transactions[0]).toEqual({
+      date: "2024-01-15",
+      account: "Opening deposit",
+      debit: 0,
+      credit: 500000,
+      currency: "IRR",
+    });
+    expect(transactions[1]).toEqual({
+      date: "2024-01-16",
+      account: "Cash withdrawal",
+      debit: 120000,
+      credit: 0,
+      currency: "IRR",
+    });
+    expect(transactions[2].credit).toBe(250000);
   });
 });
