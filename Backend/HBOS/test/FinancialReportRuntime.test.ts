@@ -129,6 +129,98 @@ describe("financial report ingestion — runtime HTTP", () => {
     expect(body.ingestedSource.document.status).toBe("COMPLETED");
     // assets 1,965,000m IRR and liabilities 820,000m IRR -> debtRatio ~0.4173
     expect(body.metrics.debtRatio).toBeCloseTo(820000 / 1965000, 4);
+    // Profit uses total expenses reconciling to the statement's net profit.
+    expect(body.metrics.profit).toBeCloseTo(220000 * 1_000_000, 0);
+  });
+
+  test("canonical document facts are authoritative over manually supplied balance-sheet values", async () => {
+    const cookie = await register("precedence-owner", "Precedence Org");
+    const bytes = await buildStatementWorkbook();
+    const ingested = await request("/api/ingest", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ sourceName: "statement.xlsx", format: "XLSX", contentBase64: bytes.toString("base64") }),
+    });
+    const sha256 = (await ingested.json()).evidence.sha256;
+
+    const analysis = await request("/api/financial/analyze", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ sourceSha256: sha256, assets: 10000, liabilities: 2500 }),
+    });
+    expect(analysis.status).toBe(200);
+    const body = await analysis.json();
+    expect(body.inputProvenance.assets).toBe("DOCUMENT");
+    expect(body.inputProvenance.liabilities).toBe("DOCUMENT");
+    expect(body.inputProvenance.expenses).toBe("DOCUMENT");
+    // The manual 10000/2500 must NOT force debtRatio = 0.25.
+    expect(body.metrics.debtRatio).toBeCloseTo(820000 / 1965000, 4);
+  });
+
+  test("statement analytics compute available ratios without a blanket 422", async () => {
+    const cookie = await register("insight-owner", "Insight Org");
+    const bytes = await buildStatementWorkbook();
+    const ingested = await request("/api/ingest", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ sourceName: "statement.xlsx", format: "XLSX", contentBase64: bytes.toString("base64") }),
+    });
+    const sha256 = (await ingested.json()).evidence.sha256;
+
+    const insights = await request("/api/financial/insights", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ sourceSha256: sha256 }),
+    });
+    expect(insights.status).toBe(200);
+    const body = await insights.json();
+    expect(body.statementInsight).toBeTruthy();
+    // transactionCount is 0 because this is a statement, not a ledger.
+    expect(body.ingestedSource.transactionCount).toBe(0);
+    expect(body.statementInsight.ratios.netMargin).toBeCloseTo(220000 / 2400000, 8);
+    expect(body.statementInsight.ratios.currentRatio).toBeNull();
+    expect(body.statementInsight.unavailableRatios).toEqual(expect.arrayContaining(["grossMargin", "currentRatio"]));
+    expect(body.statementInsight.comparative.length).toBeGreaterThan(0);
+    expect(body.statementInsight.limitations.length).toBeGreaterThan(0);
+  });
+
+  test("assistant receives the verified statement context and the report carries it", async () => {
+    const cookie = await register("assistant-owner", "Assistant Org");
+    const bytes = await buildStatementWorkbook();
+    const ingested = await request("/api/ingest", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ sourceName: "statement.xlsx", format: "XLSX", contentBase64: bytes.toString("base64") }),
+    });
+    const sha256 = (await ingested.json()).evidence.sha256;
+    await request("/api/financial/analyze", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ sourceSha256: sha256 }),
+    });
+    await request("/api/financial/insights", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ sourceSha256: sha256 }),
+    });
+
+    const answer = await request("/api/assistant", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ question: "What are the main strengths and risks?" }),
+    });
+    expect(answer.status).toBe(200);
+    const answerBody = await answer.json();
+    expect(answerBody.evidence.statementContext).toBe(true);
+    expect(answerBody.evidence.documentStatus).toBeTruthy();
+
+    const report = await request("/api/report", { headers: { cookie } });
+    expect(report.status).toBe(200);
+    const reportBody = await report.json();
+    const reportText = JSON.stringify(reportBody);
+    expect(reportText).toContain("Document status: COMPLETED");
+    expect(reportText).toContain("Reporting periods: 1402 | 1401");
+    expect(reportText).toContain("positive net profit");
   });
 
   test("analysis still requires balance-sheet fields when no facts exist", async () => {

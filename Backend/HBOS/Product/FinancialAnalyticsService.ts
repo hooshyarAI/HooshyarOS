@@ -7,7 +7,7 @@
  * dispatches to the canonical realized owners below and normalizes their
  * deterministic results into one explainable tenant-scoped payload.
  *
- *   - RatioAnalysisService          (vertical / horizontal / profitability / leverage)
+ *   - RatioAnalysisService          (vertical / horizontal / profitability / leverage / liquidity)
  *   - BreakEvenAnalysisService      (break-even, contribution margin, margin of safety)
  *   - CashFlowForecastingService    (naive / moving average / linear trend)
  *   - AnomalyDetectionService       (z-score / IQR / modified z-score)
@@ -38,10 +38,14 @@ export interface FinancialAnalyticsInput {
     readonly tenantId: string;
     /** Ordered period series for cash-flow forecasting and anomaly detection (>= 2 finite points). */
     readonly series?: readonly number[];
-    /** Structured statement for ratio analysis. */
-    readonly statement?: RatioStatement;
-    /** Prior-period statement enables horizontal analysis. */
-    readonly priorStatement?: RatioStatement;
+    /**
+     * Structured statement for ratio analysis. A partial statement is accepted:
+     * each ratio is computed only where its own evidence is present, and the
+     * absent ratios are reported as unavailable rather than fabricated.
+     */
+    readonly statement?: Partial<RatioStatement>;
+    /** Prior-period statement enables horizontal analysis (also partial). */
+    readonly priorStatement?: Partial<RatioStatement>;
     /** Break-even inputs (fixed/variable/price/units). */
     readonly breakEven?: BreakEvenAnalysisInput;
     /** Moving-average window for forecasting; defaults to 3 (clamped to series length). */
@@ -53,6 +57,7 @@ export interface RatioAnalytics {
     readonly horizontal: HorizontalAnalysisResult | null;
     readonly profitability: ReturnType<RatioAnalysisService["profitability"]> | null;
     readonly leverage: ReturnType<RatioAnalysisService["leverage"]> | null;
+    readonly liquidity: ReturnType<RatioAnalysisService["liquidity"]> | null;
 }
 
 export interface ForecastAnalytics {
@@ -110,6 +115,7 @@ export class FinancialAnalyticsService {
                 horizontal: input.priorStatement ? this.ratios.horizontal(input.statement, input.priorStatement) : null,
                 profitability: this.ratios.profitability(input.statement),
                 leverage: this.ratios.leverage(input.statement),
+                liquidity: this.ratios.liquidity(input.statement),
             }
             : null;
 
@@ -162,6 +168,7 @@ export class FinancialAnalyticsService {
             if (ratios.horizontal) statuses.push(ratios.horizontal.status);
             if (ratios.profitability) statuses.push(ratios.profitability.status);
             if (ratios.leverage) statuses.push(ratios.leverage.status);
+            if (ratios.liquidity) statuses.push(ratios.liquidity.status);
         }
         if (breakEven) statuses.push(breakEven.status);
         if (forecast) statuses.push(forecast.naive.status, forecast.movingAverage.status, forecast.linearTrend.status);

@@ -354,18 +354,121 @@ async function finishIngestJob(job, entry) {
     clearPersistedIngestJob();
     return;
   }
+  // Manual balance-sheet values are an explicit fallback only; when the
+  // document carries facts the server ignores them. They are sent only when the
+  // user actually entered a value.
+  const analyzeBody = { sourceSha256: job.result.sha256 };
+  const assetsInput = document.querySelector('#assets').value.trim();
+  const liabilitiesInput = document.querySelector('#liabilities').value.trim();
+  if (assetsInput !== '') analyzeBody.assets = Number(assetsInput);
+  if (liabilitiesInput !== '') analyzeBody.liabilities = Number(liabilitiesInput);
   const analysis = await getJson('/api/financial/analyze', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      sourceSha256: job.result.sha256,
-      assets: Number(entry.assets),
-      liabilities: Number(entry.liabilities)
-    })
+    body: JSON.stringify(analyzeBody)
   });
-  result.textContent = `تحلیل موفق (${job.result.sourceType}): ${Number(job.result.transactionCount).toLocaleString('fa-IR')} تراکنش، سود ${Number(analysis.metrics.profit).toLocaleString('fa-IR')}، نسبت بدهی ${Number(analysis.metrics.debtRatio * 100).toLocaleString('fa-IR')}٪. وضعیت: ${analysis.status}`;
+  const provenance = analysis.inputProvenance || {};
+  const originLabel = value => value === 'DOCUMENT' ? 'از سند' : value === 'LEDGER' ? 'از دفتر معاملات' : 'ورودی دستی';
+  result.textContent = `تحلیل موفق (${job.result.sourceType}): ${Number(job.result.transactionCount).toLocaleString('fa-IR')} تراکنش، سود ${Number(analysis.metrics.profit).toLocaleString('fa-IR')}، نسبت بدهی ${Number(analysis.metrics.debtRatio * 100).toLocaleString('fa-IR')}٪ (دارایی‌ها: ${originLabel(provenance.assets)}، بدهی‌ها: ${originLabel(provenance.liabilities)}). وضعیت: ${analysis.status}`;
   clearPersistedIngestJob();
+  renderStatementInsight(null);
   await refreshDashboard();
+  try {
+    const insights = await getJson('/api/financial/insights', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sourceSha256: job.result.sha256 })
+    });
+    renderStatementInsight(insights.statementInsight || null);
+  } catch (error) {
+    renderStatementInsight({ error: describeFailure(error) });
+  }
+}
+
+function insightList(title, findings) {
+  if (!Array.isArray(findings) || findings.length === 0) return null;
+  const section = document.createElement('section');
+  const heading = document.createElement('h4');
+  heading.textContent = title;
+  section.appendChild(heading);
+  const list = document.createElement('ul');
+  for (const finding of findings) {
+    const item = document.createElement('li');
+    const message = typeof finding === 'string' ? finding : String(finding.message ?? '');
+    const level = typeof finding === 'string' ? null : finding.evidenceLevel;
+    item.textContent = level ? `[${level}] ${message}` : message;
+    list.appendChild(item);
+  }
+  section.appendChild(list);
+  return section;
+}
+
+function ratioLine(label, value) {
+  return `${label}: ${value === null || value === undefined ? 'نامشخص (شواهد ناکافی)' : value}`;
+}
+
+function renderStatementInsight(insight) {
+  const container = document.querySelector('#statement-insight');
+  container.textContent = '';
+  if (!insight) { container.hidden = true; return; }
+  container.hidden = false;
+  if (insight.error) {
+    container.textContent = `تحلیل صورت مالی در دسترس نیست: ${insight.error}`;
+    return;
+  }
+  const summary = document.createElement('h3');
+  summary.textContent = 'تحلیل جامع صورت مالی';
+  container.appendChild(summary);
+
+  const periods = Array.isArray(insight.periods) ? insight.periods.map(p => p.label).join(' | ') : '';
+  const meta = document.createElement('p');
+  meta.textContent = `وضعیت سند: ${insight.documentStatus ?? 'نامشخص'} — دوره‌ها: ${periods || 'نامشخص'}`;
+  container.appendChild(meta);
+
+  const append = section => { if (section) container.appendChild(section); };
+  append(insightList('خلاصه مدیریتی (تفسیر)', insight.interpretation));
+  if (insight.ratios) {
+    const section = document.createElement('section');
+    const heading = document.createElement('h4');
+    heading.textContent = 'نسبت‌های مالی';
+    section.appendChild(heading);
+    const list = document.createElement('ul');
+    for (const line of [
+      ratioLine('حاشیه سود ناخالص', insight.ratios.grossMargin),
+      ratioLine('حاشیه سود عملیاتی', insight.ratios.operatingMargin),
+      ratioLine('حاشیه سود خالص', insight.ratios.netMargin),
+      ratioLine('بازده دارایی (ROA)', insight.ratios.roa),
+      ratioLine('بازده حقوق مالکانه (ROE)', insight.ratios.roe),
+      ratioLine('نسبت جاری', insight.ratios.currentRatio),
+      ratioLine('نسبت آنی', insight.ratios.quickRatio),
+      ratioLine('نسبت نقد', insight.ratios.cashRatio),
+      ratioLine('بدهی به حقوق مالکانه', insight.ratios.debtToEquity),
+      ratioLine('بدهی به دارایی', insight.ratios.debtToAssets),
+      ratioLine('نسبت حقوق مالکانه', insight.ratios.equityRatio)
+    ]) { const item = document.createElement('li'); item.textContent = line; list.appendChild(item); }
+    section.appendChild(list);
+    container.appendChild(section);
+  }
+  append(insightList('نقاط قوت', insight.strengths));
+  append(insightList('نقاط ضعف', insight.weaknesses));
+  append(insightList('ریسک‌ها', insight.risks));
+  append(insightList('فرصت‌ها و رشد', insight.opportunities));
+  append(insightList('اقدامات مدیریتی پیشنهادی', insight.managementActions));
+  append(insightList('محدودیت‌ها و داده‌های نامشخص', insight.limitations));
+  if (Array.isArray(insight.comparative) && insight.comparative.length > 0) {
+    const section = document.createElement('section');
+    const heading = document.createElement('h4');
+    heading.textContent = 'تحلیل مقایسه‌ای دوره‌ها';
+    section.appendChild(heading);
+    const list = document.createElement('ul');
+    for (const entry of insight.comparative) {
+      const item = document.createElement('li');
+      item.textContent = `${entry.line}: تغییر ${entry.absoluteChange} (${(entry.pctChange * 100).toFixed(2)}٪)`;
+      list.appendChild(item);
+    }
+    section.appendChild(list);
+    container.appendChild(section);
+  }
 }
 
 document.querySelector('#analysis-form').addEventListener('submit', async event => {
@@ -384,8 +487,6 @@ document.querySelector('#analysis-form').addEventListener('submit', async event 
       jobId: null,
       sourceName: file.name,
       format,
-      assets: Number(document.querySelector('#assets').value),
-      liabilities: Number(document.querySelector('#liabilities').value),
       createdAt: new Date().toISOString()
     };
     renderIngestJob({ stage: 'RECEIVED', message: INGEST_STAGE_LABELS_FA.RECEIVED, receivedAt: entry.createdAt, progress: null });

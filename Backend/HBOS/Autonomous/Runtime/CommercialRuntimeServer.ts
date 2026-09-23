@@ -10,9 +10,13 @@ import { FinancialDataIngestionAdapter, type FinancialCanonicalModel, type Finan
 import {
     assessStatementAnalysisReadiness,
     deriveAnalysisInput,
-    isCompleteRatioStatement,
+    derivePriorStatement,
     summarizeFinancialDocument,
 } from "../../Product/FinancialDocumentUnderstanding";
+import {
+    composeFinancialStatementInsight,
+    type FinancialStatementInsight,
+} from "../../Product/FinancialStatementInsight";
 import { FinancialIngestionService, IngestionFormat, SUPPORTED_INGESTION_FORMATS } from "../../Product/FinancialIngestionService";
 import { IngestionJobService } from "../../Product/IngestionJobService";
 import { isTerminalIngestionStage } from "../../Product/IngestionProgress";
@@ -117,7 +121,10 @@ const corsHeaders = (origin: string): Record<string, string> => ({
 });
 
 type StoredAnalysis = ReturnType<FinancialStatementAnalysisService["execute"]>;
-type StoredAnalytics = FinancialAnalyticsResult & { readonly source?: FinancialSourceEvidence };
+type StoredAnalytics = FinancialAnalyticsResult & {
+    readonly source?: FinancialSourceEvidence;
+    readonly statementInsight?: FinancialStatementInsight;
+};
 type ExecutiveTargets = ExecutiveIntelligenceWorkbenchInput["targets"];
 
 const send = (res: ServerResponse, status: number, contentType: string, body: string | Buffer, headers: Record<string, string> = {}) => {
@@ -492,6 +499,58 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     };
 
     /**
+     * Grounded statement insight for a tenant-scoped canonical source. Reuses
+     * `deriveAnalysisInput`/`derivePriorStatement` (canonical facts) and the
+     * persisted analytics result (existing ratio analytics) so the report,
+     * assistant and insights endpoints share one composition.
+     */
+    const loadStatementInsight = async (
+        tenantId: string,
+        sha256: string | undefined,
+        analytics?: FinancialAnalyticsResult,
+    ): Promise<FinancialStatementInsight | undefined> => {
+        if (!sha256) return undefined;
+        const model = await loadIngestedModel(tenantId, sha256);
+        if (!model?.document) return undefined;
+        const derived = deriveAnalysisInput(model.document);
+        const prior = derivePriorStatement(model.document);
+        return composeFinancialStatementInsight({
+            document: model.document,
+            derived,
+            prior,
+            analytics: analytics ?? await loadAnalytics(tenantId),
+        });
+    };
+
+    const describeStatementContext = (insight: FinancialStatementInsight): string[] => {
+        const lines: string[] = [
+            "Verified statement context:",
+            `DocumentStatus=${insight.documentStatus}`,
+            `Currency=${insight.currency ?? "unavailable"}`,
+            `Periods=${insight.periods.map((period) => period.label).join(" | ") || "unavailable"}`,
+        ];
+        const metricParts = Object.entries(insight.metrics)
+            .filter(([, value]) => value !== null)
+            .map(([key, value]) => `${key}=${value}`);
+        lines.push(`FactsAndDerivedMetrics=${metricParts.join(", ") || "unavailable"}`);
+        const ratioParts = Object.entries(insight.ratios)
+            .filter(([key, value]) => key !== "unavailable" && value !== null)
+            .map(([key, value]) => `${key}=${value}`);
+        lines.push(`Ratios=${ratioParts.join(", ") || "unavailable"}`);
+        if (insight.unavailableRatios.length > 0) lines.push(`UnavailableRatios=${insight.unavailableRatios.join(", ")}`);
+        if (insight.comparative.length > 0) {
+            lines.push(`ComparativeChanges=${insight.comparative.map((entry) => `${entry.line}:${entry.absoluteChange}(${entry.pctChange})`).join(", ")}`);
+        }
+        if (insight.strengths.length > 0) lines.push(`Strengths=${insight.strengths.map((item) => item.message).join(" | ")}`);
+        if (insight.weaknesses.length > 0) lines.push(`Weaknesses=${insight.weaknesses.map((item) => item.message).join(" | ")}`);
+        if (insight.risks.length > 0) lines.push(`Risks=${insight.risks.map((item) => item.message).join(" | ")}`);
+        if (insight.opportunities.length > 0) lines.push(`Opportunities=${insight.opportunities.map((item) => item.message).join(" | ")}`);
+        if (insight.managementActions.length > 0) lines.push(`ManagementActions=${insight.managementActions.map((item) => item.message).join(" | ")}`);
+        if (insight.limitations.length > 0) lines.push(`Limitations=${insight.limitations.join(" | ")}`);
+        return lines;
+    };
+
+    /**
      * Single source of truth for report content. The canonical `ReportsEngine`
      * remains the report owner; this composes the already-persisted, verified
      * tenant-scoped results into structured sections that both the JSON report
@@ -502,6 +561,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
         result: StoredAnalysis,
         workbench: ExecutiveIntelligenceWorkbenchResult | undefined,
         analytics: StoredAnalytics | undefined,
+        insight?: FinancialStatementInsight,
     ): ReportSection[] => {
         const sections: ReportSection[] = [
             { heading: "Overview", lines: [`Tenant: ${session.tenantId}`, `Source: ${result.source.sourceName}`] },
@@ -516,6 +576,32 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
             },
             { heading: "Observations", lines: [`Observations: ${result.observations.map((item) => item.message).join(" | ")}`] },
         ];
+        if (insight) {
+            const metricLines = Object.entries(insight.metrics)
+                .filter(([, value]) => value !== null)
+                .map(([key, value]) => `${key}: ${value}`);
+            sections.push({
+                heading: "Extracted statement facts",
+                lines: [
+                    `Document status: ${insight.documentStatus}`,
+                    `Reporting periods: ${insight.periods.map((period) => period.label).join(" | ") || "unavailable"}`,
+                    ...metricLines,
+                ],
+            });
+            const buildFindingLines = (label: string, findings: readonly { message: string }[]): void => {
+                if (findings.length === 0) return;
+                sections.push({ heading: label, lines: findings.map((finding) => finding.message) });
+            };
+            buildFindingLines("Interpretation", insight.interpretation);
+            buildFindingLines("Strengths", insight.strengths);
+            buildFindingLines("Weaknesses", insight.weaknesses);
+            buildFindingLines("Risks", insight.risks);
+            buildFindingLines("Opportunities", insight.opportunities);
+            buildFindingLines("Management actions", insight.managementActions);
+            if (insight.limitations.length > 0) {
+                sections.push({ heading: "Data limitations", lines: insight.limitations });
+            }
+        }
         if (workbench) {
             sections.push({ heading: "Recommendations", lines: [`Recommendations: ${workbench.recommendations.map((item) => item.action).join(" | ")}`] });
         }
@@ -945,15 +1031,32 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 }
                 const suppliedAssets = body.assets === undefined ? undefined : Number(body.assets);
                 const suppliedLiabilities = body.liabilities === undefined ? undefined : Number(body.liabilities);
-                const assets = suppliedAssets !== undefined ? suppliedAssets : derived?.assets;
-                const liabilities = suppliedLiabilities !== undefined ? suppliedLiabilities : derived?.liabilities;
+                // Canonical document facts are authoritative. A manually supplied
+                // balance-sheet value is only an explicit fallback for a source
+                // whose evidence is genuinely absent (for example a real ledger).
+                const documentAssets = derived && typeof derived.statement.totalAssets === "number"
+                    ? derived.statement.totalAssets
+                    : undefined;
+                const documentLiabilities = derived && typeof derived.statement.totalLiabilities === "number"
+                    ? derived.statement.totalLiabilities
+                    : undefined;
+                const documentRevenue = derived && typeof derived.statement.revenue === "number"
+                    ? derived.statement.revenue
+                    : undefined;
+                const documentExpenses = derived
+                    ? (derived.analysisExpenses !== null
+                        ? derived.analysisExpenses
+                        : (!derived.missingMeasures.includes("EXPENSES") ? derived.expenses : undefined))
+                    : undefined;
+                const assets = documentAssets !== undefined ? documentAssets : suppliedAssets;
+                const liabilities = documentLiabilities !== undefined ? documentLiabilities : suppliedLiabilities;
                 if (assets === undefined || liabilities === undefined) {
                     return corsJson(400, { error: "BALANCE_SHEET_FIELDS_REQUIRED" });
                 }
                 const result = analysis.execute({
                     tenantId: session.tenantId,
-                    revenue: derived && !derived.missingMeasures.includes("REVENUE") ? derived.revenue : model.totals.credit,
-                    expenses: derived && !derived.missingMeasures.includes("EXPENSES") ? derived.expenses : model.totals.debit,
+                    revenue: documentRevenue !== undefined ? documentRevenue : model.totals.credit,
+                    expenses: documentExpenses !== undefined ? documentExpenses : model.totals.debit,
                     assets,
                     liabilities,
                     source: model.source,
@@ -972,6 +1075,13 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 return corsJson(200, {
                     ...result,
                     ingestedSource: ingestedSourceSummary,
+                    inputProvenance: {
+                        revenue: documentRevenue !== undefined ? "DOCUMENT" : "LEDGER",
+                        expenses: documentExpenses !== undefined ? "DOCUMENT" : "LEDGER",
+                        assets: documentAssets !== undefined ? "DOCUMENT" : "MANUAL",
+                        liabilities: documentLiabilities !== undefined ? "DOCUMENT" : "MANUAL",
+                    },
+                    ...(derived ? { statement: derived.statement, missingMeasures: derived.missingMeasures } : {}),
                 });
             }
 
@@ -1173,12 +1283,16 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 let ingestedSource: { sha256: string; sourceName: string; sourceType: string; transactionCount: number; document?: ReturnType<typeof summarizeFinancialDocument> } | undefined;
                 let series = Array.isArray(body.series) ? (body.series as number[]) : undefined;
                 let statement = body.statement as FinancialAnalyticsInput["statement"];
+                let priorStatement = body.priorStatement as FinancialAnalyticsInput["priorStatement"];
+                let documentInsight: FinancialStatementInsight | undefined;
+                let documentModel: FinancialCanonicalModel | undefined;
 
                 if (body.sourceSha256 !== undefined) {
                     const sourceSha256 = String(body.sourceSha256).trim().toLowerCase();
                     if (!/^[a-f0-9]{64}$/.test(sourceSha256)) return corsJson(400, { error: "SOURCE_SHA256_INVALID" });
                     const model = await loadIngestedModel(session.tenantId, sourceSha256);
                     if (!model) return corsJson(422, { error: "INGESTED_SOURCE_REQUIRED" });
+                    documentModel = model;
                     sourceEvidence = model.source;
                     ingestedSource = {
                         sha256: sourceSha256,
@@ -1188,11 +1302,15 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                         ...(model.document ? { document: summarizeFinancialDocument(model.document) } : {})
                     };
                     if (!series) series = model.transactions.map((transaction) => transaction.credit - transaction.debit);
-                    if (!statement && model.document) {
-                        const derived = deriveAnalysisInput(model.document).statement;
-                        // Only a complete statement can feed the existing ratio
-                        // analytics; a partial derivation stays BLOCKED honestly.
-                        if (isCompleteRatioStatement(derived)) statement = derived as FinancialAnalyticsInput["statement"];
+                    if (model.document) {
+                        const derived = deriveAnalysisInput(model.document);
+                        if (!statement) statement = derived.statement as FinancialAnalyticsInput["statement"];
+                        if (!priorStatement) {
+                            const prior = derivePriorStatement(model.document);
+                            if (Object.keys(prior).length > 0) {
+                                priorStatement = prior as FinancialAnalyticsInput["priorStatement"];
+                            }
+                        }
                     }
                 }
 
@@ -1200,13 +1318,29 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                     tenantId: session.tenantId,
                     series,
                     statement,
-                    priorStatement: body.priorStatement as FinancialAnalyticsInput["priorStatement"],
+                    priorStatement,
                     breakEven: body.breakEven as FinancialAnalyticsInput["breakEven"],
                     movingAverageWindow: body.movingAverageWindow === undefined ? undefined : Number(body.movingAverageWindow)
                 });
-                if (result.status !== "READY") return corsJson(422, result);
 
-                const record: StoredAnalytics = sourceEvidence ? { ...result, source: sourceEvidence } : result;
+                // A canonical statement source is analyzable even when some
+                // optional ratios lack evidence: the per-section statuses and the
+                // `unavailable` lists carry the truth instead of a blanket 422.
+                if (documentModel?.document) {
+                    documentInsight = composeFinancialStatementInsight({
+                        document: documentModel.document,
+                        derived: deriveAnalysisInput(documentModel.document),
+                        prior: derivePriorStatement(documentModel.document),
+                        analytics: result,
+                    });
+                }
+                if (result.status !== "READY" && !documentInsight) return corsJson(422, result);
+
+                const record: StoredAnalytics = {
+                    ...result,
+                    ...(sourceEvidence ? { source: sourceEvidence } : {}),
+                    ...(documentInsight ? { statementInsight: documentInsight } : {}),
+                };
                 await persistence.write({ tenantId: session.tenantId }, LATEST_ANALYTICS_KEY, record);
                 latestAnalyticsResults.set(session.tenantId, record);
                 return corsJson(200, ingestedSource ? { ...record, ingestedSource } : record);
@@ -1479,7 +1613,9 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 if (!result) return corsJson(422, { error: "REPORT_ANALYSIS_REQUIRED" });
                 const workbench = await loadWorkbench(session.tenantId);
                 const analytics = await loadAnalytics(session.tenantId);
-                const flatSections = buildReportSections(session, result, workbench, analytics).flatMap((section) => section.lines);
+                const insight = analytics?.statementInsight
+                    ?? await loadStatementInsight(session.tenantId, result.source.sha256, analytics);
+                const flatSections = buildReportSections(session, result, workbench, analytics, insight).flatMap((section) => section.lines);
                 const report = reports.build("HooshyarOS Financial and Executive Report", flatSections);
                 return corsJson(report.status === "READY" ? 200 : 422, { ...report, tenantId: session.tenantId, source: result.source });
             }
@@ -1496,10 +1632,12 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                     if (!result) return { status: 422, payload: { error: "REPORT_ANALYSIS_REQUIRED" } };
                     const workbench = await loadWorkbench(session.tenantId);
                     const analytics = await loadAnalytics(session.tenantId);
+                    const insight = analytics?.statementInsight
+                        ?? await loadStatementInsight(session.tenantId, result.source.sha256, analytics);
                     const exported = await reportExport.generate({
                         tenantId: session.tenantId,
                         title: "HooshyarOS Financial and Executive Report",
-                        sections: buildReportSections(session, result, workbench, analytics),
+                        sections: buildReportSections(session, result, workbench, analytics, insight),
                         format: format as ReportFormat,
                         metadata: {
                             "Source": result.source.sourceName,
@@ -1558,8 +1696,14 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const result = await loadAnalysis(session.tenantId);
                 if (!result) return corsJson(422, { error: "ASSISTANT_ANALYSIS_REQUIRED" });
                 const workbench = await loadWorkbench(session.tenantId);
+                const analytics = await loadAnalytics(session.tenantId);
+                const insight = analytics?.statementInsight
+                    ?? await loadStatementInsight(session.tenantId, result.source.sha256, analytics);
+                const statementContext = insight ? describeStatementContext(insight) : [];
                 const context = [
                     `Answer using only verified persisted context for tenant ${session.tenantId}.`,
+                    "Separate extracted facts, derived metrics, interpretation and management recommendations.",
+                    "If a value or period is absent from the context, say the evidence is unavailable; never invent it.",
                     `Question: ${question}`,
                     `Revenue=${result.metrics.revenue}`,
                     `Profit=${result.metrics.profit}`,
@@ -1567,10 +1711,22 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                     `DebtRatio=${result.metrics.debtRatio}`,
                     `Observations=${result.observations.map((item) => item.message).join(" | ")}`,
                     workbench ? `Recommendations=${workbench.recommendations.map((item) => item.action).join(" | ")}` : "No executive workbench result is available yet.",
+                    ...statementContext,
                 ].join(" | ");
                 const answer = reasoning.reason(context);
                 if (!answer.success) return corsJson(503, { error: "ASSISTANT_REASONING_UNAVAILABLE" });
-                return corsJson(200, { status: "READY", tenantId: session.tenantId, question, answer: answer.answer ?? answer.status, evidence: { analysisSource: result.source, executiveWorkbench: Boolean(workbench) } });
+                return corsJson(200, {
+                    status: "READY",
+                    tenantId: session.tenantId,
+                    question,
+                    answer: answer.answer ?? answer.status,
+                    evidence: {
+                        analysisSource: result.source,
+                        executiveWorkbench: Boolean(workbench),
+                        statementContext: Boolean(insight),
+                        ...(insight ? { documentStatus: insight.documentStatus, periods: insight.periods } : {}),
+                    },
+                });
             }
 
             if (req.method === "GET" && path === "/api/dashboard") {

@@ -9,6 +9,7 @@
 import {
   buildFinancialDocumentUnderstanding,
   deriveAnalysisInput,
+  derivePriorStatement,
   detectStatementUnit,
   matchFinancialSectionHeading,
   matchStatementMeasure,
@@ -251,6 +252,23 @@ describe("derivation into the existing analysis/analytics owners", () => {
     expect(derived.expenses).toBe(430_000 * 1_000_000);
     expect(derived.statement.totalAssets).toBe(1_965_000 * 1_000_000);
     expect(derived.statement.netIncome).toBe(220_000 * 1_000_000);
+    // Total expenses reconcile revenue to the statement's net profit, so the
+    // analysis contract's profit = revenue - expenses equals the real profit.
+    expect(derived.analysisExpenses).toBe((2_400_000 - 220_000) * 1_000_000);
+  });
+
+  test("derives the prior-period statement for horizontal analysis", () => {
+    const prior = derivePriorStatement(reportDocument());
+    expect(prior.revenue).toBe(2_100_000 * 1_000_000);
+    expect(prior.netIncome).toBe(170_000 * 1_000_000);
+    expect(prior.totalAssets).toBe(1_798_000 * 1_000_000);
+  });
+
+  test("reports no prior period instead of inventing one", () => {
+    const document = buildFinancialDocumentUnderstanding([
+      { name: "ترازنامه", rows: [["شرح", "1402"], ["جمع دارایی‌ها", "100"]], positioned: true },
+    ]);
+    expect(derivePriorStatement(document)).toEqual({});
   });
 
   test("reports absent measures instead of inventing values", () => {

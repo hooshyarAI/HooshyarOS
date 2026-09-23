@@ -64,4 +64,67 @@ describe("RatioAnalysisService", () => {
         expect(result.status).toBe("READY");
         expect(result.debtToEquity).toBeCloseTo(0.6667, 3);
     });
+
+    test("liquidity computes the current ratio and marks quick/cash unavailable without evidence", () => {
+        const result = service.liquidity(statement);
+        expect(result.status).toBe("READY");
+        expect(result.currentRatio).toBeCloseTo(350 / 130, 6);
+        expect(result.quickRatio).toBeCloseTo((350 - 100) / 130, 6);
+        expect(result.cashRatio).toBeCloseTo(100 / 130, 6);
+        expect(result.unavailable).toEqual([]);
+    });
+
+    test("computes the ratios a partial statement actually supports", () => {
+        const partial = {
+            revenue: 1000,
+            grossProfit: 400,
+            netIncome: 150,
+            currentAssets: 450,
+            totalAssets: 1000,
+            currentLiabilities: 200,
+            totalLiabilities: 400,
+            equity: 600,
+        };
+        const profitability = service.profitability(partial);
+        expect(profitability.status).toBe("READY");
+        expect(profitability.grossMargin).toBeCloseTo(0.4, 6);
+        expect(profitability.netMargin).toBeCloseTo(0.15, 6);
+        expect(profitability.roe).toBeCloseTo(0.25, 6);
+        expect(profitability.operatingMargin).toBeNull();
+        expect(profitability.unavailable).toContain("operatingMargin");
+
+        const leverage = service.leverage(partial);
+        expect(leverage.status).toBe("READY");
+        expect(leverage.debtToAssets).toBeCloseTo(0.4, 6);
+        expect(leverage.equityRatio).toBeCloseTo(0.6, 6);
+
+        const liquidity = service.liquidity(partial);
+        expect(liquidity.status).toBe("READY");
+        expect(liquidity.currentRatio).toBeCloseTo(2.25, 6);
+        expect(liquidity.quickRatio).toBeNull();
+        expect(liquidity.cashRatio).toBeNull();
+        expect(liquidity.unavailable).toEqual(expect.arrayContaining(["quickRatio", "cashRatio"]));
+
+        const vertical = service.vertical(partial, "revenue");
+        expect(vertical.status).toBe("READY");
+        expect(vertical.rows.map((row) => row.line)).not.toContain("cogs");
+        expect(vertical.rows.map((row) => row.line)).toContain("grossProfit");
+        expect(vertical.unavailable).toContain("cogs");
+    });
+
+    test("a missing ratio is unavailable, never a fabricated zero", () => {
+        const result = service.profitability({ revenue: 1000 });
+        expect(result.status).toBe("BLOCKED");
+        expect(result.grossMargin).toBeNull();
+        expect(result.netMargin).toBeNull();
+        expect(result.unavailable).toEqual(
+            expect.arrayContaining(["grossMargin", "operatingMargin", "netMargin", "roa", "roe"]),
+        );
+    });
+
+    test("an explicitly invalid value still fails the whole method closed", () => {
+        const result = service.profitability({ revenue: 1000, netIncome: -1 });
+        expect(result.status).toBe("BLOCKED");
+        expect(result.netMargin).toBeNull();
+    });
 });

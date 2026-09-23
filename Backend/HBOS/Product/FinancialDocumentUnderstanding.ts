@@ -845,7 +845,18 @@ export function buildFinancialDocumentUnderstanding(blocks: ReadonlyArray<Docume
 
 export interface DerivedAnalysisInput {
   readonly revenue: number;
+  /**
+   * Operating-type expenses (EXPENSES, else OPERATING_EXPENSES) used by the
+   * vertical analysis. Kept unchanged for backward compatibility.
+   */
   readonly expenses: number;
+  /**
+   * Total expenses that reconcile revenue to net profit (`revenue - netProfit`)
+   * when both are evidence-backed, so the existing analysis contract's
+   * `profit = revenue - expenses` equals the statement's real net profit.
+   * Null when the statement's net profit or revenue evidence is absent.
+   */
+  readonly analysisExpenses: number | null;
   readonly assets: number;
   readonly liabilities: number;
   readonly equity: number;
@@ -855,12 +866,22 @@ export interface DerivedAnalysisInput {
   readonly missingMeasures: ReadonlyArray<StatementMeasure>;
 }
 
-function latestValue(facts: ReadonlyArray<FinancialStatementFact>, measure: StatementMeasure): number | null {
+function valueAtPeriod(
+  facts: ReadonlyArray<FinancialStatementFact>,
+  measure: StatementMeasure,
+  periodIndex: number,
+): number | null {
   const matches = facts.filter((fact) => fact.measure === measure);
   if (matches.length === 0) return null;
-  // Period index 0 is the current period in every supported layout.
-  const current = matches.find((fact) => fact.periodIndex === 0);
-  return (current ?? matches[0]).value;
+  const atPeriod = matches.find((fact) => fact.periodIndex === periodIndex);
+  if (atPeriod) return atPeriod.value;
+  // Period index 0 is the current period in every supported layout; only the
+  // current period may fall back to the first extracted value.
+  return periodIndex === 0 ? matches[0].value : null;
+}
+
+function latestValue(facts: ReadonlyArray<FinancialStatementFact>, measure: StatementMeasure): number | null {
+  return valueAtPeriod(facts, measure, 0);
 }
 
 /**
@@ -871,6 +892,35 @@ function latestValue(facts: ReadonlyArray<FinancialStatementFact>, measure: Stat
  */
 function costMagnitude(value: number | null): number | null {
   return value === null ? null : Math.abs(value);
+}
+
+/**
+ * Build the existing ratio-statement view for one reporting period from
+ * canonical facts. Only measures actually extracted for that period are set;
+ * nothing is padded with fabricated zeros.
+ */
+function statementForPeriod(
+  facts: ReadonlyArray<FinancialStatementFact>,
+  periodIndex: number,
+): Partial<RatioStatement> {
+  const statement: Partial<RatioStatement> = {};
+  const set = (field: keyof RatioStatement, measure: StatementMeasure, magnitude = false): void => {
+    const value = valueAtPeriod(facts, measure, periodIndex);
+    const normalized = magnitude ? costMagnitude(value) : value;
+    if (normalized !== null) (statement as Record<string, number>)[field] = normalized;
+  };
+  set("revenue", "REVENUE");
+  set("cogs", "COGS", true);
+  set("grossProfit", "GROSS_PROFIT");
+  set("operatingExpenses", "OPERATING_EXPENSES", true);
+  set("operatingIncome", "OPERATING_PROFIT");
+  set("netIncome", "NET_PROFIT");
+  set("currentAssets", "CURRENT_ASSETS");
+  set("totalAssets", "ASSETS");
+  set("currentLiabilities", "CURRENT_LIABILITIES");
+  set("totalLiabilities", "LIABILITIES");
+  set("equity", "EQUITY");
+  return statement;
 }
 
 /**
@@ -886,27 +936,12 @@ export function deriveAnalysisInput(document: FinancialDocumentUnderstanding): D
   const revenue = latestValue(facts, "REVENUE");
   const expenses = costMagnitude(latestValue(facts, "EXPENSES") ?? latestValue(facts, "OPERATING_EXPENSES"));
   const netProfit = latestValue(facts, "NET_PROFIT");
-  const grossProfit = latestValue(facts, "GROSS_PROFIT");
-  const operatingProfit = latestValue(facts, "OPERATING_PROFIT");
-  const cogs = costMagnitude(latestValue(facts, "COGS"));
-  const currentAssets = latestValue(facts, "CURRENT_ASSETS");
-  const currentLiabilities = latestValue(facts, "CURRENT_LIABILITIES");
-  const operatingCashFlow = latestValue(facts, "OPERATING_CASH_FLOW");
-  const investingCashFlow = latestValue(facts, "INVESTING_CASH_FLOW");
-  const financingCashFlow = latestValue(facts, "FINANCING_CASH_FLOW");
 
-  const statement: Partial<RatioStatement> = {};
-  if (revenue !== null) statement.revenue = revenue;
-  if (cogs !== null) statement.cogs = cogs;
-  if (grossProfit !== null) statement.grossProfit = grossProfit;
-  if (expenses !== null) statement.operatingExpenses = expenses;
-  if (operatingProfit !== null) statement.operatingIncome = operatingProfit;
-  if (netProfit !== null) statement.netIncome = netProfit;
-  if (currentAssets !== null) statement.currentAssets = currentAssets;
-  if (assets !== null) statement.totalAssets = assets;
-  if (currentLiabilities !== null) statement.currentLiabilities = currentLiabilities;
-  if (liabilities !== null) statement.totalLiabilities = liabilities;
-  if (equity !== null) statement.equity = equity;
+  const statement = statementForPeriod(facts, 0);
+
+  const analysisExpenses = revenue !== null && netProfit !== null && revenue - netProfit >= 0
+    ? revenue - netProfit
+    : null;
 
   const missing: StatementMeasure[] = [];
   if (assets === null) missing.push("ASSETS");
@@ -917,12 +952,23 @@ export function deriveAnalysisInput(document: FinancialDocumentUnderstanding): D
   return {
     revenue: revenue ?? 0,
     expenses: expenses ?? 0,
+    analysisExpenses,
     assets: assets ?? 0,
     liabilities: liabilities ?? 0,
     equity: equity ?? 0,
     statement,
     missingMeasures: missing,
   };
+}
+
+/**
+ * Derive the prior-period statement (period index 1) for horizontal analysis.
+ * Returns an empty object when no prior-period evidence exists, so the existing
+ * `RatioAnalysisService.horizontal` reports BLOCKED rather than comparing
+ * against fabricated values.
+ */
+export function derivePriorStatement(document: FinancialDocumentUnderstanding): Partial<RatioStatement> {
+  return statementForPeriod(document.facts, 1);
 }
 
 /**
@@ -1045,9 +1091,12 @@ const RATIO_STATEMENT_FIELDS: ReadonlyArray<keyof RatioStatement> = [
 ];
 
 /**
- * True only when every ratio-statement field was actually derived from evidence.
- * The existing ratio analytics requires the complete statement, so a partial
- * derivation must stay BLOCKED rather than be padded with fabricated zeros.
+ * Informational predicate: true only when every ratio-statement field was
+ * actually derived from evidence. It is retained for callers that want to know
+ * whether the derivation is complete, but it is NOT an analytics gate: the
+ * existing ratio analytics computes each ratio from the evidence it has and
+ * reports the rest as unavailable, so a partial statement is analyzed honestly
+ * instead of being blocked as a whole.
  */
 export function isCompleteRatioStatement(statement: Partial<RatioStatement>): boolean {
   return RATIO_STATEMENT_FIELDS.every(
