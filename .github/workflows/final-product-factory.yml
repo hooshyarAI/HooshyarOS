@@ -135,6 +135,14 @@ jobs:
           path: .hooshyar/android-acceptance-success.json
           if-no-files-found: warn
           retention-days: 14
+      - name: Publish installable Android APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hooshyar-android-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
 
   full-qualification:
     runs-on: ubuntu-latest
