@@ -1,11 +1,11 @@
 import { createCommercialRuntimeServer } from "./CommercialRuntimeServer";
 import { RuntimeDependencyProbe } from "./RuntimeDependencyProbe";
 
-const host = process.env.HOOSHYAR_HOST ?? "127.0.0.1";
-const port = Number(process.env.HOOSHYAR_PORT ?? "4173");
+const host = process.env.HOOSHYAR_HOST ?? "0.0.0.0";
+const port = Number(process.env.HOOSHYAR_PORT ?? process.env.PORT ?? "4173");
 
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new Error(`Invalid HOOSHYAR_PORT: ${process.env.HOOSHYAR_PORT ?? ""}`);
+    throw new Error(`Invalid runtime port: ${process.env.HOOSHYAR_PORT ?? process.env.PORT ?? ""}`);
 }
 
 const server = createCommercialRuntimeServer();
