@@ -70,4 +70,15 @@ describe("CommercialRuntimeServer security headers", () => {
         const res = await request(server, "OPTIONS", "/api/analyze");
         expect(res.headers["access-control-allow-origin"]).toBe("http://localhost:3000");
     });
+
+    it("denies unauthenticated API access with 401", async () => {
+        const server = await start();
+        (globalThis as unknown as { __crsServers?: http.Server[] }).__crsServers = [server];
+        const dashboard = await request(server, "GET", "/api/dashboard");
+        expect(dashboard.status).toBe(401);
+        const analyze = await request(server, "POST", "/api/analyze");
+        expect(analyze.status).toBe(401);
+        const reportExport = await request(server, "POST", "/api/report/export");
+        expect(reportExport.status).toBe(401);
+    });
 });

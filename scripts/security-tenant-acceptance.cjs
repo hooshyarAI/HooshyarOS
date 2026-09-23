@@ -19,9 +19,12 @@ function gitCommit() {
   return execFileSync(git, ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
 }
 
-async function waitHealth() {
+async function waitHealth(child) {
   const deadline = Date.now() + 30000;
   while (Date.now() < deadline) {
+    if (child.spawnError) throw new Error(`SECURITY_ACCEPTANCE_RUNTIME_SPAWN_ERROR:${child.spawnError.message}`);
+    if (child.exitCode !== null) throw new Error(`SECURITY_ACCEPTANCE_RUNTIME_EXITED_EARLY:code=${child.exitCode}`);
+    if (child.signalCode) throw new Error(`SECURITY_ACCEPTANCE_RUNTIME_SIGNALED_EARLY:${child.signalCode}`);
     try {
       const response = await fetch(`http://127.0.0.1:${port}/health`);
       if (response.ok && (await response.json()).status === 'ok') return;
@@ -40,13 +43,16 @@ async function request(pathname, options = {}) {
 }
 
 function startRuntime() {
-  return spawn(node, [tsxCli, runtimeEntrypoint], {
+  const child = spawn(node, [tsxCli, runtimeEntrypoint], {
     cwd: root,
-    stdio: 'inherit',
+    stdio: ['ignore', 'inherit', 'inherit'],
     shell: false,
     windowsHide: true,
     env: { ...process.env, HOOSHYAR_HOST: '127.0.0.1', HOOSHYAR_PORT: String(port), HOOSHYAR_DB_PATH: db }
   });
+  child.spawnError = null;
+  child.on('error', (error) => { child.spawnError = error; });
+  return child;
 }
 
 async function stopRuntime(child) {
@@ -62,9 +68,12 @@ async function main() {
   fs.mkdirSync(evidenceDir, { recursive: true });
   try { fs.rmSync(evidencePath, { force: true }); } catch {}
   fs.mkdirSync(path.dirname(db), { recursive: true });
+  try { fs.rmSync(db, { force: true }); } catch {}
+  if (!fs.existsSync(tsxCli)) throw new Error(`SECURITY_ACCEPTANCE_LAUNCHER_MISSING:${tsxCli}`);
+  if (!fs.existsSync(runtimeEntrypoint)) throw new Error(`SECURITY_ACCEPTANCE_ENTRYPOINT_MISSING:${runtimeEntrypoint}`);
   const child = startRuntime();
   try {
-    await waitHealth();
+    await waitHealth(child);
 
     const unauthDashboard = await request('/api/dashboard');
     const unauthAnalyze = await request('/api/analyze', {
@@ -196,6 +205,6 @@ async function main() {
 
 main().catch((error) => {
   try { fs.rmSync(evidencePath, { force: true }); } catch {}
-  console.error(JSON.stringify({ type: 'SECURITY_TENANT_ACCEPTANCE', status: 'BLOCKED', error: error.message }, null, 2));
+  console.error(JSON.stringify({ type: 'SECURITY_TENANT_ACCEPTANCE', status: 'BLOCKED', error: error.message, platform: process.platform, node: process.version }, null, 2));
   process.exitCode = 1;
 });
