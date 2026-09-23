@@ -337,11 +337,34 @@ Then improve before implementation.
 
 ## Innovation Rule
 
-Do not imitate existing software.
+Innovate through principles, never by rebuilding a proven capability.
 
-Extract principles.
+Before writing native code for any commodity capability, apply the canonical
+reuse order — INDUSTRY_STANDARD → MATURE_LIBRARY → INTERNAL_CAPABILITY →
+ADAPTER_PROVIDER → NATIVE_IMPLEMENTATION — governed by
+`Docs/HOOSHYAROS_CAPABILITY_PROVIDER_LEVERAGE_LAW.md` and enforced by
+`Backend/HBOS/Product/CapabilityProviderRegistry.ts`.
 
-Rebuild better.
+- A recognized industry standard, platform built-in or proven method is the
+  first choice; "standard" does not mean a third-party library.
+- An external capability is admissible only as the governed class: free +
+  open source + licensed for commercial use + self-hosted/offline suitable
+  where required.
+- When a standard, an admitted provider or a canonical HooshyarOS owner
+  satisfies the requirement, use or adapt it through the correct adapter
+  boundary instead of building an equivalent.
+- Rebuild natively only with recorded evidence that every earlier tier is
+  unavailable, unsuitable, unsafe, non-compliant, too weak for the contract
+  or operationally unacceptable, or that the capability is a genuine
+  HooshyarOS differentiator. "We can code it ourselves" is never sufficient.
+- Providers support but never own: HooshyarOS keeps its canonical models,
+  contracts, provenance, tenant boundaries, identity, security, audit,
+  governance and intelligence.
+- For genuinely new capability, do not imitate existing software; extract
+  principles and build the better solution.
+
+This rule creates no new law, engine, registry or subsystem and does not
+mutate Architecture Freeze V4/V4.1.
 
 ---
 

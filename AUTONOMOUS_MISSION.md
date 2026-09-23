@@ -14,7 +14,7 @@ Operating rules:
 
 1. Respect Architecture Freeze V4.
 2. Never redesign the canonical architecture.
-3. Never duplicate existing engines.
+3. Never duplicate existing engines, canonical owners or admitted providers; reuse a recognized standard, a mature admissible free/open-source capability or an existing HooshyarOS owner before any native rebuild (governed by `Docs/HOOSHYAROS_CAPABILITY_PROVIDER_LEVERAGE_LAW.md`).
 4. Audit before implementation.
 5. Implement only genuinely missing capabilities.
 6. One capability = one coherent implementation.
