@@ -24,6 +24,10 @@
  */
 import {
   extractDeclaredCurrency,
+  isChangeColumnHeader,
+  isStatementPeriodHeader,
+  isYearHeaderCell,
+  normalizePersianLetters,
   parseStatementAmount,
   toAsciiDigits,
 } from "./DocumentTableExtractor";
@@ -156,6 +160,10 @@ export const FINANCIAL_DOCUMENT_ERROR_CODES = {
   AMBIGUOUS_TABLE: "financial-report-ambiguous-table",
   PARTIAL_SUCCESS: "financial-report-partial-success",
   SPREADSHEET_STATEMENT_AMBIGUOUS: "spreadsheet-statement-ambiguous",
+  /** A `.xls`/`.xlsx` whose real content is HTML, not OLE2/BIFF or OOXML. */
+  SPREADSHEET_HTML_CONTENT_DETECTED: "spreadsheet-html-content-detected",
+  /** HTML content detected in a spreadsheet file that yields no valid financial table. */
+  SPREADSHEET_HTML_CONTENT_UNSUPPORTED: "spreadsheet-html-content-unsupported",
 } as const;
 
 /* ------------------------------------------------------------------------- *
@@ -210,16 +218,16 @@ const MEASURE_ALIASES = buildAliasMap([
   ["NON_CURRENT_LIABILITIES", ["جمع بدهی‌های غیرجاری", "بدهی‌های غیرجاری", "total non-current liabilities", "non-current liabilities"]],
   ["EQUITY", ["جمع حقوق مالکانه", "حقوق مالکانه", "مجموع حقوق مالکانه", "total equity", "equity"]],
   ["REVENUE", ["درآمد عملیاتی", "درآمدهای عملیاتی", "فروش", "درآمد", "revenue", "sales", "operating revenue"]],
-  ["COGS", ["بهای تمام شده کالای فروش رفته", "بهای تمام‌شده کالای فروش رفته", "بهای تمام شده", "cost of goods sold", "cost of sales"]],
-  ["GROSS_PROFIT", ["سود ناخالص", "زیان ناخالص", "gross profit", "gross loss"]],
+  ["COGS", ["بهای تمام شده کالای فروش رفته", "بهای تمام‌شده کالای فروش رفته", "بهای تمام شده", "بهای تمام شده درآمدهای عملیاتی", "بهای تمام شده درآمد عملیاتی", "بهای تمام شده فروش", "cost of goods sold", "cost of sales"]],
+  ["GROSS_PROFIT", ["سود ناخالص", "سود زیان ناخالص", "زیان ناخالص", "gross profit", "gross loss"]],
   ["OPERATING_EXPENSES", ["هزینه‌های فروش اداری و عمومی", "هزینه‌های عملیاتی", "هزینه‌های فروش و اداری و عمومی", "operating expenses", "selling general and administrative expenses"]],
   ["OPERATING_PROFIT", ["سود زیان عملیاتی", "سود عملیاتی", "زیان عملیاتی", "operating profit", "operating income", "operating loss"]],
   ["EXPENSES", ["جمع هزینه‌ها", "مجموع هزینه‌ها", "هزینه‌ها", "total expenses", "expenses"]],
   ["NET_PROFIT", ["سود زیان خالص", "سود خالص", "زیان خالص", "سود زیان پس از مالیات", "net profit", "net income", "net loss", "profit for the year"]],
-  ["OPERATING_CASH_FLOW", ["جریان نقدی عملیاتی", "جریان‌های نقدی عملیاتی", "خالص جریان‌های نقدی عملیاتی", "جریان نقدینگی عملیاتی", "net cash from operating activities", "net cash provided by operating activities", "cash flows from operating activities"]],
-  ["INVESTING_CASH_FLOW", ["جریان نقدی سرمایه‌گذاری", "جریان‌های نقدی سرمایه‌گذاری", "خالص جریان‌های نقدی سرمایه‌گذاری", "net cash from investing activities", "cash flows from investing activities"]],
-  ["FINANCING_CASH_FLOW", ["جریان نقدی تامین مالی", "جریان‌های نقدی تامین مالی", "خالص جریان‌های نقدی تامین مالی", "net cash from financing activities", "cash flows from financing activities"]],
-  ["NET_CASH_FLOW", ["خالص افزایش کاهش نقد", "خالص جریان نقدی", "افزایش کاهش خالص نقد", "net increase in cash", "net decrease in cash", "net cash flow"]],
+  ["OPERATING_CASH_FLOW", ["جریان نقدی عملیاتی", "جریان‌های نقدی عملیاتی", "خالص جریان‌های نقدی عملیاتی", "جریان نقدینگی عملیاتی", "جریان خالص ورود خروج نقد حاصل از فعالیت های عملیاتی", "جریان خالص ورود خروج نقد حاصل از فعالیتهای عملیاتی", "net cash from operating activities", "net cash provided by operating activities", "cash flows from operating activities"]],
+  ["INVESTING_CASH_FLOW", ["جریان نقدی سرمایه‌گذاری", "جریان‌های نقدی سرمایه‌گذاری", "خالص جریان‌های نقدی سرمایه‌گذاری", "جریان خالص ورود خروج نقد حاصل از فعالیت های سرمایه گذاری", "جریان خالص ورود خروج نقد حاصل از فعالیتهای سرمایه‌گذاری", "net cash from investing activities", "cash flows from investing activities"]],
+  ["FINANCING_CASH_FLOW", ["جریان نقدی تامین مالی", "جریان‌های نقدی تامین مالی", "خالص جریان‌های نقدی تامین مالی", "جریان خالص ورود خروج نقد حاصل از فعالیت های تامین مالی", "جریان خالص ورود خروج نقد حاصل از فعالیتهای تامین مالی", "net cash from financing activities", "cash flows from financing activities"]],
+  ["NET_CASH_FLOW", ["خالص افزایش کاهش نقد", "خالص افزایش کاهش در موجودی نقد", "خالص جریان نقدی", "افزایش کاهش خالص نقد", "net increase in cash", "net decrease in cash", "net cash flow"]],
 ]);
 
 /** Map a statement label to a canonical measure, or null when unrecognized. */
@@ -241,24 +249,57 @@ export interface StatementUnitDeclaration {
 /**
  * Detect the declared statement unit and currency. Only an explicit declaration
  * is accepted; a bare number is never assumed to be thousands/millions.
+ *
+ * Real Persian reports mix Arabic and Persian letter variants (`ميليون` vs
+ * `میلیون`), so every comparison first normalizes the letters. The scale is
+ * taken from the most frequent explicit scale phrase (`هزار/میلیون/میلیارد ریال`,
+ * "thousand/million/billion rials"): the statements declare their unit many
+ * times, so one narrative amount such as
+ * `افزايش سرمايه به مبلغ ۵هزار ميليارد ريال` can never override the unit the
+ * statements actually declare, and a generic `ريال` never overrides a specific
+ * `هزار/میلیون/میلیارد` unit.
  */
+const SCALE_PHRASES: ReadonlyArray<readonly [RegExp, number]> = [
+  [/(?:میلیارد|billions?)\s*(?:ریال|تومان|rials?|irr|tomans?)/i, 1_000_000_000],
+  [/(?:میلیون|millions?)\s*(?:ریال|تومان|rials?|irr|tomans?)/i, 1_000_000],
+  [/(?:هزار|thousands?)\s*(?:ریال|تومان|rials?|irr|tomans?)/i, 1_000],
+];
+
+/**
+ * Count every explicit scale phrase and take the most frequent, so a single
+ * narrative `میلیارد ریال` never beats the many `میلیون ریال` occurrences the
+ * statements declare. Ties resolve to the larger scale deterministically.
+ */
+function dominantScaleInText(text: string): number {
+  let best = 1;
+  let bestCount = 0;
+  for (const [pattern, multiplier] of SCALE_PHRASES) {
+    const global = new RegExp(pattern.source, `${pattern.flags}g`);
+    const count = text.match(global)?.length ?? 0;
+    if (count > bestCount) {
+      best = multiplier;
+      bestCount = count;
+    }
+  }
+  return bestCount > 0 ? best : 1;
+}
+
 export function detectStatementUnit(text: string): StatementUnitDeclaration {
-  const normalized = toAsciiDigits(typeof text === "string" ? text : "").replace(/[\u200c\u200e\u200f]/g, " ");
+  const normalized = normalizePersianLetters(
+    toAsciiDigits(typeof text === "string" ? text : ""),
+  ).replace(/[\u200c\u200e\u200f]/g, " ");
   const compact = normalized.replace(/\s+/g, " ");
 
-  let multiplier = 1;
-  if (/میلیارد\s*ریال/.test(compact) || /(billion|میلیارد)\s*(rial|irr)/i.test(compact)) multiplier = 1_000_000_000;
-  else if (/میلیون\s*ریال/.test(compact) || /(million|میلیون)\s*(rial|irr)/i.test(compact)) multiplier = 1_000_000;
-  else if (/هزار\s*ریال/.test(compact) || /(thousand|هزار)\s*(rial|irr)/i.test(compact)) multiplier = 1_000;
+  const multiplier = dominantScaleInText(compact);
 
   let currency: string | null = null;
   if (/تومان/.test(compact)) currency = "IRT";
   else if (/ریال/.test(compact)) currency = "IRR";
-  const declared = extractDeclaredCurrency(compact);
+  const declared = extractDeclaredCurrency(toAsciiDigits(compact));
   if (declared) currency = declared;
   if (!currency) {
     // An explicit unit phrase followed by a code ("figures in million IRR").
-    const unitCurrency = compact.match(/(?:million|thousand|billion|هزار|میلیون|میلیارد)\s*(rials?|irr|tomans?|irt)\b/i);
+    const unitCurrency = compact.match(/(?:millions?|thousands?|billions?|هزار|میلیون|میلیارد)\s*(rials?|irr|tomans?|irt)\b/i);
     if (unitCurrency) currency = /toman|irt/i.test(unitCurrency[1]) ? "IRT" : "IRR";
   }
 
@@ -300,6 +341,13 @@ export function matchFinancialSectionHeading(line: string): FinancialSectionType
   const key = stripSpaces(normalizeStatementLabel(raw));
   if (!key) return null;
 
+  // A table-of-contents reference ("- صورت سود و زیان تلفیقی 5") is NOT a
+  // section: it is a list entry pointing at a page. Detecting it as a heading
+  // produced dozens of empty FAILED sections in the real scanned report.
+  const ascii = toAsciiDigits(raw);
+  if (/^[-–—•*]\s+/.test(ascii)) return null;
+  if (/\s\d{1,3}$/.test(ascii)) return null;
+
   let matched: FinancialSectionType | null = null;
   for (const alias of SECTION_ALIAS_KEYS) {
     if (key === alias.key || key.startsWith(alias.key)) {
@@ -335,21 +383,17 @@ export function splitStatementRow(line: string): string[] {
   return trimmed.split(/\s+/).map((cell) => cell.trim());
 }
 
-const YEAR_RE = /^\d{4}$/;
 const RELATIVE_PERIOD_KEYS = new Set([
   "دورهجاری", "سالجاری", "جاری", "current", "currentyear", "دورهقبل", "سالقبل", "قبل", "prior", "previous", "comparative", "دورهبعد",
 ]);
 
-function isYearToken(cell: string): boolean {
-  const digits = toAsciiDigits(String(cell ?? "")).replace(/[^\d]/g, "");
-  if (!YEAR_RE.test(digits)) return false;
-  const year = Number(digits);
-  return (year >= 1300 && year <= 1500) || (year >= 1900 && year <= 2100);
-}
-
 function isPeriodToken(cell: string): boolean {
-  if (isYearToken(cell)) return true;
-  return RELATIVE_PERIOD_KEYS.has(stripSpaces(normalizeStatementLabel(cell)));
+  if (isYearHeaderCell(cell)) return true;
+  if (RELATIVE_PERIOD_KEYS.has(stripSpaces(normalizeStatementLabel(cell)))) return true;
+  // Comparative-statement headers carry a real year ("دوره منتهی به ۱۴۰۵/۰۴/۳۱").
+  // A change/percentage column is explicitly NOT a period.
+  if (isChangeColumnHeader(cell)) return false;
+  return isStatementPeriodHeader(cell);
 }
 
 function isNumericCell(cell: string): boolean {
@@ -559,6 +603,103 @@ function sectionState(
  * Document assembly
  * ------------------------------------------------------------------------- */
 
+export interface OcrGeometryBoundingBox {
+  readonly x0: number;
+  readonly y0: number;
+  readonly x1: number;
+  readonly y1: number;
+}
+
+export interface OcrGeometryWord {
+  readonly text: string;
+  readonly bbox?: OcrGeometryBoundingBox;
+}
+
+export interface OcrGeometryLine {
+  readonly text: string;
+  readonly words: ReadonlyArray<OcrGeometryWord>;
+}
+
+/** One OCR page with real line/word geometry, as produced by an OcrAdapter. */
+export interface OcrPageInput {
+  readonly pageNumber: number;
+  readonly lines: ReadonlyArray<OcrGeometryLine>;
+}
+
+/**
+ * Rebuild one OCR line into deterministic cells using real word geometry.
+ *
+ * OCR collapses column spacing to single spaces, which destroys the positional
+ * grid. The engine does preserve each word's bounding box, and tesseract emits
+ * the words of an RTL line in logical reading order (label first, then the
+ * numeric columns). Splitting at real inter-word x-gaps therefore recovers the
+ * columns evidence-based, handles RTL and LTR, and never re-orders words.
+ */
+export function ocrLineToCells(line: OcrGeometryLine): string[] {
+  const words = (line.words ?? [])
+    .map((word) => ({ text: String(word?.text ?? "").trim(), bbox: word?.bbox }))
+    .filter((word) => word.text.length > 0);
+  if (words.length === 0) {
+    const text = String(line.text ?? "").trim();
+    return text ? [text] : [];
+  }
+  const boxed = words.filter(
+    (word): word is { text: string; bbox: OcrGeometryBoundingBox } => !!word.bbox,
+  );
+  if (boxed.length !== words.length || boxed.length === 1) {
+    return [words.map((word) => word.text).join(" ")];
+  }
+
+  const centers = boxed.map((word) => (word.bbox.x0 + word.bbox.x1) / 2);
+  const leftToRight = centers[0] < centers[centers.length - 1];
+  const heights = boxed
+    .map((word) => Math.abs(word.bbox.y1 - word.bbox.y0))
+    .filter((height) => height > 0)
+    .sort((a, b) => a - b);
+  const medianHeight = heights.length > 0 ? heights[Math.floor(heights.length / 2)] : 0;
+  const gapThreshold = Math.max(6, medianHeight * 0.75);
+
+  const cells: string[] = [];
+  let current: string[] = [];
+  let previous: { x0: number; x1: number } | null = null;
+  for (const word of boxed) {
+    if (previous) {
+      const gap = leftToRight ? word.bbox.x0 - previous.x1 : previous.x0 - word.bbox.x1;
+      if (gap > gapThreshold && current.length > 0) {
+        cells.push(current.join(" "));
+        current = [];
+      }
+    }
+    current.push(word.text);
+    previous = { x0: word.bbox.x0, x1: word.bbox.x1 };
+  }
+  if (current.length > 0) cells.push(current.join(" "));
+  return cells;
+}
+
+/**
+ * Build the unified document understanding from OCR pages using real word
+ * geometry. Rows are reconstructed with `ocrLineToCells`, and page provenance is
+ * preserved so every fact still points at its page. The same section/measure
+ * contract as PDF/XLSX/XLS is used; nothing is invented.
+ */
+export function buildFinancialDocumentUnderstandingFromOcrPages(
+  pages: ReadonlyArray<OcrPageInput>,
+): FinancialDocumentUnderstanding {
+  const blocks: DocumentSectionInput[] = [];
+  for (const page of pages) {
+    const lines = (page.lines ?? []).filter(
+      (line) => line && ((line.words?.length ?? 0) > 0 || String(line.text ?? "").trim().length > 0),
+    );
+    if (lines.length === 0) continue;
+    blocks.push({
+      rows: lines.map((line) => ocrLineToCells(line)),
+      pageNumbers: lines.map(() => page.pageNumber),
+    });
+  }
+  return buildFinancialDocumentUnderstanding(blocks);
+}
+
 export interface DocumentSectionInput {
   /** Section hint from a worksheet name; used only when no heading is found. */
   readonly name?: string;
@@ -650,6 +791,11 @@ export function buildFinancialDocumentUnderstanding(blocks: ReadonlyArray<Docume
     if (lines.length === 0) continue;
 
     for (const segment of segmentByHeadings(lines, block.name)) {
+      // An UNKNOWN run is text that is not one of the canonical sections (cover
+      // pages, disclaimers, non-financial tables). It owns no canonical measure,
+      // so it is not surfaced as a section at all; keeping it would inflate the
+      // section list with meaningless FAILED entries.
+      if (segment.type === "UNKNOWN") continue;
       const rows = segment.lines.map((line) => line.row);
       const { facts, notes } = extractSectionFacts(
         rows,
@@ -718,6 +864,16 @@ function latestValue(facts: ReadonlyArray<FinancialStatementFact>, measure: Stat
 }
 
 /**
+ * Statement cost measures are printed with a negative sign in many real Persian
+ * statements (`هزینه های ... (۲۹۱,۶۳۴)`) while the analysis contract consumes a
+ * positive cost magnitude. Normalize the sign without changing the extracted
+ * evidence (the raw signed value stays on the fact).
+ */
+function costMagnitude(value: number | null): number | null {
+  return value === null ? null : Math.abs(value);
+}
+
+/**
  * Derive the existing analysis inputs from canonical statement facts. Only
  * measures that were actually extracted are used; nothing is invented and the
  * absent measures are reported so a downstream engine can fail closed honestly.
@@ -728,11 +884,11 @@ export function deriveAnalysisInput(document: FinancialDocumentUnderstanding): D
   const liabilities = latestValue(facts, "LIABILITIES");
   const equity = latestValue(facts, "EQUITY");
   const revenue = latestValue(facts, "REVENUE");
-  const expenses = latestValue(facts, "EXPENSES") ?? latestValue(facts, "OPERATING_EXPENSES");
+  const expenses = costMagnitude(latestValue(facts, "EXPENSES") ?? latestValue(facts, "OPERATING_EXPENSES"));
   const netProfit = latestValue(facts, "NET_PROFIT");
   const grossProfit = latestValue(facts, "GROSS_PROFIT");
   const operatingProfit = latestValue(facts, "OPERATING_PROFIT");
-  const cogs = latestValue(facts, "COGS");
+  const cogs = costMagnitude(latestValue(facts, "COGS"));
   const currentAssets = latestValue(facts, "CURRENT_ASSETS");
   const currentLiabilities = latestValue(facts, "CURRENT_LIABILITIES");
   const operatingCashFlow = latestValue(facts, "OPERATING_CASH_FLOW");
@@ -766,6 +922,78 @@ export function deriveAnalysisInput(document: FinancialDocumentUnderstanding): D
     equity: equity ?? 0,
     statement,
     missingMeasures: missing,
+  };
+}
+
+/**
+ * Measures the existing statement analysis contract consumes directly. A
+ * report analysis must not return READY unless every one of these was derived
+ * from real evidence for the CURRENT period.
+ */
+const ANALYSIS_REQUIRED_MEASURES: ReadonlyArray<StatementMeasure> = [
+  "ASSETS",
+  "LIABILITIES",
+  "REVENUE",
+];
+
+/** Sections whose completeness the statement analysis contract depends on. */
+const ANALYSIS_REQUIRED_SECTIONS: ReadonlyArray<FinancialSectionType> = [
+  "BALANCE_SHEET",
+  "INCOME_STATEMENT",
+];
+
+export interface StatementAnalysisReadiness {
+  /** True only when the required measures and sections were really extracted. */
+  readonly ready: boolean;
+  readonly missingMeasures: ReadonlyArray<StatementMeasure>;
+  readonly incompleteSections: ReadonlyArray<FinancialSectionType>;
+  /** Precise typed code when not ready (financial-report-insufficient-evidence). */
+  readonly code?: string;
+  /** Short, non-fabricated explanation of what evidence is missing. */
+  readonly reason: string;
+}
+
+/**
+ * Fail-closed sufficiency gate for statement analysis. A PARTIAL/insufficient
+ * document must never be analyzed as if it were complete: the balance sheet and
+ * income statement sections must be COMPLETED and the current-period assets,
+ * liabilities and revenue the analysis contract consumes must be evidence-backed.
+ * A partial document (for example a scanned report with two readable facts) stays
+ * BLOCKED with `financial-report-insufficient-evidence` instead of returning a
+ * READY analysis built from absent values. Ledger analysis is unaffected because
+ * it does not call this gate.
+ */
+export function assessStatementAnalysisReadiness(document: FinancialDocumentUnderstanding): StatementAnalysisReadiness {
+  const hasCurrent = (measure: StatementMeasure): boolean =>
+    document.facts.some(
+      (fact) => fact.measure === measure && fact.periodIndex === 0 && Number.isFinite(fact.value),
+    );
+
+  const missingMeasures: StatementMeasure[] = [];
+  for (const measure of ANALYSIS_REQUIRED_MEASURES) {
+    if (!hasCurrent(measure)) missingMeasures.push(measure);
+  }
+
+  const incompleteSections: FinancialSectionType[] = [];
+  for (const type of ANALYSIS_REQUIRED_SECTIONS) {
+    const section = document.sections.find((candidate) => candidate.type === type);
+    if (!section || section.state !== "COMPLETED") incompleteSections.push(type);
+  }
+
+  const ready = missingMeasures.length === 0 && incompleteSections.length === 0;
+  if (ready) {
+    return { ready: true, missingMeasures: [], incompleteSections: [], reason: "required-statement-evidence-present" };
+  }
+
+  const parts: string[] = [];
+  if (missingMeasures.length > 0) parts.push(`missing-measures:${missingMeasures.join(",")}`);
+  if (incompleteSections.length > 0) parts.push(`incomplete-sections:${incompleteSections.join(",")}`);
+  return {
+    ready: false,
+    missingMeasures,
+    incompleteSections,
+    code: FINANCIAL_DOCUMENT_ERROR_CODES.INSUFFICIENT_EVIDENCE,
+    reason: parts.join(";"),
   };
 }
 

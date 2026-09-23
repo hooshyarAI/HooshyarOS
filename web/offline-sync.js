@@ -274,7 +274,7 @@
     SECTION_BALANCE_SHEET: "صورت وضعیت مالی",
     SECTION_INCOME_STATEMENT: "سود و زیان",
     SECTION_CASH_FLOW: "جریان وجوه نقد",
-    SECTION_EQUITY: "حقوق مالکانه",
+    SECTION_CHANGES_IN_EQUITY: "حقوق مالکانه",
     SECTION_NOTES: "یادداشت‌ها",
     NORMALIZING: "در حال نرمال‌سازی ساختار سند",
     EVIDENCE_VALIDATION: "در حال اعتبارسنجی شواهد",

@@ -278,6 +278,75 @@ export function mapTableToCanonical(
 const PERSIAN_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
 const ARABIC_INDIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
 
+/**
+ * Arabic letter variants that Persian financial documents mix freely
+ * (`ي`/`ی`, `ك`/`ک`, `ة`/`ه`, `أ`/`ا`). OCR output and real spreadsheets use
+ * both forms, so every deterministic match (unit words, section titles, measure
+ * labels) must converge on ONE canonical spelling before comparison. Without
+ * this, `ميليون ريال` (Arabic yeh) never matched the `میلیون ریال` unit phrase
+ * and a narrative `میلیارد` elsewhere silently became the document unit.
+ */
+const ARABIC_TO_PERSIAN_LETTERS: ReadonlyArray<readonly [RegExp, string]> = [
+  [/[\u064a\u0649]/g, "ی"],
+  [/[\u0643]/g, "ک"],
+  [/[\u0629]/g, "ه"],
+  [/[\u0623\u0625\u0622\u0671]/g, "ا"],
+];
+
+/** Normalize Arabic/Persian letter variants to their canonical Persian form. */
+export function normalizePersianLetters(value: string): string {
+  let out = typeof value === "string" ? value : "";
+  for (const [pattern, replacement] of ARABIC_TO_PERSIAN_LETTERS) out = out.replace(pattern, replacement);
+  return out;
+}
+
+/** Remove zero-width joiners/marks that make visually identical labels differ. */
+export function stripZeroWidth(value: string): string {
+  return typeof value === "string" ? value.replace(/[\u200c\u200e\u200f]/g, " ") : "";
+}
+
+/**
+ * A header cell that is a percentage/change column ("درصد تغییر", "% change",
+ * "percentage change", "growth"). Such a column is NOT a monetary period and
+ * must never be normalized as one.
+ */
+const CHANGE_COLUMN_HEADER_RE = /(%|درصد\s*تغيير|درصد\s*تغییر|تغيير\s*درصد|تغییر\s*درصد|percentage|percent|change|growth|رشد)/i;
+
+export function isChangeColumnHeader(cell: string): boolean {
+  if (typeof cell !== "string") return false;
+  const normalized = stripZeroWidth(normalizePersianLetters(toAsciiDigits(cell)));
+  if (!normalized.trim()) return false;
+  return CHANGE_COLUMN_HEADER_RE.test(normalized);
+}
+
+function isFourDigitYear(digits: string): boolean {
+  if (!/^\d{4}$/.test(digits)) return false;
+  const year = Number(digits);
+  return (year >= 1300 && year <= 1500) || (year >= 1900 && year <= 2100);
+}
+
+/**
+ * A comparative-statement column header such as `دوره منتهی به ۱۴۰۵/۰۴/۳۱`,
+ * `به تاریخ ۱۴۰۴/۰۴/۳۱` or `سال مالی ۱۴۰۲`. It carries a real Jalali/Gregorian
+ * year, which is the deterministic evidence that the column is a monetary
+ * period. Used to locate statement grids from real Persian headers.
+ */
+export function isStatementPeriodHeader(cell: string): boolean {
+  if (typeof cell !== "string") return false;
+  const normalized = stripZeroWidth(normalizePersianLetters(toAsciiDigits(cell)));
+  if (!normalized.trim()) return false;
+  for (const token of normalized.match(/\d{4}/g) ?? []) {
+    if (isFourDigitYear(token)) return true;
+  }
+  return false;
+}
+
+/** True when the cell is a bare four-digit year (`1402`, `2024`). */
+export function isYearHeaderCell(cell: string): boolean {
+  const digits = toAsciiDigits(String(cell ?? "")).replace(/[^\d]/g, "");
+  return isFourDigitYear(digits);
+}
+
 export function toAsciiDigits(value: string): string {
   let out = "";
   for (const char of value) {
@@ -300,13 +369,14 @@ export function toAsciiDigits(value: string): string {
  */
 export function parseStatementAmount(value: string): number | null {
   if (typeof value !== "string") return null;
-  let v = toAsciiDigits(value).replace(/[\u00a0\u200f\u200e]/g, " ").trim();
+  let v = toAsciiDigits(value).replace(/[\u00a0\u200f\u200e\u200c]/g, " ").trim();
   if (!v) return 0;
   if (/^[-–—−]+$/.test(v)) return 0;
   let negative = false;
   const paren = v.match(/^\((.*)\)$/);
   if (paren) { negative = true; v = paren[1]; }
-  v = v.replace(/[,٬\s]/g, "").replace(/[ریال$€£]/g, "");
+  // Arabic decimal separator -> ".", Arabic/Persian thousands separators -> "".
+  v = v.replace(/٫/g, ".").replace(/[,٬،\s]/g, "").replace(/[ریاليا$€£]/g, "");
   if (v.startsWith("-") || v.startsWith("−")) { negative = true; v = v.slice(1); }
   if (!/^\d+(\.\d+)?$/.test(v)) return null;
   const n = Number(v);

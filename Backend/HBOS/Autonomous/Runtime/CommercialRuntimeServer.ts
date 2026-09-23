@@ -8,6 +8,7 @@ import { ReasoningEngine } from "../../Engines/ReasoningEngine";
 import { ReportsEngine, SUPPORTED_REPORT_FORMATS, type ReportFormat, type ReportSection } from "../../Engines/ReportsEngine";
 import { FinancialDataIngestionAdapter, type FinancialCanonicalModel, type FinancialSourceEvidence } from "../../Product/FinancialDataIngestionAdapter";
 import {
+    assessStatementAnalysisReadiness,
     deriveAnalysisInput,
     isCompleteRatioStatement,
     summarizeFinancialDocument,
@@ -920,6 +921,28 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const model = await loadIngestedModel(session.tenantId, sourceSha256);
                 if (!model) return corsJson(422, { error: "INGESTED_SOURCE_REQUIRED" });
                 const derived = model.document ? deriveAnalysisInput(model.document) : null;
+                const readiness = model.document ? assessStatementAnalysisReadiness(model.document) : null;
+                const ingestedSourceSummary = {
+                    sha256: sourceSha256,
+                    sourceName: model.source.sourceName,
+                    sourceType: model.source.sourceType,
+                    transactionCount: model.transactions.length,
+                    ...(model.document ? { document: summarizeFinancialDocument(model.document) } : {}),
+                };
+                if (readiness && !readiness.ready) {
+                    // A partial/insufficient statement must not be analyzed as if
+                    // complete: refuse with the precise canonical code instead of
+                    // returning READY over absent (zero) metrics.
+                    return corsJson(422, {
+                        status: "BLOCKED",
+                        error: readiness.code ?? "financial-report-insufficient-evidence",
+                        reason: readiness.reason,
+                        tenantId: session.tenantId,
+                        missingMeasures: readiness.missingMeasures,
+                        incompleteSections: readiness.incompleteSections,
+                        ingestedSource: ingestedSourceSummary,
+                    });
+                }
                 const suppliedAssets = body.assets === undefined ? undefined : Number(body.assets);
                 const suppliedLiabilities = body.liabilities === undefined ? undefined : Number(body.liabilities);
                 const assets = suppliedAssets !== undefined ? suppliedAssets : derived?.assets;
@@ -933,20 +956,22 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                     expenses: derived && !derived.missingMeasures.includes("EXPENSES") ? derived.expenses : model.totals.debit,
                     assets,
                     liabilities,
-                    source: model.source
+                    source: model.source,
+                    ...(readiness ? { documentEvidence: readiness } : {}),
                 });
-                if (result.status !== "READY") return corsJson(422, result);
+                if (result.status !== "READY") {
+                    return corsJson(422, {
+                        error: result.failureCode ?? "financial-analysis-blocked",
+                        reason: result.reason,
+                        ...result,
+                        ingestedSource: ingestedSourceSummary,
+                    });
+                }
                 await persistence.write({ tenantId: session.tenantId }, LATEST_ANALYSIS_KEY, result);
                 latestResults.set(session.tenantId, result);
                 return corsJson(200, {
                     ...result,
-                    ingestedSource: {
-                        sha256: sourceSha256,
-                        sourceName: model.source.sourceName,
-                        sourceType: model.source.sourceType,
-                        transactionCount: model.transactions.length,
-                        ...(model.document ? { document: summarizeFinancialDocument(model.document) } : {}),
-                    },
+                    ingestedSource: ingestedSourceSummary,
                 });
             }
 

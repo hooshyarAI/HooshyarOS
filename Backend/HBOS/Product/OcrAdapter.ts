@@ -44,9 +44,34 @@ export const OCR_PROVIDER_ENGINE = "tesseract.js";
 export const OCR_LANGUAGE_DATA_PACKAGE_PREFIX = "@tesseract.js-data/";
 const OCR_LANGUAGE_DATA_VARIANTS = ["4.0.0_best_int", "4.0.0"] as const;
 
+export interface OcrBoundingBox {
+  readonly x0: number;
+  readonly y0: number;
+  readonly x1: number;
+  readonly y1: number;
+}
+
 export interface OcrWord {
   readonly text: string;
   readonly confidence: number;
+  /**
+   * Real word bounding box from the OCR engine. Present only when the engine
+   * produced geometry; it is the evidence used to reconstruct statement columns
+   * deterministically instead of guessing from collapsed spaces.
+   */
+  readonly bbox?: OcrBoundingBox;
+}
+
+/**
+ * One recognized line with its words and real bounding boxes. Preserved so the
+ * canonical document boundary can rebuild RTL multi-column statement rows from
+ * geometry (word x/y) rather than from single-space OCR text.
+ */
+export interface OcrLine {
+  readonly text: string;
+  readonly confidence: number;
+  readonly bbox?: OcrBoundingBox;
+  readonly words: ReadonlyArray<OcrWord>;
 }
 
 export interface OcrResult {
@@ -57,6 +82,8 @@ export interface OcrResult {
   readonly text: string;
   readonly meanConfidence: number;
   readonly words: ReadonlyArray<OcrWord>;
+  /** Line/word geometry when the engine produced it; absent otherwise. */
+  readonly lines?: ReadonlyArray<OcrLine>;
   readonly engine: string;
   readonly engineVersion: string;
   readonly language: string;
@@ -68,7 +95,10 @@ export interface OcrEngineData {
   readonly blocks?: ReadonlyArray<{
     readonly paragraphs?: ReadonlyArray<{
       readonly lines?: ReadonlyArray<{
-        readonly words?: ReadonlyArray<{ readonly text?: string; readonly confidence?: number }>;
+        readonly text?: string;
+        readonly confidence?: number;
+        readonly bbox?: OcrBoundingBox;
+        readonly words?: ReadonlyArray<{ readonly text?: string; readonly confidence?: number; readonly bbox?: OcrBoundingBox }>;
       }>;
     }>;
   }>;
@@ -339,15 +369,26 @@ export class TesseractOcrAdapter implements OcrAdapter {
     const data = result.data ?? {};
     const text = data.text ?? "";
     const words: OcrWord[] = [];
+    const lines: OcrLine[] = [];
     for (const block of data.blocks ?? []) {
       for (const para of block.paragraphs ?? []) {
         for (const line of para.lines ?? []) {
+          const lineWords: OcrWord[] = [];
           for (const w of line.words ?? []) {
-            words.push({
+            const word: OcrWord = {
               text: w.text ?? "",
               confidence: typeof w.confidence === "number" ? w.confidence : 0,
-            });
+              ...(w.bbox ? { bbox: w.bbox } : {}),
+            };
+            words.push(word);
+            lineWords.push(word);
           }
+          lines.push({
+            text: line.text ?? lineWords.map((word) => word.text).join(" "),
+            confidence: typeof line.confidence === "number" ? line.confidence : 0,
+            ...(line.bbox ? { bbox: line.bbox } : {}),
+            words: lineWords,
+          });
         }
       }
     }
@@ -363,6 +404,7 @@ export class TesseractOcrAdapter implements OcrAdapter {
       text,
       meanConfidence,
       words,
+      ...(lines.length > 0 ? { lines } : {}),
       engine: this.engine,
       engineVersion: engine.version ?? this.engineVersionOverride ?? "unknown",
       language,

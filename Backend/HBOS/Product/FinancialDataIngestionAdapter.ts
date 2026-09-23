@@ -23,13 +23,19 @@ import {
   isCanonicalStatementHeader,
   mapStatementToCanonical,
   mapTableToCanonical,
+  normalizePersianLetters,
   parseStatementAmount,
+  toAsciiDigits,
 } from "./DocumentTableExtractor";
 import {
   buildFinancialDocumentUnderstanding,
+  buildFinancialDocumentUnderstandingFromOcrPages,
   FINANCIAL_DOCUMENT_ERROR_CODES,
   hasFinancialDocumentFacts,
+  matchFinancialSectionHeading,
+  type DocumentSectionInput,
   type FinancialDocumentUnderstanding,
+  type OcrPageInput,
 } from "./FinancialDocumentUnderstanding";
 import { createOcrProvenance, type OcrProvenance } from "./OcrProvenance";
 import type { OcrAdapter, OcrResult } from "./OcrAdapter";
@@ -59,6 +65,11 @@ export interface FinancialSourceEvidence {
   readonly sourceType: SourceType;
   readonly sha256: string;
   readonly receivedAt: string;
+  /**
+   * Real detected content kind when it differs from the file extension, e.g. a
+   * `.xls` whose bytes are actually HTML. Absent for ordinary sources.
+   */
+  readonly contentKind?: "html";
   /**
    * OCR provenance, present only when the canonical text was produced by an
    * explicitly supplied OCR provider. Absent for native text routes. Never
@@ -323,6 +334,20 @@ function detectFormatFromMagicBytes(buffer: Buffer): SourceType | null {
 }
 
 /**
+ * Detect HTML content that is masquerading as a binary spreadsheet. Real
+ * `.xls` files are OLE2 and real `.xlsx` files are ZIP; both are caught by the
+ * magic-byte check first. A file whose bytes are ASCII-compatible markup
+ * (`<html`, `<!doctype html`, `<table`) is HTML and must never be reported as a
+ * successfully parsed genuine XLS/XLSX workbook.
+ */
+function looksLikeHtmlContent(buffer: Buffer): boolean {
+  const head = buffer.subarray(0, 4096).toString("latin1").replace(/^\uFEFF/, "").trimStart().toLowerCase();
+  if (!head) return false;
+  if (head.startsWith("<!doctype html") || head.startsWith("<html")) return true;
+  return head.includes("<table") || head.includes("<html");
+}
+
+/**
  * Validate extension matches detected format
  */
 function validateExtensionMatchesFormat(sourceName: string, detectedFormat: SourceType): void {
@@ -580,6 +605,12 @@ export class FinancialDataIngestionAdapter {
       // Detect format from magic bytes
       const detectedFormat = detectFormatFromMagicBytes(rawBytes);
       if (!detectedFormat) {
+        // A `.xls`/`.xlsx` that is really HTML (a common Excel "Save as Web
+        // Page" export). It is not OLE2/BIFF and not OOXML: report the real
+        // content type and process it only through the governed HTML path.
+        if (looksLikeHtmlContent(rawBytes)) {
+          return this.ingestHtmlSpreadsheetBytes(tenantId, sourceName, rawBytes);
+        }
         throw new Error("ingestion-format-unsupported");
       }
 
@@ -844,9 +875,11 @@ export class FinancialDataIngestionAdapter {
 
   /**
    * Multi-format canonical route: HTML. Table structure is preserved through
-   * the canonical table contract when a recognizable ledger table exists;
-   * otherwise bounded visible text is extracted (active content discarded) and
-   * normalized through the canonical ledger pipeline.
+   * the canonical table contract when a recognizable ledger table exists; a
+   * financial-statement HTML report is normalized through the SAME unified
+   * `FinancialDocumentUnderstanding` boundary as PDF/XLSX/XLS; otherwise
+   * bounded visible text is extracted (active content discarded) and normalized
+   * through the canonical ledger pipeline.
    */
   async ingestHtml(tenantId: string, sourceName: string, html: string): Promise<FinancialIngestionResult> {
     const normalizedTenant = tenantId.trim();
@@ -867,10 +900,64 @@ export class FinancialDataIngestionAdapter {
     );
     if (fromTables) return this.finalize(normalizedTenant, source, fromTables);
 
+    const document = this.buildHtmlSpreadsheetDocument(html);
+    if (hasFinancialDocumentFacts(document)) {
+      return this.finalize(normalizedTenant, source, [], document);
+    }
+
     const text = htmlToText(html);
     if (!text.trim()) throw new Error("ingestion-html-empty");
     const transactions = this.parseAndValidate(text);
     return this.finalize(normalizedTenant, source, transactions);
+  }
+
+  /**
+   * Governed HTML route for a spreadsheet extension whose real bytes are HTML
+   * (a very common Excel "Save as Web Page" `.xls` export). The content type is
+   * reported truthfully (`sourceType: "HTML"`, `contentKind: "html"`) and the
+   * ORIGINAL-byte SHA-256 is preserved, so the source is never mislabelled as a
+   * successfully parsed genuine XLS workbook. Malformed or empty HTML fails
+   * closed with the precise `spreadsheet-html-content-unsupported` code.
+   */
+  async ingestHtmlSpreadsheetBytes(
+    tenantId: string,
+    sourceName: string,
+    rawBytes: Buffer,
+    observer?: IngestionProgressObserver,
+  ): Promise<FinancialIngestionResult> {
+    const normalizedTenant = tenantId.trim();
+    const normalizedSource = sourceName.trim();
+    if (!normalizedTenant) throw new Error("ingestion-tenant-required");
+    if (!normalizedSource) throw new Error("ingestion-source-required");
+    if (!Buffer.isBuffer(rawBytes) || rawBytes.length === 0) throw new Error("ingestion-source-empty");
+
+    const html = this.decodeHtmlBytes(rawBytes);
+    if (!html.trim()) throw new Error(FINANCIAL_DOCUMENT_ERROR_CODES.SPREADSHEET_HTML_CONTENT_UNSUPPORTED);
+    try {
+      assertMarkupWithinLimits(html);
+    } catch {
+      throw new Error(FINANCIAL_DOCUMENT_ERROR_CODES.SPREADSHEET_HTML_CONTENT_UNSUPPORTED);
+    }
+
+    const source: FinancialSourceEvidence = {
+      sourceName: normalizedSource,
+      sourceType: "HTML",
+      sha256: createHash("sha256").update(rawBytes).digest("hex"),
+      receivedAt: new Date().toISOString(),
+      contentKind: "html",
+    };
+
+    const fromTables = this.mapMarkupTablesToTransactions(
+      extractMarkupTables(html).map((table) => table.rows),
+    );
+    if (fromTables) return this.finalize(normalizedTenant, source, fromTables);
+
+    observer?.({ stage: "NORMALIZING" });
+    const document = this.buildHtmlSpreadsheetDocument(html, observer);
+    if (hasFinancialDocumentFacts(document)) {
+      return this.finalize(normalizedTenant, source, [], document);
+    }
+    throw new Error(FINANCIAL_DOCUMENT_ERROR_CODES.SPREADSHEET_HTML_CONTENT_UNSUPPORTED);
   }
 
   /**
@@ -1002,7 +1089,21 @@ export class FinancialDataIngestionAdapter {
     if (!text.trim()) throw new Error("ingestion-ocr-empty");
 
     observer?.({ stage: "NORMALIZING" });
-    const normalized = this.normalizeFinancialReportText(text, observer, paged.pageNumbers);
+    const ocrPages: OcrPageInput[] = [];
+    for (const page of document.pages) {
+      const result = ocrByPage.get(page.pageNumber);
+      const lines = result?.lines;
+      if (!lines || lines.length === 0) continue;
+      ocrPages.push({
+        pageNumber: page.pageNumber,
+        lines: lines.map((line) => ({
+          text: line.text,
+          words: line.words.map((word) => ({ text: word.text, ...(word.bbox ? { bbox: word.bbox } : {}) })),
+        })),
+      });
+    }
+
+    const normalized = this.normalizeFinancialReportText(text, observer, paged.pageNumbers, ocrPages);
     const source: FinancialSourceEvidence = {
       sourceName: normalizedSource,
       sourceType: "PDF",
@@ -1069,6 +1170,12 @@ export class FinancialDataIngestionAdapter {
     if (!normalizedSource) throw new Error("ingestion-source-required");
     if (rawBytes.length === 0) throw new Error("ingestion-source-empty");
 
+    // A Web-Page export misnamed `.xlsx` is HTML, not OOXML: never report it as
+    // a successfully parsed genuine XLSX workbook.
+    if (looksLikeHtmlContent(rawBytes)) {
+      return this.ingestHtmlSpreadsheetBytes(tenantId, sourceName, rawBytes, observer);
+    }
+
     const sha256 = createHash("sha256").update(rawBytes).digest("hex");
     const receivedAt = new Date().toISOString();
 
@@ -1130,7 +1237,12 @@ export class FinancialDataIngestionAdapter {
     if (!normalizedSource) throw new Error("ingestion-source-required");
     if (!Buffer.isBuffer(rawBytes) || rawBytes.length === 0) throw new Error("ingestion-source-empty");
     if (rawBytes.length > this.config.xlsMaxSizeBytes) throw new Error("ingestion-file-too-large");
-    if (!detectFormatFromMagicBytes(rawBytes)) throw new Error("ingestion-format-unsupported");
+    // Real `.xls` files are OLE2. A Web-Page export named `.xls` is HTML; it is
+    // routed to the governed HTML path instead of being mislabelled as XLS.
+    if (!detectFormatFromMagicBytes(rawBytes)) {
+      if (looksLikeHtmlContent(rawBytes)) return this.ingestHtmlSpreadsheetBytes(tenantId, sourceName, rawBytes, observer);
+      throw new Error("ingestion-format-unsupported");
+    }
     if (detectFormatFromMagicBytes(rawBytes) !== "XLS") throw new Error("ingestion-format-mismatch");
 
     const sha256 = createHash("sha256").update(rawBytes).digest("hex");
@@ -1355,6 +1467,7 @@ export class FinancialDataIngestionAdapter {
     text: string,
     observer?: IngestionProgressObserver,
     pageNumbers?: ReadonlyArray<number>,
+    ocrPages?: ReadonlyArray<OcrPageInput>,
   ): { readonly transactions: FinancialTransaction[]; readonly document?: FinancialDocumentUnderstanding } {
     let transactions: FinancialTransaction[] | null = null;
     let transactionError: Error | null = null;
@@ -1368,12 +1481,20 @@ export class FinancialDataIngestionAdapter {
       return { transactions };
     }
 
-    const document = buildFinancialDocumentUnderstanding([
+    const textDocument = buildFinancialDocumentUnderstanding([
       {
         rows: text.split(/\r?\n/).map((line) => [line.replace(/\u00a0/g, " ").trimEnd()]),
         ...(pageNumbers ? { pageNumbers } : {}),
       },
     ]);
+    // OCR word geometry reconstructs RTL multi-column rows more faithfully than
+    // single-space OCR text, so prefer the geometry document when it yields at
+    // least as many evidence-backed facts. Nothing is invented either way.
+    let document = textDocument;
+    if (ocrPages && ocrPages.length > 0) {
+      const geometryDocument = buildFinancialDocumentUnderstandingFromOcrPages(ocrPages);
+      if (geometryDocument.facts.length > textDocument.facts.length) document = geometryDocument;
+    }
     this.emitDocumentStages(document, observer);
     observer?.({ stage: "EVIDENCE_VALIDATION" });
 
@@ -1418,7 +1539,7 @@ export class FinancialDataIngestionAdapter {
       BALANCE_SHEET: "SECTION_BALANCE_SHEET",
       INCOME_STATEMENT: "SECTION_INCOME_STATEMENT",
       CASH_FLOW_STATEMENT: "SECTION_CASH_FLOW",
-      CHANGES_IN_EQUITY: "SECTION_EQUITY",
+      CHANGES_IN_EQUITY: "SECTION_CHANGES_IN_EQUITY",
       NOTES: "SECTION_NOTES",
     };
     const emitted = new Set<string>();
@@ -1468,6 +1589,72 @@ export class FinancialDataIngestionAdapter {
     observer?.({ stage: "SECTION_DETECTION" });
     this.emitDocumentStages(document, observer);
     return document;
+  }
+
+  /**
+   * Decode HTML bytes. An explicit UTF-16 BOM is honored; everything else is
+   * UTF-8 (the dominant web-export encoding). No charset guessing beyond the
+   * declared BOM, so a mis-decode never silently invents text.
+   */
+  private decodeHtmlBytes(rawBytes: Buffer): string {
+    if (rawBytes.length >= 2 && rawBytes[0] === 0xff && rawBytes[1] === 0xfe) {
+      return rawBytes.toString("utf16le");
+    }
+    if (rawBytes.length >= 2 && rawBytes[0] === 0xfe && rawBytes[1] === 0xff) {
+      const swapped = Buffer.from(rawBytes);
+      swapped.swap16();
+      return swapped.toString("utf16le");
+    }
+    return rawBytes.toString("utf8");
+  }
+
+  /**
+   * Build the unified document understanding from an HTML financial report. The
+   * existing bounded HTML extractor supplies the table grids in document order;
+   * the short text before each table contributes the section heading and the
+   * declared unit, so a real Web-Page `.xls` report reaches the same canonical
+   * facts as PDF/XLSX/XLS. No new HTML parser is introduced.
+   */
+  private buildHtmlSpreadsheetDocument(
+    html: string,
+    observer?: IngestionProgressObserver,
+  ): FinancialDocumentUnderstanding {
+    observer?.({ stage: "DOCUMENT_DETECTION" });
+    const tables = extractMarkupTables(html).map((table) =>
+      table.rows.map((row) => row.map((cell) => String(cell ?? "").trim())),
+    );
+    const segments = html.split(/<table\b[^>]*>[\s\S]*?<\/table>/gi);
+    const blocks: DocumentSectionInput[] = [];
+    let pendingHeaders: string[][] = [];
+
+    const collect = (segment: string): void => {
+      const text = htmlToText(segment);
+      for (const line of text.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        if (matchFinancialSectionHeading(trimmed) || this.isUnitDeclarationLine(trimmed)) {
+          pendingHeaders.push([trimmed]);
+        }
+      }
+    };
+
+    for (let index = 0; index < tables.length; index += 1) {
+      collect(segments[index] ?? "");
+      const rows = [...pendingHeaders, ...tables[index]];
+      pendingHeaders = [];
+      if (rows.length > 0) blocks.push({ rows, positioned: true });
+    }
+
+    observer?.({ stage: "SECTION_DETECTION" });
+    const document = buildFinancialDocumentUnderstanding(blocks);
+    this.emitDocumentStages(document, observer);
+    return document;
+  }
+
+  /** A short line that declares the statement unit/currency (e.g. "مبالغ به میلیون ریال"). */
+  private isUnitDeclarationLine(line: string): boolean {
+    const normalized = normalizePersianLetters(toAsciiDigits(line));
+    return /(مبالغ|ارقام|figure|amounts?)/i.test(normalized) && /(ریال|تومان|rial|irr|toman)/i.test(normalized);
   }
 
   /**

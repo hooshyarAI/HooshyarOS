@@ -16,6 +16,8 @@ Canonical multi-format financial data ingestion with tenant isolation and persis
 
 **Unified financial document understanding:** a complete annual financial report (or a financial-statement workbook) is not a transaction ledger. When the ledger/statement transaction route cannot map a document, the SAME `Product/FinancialDocumentUnderstanding.ts` boundary used by PDF, XLSX and legacy XLS detects the report sections (auditor, board, balance sheet, income statement, cash flow, equity, notes) and normalizes statement tables into canonical facts, which are attached to the one canonical model as an optional `document` field. The 5-column transaction model remains canonical for real ledgers. See `Docs/Product/FinancialDocumentUnderstanding.md`.
 
+**HTML disguised as a spreadsheet:** an Excel "Save as Web Page" export is frequently named `.xls` (or `.xlsx`) but contains HTML, not OLE2/BIFF or OOXML. Because the magic bytes are not a spreadsheet signature, the adapter sniffs the real content and routes it through the governed HTML path (`extractMarkupTables` + the same unified statement boundary), reporting `sourceType: "HTML"` and `contentKind: "html"` and preserving the ORIGINAL-byte SHA-256. It is never reported as a successfully parsed genuine XLS/XLSX workbook. Empty/malformed HTML, or HTML with no valid financial table, fails closed with `spreadsheet-html-content-unsupported` (`spreadsheet-html-content-detected` is the detection code). The `xls-reader` provider is not "broken" for genuine OLE2/BIFF workbooks and is unchanged.
+
 **Supported Formats:**
 - **CSV** — Standard CSV with columns: date, account, debit, credit, currency
 - **STRUCTURED (JSON)** — JSON with `transactions` array containing financial transactions
