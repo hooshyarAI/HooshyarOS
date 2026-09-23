@@ -8,7 +8,18 @@
  * Partial statements are supported per-ratio: a ratio is returned only when
  * every input it needs is present and finite; ratios whose evidence is absent
  * are reported in `unavailable` and never fabricated. A present-but-invalid
- * value (non-finite or negative) still fails the whole statement closed.
+ * value still fails the whole statement closed.
+ *
+ * Signed-value semantics (V2): legitimate statement measures may be negative
+ * (gross/operating/pre-tax/net loss, negative equity, negative cash flows).
+ * Only `SIGNED_FIELDS` may carry a negative value; every other field is a
+ * magnitude whose negative value is corruption and fails closed. A ratio whose
+ * derived result is undefined for a semantic reason (non-positive equity for
+ * debt/equity or ROE, non-positive current liabilities for the current ratio)
+ * is reported in `notApplicable` — never silently dropped and never computed
+ * with a misleading denominator. Percentage change is `null` when the prior
+ * value is zero or when the sign reverses, and the absolute change is always
+ * preserved.
  */
 
 export interface RatioStatement {
@@ -56,6 +67,16 @@ const RATIO_STATEMENT_FIELDS: ReadonlyArray<keyof RatioStatement> = [
     ...INCOME_LINES, ...BALANCE_LINES,
 ];
 
+/**
+ * Fields whose real accounting value may legitimately be negative: losses
+ * (gross/operating/pre-tax/net), accumulated-loss equity, and items that are
+ * net presentations (interest, taxes as a benefit). Every other statement
+ * field is a magnitude and a negative value is corruption.
+ */
+const SIGNED_FIELDS: ReadonlySet<keyof RatioStatement> = new Set<keyof RatioStatement>([
+    "grossProfit", "operatingIncome", "preTaxIncome", "netIncome", "interest", "taxes", "equity",
+]);
+
 export interface VerticalAnalysisRow {
     line: string;
     amount: number;
@@ -75,7 +96,16 @@ export interface HorizontalAnalysisEntry {
     current: number;
     prior: number;
     absoluteChange: number;
-    pctChange: number;
+    /**
+     * Period-over-period percentage change. `null` when it is mathematically
+     * undefined (`prior === 0`) or financially misleading (sign reversal); the
+     * absolute change is always preserved.
+     */
+    pctChange: number | null;
+    /** True when the line crossed zero between the prior and current period. */
+    signReversal: boolean;
+    /** Precise reason `pctChange` is null (for honest interpretation). */
+    pctChangeUnavailableReason?: "prior-value-zero" | "sign-reversal";
 }
 
 export interface HorizontalAnalysisResult {
@@ -92,7 +122,10 @@ export interface ProfitabilityResult {
     roa: number | null;
     roe: number | null;
     status: "READY" | "BLOCKED";
+    /** Ratios whose evidence was absent. */
     unavailable: string[];
+    /** Ratios whose evidence exists but the ratio is financially undefined (with reason). */
+    notApplicable: string[];
 }
 
 export interface LeverageResult {
@@ -101,6 +134,7 @@ export interface LeverageResult {
     equityRatio: number | null;
     status: "READY" | "BLOCKED";
     unavailable: string[];
+    notApplicable: string[];
 }
 
 export interface LiquidityResult {
@@ -109,6 +143,7 @@ export interface LiquidityResult {
     cashRatio: number | null;
     status: "READY" | "BLOCKED";
     unavailable: string[];
+    notApplicable: string[];
 }
 
 export class RatioAnalysisService {
@@ -122,14 +157,19 @@ export class RatioAnalysisService {
         for (const field of RATIO_STATEMENT_FIELDS) {
             const value = (statement as Record<string, unknown>)[field];
             if (value === undefined) continue;
-            if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return true;
+            if (typeof value !== "number" || !Number.isFinite(value)) return true;
+            // A negative value is legitimate only for a signed statement measure;
+            // for a magnitude field it is corruption and fails closed.
+            if (value < 0 && !SIGNED_FIELDS.has(field)) return true;
         }
         return false;
     }
 
     private value(statement: Partial<RatioStatement>, field: keyof RatioStatement): number | null {
         const candidate = (statement as Record<string, unknown>)[field];
-        return typeof candidate === "number" && Number.isFinite(candidate) && candidate >= 0 ? candidate : null;
+        if (typeof candidate !== "number" || !Number.isFinite(candidate)) return null;
+        if (candidate < 0 && !SIGNED_FIELDS.has(field)) return null;
+        return candidate;
     }
 
     private ratio(numerator: number | null, denominator: number | null): number | null {
@@ -173,12 +213,23 @@ export class RatioAnalysisService {
                 unavailable.push(line);
                 continue;
             }
+            const signReversal = (p < 0 && c >= 0) || (p > 0 && c < 0);
+            // A zero prior base makes the percentage mathematically undefined; a
+            // sign reversal makes a single percentage misleading. In both cases
+            // the percentage is honestly unavailable and the absolute change is
+            // kept. A negative prior base (without reversal) uses its magnitude so
+            // the change direction is still truthful.
+            const pctChange = p === 0 ? null : signReversal ? null : (c - p) / Math.abs(p);
             entries.push({
                 line,
                 current: c,
                 prior: p,
                 absoluteChange: c - p,
-                pctChange: p === 0 ? 0 : (c - p) / p,
+                pctChange,
+                signReversal,
+                ...(pctChange === null
+                    ? { pctChangeUnavailableReason: p === 0 ? "prior-value-zero" as const : "sign-reversal" as const }
+                    : {}),
             });
         }
         return { entries, status: entries.length > 0 ? "READY" : "BLOCKED", unavailable };
@@ -187,46 +238,68 @@ export class RatioAnalysisService {
     profitability(statement: Partial<RatioStatement>): ProfitabilityResult {
         const unavailableAll = ["grossMargin", "operatingMargin", "netMargin", "roa", "roe"];
         if (this.hasInvalidProvidedField(statement)) {
-            return { grossMargin: null, operatingMargin: null, netMargin: null, roa: null, roe: null, status: "BLOCKED", unavailable: unavailableAll };
+            return { grossMargin: null, operatingMargin: null, netMargin: null, roa: null, roe: null, status: "BLOCKED", unavailable: unavailableAll, notApplicable: [] };
         }
         const revenue = this.value(statement, "revenue");
         const grossProfit = this.value(statement, "grossProfit");
         const operatingIncome = this.value(statement, "operatingIncome");
         const netIncome = this.value(statement, "netIncome");
         const totalAssets = this.value(statement, "totalAssets");
-        const equity = this.value(statement, "equity");
+        const rawEquity = (statement as Record<string, unknown>).equity;
+        const equity = typeof rawEquity === "number" && Number.isFinite(rawEquity) ? rawEquity : null;
 
+        // Losses legitimately produce negative margins/returns; a non-positive
+        // equity makes ROE undefined rather than a misleading signed quotient.
         const grossMargin = this.ratio(grossProfit, revenue);
         const operatingMargin = this.ratio(operatingIncome, revenue);
         const netMargin = this.ratio(netIncome, revenue);
         const roa = this.ratio(netIncome, totalAssets);
-        const roe = this.ratio(netIncome, equity);
+        const roe = equity !== null && equity > 0 ? this.ratio(netIncome, equity) : null;
         const computed = { grossMargin, operatingMargin, netMargin, roa, roe };
-        const unavailable = unavailableAll.filter((key) => computed[key as keyof typeof computed] === null);
-        return { ...computed, status: unavailable.length < unavailableAll.length ? "READY" : "BLOCKED", unavailable };
+        const notApplicable = roe === null && equity !== null && equity <= 0 && netIncome !== null
+            ? ["roe:equity-non-positive"]
+            : [];
+        const notApplicableKeys = new Set(notApplicable.map((reason) => reason.split(":")[0]));
+        const unavailable = unavailableAll.filter(
+            (key) => computed[key as keyof typeof computed] === null && !notApplicableKeys.has(key),
+        );
+        const status = Object.values(computed).some((value) => value !== null) ? "READY" : "BLOCKED";
+        return { ...computed, status, unavailable, notApplicable };
     }
 
     leverage(statement: Partial<RatioStatement>): LeverageResult {
         const unavailableAll = ["debtToEquity", "debtToAssets", "equityRatio"];
         if (this.hasInvalidProvidedField(statement)) {
-            return { debtToEquity: null, debtToAssets: null, equityRatio: null, status: "BLOCKED", unavailable: unavailableAll };
+            return { debtToEquity: null, debtToAssets: null, equityRatio: null, status: "BLOCKED", unavailable: unavailableAll, notApplicable: [] };
         }
         const totalAssets = this.value(statement, "totalAssets");
         const totalLiabilities = this.value(statement, "totalLiabilities");
-        const equity = this.value(statement, "equity");
+        const rawEquity = (statement as Record<string, unknown>).equity;
+        const equity = typeof rawEquity === "number" && Number.isFinite(rawEquity) ? rawEquity : null;
 
-        const debtToEquity = this.ratio(totalLiabilities, equity);
+        // Debt/equity is not meaningful when equity is zero or negative: a signed
+        // quotient would invert its economic meaning. Report it as not applicable
+        // with a precise reason instead of a fabricated number.
+        const debtToEquity = equity !== null && equity > 0 ? this.ratio(totalLiabilities, equity) : null;
         const debtToAssets = this.ratio(totalLiabilities, totalAssets);
+        // Equity/assets may legitimately be negative when equity is negative.
         const equityRatio = this.ratio(equity, totalAssets);
         const computed = { debtToEquity, debtToAssets, equityRatio };
-        const unavailable = unavailableAll.filter((key) => computed[key as keyof typeof computed] === null);
-        return { ...computed, status: unavailable.length < unavailableAll.length ? "READY" : "BLOCKED", unavailable };
+        const notApplicable = debtToEquity === null && equity !== null && equity <= 0
+            ? ["debtToEquity:equity-non-positive"]
+            : [];
+        const notApplicableKeys = new Set(notApplicable.map((reason) => reason.split(":")[0]));
+        const unavailable = unavailableAll.filter(
+            (key) => computed[key as keyof typeof computed] === null && !notApplicableKeys.has(key),
+        );
+        const status = Object.values(computed).some((value) => value !== null) ? "READY" : "BLOCKED";
+        return { ...computed, status, unavailable, notApplicable };
     }
 
     liquidity(statement: Partial<RatioStatement>): LiquidityResult {
         const unavailableAll = ["currentRatio", "quickRatio", "cashRatio"];
         if (this.hasInvalidProvidedField(statement)) {
-            return { currentRatio: null, quickRatio: null, cashRatio: null, status: "BLOCKED", unavailable: unavailableAll };
+            return { currentRatio: null, quickRatio: null, cashRatio: null, status: "BLOCKED", unavailable: unavailableAll, notApplicable: [] };
         }
         const currentAssets = this.value(statement, "currentAssets");
         const currentLiabilities = this.value(statement, "currentLiabilities");
@@ -236,11 +309,21 @@ export class RatioAnalysisService {
             ? currentAssets - inventory
             : null;
 
-        const currentRatio = this.ratio(currentAssets, currentLiabilities);
-        const quickRatio = this.ratio(quickAssets, currentLiabilities);
-        const cashRatio = this.ratio(cash, currentLiabilities);
+        // A non-positive current-liability base makes every liquidity ratio
+        // undefined; do not divide by it.
+        const liquidityBase = currentLiabilities !== null && currentLiabilities > 0 ? currentLiabilities : null;
+        const currentRatio = this.ratio(currentAssets, liquidityBase);
+        const quickRatio = this.ratio(quickAssets, liquidityBase);
+        const cashRatio = this.ratio(cash, liquidityBase);
         const computed = { currentRatio, quickRatio, cashRatio };
-        const unavailable = unavailableAll.filter((key) => computed[key as keyof typeof computed] === null);
-        return { ...computed, status: unavailable.length < unavailableAll.length ? "READY" : "BLOCKED", unavailable };
+        const notApplicable = currentLiabilities !== null && currentLiabilities <= 0
+            ? ["currentRatio:current-liabilities-non-positive", "quickRatio:current-liabilities-non-positive", "cashRatio:current-liabilities-non-positive"]
+            : [];
+        const notApplicableKeys = new Set(notApplicable.map((reason) => reason.split(":")[0]));
+        const unavailable = unavailableAll.filter(
+            (key) => computed[key as keyof typeof computed] === null && !notApplicableKeys.has(key),
+        );
+        const status = Object.values(computed).some((value) => value !== null) ? "READY" : "BLOCKED";
+        return { ...computed, status, unavailable, notApplicable };
     }
 }

@@ -851,12 +851,21 @@ export interface DerivedAnalysisInput {
    */
   readonly expenses: number;
   /**
-   * Total expenses that reconcile revenue to net profit (`revenue - netProfit`)
-   * when both are evidence-backed, so the existing analysis contract's
-   * `profit = revenue - expenses` equals the statement's real net profit.
-   * Null when the statement's net profit or revenue evidence is absent.
+   * DERIVED RESIDUAL expense used to reconcile revenue to net profit
+   * (`revenue - netProfit`) when both are evidence-backed, so the existing
+   * analysis contract's `profit = revenue - expenses` equals the statement's
+   * real net profit. It is NOT an extracted accounting total: it bundles COGS,
+   * operating expenses, finance cost, tax and non-operating items. Null when
+   * the statement's net profit or revenue evidence is absent.
    */
   readonly analysisExpenses: number | null;
+  /**
+   * Provenance of `analysisExpenses` for honest evidence labelling. It is always
+   * `"DERIVED_RESIDUAL"` when present, or null when no residual could be
+   * derived. Extracted COGS / operating expenses remain authoritative for the
+   * component-level metrics on `statement`.
+   */
+  readonly analysisExpensesSource: "DERIVED_RESIDUAL" | null;
   readonly assets: number;
   readonly liabilities: number;
   readonly equity: number;
@@ -939,9 +948,11 @@ export function deriveAnalysisInput(document: FinancialDocumentUnderstanding): D
 
   const statement = statementForPeriod(facts, 0);
 
-  const analysisExpenses = revenue !== null && netProfit !== null && revenue - netProfit >= 0
-    ? revenue - netProfit
-    : null;
+  // The residual is kept even when negative (net profit above revenue is
+  // possible through non-operating income) so that the analysis contract's
+  // `profit = revenue - expenses` still equals the statement's verified net
+  // profit. It is disclosed as a derived residual, never as a total expense.
+  const analysisExpenses = revenue !== null && netProfit !== null ? revenue - netProfit : null;
 
   const missing: StatementMeasure[] = [];
   if (assets === null) missing.push("ASSETS");
@@ -953,6 +964,7 @@ export function deriveAnalysisInput(document: FinancialDocumentUnderstanding): D
     revenue: revenue ?? 0,
     expenses: expenses ?? 0,
     analysisExpenses,
+    analysisExpensesSource: analysisExpenses !== null ? "DERIVED_RESIDUAL" : null,
     assets: assets ?? 0,
     liabilities: liabilities ?? 0,
     equity: equity ?? 0,

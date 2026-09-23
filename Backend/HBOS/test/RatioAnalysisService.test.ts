@@ -122,9 +122,57 @@ describe("RatioAnalysisService", () => {
         );
     });
 
-    test("an explicitly invalid value still fails the whole method closed", () => {
-        const result = service.profitability({ revenue: 1000, netIncome: -1 });
-        expect(result.status).toBe("BLOCKED");
-        expect(result.netMargin).toBeNull();
+    test("a genuinely corrupt magnitude still fails the whole method closed", () => {
+        expect(service.profitability({ revenue: 1000, netIncome: Number.NaN }).status).toBe("BLOCKED");
+        // A negative revenue/asset/liability magnitude is corruption, not a loss.
+        expect(service.vertical({ revenue: -1 }).status).toBe("BLOCKED");
+        expect(service.leverage({ totalAssets: -1, totalLiabilities: 100, equity: 50 }).status).toBe("BLOCKED");
+    });
+
+    test("signed losses produce negative margins and returns", () => {
+        const result = service.profitability({ revenue: 1000, grossProfit: -200, operatingIncome: -150, netIncome: -100, totalAssets: 2000, equity: 500 });
+        expect(result.status).toBe("READY");
+        expect(result.grossMargin).toBeCloseTo(-0.2, 6);
+        expect(result.operatingMargin).toBeCloseTo(-0.15, 6);
+        expect(result.netMargin).toBeCloseTo(-0.1, 6);
+        expect(result.roa).toBeCloseTo(-0.05, 6);
+        expect(result.roe).toBeCloseTo(-0.2, 6);
+    });
+
+    test("negative equity makes ROE and debt/equity not applicable, not fabricated", () => {
+        const result = service.profitability({ revenue: 1000, netIncome: -100, totalAssets: 500, equity: -200 });
+        expect(result.roe).toBeNull();
+        expect(result.notApplicable).toContain("roe:equity-non-positive");
+        expect(result.unavailable).not.toContain("roe");
+
+        const leverage = service.leverage({ totalAssets: 500, totalLiabilities: 700, equity: -200 });
+        expect(leverage.debtToEquity).toBeNull();
+        expect(leverage.notApplicable).toContain("debtToEquity:equity-non-positive");
+        expect(leverage.debtToAssets).toBeCloseTo(1.4, 6);
+        expect(leverage.equityRatio).toBeCloseTo(-0.4, 6);
+    });
+
+    test("horizontal change is null for a zero prior base and preserves the absolute change", () => {
+        const result = service.horizontal({ revenue: 1000, netIncome: 50 }, { revenue: 0, netIncome: 0 });
+        const revenue = result.entries.find((entry) => entry.line === "revenue");
+        expect(revenue?.absoluteChange).toBe(1000);
+        expect(revenue?.pctChange).toBeNull();
+        expect(revenue?.pctChangeUnavailableReason).toBe("prior-value-zero");
+    });
+
+    test("horizontal change exposes a sign reversal instead of a misleading percentage", () => {
+        const result = service.horizontal({ revenue: 1000, netIncome: 300 }, { revenue: 1000, netIncome: -200 });
+        const netIncome = result.entries.find((entry) => entry.line === "netIncome");
+        expect(netIncome?.signReversal).toBe(true);
+        expect(netIncome?.pctChange).toBeNull();
+        expect(netIncome?.pctChangeUnavailableReason).toBe("sign-reversal");
+        expect(netIncome?.absoluteChange).toBe(500);
+    });
+
+    test("a negative prior base without reversal uses the magnitude so direction stays truthful", () => {
+        const result = service.horizontal({ revenue: 100, netIncome: -100 }, { revenue: 100, netIncome: -200 });
+        const netIncome = result.entries.find((entry) => entry.line === "netIncome");
+        expect(netIncome?.pctChange).toBeCloseTo(0.5, 6);
+        expect(netIncome?.signReversal).toBe(false);
     });
 });

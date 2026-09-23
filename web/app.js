@@ -426,6 +426,17 @@ function renderStatementInsight(insight) {
   container.appendChild(meta);
 
   const append = section => { if (section) container.appendChild(section); };
+  const textSection = (title, lines) => {
+    if (!Array.isArray(lines) || lines.length === 0) return null;
+    const section = document.createElement('section');
+    const heading = document.createElement('h4');
+    heading.textContent = title;
+    section.appendChild(heading);
+    const list = document.createElement('ul');
+    for (const line of lines) { const item = document.createElement('li'); item.textContent = line; list.appendChild(item); }
+    section.appendChild(list);
+    return section;
+  };
   append(insightList('خلاصه مدیریتی (تفسیر)', insight.interpretation));
   if (insight.ratios) {
     const section = document.createElement('section');
@@ -454,21 +465,54 @@ function renderStatementInsight(insight) {
   append(insightList('ریسک‌ها', insight.risks));
   append(insightList('فرصت‌ها و رشد', insight.opportunities));
   append(insightList('اقدامات مدیریتی پیشنهادی', insight.managementActions));
-  append(insightList('محدودیت‌ها و داده‌های نامشخص', insight.limitations));
   if (Array.isArray(insight.comparative) && insight.comparative.length > 0) {
-    const section = document.createElement('section');
-    const heading = document.createElement('h4');
-    heading.textContent = 'تحلیل مقایسه‌ای دوره‌ها';
-    section.appendChild(heading);
-    const list = document.createElement('ul');
-    for (const entry of insight.comparative) {
-      const item = document.createElement('li');
-      item.textContent = `${entry.line}: تغییر ${entry.absoluteChange} (${(entry.pctChange * 100).toFixed(2)}٪)`;
-      list.appendChild(item);
-    }
-    section.appendChild(list);
-    container.appendChild(section);
+    append(textSection('تحلیل مقایسه‌ای دوره‌ها', insight.comparative.map(entry => {
+      let pctText;
+      if (entry.pctChange === null || entry.pctChange === undefined) {
+        pctText = entry.pctChangeUnavailableReason === 'sign-reversal'
+          ? 'درصد تغییر معنادار نیست (تغییر علامت)'
+          : 'درصد تغییر نامشخص است (دوره قبل صفر بوده)';
+      } else {
+        pctText = `${(entry.pctChange * 100).toFixed(2)}٪`;
+      }
+      const reversal = entry.signReversal ? ' — تغییر علامت' : '';
+      return `${entry.line}: از ${entry.prior} به ${entry.current}؛ تغییر مطلق ${entry.absoluteChange}؛ ${pctText}${reversal}`;
+    })));
   }
+  if (insight.cashFlow) {
+    const cf = insight.cashFlow;
+    const labels = {
+      operating: 'جریان نقدی عملیاتی',
+      investing: 'جریان نقدی سرمایه‌گذاری',
+      financing: 'جریان نقدی تأمین مالی',
+      net: 'خالص تغییر نقد',
+      priorOperating: 'جریان نقدی عملیاتی دوره قبل',
+      qualityOfEarnings: 'کیفیت سود'
+    };
+    append(textSection('تفسیر جریان نقدی', [
+      `${labels.operating}: ${cf.operating === null || cf.operating === undefined ? 'نامشخص (شواهد ناکافی)' : cf.operating}`,
+      `${labels.investing}: ${cf.investing === null || cf.investing === undefined ? 'نامشخص (شواهد ناکافی)' : cf.investing}`,
+      `${labels.financing}: ${cf.financing === null || cf.financing === undefined ? 'نامشخص (شواهد ناکافی)' : cf.financing}`,
+      `${labels.net}: ${cf.net === null || cf.net === undefined ? 'نامشخص (شواهد ناکافی)' : cf.net}`,
+      `${labels.priorOperating}: ${cf.priorOperating === null || cf.priorOperating === undefined ? 'نامشخص (شواهد ناکافی)' : cf.priorOperating}`,
+      `${labels.qualityOfEarnings}: ${cf.qualityOfEarnings ?? 'نامشخص'}`
+    ]));
+  }
+  if (Array.isArray(insight.integrity) && insight.integrity.length > 0) {
+    append(textSection('بررسی‌های انسجام حسابداری', insight.integrity.map(check => {
+      if (check.status === 'NOT_TESTABLE') {
+        return `${check.id}: قابل آزمون نیست (شواهد ناقص: ${(check.missing || []).join('، ') || 'اقلام غیرعملیاتی'})`;
+      }
+      return `${check.id}: ${check.status} (انتظار ${check.expected}، مقدار ${check.actual}، اختلاف ${check.difference})`;
+    })));
+  }
+  if (Array.isArray(insight.ratios?.notApplicable) && insight.ratios.notApplicable.length > 0) {
+    append(textSection('نسبت‌های نامفهوم/بی‌معنا', insight.ratios.notApplicable));
+  }
+  if (insight.derivedResidual) {
+    append(textSection('هزینه باقی‌مانده مشتق‌شده', [insight.derivedResidual.note]));
+  }
+  append(insightList('محدودیت‌ها و داده‌های نامشخص', insight.limitations));
 }
 
 document.querySelector('#analysis-form').addEventListener('submit', async event => {

@@ -213,6 +213,12 @@ describe("financial report ingestion — runtime HTTP", () => {
     const answerBody = await answer.json();
     expect(answerBody.evidence.statementContext).toBe(true);
     expect(answerBody.evidence.documentStatus).toBeTruthy();
+    // The assistant shares the report's verified context: integrity, cash-flow
+    // quality and limitations are exposed, not just four scalars.
+    expect(Array.isArray(answerBody.evidence.integrity)).toBe(true);
+    expect(answerBody.evidence.integrity.some((check: { id: string }) => check.id === "balance-sheet-identity")).toBe(true);
+    expect(typeof answerBody.evidence.cashFlowQuality).toBe("string");
+    expect(Array.isArray(answerBody.evidence.limitations)).toBe(true);
 
     const report = await request("/api/report", { headers: { cookie } });
     expect(report.status).toBe(200);
@@ -221,6 +227,10 @@ describe("financial report ingestion — runtime HTTP", () => {
     expect(reportText).toContain("Document status: COMPLETED");
     expect(reportText).toContain("Reporting periods: 1402 | 1401");
     expect(reportText).toContain("positive net profit");
+    // The report carries the same integrity and cash-flow evidence.
+    expect(reportText).toContain("balance-sheet-identity");
+    expect(reportText).toContain("Quality of earnings:");
+    expect(reportText).toContain("derived residual");
   });
 
   test("analysis still requires balance-sheet fields when no facts exist", async () => {

@@ -531,15 +531,36 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
         ];
         const metricParts = Object.entries(insight.metrics)
             .filter(([, value]) => value !== null)
-            .map(([key, value]) => `${key}=${value}`);
+            .map(([key, value]) => `${key}=${value}[${insight.metricEvidence[key] ?? "UNAVAILABLE"}]`);
         lines.push(`FactsAndDerivedMetrics=${metricParts.join(", ") || "unavailable"}`);
         const ratioParts = Object.entries(insight.ratios)
-            .filter(([key, value]) => key !== "unavailable" && value !== null)
+            .filter(([key, value]) => key !== "unavailable" && key !== "notApplicable" && value !== null)
             .map(([key, value]) => `${key}=${value}`);
         lines.push(`Ratios=${ratioParts.join(", ") || "unavailable"}`);
         if (insight.unavailableRatios.length > 0) lines.push(`UnavailableRatios=${insight.unavailableRatios.join(", ")}`);
+        if (insight.ratios.notApplicable.length > 0) lines.push(`NotApplicableRatios=${insight.ratios.notApplicable.join(", ")}`);
         if (insight.comparative.length > 0) {
-            lines.push(`ComparativeChanges=${insight.comparative.map((entry) => `${entry.line}:${entry.absoluteChange}(${entry.pctChange})`).join(", ")}`);
+            lines.push(`ComparativeChanges=${insight.comparative.map((entry) => {
+                const change = entry.pctChange === null
+                    ? `${entry.absoluteChange}(${entry.pctChangeUnavailableReason ?? "unavailable"})`
+                    : `${entry.absoluteChange}(${entry.pctChange})`;
+                return `${entry.line}:${change}`;
+            }).join(", ")}`);
+        }
+        if (insight.integrity.length > 0) {
+            lines.push(`IntegrityChecks=${insight.integrity.map((check) => `${check.id}:${check.status}${check.missing.length > 0 ? `(missing:${check.missing.join("+")})` : ""}`).join(", ")}`);
+        }
+        const cashFlowParts = [
+            `operating=${insight.cashFlow.operating ?? "unavailable"}`,
+            `investing=${insight.cashFlow.investing ?? "unavailable"}`,
+            `financing=${insight.cashFlow.financing ?? "unavailable"}`,
+            `net=${insight.cashFlow.net ?? "unavailable"}`,
+            `priorOperating=${insight.cashFlow.priorOperating ?? "unavailable"}`,
+            `qualityOfEarnings=${insight.cashFlow.qualityOfEarnings}`,
+        ];
+        lines.push(`CashFlow=${cashFlowParts.join(", ")}`);
+        if (insight.derivedResidual) {
+            lines.push(`DerivedResidualExpense=${insight.derivedResidual.value}[DERIVED_RESIDUAL, not an extracted total expense]`);
         }
         if (insight.strengths.length > 0) lines.push(`Strengths=${insight.strengths.map((item) => item.message).join(" | ")}`);
         if (insight.weaknesses.length > 0) lines.push(`Weaknesses=${insight.weaknesses.map((item) => item.message).join(" | ")}`);
@@ -588,6 +609,55 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                     ...metricLines,
                 ],
             });
+            const ratioLines = Object.entries(insight.ratios)
+                .filter(([key, value]) => key !== "unavailable" && key !== "notApplicable" && value !== null)
+                .map(([key, value]) => `${key}: ${value}`);
+            if (ratioLines.length > 0) sections.push({ heading: "Ratios", lines: ratioLines });
+            if (insight.ratios.unavailable.length > 0) {
+                sections.push({ heading: "Unavailable ratios", lines: insight.ratios.unavailable });
+            }
+            if (insight.ratios.notApplicable.length > 0) {
+                sections.push({ heading: "Not applicable ratios", lines: insight.ratios.notApplicable });
+            }
+            if (insight.comparative.length > 0) {
+                sections.push({
+                    heading: "Comparative analysis",
+                    lines: insight.comparative.map((entry) => {
+                        const pct = entry.pctChange === null
+                            ? `${entry.pctChangeUnavailableReason ?? "percentage unavailable"}`
+                            : `${(entry.pctChange * 100).toFixed(2)}%`;
+                        const reversal = entry.signReversal ? " (sign reversal)" : "";
+                        return `${entry.line}: ${entry.prior} -> ${entry.current}; absolute change ${entry.absoluteChange}; ${pct}${reversal}`;
+                    }),
+                });
+            }
+            sections.push({
+                heading: "Cash-flow interpretation",
+                lines: [
+                    `Operating: ${insight.cashFlow.operating ?? "unavailable"}`,
+                    `Investing: ${insight.cashFlow.investing ?? "unavailable"}`,
+                    `Financing: ${insight.cashFlow.financing ?? "unavailable"}`,
+                    `Net change: ${insight.cashFlow.net ?? "unavailable"}`,
+                    `Prior-period operating: ${insight.cashFlow.priorOperating ?? "unavailable"}`,
+                    `Quality of earnings: ${insight.cashFlow.qualityOfEarnings}`,
+                    ...(insight.cashFlow.reconciliation
+                        ? [`Cash-flow reconciliation: ${insight.cashFlow.reconciliation.status}`]
+                        : []),
+                ],
+            });
+            if (insight.integrity.length > 0) {
+                sections.push({
+                    heading: "Integrity checks",
+                    lines: insight.integrity.map((check) =>
+                        check.status === "NOT_TESTABLE"
+                            ? `${check.id}: NOT_TESTABLE (missing ${check.missing.join(", ") || "non-operating items"})`
+                            : `${check.id}: ${check.status} (expected ${check.expected}, actual ${check.actual}, difference ${check.difference})`,
+                    ),
+                });
+            }
+            if (insight.derivedResidual) {
+                sections.push({ heading: "Derived residual expense", lines: [insight.derivedResidual.note] });
+            }
             const buildFindingLines = (label: string, findings: readonly { message: string }[]): void => {
                 if (findings.length === 0) return;
                 sections.push({ heading: label, lines: findings.map((finding) => finding.message) });
@@ -596,7 +666,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
             buildFindingLines("Strengths", insight.strengths);
             buildFindingLines("Weaknesses", insight.weaknesses);
             buildFindingLines("Risks", insight.risks);
-            buildFindingLines("Opportunities", insight.opportunities);
+            buildFindingLines("Financial growth readiness", insight.opportunities);
             buildFindingLines("Management actions", insight.managementActions);
             if (insight.limitations.length > 0) {
                 sections.push({ heading: "Data limitations", lines: insight.limitations });
@@ -1081,7 +1151,23 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                         assets: documentAssets !== undefined ? "DOCUMENT" : "MANUAL",
                         liabilities: documentLiabilities !== undefined ? "DOCUMENT" : "MANUAL",
                     },
-                    ...(derived ? { statement: derived.statement, missingMeasures: derived.missingMeasures } : {}),
+                    ...(derived
+                        ? {
+                            statement: derived.statement,
+                            missingMeasures: derived.missingMeasures,
+                            // The analysis contract needs one total-expense input so that
+                            // profit equals the statement's verified net profit. Disclose
+                            // whether that input is a derived residual or an extracted
+                            // expense, so no caller mistakes the residual for a fact.
+                            analysisExpenseBasis: derived.analysisExpensesSource
+                                ?? (documentExpenses === undefined
+                                    ? "LEDGER"
+                                    : derived.missingMeasures.includes("EXPENSES")
+                                        ? "EXTRACTED_OPERATING_EXPENSES_FALLBACK"
+                                        : "EXTRACTED_TOTAL_EXPENSES"),
+                            ...(derived.analysisExpenses !== null ? { derivedResidualExpense: derived.analysisExpenses } : {}),
+                        }
+                        : {}),
                 });
             }
 
@@ -1703,8 +1789,11 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const context = [
                     `Answer using only verified persisted context for tenant ${session.tenantId}.`,
                     "Separate extracted facts, derived metrics, interpretation and management recommendations.",
+                    "Never contradict the deterministic calculations; a ratio reported as unavailable or not-applicable must be described as such.",
+                    "Do not infer market demand, competitive position or future sales from statement-only evidence.",
                     "If a value or period is absent from the context, say the evidence is unavailable; never invent it.",
                     `Question: ${question}`,
+                    `SourceSha256=${result.source.sha256}`,
                     `Revenue=${result.metrics.revenue}`,
                     `Profit=${result.metrics.profit}`,
                     `ProfitMargin=${result.metrics.profitMargin}`,
@@ -1724,7 +1813,16 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                         analysisSource: result.source,
                         executiveWorkbench: Boolean(workbench),
                         statementContext: Boolean(insight),
-                        ...(insight ? { documentStatus: insight.documentStatus, periods: insight.periods } : {}),
+                        ...(insight
+                            ? {
+                                documentStatus: insight.documentStatus,
+                                periods: insight.periods,
+                                integrity: insight.integrity.map((check) => ({ id: check.id, status: check.status })),
+                                cashFlowQuality: insight.cashFlow.qualityOfEarnings,
+                                notApplicableRatios: insight.ratios.notApplicable,
+                                limitations: insight.limitations,
+                            }
+                            : {}),
                     },
                 });
             }

@@ -54,6 +54,20 @@ const METRIC_PATTERNS: ReadonlyArray<readonly [string, RegExp]> = [
     ["debt_ratio", /DebtRatio=([-+]?\d+(?:\.\d+)?)/],
 ];
 
+/**
+ * Verified-context markers that are echoed (never recomputed) when present in
+ * the statement context. They carry already-computed deterministic findings so
+ * the reasoner can interpret cash-flow quality, integrity checks and
+ * not-applicable ratios without performing any financial mathematics itself.
+ */
+const CONTEXT_MARKER_PATTERNS: ReadonlyArray<readonly [string, RegExp]> = [
+    ["operating_cash_flow", /(?:^|\| )operating=([-+]?\d+(?:\.\d+)?)(?:,| \|)/],
+    ["quality_of_earnings", /QualityOfEarnings=([A-Z_]+)/],
+    ["integrity_checks", /IntegrityChecks=([^|]+)/],
+    ["not_applicable_ratios", /NotApplicableRatios=([^|]+)/],
+    ["derived_residual", /DerivedResidualExpense=([-+]?\d+(?:\.\d+)?)/],
+];
+
 const NO_METRICS_ANSWER = "برای پاسخ مستند، ابتدا یک تحلیل مالی تأییدشده برای این نشست ثبت کنید.";
 
 function trimTrailingZeros(text: string): string {
@@ -149,9 +163,15 @@ export class ReasoningEngine implements Engine {
             if (match) metrics.set(name, Number(match[1]));
         }
 
+        const markers = new Map<string, string>();
+        for (const [name, pattern] of CONTEXT_MARKER_PATTERNS) {
+            const match = problem.match(pattern);
+            if (match) markers.set(name, match[1].trim());
+        }
+
         const steps: string[] = ["extract-verified-context-metrics"];
 
-        if (metrics.size === 0) {
+        if (metrics.size === 0 && markers.size === 0) {
             steps.push("no-verified-metrics-present");
             return { status: "reasoned", answer: NO_METRICS_ANSWER, steps };
         }
@@ -161,6 +181,11 @@ export class ReasoningEngine implements Engine {
         if (metrics.has("profit")) parts.push(`سود ثبت‌شده ${formatG(metrics.get("profit")!)} است`);
         if (metrics.has("profit_margin")) parts.push(`حاشیه سود ${formatG(metrics.get("profit_margin")!, 4)} است`);
         if (metrics.has("debt_ratio")) parts.push(`نسبت بدهی ${formatG(metrics.get("debt_ratio")!, 4)} است`);
+        if (markers.has("operating_cash_flow")) parts.push(`جریان نقدی عملیاتی ${formatG(Number(markers.get("operating_cash_flow")))} است`);
+        if (markers.has("quality_of_earnings")) parts.push(`کیفیت سود بر پایه شواهد ${markers.get("quality_of_earnings")} است`);
+        if (markers.has("integrity_checks")) parts.push(`بررسی‌های انسجام حسابداری: ${markers.get("integrity_checks")}`);
+        if (markers.has("not_applicable_ratios")) parts.push(`نسبت‌های نامفهوم: ${markers.get("not_applicable_ratios")}`);
+        if (markers.has("derived_residual")) parts.push(`هزینه باقی‌مانده مشتق‌شده ${formatG(Number(markers.get("derived_residual")))} است`);
 
         steps.push("compose-evidence-bound-explanation");
         return {
