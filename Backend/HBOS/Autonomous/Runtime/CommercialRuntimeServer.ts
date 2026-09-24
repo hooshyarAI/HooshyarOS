@@ -501,25 +501,52 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     /**
      * Grounded statement insight for a tenant-scoped canonical source. Reuses
      * `deriveAnalysisInput`/`derivePriorStatement` (canonical facts) and the
-     * persisted analytics result (existing ratio analytics) so the report,
-     * assistant and insights endpoints share one composition.
+     * existing ratio analytics so the report, assistant and insights endpoints
+     * share one composition.
+     *
+     * The insight describes exactly ONE source: a persisted analytics result is
+     * reused only when it was computed for this same `sha256`. A result for a
+     * different source (or a manual result whose provenance is unknown) must
+     * never be combined with these canonical facts, so it is recomputed
+     * deterministically from this source's canonical statement instead. Nothing
+     * is fabricated: the ratio owner still fails closed per section when evidence
+     * is absent.
      */
     const loadStatementInsight = async (
         tenantId: string,
         sha256: string | undefined,
-        analytics?: FinancialAnalyticsResult,
+        analytics?: StoredAnalytics,
     ): Promise<FinancialStatementInsight | undefined> => {
         if (!sha256) return undefined;
         const model = await loadIngestedModel(tenantId, sha256);
         if (!model?.document) return undefined;
         const derived = deriveAnalysisInput(model.document);
         const prior = derivePriorStatement(model.document);
+        const correlated = analytics && analytics.source?.sha256 === sha256 ? analytics : undefined;
+        const sourceAnalytics = correlated ?? financialAnalytics.execute({
+            tenantId,
+            statement: derived.statement as FinancialAnalyticsInput["statement"],
+            ...(Object.keys(prior).length > 0 ? { priorStatement: prior as FinancialAnalyticsInput["priorStatement"] } : {}),
+        });
         return composeFinancialStatementInsight({
             document: model.document,
             derived,
             prior,
-            analytics: analytics ?? await loadAnalytics(tenantId),
+            analytics: sourceAnalytics,
         });
+    };
+
+    /**
+     * Analytics correlated to one analyzed source. A persisted analytics result
+     * belongs to a report/assistant context only when it is untagged (the manual
+     * ledger path) or explicitly tagged with the same SHA-256. A result computed
+     * for a different source is never mixed into this context.
+     */
+    const correlatedAnalyticsFor = async (tenantId: string, sha256: string): Promise<StoredAnalytics | undefined> => {
+        const loaded = await loadAnalytics(tenantId);
+        if (!loaded) return undefined;
+        if (loaded.source && loaded.source.sha256 !== sha256) return undefined;
+        return loaded;
     };
 
     const describeStatementContext = (insight: FinancialStatementInsight): string[] => {
@@ -1387,16 +1414,28 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                         transactionCount: model.transactions.length,
                         ...(model.document ? { document: summarizeFinancialDocument(model.document) } : {})
                     };
-                    if (!series) series = model.transactions.map((transaction) => transaction.credit - transaction.debit);
                     if (model.document) {
+                        // Canonical document facts are authoritative. Client-supplied
+                        // `statement`/`priorStatement`/`series` must never override a
+                        // verified statement source (this mirrors the precedence rule
+                        // already enforced by `/api/financial/analyze`). Otherwise the
+                        // persisted statement insight would mix verified facts with
+                        // unverified client figures and later reach the report and
+                        // assistant as if it were one verified context. Absent measures
+                        // stay absent and the ratio owner fails closed per section
+                        // instead of being silently filled with zeros.
                         const derived = deriveAnalysisInput(model.document);
-                        if (!statement) statement = derived.statement as FinancialAnalyticsInput["statement"];
-                        if (!priorStatement) {
-                            const prior = derivePriorStatement(model.document);
-                            if (Object.keys(prior).length > 0) {
-                                priorStatement = prior as FinancialAnalyticsInput["priorStatement"];
-                            }
-                        }
+                        statement = derived.statement as FinancialAnalyticsInput["statement"];
+                        const prior = derivePriorStatement(model.document);
+                        priorStatement = Object.keys(prior).length > 0
+                            ? prior as FinancialAnalyticsInput["priorStatement"]
+                            : undefined;
+                        // A document source carries no ledger transaction series; use
+                        // the canonical (empty) series so forecast/anomaly sections
+                        // fail closed rather than consuming client-supplied numbers.
+                        series = model.transactions.map((transaction) => transaction.credit - transaction.debit);
+                    } else if (!series) {
+                        series = model.transactions.map((transaction) => transaction.credit - transaction.debit);
                     }
                 }
 
@@ -1698,7 +1737,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const result = await loadAnalysis(session.tenantId);
                 if (!result) return corsJson(422, { error: "REPORT_ANALYSIS_REQUIRED" });
                 const workbench = await loadWorkbench(session.tenantId);
-                const analytics = await loadAnalytics(session.tenantId);
+                const analytics = await correlatedAnalyticsFor(session.tenantId, result.source.sha256);
                 const insight = analytics?.statementInsight
                     ?? await loadStatementInsight(session.tenantId, result.source.sha256, analytics);
                 const flatSections = buildReportSections(session, result, workbench, analytics, insight).flatMap((section) => section.lines);
@@ -1717,7 +1756,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                     const result = await loadAnalysis(session.tenantId);
                     if (!result) return { status: 422, payload: { error: "REPORT_ANALYSIS_REQUIRED" } };
                     const workbench = await loadWorkbench(session.tenantId);
-                    const analytics = await loadAnalytics(session.tenantId);
+                    const analytics = await correlatedAnalyticsFor(session.tenantId, result.source.sha256);
                     const insight = analytics?.statementInsight
                         ?? await loadStatementInsight(session.tenantId, result.source.sha256, analytics);
                     const exported = await reportExport.generate({
@@ -1782,7 +1821,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const result = await loadAnalysis(session.tenantId);
                 if (!result) return corsJson(422, { error: "ASSISTANT_ANALYSIS_REQUIRED" });
                 const workbench = await loadWorkbench(session.tenantId);
-                const analytics = await loadAnalytics(session.tenantId);
+                const analytics = await correlatedAnalyticsFor(session.tenantId, result.source.sha256);
                 const insight = analytics?.statementInsight
                     ?? await loadStatementInsight(session.tenantId, result.source.sha256, analytics);
                 const statementContext = insight ? describeStatementContext(insight) : [];
