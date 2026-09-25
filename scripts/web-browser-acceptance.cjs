@@ -250,7 +250,7 @@ async function main() {
   const runtime = spawnRuntime();
   let browserProcess = null;
   let cdp = null;
-  const checksExpected = ['render-shell', 'register-interaction', 'dashboard-rendered', 'analysis-interaction', 'analysis-rendered-profit', 'logout-interaction', 'login-interaction'];
+  const checksExpected = ['render-shell', 'register-interaction', 'dashboard-rendered', 'analysis-interaction', 'analysis-rendered-profit', 'context-and-insight-rendered', 'report-interaction', 'logout-interaction', 'login-interaction'];
 
   try {
     await waitHealth(runtime);
