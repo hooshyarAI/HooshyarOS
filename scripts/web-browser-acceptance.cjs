@@ -296,9 +296,12 @@ async function main() {
           analysis: !!document.querySelector('#analysis-form'),
           fileInput: !!document.querySelector('#csv-file'),
           profit: !!document.querySelector('#profit'),
+          workspace: !!document.querySelector('#workspace'),
+          context: !!document.querySelector('#workspace-context-title'),
+          promptChip: !!document.querySelector('.prompt-chip'),
         };
       })()`);
-      return value && value.register && value.login && value.analysis && value.fileInput && value.profit && value.headingOk ? value : null;
+      return value && value.register && value.login && value.analysis && value.fileInput && value.profit && value.workspace && value.context && value.promptChip && value.headingOk ? value : null;
     }, 'render-shell');
     if (shell.title !== 'هوشیارOS') throw new Error(`WEB_BROWSER_TITLE_FAILED:${shell.title}`);
     checks.push('render-shell');
