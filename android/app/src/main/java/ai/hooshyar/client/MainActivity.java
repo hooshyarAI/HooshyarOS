@@ -220,8 +220,9 @@ public final class MainActivity extends Activity {
                     return;
                 }
 
-                connectionPanel.setVisibility(View.VISIBLE);
+                connectionPanel.setVisibility(View.GONE);
                 web.setVisibility(View.VISIBLE);
+                web.setContentDescription("فضای کار هوشیارOS");
                 status.setText("Runtime در دسترس است؛ داشبورد در حال بارگذاری است…");
                 web.loadUrl(endpoint + "/");
             });
