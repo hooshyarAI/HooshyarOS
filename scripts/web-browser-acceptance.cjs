@@ -304,6 +304,8 @@ async function main() {
       return value && value.register && value.login && value.analysis && value.fileInput && value.profit && value.workspace && value.context && value.promptChip && value.headingOk ? value : null;
     }, 'render-shell');
     if (shell.title !== 'هوشیارOS') throw new Error(`WEB_BROWSER_TITLE_FAILED:${shell.title}`);
+    const promptProbe = await evaluate(cdp, `(function () { const button=document.querySelector('.prompt-chip'); const input=document.querySelector('#assistant-question'); button.click(); return input.value; })()`);
+    if (promptProbe !== 'این صورت مالی را تحلیل کن.') throw new Error('WEB_BROWSER_PROMPT_CHIP_FAILED');
     checks.push('render-shell');
 
     // 2. Real interaction: type into the register form and submit it.
