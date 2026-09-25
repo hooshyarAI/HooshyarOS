@@ -358,6 +358,28 @@ async function main() {
     );
     checks.push('analysis-rendered-profit');
 
+    const contextProbe = await waitFor(
+      () => evaluate(cdp, `(function () {
+        const state = document.querySelector('#context-state')?.textContent || '';
+        const source = document.querySelector('#context-source')?.textContent || '';
+        const actions = document.querySelector('#context-actions');
+        const insight = document.querySelector('#statement-insight');
+        return state.includes('تحلیل و بینش آماده') && source.includes('browser-qa.csv') && actions && !actions.hidden && insight && !insight.hidden;
+      })()`),
+      'context-and-insight-rendered',
+      10000,
+    );
+    if (!contextProbe) throw new Error('WEB_BROWSER_CONTEXT_RENDER_FAILED');
+    checks.push('context-and-insight-rendered');
+
+    await evaluate(cdp, `(function () { document.querySelector('#report-section').open=true; document.querySelector('#report-button').click(); return true; })()`);
+    await waitFor(
+      () => evaluate(cdp, `document.querySelector('#report-result').textContent.trim().length > 0`),
+      'report-interaction',
+      15000,
+    );
+    checks.push('report-interaction');
+
     // 6. Real interaction: the logout control ends the session.
     await evaluate(cdp, `(function () { document.querySelector('#logout-button').click(); return true; })()`);
     await waitFor(
