@@ -207,6 +207,13 @@ async function main() {
     if (sources.status !== 200 || !Array.isArray(sources.body.sources) || sources.body.sources.length < 3) throw new Error(`WEB_ACCEPTANCE_SOURCES_FAILED:${sources.status}`);
 
     // Layer 5: financial analytics composition over the canonical ingested source.
+    // The runtime intentionally correlates report/assistant context to the same
+    // analyzed source SHA-256. Re-select structuredIngest as the active analysis
+    // source before exercising analytics/report composition; otherwise later PDF
+    // acceptance fixtures would make a correct source-isolation guard look broken.
+    await sleep(1100);
+    const structuredSourceAnalysis = await request('/api/financial/analyze', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceSha256: structuredIngest.body.evidence.sha256, assets: 10000, liabilities: 4000 }) });
+    if (structuredSourceAnalysis.status !== 200 || structuredSourceAnalysis.body.status !== 'READY' || structuredSourceAnalysis.body.source?.sha256 !== structuredIngest.body.evidence.sha256) throw new Error(`WEB_ACCEPTANCE_ANALYTICS_SOURCE_RESELECT_FAILED:${structuredSourceAnalysis.status}:${JSON.stringify(structuredSourceAnalysis.body)}`);
     await sleep(1100);
     const analytics = await request('/api/financial/insights', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceSha256: structuredIngest.body.evidence.sha256, breakEven: { fixedCosts: 1000, variableCostPerUnit: 5, pricePerUnit: 10, unitsSold: 300 } }) });
     if (analytics.status !== 200 || analytics.body.status !== 'READY' || analytics.body.capabilityId !== 'product.financial-analytics' || analytics.body.targetEngine !== 'Financial Intelligence Engine' || analytics.body.breakEven?.breakEvenUnits !== 200 || !Array.isArray(analytics.body.anomalies?.zscore?.points) || analytics.body.source?.sha256 !== structuredIngest.body.evidence.sha256) throw new Error(`WEB_ACCEPTANCE_ANALYTICS_FAILED:${analytics.status}:${JSON.stringify(analytics.body)}`);
