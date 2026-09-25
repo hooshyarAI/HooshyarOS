@@ -146,6 +146,7 @@ async function refreshDashboard() {
     document.querySelector('#revenue').textContent = Number(dashboard.metrics?.revenue ?? 0).toLocaleString('fa-IR');
     document.querySelector('#profit').textContent = Number(dashboard.metrics?.profit ?? 0).toLocaleString('fa-IR');
     document.querySelector('#risk').textContent = `${Number(dashboard.metrics?.risk ?? 0).toLocaleString('fa-IR')}٪`;
+    syncWorkspaceSnapshot();
     await refreshAnalyticsSources();
     await refreshReportArtifacts();
   } catch (error) {
@@ -158,9 +159,11 @@ async function refreshSessionState() {
   try {
     const session = await getJson('/api/session');
     result.textContent = `نشست فعال: ${session.username} — سازمان ${session.organization.name} (نقش ${session.role}).`;
+    const contextSession=document.querySelector('#context-session'); if(contextSession)contextSession.textContent=session.organization.name;
     return session;
   } catch {
     result.textContent = 'نشست فعالی وجود ندارد. ثبت‌نام کنید یا با گذرواژه وارد شوید.';
+    const contextSession=document.querySelector('#context-session'); if(contextSession)contextSession.textContent='بدون ورود';
     return null;
   }
 }
@@ -346,6 +349,39 @@ async function pollIngestJob(jobId) {
   }
 }
 
+
+function syncWorkspaceSnapshot() {
+  const pairs=[['#revenue-inline','#revenue'],['#profit-inline','#profit'],['#risk-inline','#risk']];
+  for (const [target,source] of pairs) {
+    const a=document.querySelector(target), b=document.querySelector(source);
+    if(a&&b)a.textContent=b.textContent;
+  }
+}
+function setWorkspaceContext({title,description,source,state,revealActions=false}={}) {
+  for (const [selector,value] of [['#workspace-context-title',title],['#workspace-context-description',description],['#context-source',source],['#context-state',state]]) {
+    const el=document.querySelector(selector); if(el&&value!==undefined)el.textContent=value;
+  }
+  const actions=document.querySelector('#context-actions'); if(actions&&revealActions)actions.hidden=false;
+}
+function wireWorkspaceInteractions() {
+  document.querySelectorAll('[data-scroll-target]').forEach(button=>button.addEventListener('click',()=>{
+    const target=document.querySelector(button.dataset.scrollTarget);
+    if(target){target.scrollIntoView({behavior:'smooth',block:'start'});const details=target.closest('details');if(details)details.open=true;}
+  }));
+  document.querySelectorAll('[data-focus-target]').forEach(button=>button.addEventListener('click',()=>{
+    const target=document.querySelector(button.dataset.focusTarget);
+    if(target){target.focus({preventScroll:true});target.scrollIntoView({behavior:'smooth',block:'center'});}
+  }));
+  document.querySelectorAll('.prompt-chip').forEach(button=>button.addEventListener('click',()=>{
+    const input=document.querySelector('#assistant-question'); if(!input)return; input.value=button.dataset.prompt||''; input.focus();
+  }));
+  const file=document.querySelector('#csv-file');
+  if(file)file.addEventListener('change',()=>{
+    const selected=file.files&&file.files[0]; if(!selected)return;
+    setWorkspaceContext({title:'منبع انتخاب شد',description:'منبع دریافت شد؛ اکنون آن را به context معتبر تبدیل و سپس تحلیل می‌کنیم.',source:selected.name,state:'آماده دریافت و اعتبارسنجی'});
+  });
+}
+
 async function finishIngestJob(job, entry) {
   const result = document.querySelector('#analysis-result');
   if (!job || job.status !== 'COMPLETED' || !job.result) {
@@ -372,6 +408,7 @@ async function finishIngestJob(job, entry) {
   result.textContent = `تحلیل موفق (${job.result.sourceType}): ${Number(job.result.transactionCount).toLocaleString('fa-IR')} تراکنش، سود ${Number(analysis.metrics.profit).toLocaleString('fa-IR')}، نسبت بدهی ${Number(analysis.metrics.debtRatio * 100).toLocaleString('fa-IR')}٪ (دارایی‌ها: ${originLabel(provenance.assets)}، بدهی‌ها: ${originLabel(provenance.liabilities)}). وضعیت: ${analysis.status}`;
   clearPersistedIngestJob();
   renderStatementInsight(null);
+  syncWorkspaceSnapshot();
   await refreshDashboard();
   try {
     const insights = await getJson('/api/financial/insights', {
@@ -380,27 +417,33 @@ async function finishIngestJob(job, entry) {
       body: JSON.stringify({ sourceSha256: job.result.sha256 })
     });
     renderStatementInsight(insights.statementInsight || null);
+    syncWorkspaceSnapshot();
+    setWorkspaceContext({title:'نتیجه آماده است',description:'یافته‌ها، شواهد و محدودیت‌ها از همان منبع معتبر نمایش داده شده‌اند.',source:entry.sourceName,state:'تحلیل و بینش آماده',revealActions:true});
   } catch (error) {
     renderStatementInsight({ error: describeFailure(error) });
+    syncWorkspaceSnapshot();
+    setWorkspaceContext({title:'بخشی از تحلیل در دسترس نیست',description:'محدودیت دقیق در بخش نتیجه نمایش داده شده؛ دادهٔ قابل اتکا پنهان نشده است.',source:entry.sourceName,state:'نیازمند بررسی محدودیت',revealActions:true});
   }
 }
 
+function evidenceBadge(level) {
+  const labels={EXTRACTED_FACT:['واقعیت تأییدشده','evidence-fact'],DERIVED_METRIC:['شاخص مشتق‌شده','evidence-derived'],INTERPRETATION:['تفسیر','evidence-interpretation'],MANAGEMENT_RECOMMENDATION:['اقدام مدیریتی','evidence-recommendation']};
+  const [label,className]=labels[level]||[level||'نتیجه','evidence-derived'];
+  const badge=document.createElement('span'); badge.className=`evidence-badge ${className}`; badge.textContent=label; return badge;
+}
 function insightList(title, findings) {
   if (!Array.isArray(findings) || findings.length === 0) return null;
-  const section = document.createElement('section');
-  const heading = document.createElement('h4');
-  heading.textContent = title;
-  section.appendChild(heading);
-  const list = document.createElement('ul');
-  for (const finding of findings) {
-    const item = document.createElement('li');
-    const message = typeof finding === 'string' ? finding : String(finding.message ?? '');
-    const level = typeof finding === 'string' ? null : finding.evidenceLevel;
-    item.textContent = level ? `[${level}] ${message}` : message;
-    list.appendChild(item);
+  const section=document.createElement('section'); section.className='result-block';
+  const details=document.createElement('details'); details.open=title==='خلاصه مدیریتی (تفسیر)';
+  const summary=document.createElement('summary'); summary.textContent=title; details.appendChild(summary);
+  const list=document.createElement('ul');
+  for(const finding of findings){
+    const item=document.createElement('li'); item.className='evidence-item';
+    const message=typeof finding==='string'?finding:String(finding.message??''); const level=typeof finding==='string'?null:finding.evidenceLevel;
+    if(level)item.appendChild(evidenceBadge(level));
+    const body=document.createElement('span'); body.textContent=message; item.appendChild(body); list.appendChild(item);
   }
-  section.appendChild(list);
-  return section;
+  details.appendChild(list); section.appendChild(details); return section;
 }
 
 function ratioLine(label, value) {
@@ -1007,6 +1050,7 @@ document.querySelector('#analytics-form').addEventListener('submit', async event
   }
 });
 
+wireWorkspaceInteractions();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => undefined);
 if (typeof window !== 'undefined') window.addEventListener('online', () => { flushOfflineQueue(); });
 refreshSessionState();
