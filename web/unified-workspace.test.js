@@ -1,4 +1,5 @@
 const fs=require('node:fs');
+const vm=require('node:vm');
 const path=require('node:path');
 const ROOT=path.join(__dirname,'..');
 const read=file=>fs.readFileSync(path.join(ROOT,file),'utf8');
@@ -21,6 +22,8 @@ describe('Unified Intelligent Workspace UI contract',()=>{
   test('distinguishes result semantics without exposing private reasoning',()=>{
     expect(html).toContain('واقعیت تأییدشده'); expect(html).toContain('شاخص مشتق‌شده'); expect(html).toContain('اقدام مدیریتی'); expect(app).toContain('evidenceBadge'); expect(app).not.toContain('chain-of-thought');
   });
+  test('preserves the legacy workspace anchor for existing links',()=>{ expect(html).toContain('id="workspace"'); expect(html).toContain('id="main-workspace"'); });
+  test('parses the shipped app script as valid JavaScript',()=>{ expect(()=>new vm.Script(app,{filename:'web/app.js'})).not.toThrow(); });
   test('keeps the surface framework-free and mobile-adaptive',()=>{
     expect(html).toContain('dir="rtl"'); expect(css).toContain('@media(max-width:760px)'); expect(css).toContain('@media(prefers-reduced-motion:reduce)'); expect(css).not.toContain('bootstrap'); expect(css).not.toContain('tailwind');
   });
