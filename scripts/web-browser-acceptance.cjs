@@ -290,7 +290,7 @@ async function main() {
         const heading = document.querySelector('h1') ? document.querySelector('h1').textContent : '';
         return {
           title,
-          headingOk: heading.includes('مرکز هوشمندی مالی'),
+          headingOk: heading.includes('چه کاری می‌خواهید انجام دهید؟'),
           register: !!document.querySelector('#register-form'),
           login: !!document.querySelector('#login-form'),
           analysis: !!document.querySelector('#analysis-form'),
@@ -300,7 +300,7 @@ async function main() {
       })()`);
       return value && value.register && value.login && value.analysis && value.fileInput && value.profit && value.headingOk ? value : null;
     }, 'render-shell');
-    if (shell.title !== 'هوشیار.ai') throw new Error(`WEB_BROWSER_TITLE_FAILED:${shell.title}`);
+    if (shell.title !== 'هوشیارOS') throw new Error(`WEB_BROWSER_TITLE_FAILED:${shell.title}`);
     checks.push('render-shell');
 
     // 2. Real interaction: type into the register form and submit it.
