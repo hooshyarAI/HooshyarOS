@@ -100,7 +100,7 @@ async function main() {
   try {
     await waitHealth(child);
     const rootPage = await fetch(`http://127.0.0.1:${port}/`);
-    if (!rootPage.ok || !(await rootPage.text()).includes('هوشیار.ai')) throw new Error('WEB_ACCEPTANCE_ROOT_FAILED');
+    if (!rootPage.ok || !(await rootPage.text()).includes('هوشیارOS')) throw new Error('WEB_ACCEPTANCE_ROOT_FAILED');
     const session = await request('/api/session', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'web-qa', organization: 'Hooshyar Web QA' }) });
     if (session.status !== 201 || !session.body.tenantId || !session.setCookie) throw new Error(`WEB_ACCEPTANCE_SESSION_FAILED:${session.status}`);
     const cookie = session.setCookie.split(';')[0];
