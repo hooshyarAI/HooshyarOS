@@ -58,7 +58,7 @@ describe("Commercial web entrypoint", () => {
 
         expect(home.status).toBe(200);
         expect(home.contentType).toContain("text/html");
-        expect(home.body).toContain("هوشیار.ai");
+        expect(home.body).toContain("هوشیارOS");
         expect(home.body).toContain("/app.js");
         expect(home.body).toContain("/offline-sync.js");
         expect(home.body).toContain("/manifest.webmanifest");
