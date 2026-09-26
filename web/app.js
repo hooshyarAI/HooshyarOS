@@ -426,11 +426,142 @@ async function finishIngestJob(job, entry) {
   }
 }
 
+let latestStatementInsight = null;
+
+const FINANCIAL_METRIC_LABELS_FA = {
+  revenue: 'درآمد',
+  cogs: 'بهای تمام‌شده',
+  grossProfit: 'سود ناخالص',
+  operatingExpenses: 'هزینه‌های عملیاتی',
+  operatingProfit: 'سود عملیاتی',
+  netProfit: 'سود خالص',
+  currentAssets: 'دارایی‌های جاری',
+  totalAssets: 'کل دارایی‌ها',
+  currentLiabilities: 'بدهی‌های جاری',
+  totalLiabilities: 'کل بدهی‌ها',
+  equity: 'حقوق مالکانه',
+  operatingCashFlow: 'جریان نقد عملیاتی',
+  investingCashFlow: 'جریان نقد سرمایه‌گذاری',
+  financingCashFlow: 'جریان نقد تأمین مالی',
+  netCashFlow: 'تغییر خالص وجه نقد'
+};
+
+const FINANCIAL_RATIO_LABELS_FA = {
+  grossMargin: 'حاشیه سود ناخالص',
+  operatingMargin: 'حاشیه سود عملیاتی',
+  netMargin: 'حاشیه سود خالص',
+  roa: 'بازده دارایی',
+  roe: 'بازده حقوق مالکانه',
+  currentRatio: 'نسبت جاری',
+  quickRatio: 'نسبت آنی',
+  cashRatio: 'نسبت نقد',
+  debtToEquity: 'بدهی به حقوق مالکانه',
+  debtToAssets: 'بدهی به دارایی',
+  equityRatio: 'نسبت حقوق مالکانه'
+};
+
+const FINANCIAL_RATIO_PERCENT_KEYS = new Set([
+  'grossMargin', 'operatingMargin', 'netMargin', 'roa', 'roe', 'debtToAssets', 'equityRatio'
+]);
+
+const FINANCIAL_COMPARATIVE_LABELS_FA = {
+  revenue: 'درآمد',
+  cogs: 'بهای تمام‌شده',
+  grossProfit: 'سود ناخالص',
+  operatingExpenses: 'هزینه‌های عملیاتی',
+  operatingIncome: 'سود عملیاتی',
+  netIncome: 'سود خالص',
+  totalAssets: 'کل دارایی‌ها',
+  totalLiabilities: 'کل بدهی‌ها',
+  equity: 'حقوق مالکانه'
+};
+
+const FINANCIAL_INTEGRITY_LABELS_FA = {
+  'balance-sheet-identity': 'ترازنامه',
+  'gross-profit-identity': 'سود ناخالص',
+  'operating-profit-identity': 'سود عملیاتی',
+  'pre-tax-identity': 'سود قبل از مالیات',
+  'net-profit-identity': 'سود خالص',
+  'cash-flow-identity': 'جریان نقد'
+};
+
+function formatFaNumber(value, maximumFractionDigits = 2) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return String(value ?? '');
+  return n.toLocaleString('fa-IR', { maximumFractionDigits, minimumFractionDigits: 0 });
+}
+
+function formatFaAmount(value, currency = 'IRR') {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 'نامشخص';
+  const unit = currency === 'IRR' ? 'ریال' : (currency || 'واحد پول');
+  const abs = Math.abs(n);
+  if (abs >= 1e12) return `${formatFaNumber(n / 1e12, 2)} تریلیون ${unit}`;
+  if (abs >= 1e9) return `${formatFaNumber(n / 1e9, 2)} میلیارد ${unit}`;
+  if (abs >= 1e6) return `${formatFaNumber(n / 1e6, 2)} میلیون ${unit}`;
+  return `${formatFaNumber(n, 0)} ${unit}`;
+}
+
+function formatFaPercent(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 'نامشخص';
+  return `${formatFaNumber(n * 100, 2)}٪`;
+}
+
+function formatFaRatio(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? `${formatFaNumber(n, 2)} برابر` : 'نامشخص';
+}
+
+function localizeFinancialText(value) {
+  let text = String(value ?? '');
+  const replacements = [
+    ['Extracted net profit', 'سود خالص ثبت‌شده'],
+    ['net profit', 'سود خالص'],
+    ['Net margin', 'حاشیه سود خالص'],
+    ['Gross margin', 'حاشیه سود ناخالص'],
+    ['Operating margin', 'حاشیه سود عملیاتی'],
+    ['Revenue increased', 'درآمد افزایش یافته است'],
+    ['Revenue grew relative to the prior period.', 'درآمد نسبت به دوره قبل افزایش یافته است.'],
+    ['Revenue declined relative to the prior period.', 'درآمد نسبت به دوره قبل کاهش یافته است.'],
+    ['Current assets cover current liabilities in the reported period.', 'دارایی‌های جاری بدهی‌های جاری را پوشش می‌دهند.'],
+    ['Operations generated positive net cash flow.', 'فعالیت‌های عملیاتی جریان نقد مثبت ایجاد کرده‌اند.'],
+    ['earnings are cash-backed.', 'سود از جریان نقد پشتیبانی می‌شود.'],
+    ['the capital structure is debt-heavy.', 'ساختار تأمین مالی بدهی‌محور است.'],
+    ['unavailable', 'نامشخص'],
+    ['not applicable', 'قابل اتکا نیست'],
+    ['NOT_TESTABLE', 'قابل آزمون نیست'],
+    ['RECONCILED', 'سازگار'],
+    ['MISMATCH', 'دارای اختلاف'],
+    ['EXTRACTED_FACT', 'واقعیت تأییدشده'],
+    ['DERIVED_METRIC', 'شاخص مشتق‌شده'],
+    ['INTERPRETATION', 'تفسیر'],
+    ['MANAGEMENT_RECOMMENDATION', 'اقدام مدیریتی']
+  ];
+  for (const [from, to] of replacements) text = text.split(from).join(to);
+  return text.replace(/[-+]?(?:\d+(?:\.\d+)?|\.\d+)(?:e[-+]?\d+)?/gi, token => {
+    const n = Number(token);
+    return Number.isFinite(n) ? formatFaNumber(n, 6) : token;
+  }).replace(/%/g, '٪');
+}
+
+function humanizeStatementStatus(status) {
+  if (status === 'COMPLETED') return 'کامل';
+  if (status === 'PARTIAL') return 'ناقص؛ بخشی از اطلاعات ممکن است در دسترس نباشد';
+  if (status === 'READY') return 'آماده';
+  return localizeFinancialText(status || 'نامشخص');
+}
+
 function evidenceBadge(level) {
   const labels={EXTRACTED_FACT:['واقعیت تأییدشده','evidence-fact'],DERIVED_METRIC:['شاخص مشتق‌شده','evidence-derived'],INTERPRETATION:['تفسیر','evidence-interpretation'],MANAGEMENT_RECOMMENDATION:['اقدام مدیریتی','evidence-recommendation']};
-  const [label,className]=labels[level]||[level||'نتیجه','evidence-derived'];
+  const [label,className]=labels[level]||['نتیجه','evidence-derived'];
   const badge=document.createElement('span'); badge.className=`evidence-badge ${className}`; badge.textContent=label; return badge;
 }
+
+function findingMessage(finding) {
+  return localizeFinancialText(typeof finding === 'string' ? finding : finding?.message ?? '');
+}
+
 function insightList(title, findings) {
   if (!Array.isArray(findings) || findings.length === 0) return null;
   const section=document.createElement('section'); section.className='result-block';
@@ -439,124 +570,201 @@ function insightList(title, findings) {
   const list=document.createElement('ul');
   for(const finding of findings){
     const item=document.createElement('li'); item.className='evidence-item';
-    const message=typeof finding==='string'?finding:String(finding.message??''); const level=typeof finding==='string'?null:finding.evidenceLevel;
+    const level=typeof finding==='string'?null:finding?.evidenceLevel;
     if(level)item.appendChild(evidenceBadge(level));
-    const body=document.createElement('span'); body.textContent=message; item.appendChild(body); list.appendChild(item);
+    const body=document.createElement('span'); body.textContent=findingMessage(finding); item.appendChild(body); list.appendChild(item);
   }
   details.appendChild(list); section.appendChild(details); return section;
 }
 
-function ratioLine(label, value) {
-  return `${label}: ${value === null || value === undefined ? 'نامشخص (شواهد ناکافی)' : value}`;
+function ratioLine(key, value, insight) {
+  const label = FINANCIAL_RATIO_LABELS_FA[key] || key;
+  if (value === null || value === undefined) return `${label}: نامشخص (شواهد کافی وجود ندارد)`;
+  return FINANCIAL_RATIO_PERCENT_KEYS.has(key)
+    ? `${label}: ${formatFaPercent(value)}`
+    : `${label}: ${formatFaRatio(value)}`;
+}
+
+function comparativeLine(entry, currency) {
+  const label = FINANCIAL_COMPARATIVE_LABELS_FA[entry.line] || localizeFinancialText(entry.line);
+  const change = entry.absoluteChange;
+  const direction = change > 0 ? 'افزایش' : change < 0 ? 'کاهش' : 'بدون تغییر';
+  let percent = entry.pctChange === null || entry.pctChange === undefined
+    ? (entry.pctChangeUnavailableReason === 'sign-reversal'
+      ? 'درصد تغییر به دلیل تغییر علامت قابل اتکا نیست'
+      : 'درصد تغییر قابل محاسبه نیست')
+    : formatFaPercent(entry.pctChange);
+  return `${label}: از ${formatFaAmount(entry.prior, currency)} به ${formatFaAmount(entry.current, currency)}؛ ${direction} ${formatFaAmount(Math.abs(change), currency)}؛ ${percent}`;
+}
+
+function integrityLine(check, currency) {
+  const label = FINANCIAL_INTEGRITY_LABELS_FA[check.id] || check.id;
+  if (check.status === 'RECONCILED') return `${label}: اعداد سند با کنترل حسابداری سازگارند.`;
+  if (check.status === 'NOT_TESTABLE') {
+    const missing = (check.missing || []).map(localizeFinancialText).join('، ');
+    return `${label}: بررسی کامل ممکن نیست؛ اطلاعات لازم ${missing || 'در دسترس نیست'}.`;
+  }
+  return `${label}: بین اعداد این بخش ${formatFaAmount(Math.abs(check.difference), currency)} اختلاف وجود دارد.`;
+}
+
+function buildFinancialSummary(insight) {
+  const c = insight.comparative || [];
+  const current = key => insight.metrics?.[key];
+  const find = key => c.find(item => item.line === key);
+  const lines = [];
+  const rev = find('revenue');
+  const profit = find('netIncome');
+  const gp = find('grossProfit');
+  const opx = find('operatingExpenses');
+  if (rev && profit) {
+    const direction = profit.absoluteChange > 0 ? 'افزایش یافته' : profit.absoluteChange < 0 ? 'کاهش یافته' : 'بدون تغییر بوده است';
+    lines.push(`سود خالص در مقایسه با دوره قبل ${direction} و اکنون ${formatFaAmount(current('netProfit'), insight.currency)} است.`);
+    if (rev.absoluteChange > 0) lines.push(`درآمد نیز ${formatFaPercent(rev.pctChange)} رشد کرده است.`);
+    if (gp?.absoluteChange > 0) lines.push(`سود ناخالص ${formatFaPercent(gp.pctChange)} رشد کرده است.`);
+    if (opx?.absoluteChange < 0) lines.push(`هزینه‌های عملیاتی ${formatFaPercent(Math.abs(opx.pctChange))} کاهش یافته است.`);
+  }
+  if (insight.cashFlow?.operating != null) {
+    lines.push(`جریان نقد عملیاتی ${formatFaAmount(insight.cashFlow.operating, insight.currency)} است.`);
+  }
+  return lines;
+}
+
+function buildFinancialAssistantAnswer(insight, question) {
+  const q = String(question || '').replace(/\s+/g, ' ').trim();
+  if (!insight) return null;
+  const currency = insight.currency || 'IRR';
+  const c = insight.comparative || [];
+  const current = key => insight.metrics?.[key];
+  const find = key => c.find(item => item.line === key);
+  const lines = [];
+
+  if (/چرا.*سود|سود.*تغییر|سود.*عوض/i.test(q)) {
+    const rev=find('revenue'), profit=find('netIncome'), gp=find('grossProfit'), opx=find('operatingExpenses'), op=find('operatingIncome');
+    if (profit) {
+      lines.push(`سود خالص از ${formatFaAmount(profit.prior, currency)} به ${formatFaAmount(profit.current, currency)} رسیده است؛ ${profit.pctChange == null ? 'درصد تغییر به دلیل نوع تغییر قابل اتکا نیست' : `افزایش ${formatFaPercent(profit.pctChange)}`}.`);
+    }
+    if (rev && gp && opx && op) {
+      lines.push(`عوامل قابل مشاهده در صورت مالی: درآمد ${rev.pctChange == null ? 'تغییر داشته' : ` ${formatFaPercent(rev.pctChange)} افزایش`}؛ سود ناخالص ${gp.pctChange == null ? 'تغییر داشته' : ` ${formatFaPercent(gp.pctChange)} افزایش`}؛ هزینه‌های عملیاتی ${opx.pctChange == null ? 'تغییر داشته' : ` ${formatFaPercent(Math.abs(opx.pctChange))} کاهش`}؛ سود عملیاتی ${op.pctChange == null ? 'تغییر داشته' : ` ${formatFaPercent(op.pctChange)} افزایش`}.`);
+      lines.push('بنابراین داده‌ها با رشد هم‌زمان درآمد و سود ناخالص و کنترل هزینه‌های عملیاتی سازگار است؛ اما این موضوع علت قطعی همه اجزای تغییر سود را اثبات نمی‌کند.');
+    } else {
+      lines.push('برای توضیح علت تغییر سود، اطلاعات مقایسه‌ای کافی در سند موجود نیست.');
+    }
+  } else if (/ریسک/i.test(q)) {
+    const debt=insight.ratios?.debtToAssets, liabilities=current('totalLiabilities'), equity=current('equity');
+    if (debt != null) lines.push(`نسبت بدهی ${formatFaPercent(debt)} است؛ یعنی ${formatFaAmount(liabilities, currency)} بدهی در برابر ${formatFaAmount(equity, currency)} حقوق مالکانه.`);
+    if (liabilities != null && equity != null && liabilities > equity) lines.push(`بدهی ${formatFaAmount(liabilities - equity, currency)} بیشتر از حقوق مالکانه است؛ این موضوع نیاز به کنترل ساختار تأمین مالی دارد.`);
+    const mismatch=(insight.integrity||[]).find(x=>x.status==='MISMATCH');
+    if (mismatch) lines.push(`یک اختلاف ${formatFaAmount(Math.abs(mismatch.difference), currency)} در کنترل ${FINANCIAL_INTEGRITY_LABELS_FA[mismatch.id] || 'حسابداری'} دیده شده است.`);
+  } else if (/کم|ناقص|اطلاعات.*لازم|چه چیز/i.test(q)) {
+    const limitations=(insight.limitations||[]).map(localizeFinancialText);
+    lines.push(...limitations.slice(0,6));
+    if (!lines.length) lines.push('در داده‌های فعلی، محدودیت مهمی ثبت نشده است.');
+  } else {
+    lines.push(...buildFinancialSummary(insight));
+  }
+
+  lines.push(`مبنای پاسخ: سند ${q ? 'و' : ''} با وضعیت «${humanizeStatementStatus(insight.documentStatus)}»؛ نتیجه فقط بر اساس شواهد موجود در همان سند است.`);
+  return lines.join('\n');
 }
 
 function renderStatementInsight(insight) {
   const container = document.querySelector('#statement-insight');
   container.textContent = '';
+  latestStatementInsight = insight || null;
   if (!insight) { container.hidden = true; return; }
   container.hidden = false;
   if (insight.error) {
     container.textContent = `تحلیل صورت مالی در دسترس نیست: ${insight.error}`;
     return;
   }
+
   const summary = document.createElement('h3');
-  summary.textContent = 'تحلیل جامع صورت مالی';
+  summary.textContent = 'تحلیل جامع صورت مالی — به زبان ساده';
   container.appendChild(summary);
 
-  const periods = Array.isArray(insight.periods) ? insight.periods.map(p => p.label).join(' | ') : '';
   const meta = document.createElement('p');
-  meta.textContent = `وضعیت سند: ${insight.documentStatus ?? 'نامشخص'} — دوره‌ها: ${periods || 'نامشخص'}`;
+  const periods = Array.isArray(insight.periods) ? insight.periods.map(p => p.label).join(' | ') : 'نامشخص';
+  meta.textContent = `وضعیت سند: ${humanizeStatementStatus(insight.documentStatus)} — دوره‌ها: ${periods}`;
   container.appendChild(meta);
+
+  const snapshot = document.createElement('div');
+  snapshot.className='financial-snapshot';
+  const snapshotItems = [
+    ['درآمد', insight.metrics?.revenue, 'amount'],
+    ['سود خالص', insight.metrics?.netProfit, 'amount'],
+    ['نسبت بدهی', insight.ratios?.debtToAssets, 'percent'],
+    ['جریان نقد عملیاتی', insight.cashFlow?.operating, 'amount']
+  ];
+  for (const [label,value,kind] of snapshotItems) {
+    const card=document.createElement('article'); card.className='summary-card';
+    const valueText=kind==='percent' ? formatFaPercent(value) : formatFaAmount(value, insight.currency || 'IRR');
+    card.innerHTML=`<span>${label}</span><strong>${valueText}</strong>`;
+    snapshot.appendChild(card);
+  }
+  container.appendChild(snapshot);
+
+  const summaryLines = buildFinancialSummary(insight);
+  if (summaryLines.length) {
+    const executive=document.createElement('section'); executive.className='executive-summary';
+    const h=document.createElement('h4'); h.textContent='برداشت مدیریتی'; executive.appendChild(h);
+    const ul=document.createElement('ul');
+    for(const line of summaryLines){ const li=document.createElement('li'); li.textContent=line; ul.appendChild(li); }
+    executive.appendChild(ul); container.appendChild(executive);
+  }
 
   const append = section => { if (section) container.appendChild(section); };
   const textSection = (title, lines) => {
     if (!Array.isArray(lines) || lines.length === 0) return null;
-    const section = document.createElement('section');
-    const heading = document.createElement('h4');
-    heading.textContent = title;
-    section.appendChild(heading);
-    const list = document.createElement('ul');
-    for (const line of lines) { const item = document.createElement('li'); item.textContent = line; list.appendChild(item); }
-    section.appendChild(list);
-    return section;
+    const section=document.createElement('section'); section.className='result-block';
+    const heading=document.createElement('h4'); heading.textContent=title; section.appendChild(heading);
+    const list=document.createElement('ul');
+    for(const line of lines){ const item=document.createElement('li'); item.textContent=line; list.appendChild(item); }
+    section.appendChild(list); return section;
   };
+
   append(insightList('خلاصه مدیریتی (تفسیر)', insight.interpretation));
+
   if (insight.ratios) {
-    const section = document.createElement('section');
-    const heading = document.createElement('h4');
-    heading.textContent = 'نسبت‌های مالی';
-    section.appendChild(heading);
-    const list = document.createElement('ul');
-    for (const line of [
-      ratioLine('حاشیه سود ناخالص', insight.ratios.grossMargin),
-      ratioLine('حاشیه سود عملیاتی', insight.ratios.operatingMargin),
-      ratioLine('حاشیه سود خالص', insight.ratios.netMargin),
-      ratioLine('بازده دارایی (ROA)', insight.ratios.roa),
-      ratioLine('بازده حقوق مالکانه (ROE)', insight.ratios.roe),
-      ratioLine('نسبت جاری', insight.ratios.currentRatio),
-      ratioLine('نسبت آنی', insight.ratios.quickRatio),
-      ratioLine('نسبت نقد', insight.ratios.cashRatio),
-      ratioLine('بدهی به حقوق مالکانه', insight.ratios.debtToEquity),
-      ratioLine('بدهی به دارایی', insight.ratios.debtToAssets),
-      ratioLine('نسبت حقوق مالکانه', insight.ratios.equityRatio)
-    ]) { const item = document.createElement('li'); item.textContent = line; list.appendChild(item); }
-    section.appendChild(list);
-    container.appendChild(section);
+    const lines=Object.keys(FINANCIAL_RATIO_LABELS_FA).map(key=>ratioLine(key, insight.ratios[key], insight));
+    append(textSection('نسبت‌های مالی', lines));
   }
+
   append(insightList('نقاط قوت', insight.strengths));
   append(insightList('نقاط ضعف', insight.weaknesses));
   append(insightList('ریسک‌ها', insight.risks));
   append(insightList('فرصت‌ها و رشد', insight.opportunities));
   append(insightList('اقدامات مدیریتی پیشنهادی', insight.managementActions));
+
   if (Array.isArray(insight.comparative) && insight.comparative.length > 0) {
-    append(textSection('تحلیل مقایسه‌ای دوره‌ها', insight.comparative.map(entry => {
-      let pctText;
-      if (entry.pctChange === null || entry.pctChange === undefined) {
-        pctText = entry.pctChangeUnavailableReason === 'sign-reversal'
-          ? 'درصد تغییر معنادار نیست (تغییر علامت)'
-          : 'درصد تغییر نامشخص است (دوره قبل صفر بوده)';
-      } else {
-        pctText = `${(entry.pctChange * 100).toFixed(2)}٪`;
-      }
-      const reversal = entry.signReversal ? ' — تغییر علامت' : '';
-      return `${entry.line}: از ${entry.prior} به ${entry.current}؛ تغییر مطلق ${entry.absoluteChange}؛ ${pctText}${reversal}`;
-    })));
+    append(textSection('مقایسه با دوره قبل', insight.comparative.map(entry=>comparativeLine(entry, insight.currency || 'IRR')));
   }
+
   if (insight.cashFlow) {
-    const cf = insight.cashFlow;
-    const labels = {
-      operating: 'جریان نقدی عملیاتی',
-      investing: 'جریان نقدی سرمایه‌گذاری',
-      financing: 'جریان نقدی تأمین مالی',
-      net: 'خالص تغییر نقد',
-      priorOperating: 'جریان نقدی عملیاتی دوره قبل',
-      qualityOfEarnings: 'کیفیت سود'
-    };
-    append(textSection('تفسیر جریان نقدی', [
-      `${labels.operating}: ${cf.operating === null || cf.operating === undefined ? 'نامشخص (شواهد ناکافی)' : cf.operating}`,
-      `${labels.investing}: ${cf.investing === null || cf.investing === undefined ? 'نامشخص (شواهد ناکافی)' : cf.investing}`,
-      `${labels.financing}: ${cf.financing === null || cf.financing === undefined ? 'نامشخص (شواهد ناکافی)' : cf.financing}`,
-      `${labels.net}: ${cf.net === null || cf.net === undefined ? 'نامشخص (شواهد ناکافی)' : cf.net}`,
-      `${labels.priorOperating}: ${cf.priorOperating === null || cf.priorOperating === undefined ? 'نامشخص (شواهد ناکافی)' : cf.priorOperating}`,
-      `${labels.qualityOfEarnings}: ${cf.qualityOfEarnings ?? 'نامشخص'}`
+    const cf=insight.cashFlow;
+    append(textSection('جریان نقدی', [
+      `جریان نقد عملیاتی: ${formatFaAmount(cf.operating, insight.currency || 'IRR')}`,
+      `جریان نقد سرمایه‌گذاری: ${formatFaAmount(cf.investing, insight.currency || 'IRR')}`,
+      `جریان نقد تأمین مالی: ${formatFaAmount(cf.financing, insight.currency || 'IRR')}`,
+      `تغییر خالص وجه نقد: ${formatFaAmount(cf.net, insight.currency || 'IRR')}`,
+      `جریان نقد عملیاتی دوره قبل: ${formatFaAmount(cf.priorOperating, insight.currency || 'IRR')}`,
+      `کیفیت سود: ${cf.qualityOfEarnings === 'CASH_BACKED' ? 'سود از جریان نقد پشتیبانی می‌شود' : cf.qualityOfEarnings === 'PROFIT_NOT_CASH_BACKED' ? 'سود کاملاً به جریان نقد تبدیل نشده است' : 'نامشخص'}`
     ]));
   }
+
   if (Array.isArray(insight.integrity) && insight.integrity.length > 0) {
-    append(textSection('بررسی‌های انسجام حسابداری', insight.integrity.map(check => {
-      if (check.status === 'NOT_TESTABLE') {
-        return `${check.id}: قابل آزمون نیست (شواهد ناقص: ${(check.missing || []).join('، ') || 'اقلام غیرعملیاتی'})`;
-      }
-      return `${check.id}: ${check.status} (انتظار ${check.expected}، مقدار ${check.actual}، اختلاف ${check.difference})`;
-    })));
+    append(textSection('کنترل‌های سازگاری حسابداری', insight.integrity.map(check=>integrityLine(check, insight.currency || 'IRR'))));
   }
-  if (Array.isArray(insight.ratios?.notApplicable) && insight.ratios.notApplicable.length > 0) {
-    append(textSection('نسبت‌های نامفهوم/بی‌معنا', insight.ratios.notApplicable));
-  }
+
   if (insight.derivedResidual) {
-    append(textSection('هزینه باقی‌مانده مشتق‌شده', [insight.derivedResidual.note]));
+    append(textSection('مقدار باقیمانده مشتق‌شده', [
+      `مقدار: ${formatFaAmount(insight.derivedResidual.value, insight.currency || 'IRR')}`,
+      'این مقدار جمع هزینه‌های استخراج‌شده از صورت مالی نیست؛ از درآمد منهای سود خالص به‌صورت مشتق‌شده به دست آمده است.'
+    ]));
   }
-  append(insightList('محدودیت‌ها و داده‌های نامشخص', insight.limitations));
+
+  append(textSection('محدودیت‌ها و داده‌های نامشخص', (insight.limitations || []).map(localizeFinancialText)));
 }
+
 
 document.querySelector('#analysis-form').addEventListener('submit', async event => {
   event.preventDefault();
@@ -878,7 +1086,7 @@ document.querySelector('#assistant-form').addEventListener('submit', async event
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ question: document.querySelector('#assistant-question').value })
     });
-    result.textContent = text(payload);
+    result.textContent = buildFinancialAssistantAnswer(latestStatementInsight, payload.question) || localizeFinancialText(payload.answer || 'پاسخی در دسترس نیست.');
   } catch (error) {
     result.textContent = `دستیار در دسترس نیست: ${error.message}`;
   }
