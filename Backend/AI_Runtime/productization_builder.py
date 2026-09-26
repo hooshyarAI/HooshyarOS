@@ -27,6 +27,7 @@ TOOLCACHE = RELEASE_ROOT / ".toolcache"
 
 JDK17_URL = "https://aka.ms/download-jdk/microsoft-jdk-17-windows-x64.zip"
 ANDROID_CLI_PACKAGE_ID = "Google.AndroidCLI"
+ANDROID_CLI_INSTALL_URL = "https://dl.google.com/android/cli/latest/windows_x86_64/install.cmd"
 GRADLE_URL = "https://services.gradle.org/distributions/gradle-8.7-bin.zip"
 
 
@@ -66,10 +67,12 @@ def install_android_cli() -> Path | None:
     emit("AUTONOMOUS_ANDROID_CLI", stage="INSTALL", method="winget", package=ANDROID_CLI_PACKAGE_ID)
     winget = shutil.which("winget.exe") or shutil.which("winget")
     if not winget:
-        raise RuntimeError("winget is required to install the official Android CLI on Windows")
+        emit("AUTONOMOUS_ANDROID_CLI", stage="INSTALL", status="FALLBACK", method="google-official-installer")
+        return install_android_cli_official()
+
     result = subprocess.run(
-        [winget, "install", "--id", ANDROID_CLI_PACKAGE_ID,
-         "--exact", "--accept-source-agreements", "--accept-package-agreements"],
+        [winget, "install", "--id", ANDROID_CLI_PACKAGE_ID, "--exact",
+         "--source", "winget", "--accept-source-agreements", "--accept-package-agreements"],
         cwd=ROOT,
         text=True,
         encoding="utf-8",
@@ -82,8 +85,17 @@ def install_android_cli() -> Path | None:
     if result.stdout:
         print(result.stdout, end="")
     if result.returncode != 0:
-        emit("AUTONOMOUS_ANDROID_CLI", stage="INSTALL", status="NONZERO", exitCode=result.returncode)
+        emit("AUTONOMOUS_ANDROID_CLI", stage="INSTALL", status="NONZERO", exitCode=result.returncode, source="winget")
 
+    found = discover_android_cli()
+    if found:
+        return found
+
+    emit("AUTONOMOUS_ANDROID_CLI", stage="INSTALL", status="FALLBACK", method="google-official-installer")
+    return install_android_cli_official()
+
+
+def discover_android_cli() -> Path | None:
     user_path_result = subprocess.run(
         ["powershell.exe", "-NoProfile", "-Command",
          "[Environment]::GetEnvironmentVariable('Path','User')"],
@@ -104,8 +116,9 @@ def install_android_cli() -> Path | None:
 
     local_app_data = os.environ.get("LOCALAPPDATA")
     program_files = os.environ.get("ProgramFiles")
-    for root_dir in [p for p in (local_app_data, program_files) if p]:
-        base = Path(root_dir)
+    roots = [Path(p) for p in (local_app_data, program_files) if p]
+    roots.append(TOOLCACHE / "android")
+    for base in roots:
         try:
             candidates = sorted(
                 (p for p in base.glob("**/android.exe") if p.is_file()),
@@ -117,6 +130,42 @@ def install_android_cli() -> Path | None:
             return candidates[0]
     return None
 
+
+def install_android_cli_official() -> Path | None:
+    local = TOOLCACHE / "android"
+    installer = local / "android-cli-install.cmd"
+    download(ANDROID_CLI_INSTALL_URL, installer)
+    if not installer.exists() or installer.stat().st_size < 256:
+        emit("AUTONOMOUS_ANDROID_CLI", stage="INSTALL", status="BLOCKED", reason="official-android-cli-installer-not-downloaded")
+        return None
+
+    result = subprocess.run(
+        ["cmd.exe", "/d", "/c", str(installer)],
+        cwd=ROOT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        timeout=15 * 60,
+        check=False,
+    )
+    if result.stdout:
+        print(result.stdout, end="")
+    if result.returncode != 0:
+        emit("AUTONOMOUS_ANDROID_CLI", stage="INSTALL", status="NONZERO", exitCode=result.returncode, method="google-official-installer")
+
+    found = discover_android_cli()
+    if found:
+        return found
+
+    emit(
+        "AUTONOMOUS_ANDROID_CLI",
+        stage="VERIFY",
+        status="BLOCKED",
+        reason="android-executable-not-discoverable-after-install",
+    )
+    return None
 
 
 def extract_zip(archive: Path, destination: Path) -> None:
@@ -240,7 +289,8 @@ def provision_android_toolchain() -> tuple[Path, Path, Path] | None:
     else:
         installed = install_android_cli()
         if not installed:
-            raise RuntimeError("WinGet installation completed but android.exe was not discoverable")
+            emit("AUTONOMOUS_ANDROID_REPAIR", stage="VERIFY", status="BLOCKED", reason="android-cli-not-discoverable")
+            return None
         android_cli_path = installed
 
     gradle_root = local / "gradle"

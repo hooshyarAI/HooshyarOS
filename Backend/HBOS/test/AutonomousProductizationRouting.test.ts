@@ -27,6 +27,10 @@ describe("Autonomous productization routing", () => {
         expect(builder).toContain('ANDROID_CLI_PACKAGE_ID = "Google.AndroidCLI"');
         expect(builder).toContain("install_android_cli");
         expect(builder).toContain('"install", "--id", ANDROID_CLI_PACKAGE_ID');
+        expect(builder).toContain('"--source", "winget"');
+        expect(builder).toContain("ANDROID_CLI_INSTALL_URL = \"https://dl.google.com/android/cli/latest/windows_x86_64/install.cmd\"");
+        expect(builder).toContain("install_android_cli_official");
+        expect(builder).toContain("android-cli-not-discoverable");
         expect(builder).toContain('"sdk", "install"');
         expect(builder).toContain("platforms/android-35");
         expect(builder).toContain("build-tools/35.0.0");
