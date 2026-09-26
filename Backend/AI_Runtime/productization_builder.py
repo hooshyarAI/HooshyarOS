@@ -62,6 +62,31 @@ def download(url: str, target: Path) -> None:
     with urllib.request.urlopen(url, timeout=120) as response, target.open("wb") as handle:
         shutil.copyfileobj(response, handle)
 
+def download_with_curl(url: str, target: Path) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists() and target.stat().st_size > 1024:
+        return
+    curl = shutil.which("curl.exe") or shutil.which("curl")
+    if not curl:
+        raise RuntimeError("curl.exe is required for the official Android CLI download")
+    emit("AUTONOMOUS_PRODUCTIZATION_DOWNLOAD", url=url, target=str(target.relative_to(ROOT)), transport="curl")
+    temporary = target.with_suffix(target.suffix + ".part")
+    if temporary.exists():
+        temporary.unlink()
+    result = subprocess.run(
+        [curl, "-fL", "--retry", "3", "--retry-delay", "2", "--connect-timeout", "30",
+         "--max-time", "300", "-o", str(temporary), url],
+        cwd=ROOT, text=True, encoding="utf-8", errors="replace",
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
+    )
+    if result.stdout:
+        print(result.stdout, end="")
+    if result.returncode != 0 or not temporary.exists() or temporary.stat().st_size <= 1024:
+        if temporary.exists():
+            temporary.unlink()
+        raise RuntimeError(f"official Android CLI curl download failed with exit code {result.returncode}")
+    os.replace(temporary, target)
+
 
 def extract_zip(archive: Path, destination: Path) -> None:
     destination.mkdir(parents=True, exist_ok=True)
@@ -180,7 +205,7 @@ def provision_android_toolchain() -> tuple[Path, Path, Path] | None:
     sdk_root = local / "sdk"
     android_cli = local / "android.exe"
     if not android_cli.exists():
-        download(ANDROID_CLI_URL, android_cli)
+        download_with_curl(ANDROID_CLI_URL, android_cli)
 
     gradle_root = local / "gradle"
     gradle_zip = local / "gradle-8.7-bin.zip"

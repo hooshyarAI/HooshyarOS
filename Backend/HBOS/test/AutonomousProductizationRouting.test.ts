@@ -28,5 +28,7 @@ describe("Autonomous productization routing", () => {
         expect(builder).toContain('"sdk", "install"');
         expect(builder).toContain("platforms/android-35");
         expect(builder).toContain("build-tools/35.0.0");
+        expect(builder).toContain("download_with_curl(ANDROID_CLI_URL, android_cli)");
+        expect(builder).toContain('"--retry", "3"');
     });
 });
