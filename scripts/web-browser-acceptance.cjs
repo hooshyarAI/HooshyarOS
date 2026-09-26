@@ -15,14 +15,25 @@
  *   render-shell        real DOM renders the app shell and the auth/analysis forms
  *   register-interaction   typing into the real register form and submitting it
  *   dashboard-rendered     the dashboard renders from the authenticated session
- *   analysis-interaction   selecting a real file and submitting the analysis form
+ *   analysis-interaction   selecting a real statement document and submitting it
  *   analysis-rendered-profit  the real profit value is rendered into the DOM
+ *   context-and-insight-rendered  the context rail and the canonical statement
+ *                             insight render from the real statement document
+ *   report-interaction     the real report control renders a report
  *   logout-interaction     the real logout control ends the session
  *   login-interaction      the real login form re-authenticates the session
  *
+ * The ingested source is a real financial-statement workbook generated from
+ * canonical statement figures, not a ledger. A ledger has no canonical
+ * statement document, so `/api/financial/insights` correctly yields no
+ * `statementInsight` and the insight panel stays hidden; using a statement is
+ * what makes the context/insight assertion a real product contract rather than
+ * a false expectation.
+ *
  * It never fakes a browser: with no discoverable browser the harness reports
  * `ENVIRONMENT_BLOCKED` and never writes a PASS. No new npm dependency is
- * introduced; it uses Node's built-in fetch/WebSocket only.
+ * introduced; it uses Node's built-in fetch/WebSocket plus the repository's
+ * existing `exceljs-hardened` dependency to author the statement workbook.
  *
  * Usage: node scripts/web-browser-acceptance.cjs
  * Env:   HOOSHYAR_WEB_BROWSER_PORT (default 4176)
@@ -237,14 +248,32 @@ async function main() {
   const userDataDir = path.join(os.tmpdir(), `hooshyar-browser-${crypto.randomUUID()}`);
   fs.mkdirSync(userDataDir, { recursive: true });
   const appUrl = `http://127.0.0.1:${port}/`;
-  const csvPath = path.join(userDataDir, 'browser-qa.csv');
-  fs.writeFileSync(csvPath, [
-    'date,account,debit,credit,currency',
-    '2026-08-01,Cash,1000,0,IRR',
-    '2026-08-02,Sales,0,1500,IRR',
-    '2026-08-03,Expense,300,0,IRR',
-    '2026-08-04,Receivable,0,800,IRR',
-  ].join('\n'), 'utf8');
+  // A real financial-statement workbook (balance sheet + income statement) so
+  // the canonical document-understanding boundary produces statement facts and
+  // the statement-insight surface has real evidence to render. A ledger CSV
+  // cannot produce a statement document and would make the insight assertion
+  // impossible to satisfy honestly.
+  const ExcelJS = require('exceljs-hardened');
+  const workbook = new ExcelJS.Workbook();
+  const balanceSheet = workbook.addWorksheet('ترازنامه');
+  [
+    ['صورت وضعیت مالی'],
+    ['(ارقام به میلیون ریال)'],
+    ['شرح', '1402', '1401'],
+    ['جمع دارایی‌ها', 1965000, 1798000],
+    ['جمع بدهی‌ها', 820000, 880000],
+    ['جمع حقوق مالکانه', 1145000, 918000],
+  ].forEach((row) => balanceSheet.addRow(row));
+  const incomeStatement = workbook.addWorksheet('سود و زیان');
+  [
+    ['صورت سود و زیان'],
+    ['(ارقام به میلیون ریال)'],
+    ['شرح', '1402', '1401'],
+    ['درآمد عملیاتی', 2400000, 2100000],
+    ['سود (زیان) خالص', 220000, 170000],
+  ].forEach((row) => incomeStatement.addRow(row));
+  const statementPath = path.join(userDataDir, 'browser-statement.xlsx');
+  fs.writeFileSync(statementPath, Buffer.from(await workbook.xlsx.writeBuffer()));
 
   const checks = [];
   const runtime = spawnRuntime();
@@ -333,10 +362,8 @@ async function main() {
     const documentNode = await cdp.send('DOM.getDocument', { depth: -1 });
     const fileNode = await cdp.send('DOM.querySelector', { nodeId: documentNode.root.nodeId, selector: '#csv-file' });
     if (!fileNode.nodeId) throw new Error('WEB_BROWSER_FILE_INPUT_MISSING');
-    await cdp.send('DOM.setFileInputFiles', { files: [csvPath], nodeId: fileNode.nodeId });
+    await cdp.send('DOM.setFileInputFiles', { files: [statementPath], nodeId: fileNode.nodeId });
     await evaluate(cdp, `(function () {
-      document.querySelector('#assets').value = '10000';
-      document.querySelector('#liabilities').value = '4000';
       document.querySelector('#analysis-form button[type="submit"]').click();
       return true;
     })()`);
@@ -348,11 +375,12 @@ async function main() {
     checks.push('analysis-interaction');
 
     // 5. The real profit value is rendered into the DOM (Persian locale digits).
+    //    The statement's net profit is 220,000 million IRR = 220,000,000,000 IRR.
     await waitFor(
       () => evaluate(cdp, `(function () {
         const text = document.querySelector('#profit').textContent;
         const ascii = text.replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)));
-        return ascii.replace(/[^0-9]/g, '') === '1000';
+        return ascii.replace(/[^0-9]/g, '') === '220000000000';
       })()`),
       'analysis-rendered-profit',
     );
@@ -364,7 +392,7 @@ async function main() {
         const source = document.querySelector('#context-source')?.textContent || '';
         const actions = document.querySelector('#context-actions');
         const insight = document.querySelector('#statement-insight');
-        return state.includes('تحلیل و بینش آماده') && source.includes('browser-qa.csv') && actions && !actions.hidden && insight && !insight.hidden;
+        return state.includes('تحلیل و بینش آماده') && source.includes('browser-statement.xlsx') && actions && !actions.hidden && insight && !insight.hidden;
       })()`),
       'context-and-insight-rendered',
       10000,
