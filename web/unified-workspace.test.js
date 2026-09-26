@@ -25,6 +25,7 @@ describe('Unified Intelligent Workspace UI contract',()=>{
     expect(app).toContain('buildUserFacingFindingGroups');
     expect(app).toContain('formatFaAmount');
     expect(app).not.toContain('result.textContent = text(payload);');
+    expect(app).not.toContain("insightList('خلاصه مدیریتی (تفسیر)', insight.interpretation)");
   });
   test('distinguishes result semantics without exposing private reasoning',()=>{
     expect(html).toContain('واقعیت تأییدشده'); expect(html).toContain('شاخص مشتق‌شده'); expect(html).toContain('اقدام مدیریتی'); expect(app).toContain('evidenceBadge'); expect(app).not.toContain('chain-of-thought');

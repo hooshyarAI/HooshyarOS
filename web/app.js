@@ -149,6 +149,15 @@ async function refreshDashboard() {
     syncWorkspaceSnapshot();
     await refreshAnalyticsSources();
     await refreshReportArtifacts();
+    try {
+      const latest = await getJson('/api/financial/insights/latest');
+      if (latest.statementInsight) {
+        renderStatementInsight(latest.statementInsight);
+        syncWorkspaceSnapshot();
+      }
+    } catch {
+      /* persisted insight is optional during first login or before first analysis */
+    }
   } catch (error) {
     document.querySelector('#readiness').textContent = `برای ادامه ابتدا نشست ایجاد کنید: ${error.message}`;
   }
@@ -807,8 +816,6 @@ function renderStatementInsight(insight) {
     for(const line of lines){ const item=document.createElement('li'); item.textContent=line; list.appendChild(item); }
     section.appendChild(list); return section;
   };
-
-  append(insightList('خلاصه مدیریتی (تفسیر)', insight.interpretation));
 
   if (insight.ratios) {
     const lines=Object.keys(FINANCIAL_RATIO_LABELS_FA).map(key=>ratioLine(key, insight.ratios[key], insight));
