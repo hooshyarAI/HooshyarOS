@@ -17,6 +17,7 @@ import zipfile
 from pathlib import Path
 
 from android_toolchain_repair import AndroidRepairError, install_from_metadata
+from android_toolchain_sources import CMDLINE_TOOLS_URLS
 
 ROOT = Path(__file__).resolve().parents[2]
 RELEASE_ROOT = ROOT / "dist" / "productization"
@@ -183,7 +184,19 @@ def provision_android_toolchain() -> tuple[Path, Path, Path] | None:
     cmdline_root = sdk_root / "cmdline-tools" / "latest"
     sdkmanager = cmdline_root / "bin" / "sdkmanager.bat"
     if not sdkmanager.exists():
-        download(ANDROID_CLI_URL, cmdline_zip)
+        download_failures: list[str] = []
+        for cmdline_url in CMDLINE_TOOLS_URLS:
+            try:
+                download(cmdline_url, cmdline_zip)
+                break
+            except Exception as exc:
+                download_failures.append(f"{cmdline_url}: {exc}")
+                if cmdline_zip.exists():
+                    cmdline_zip.unlink()
+        else:
+            raise RuntimeError(
+                "Android command-line tools download failed: " + " | ".join(download_failures)
+            )
         temp_extract = local / "cmdline-extract"
         if temp_extract.exists():
             shutil.rmtree(temp_extract)
