@@ -19,6 +19,13 @@ describe('Unified Intelligent Workspace UI contract',()=>{
     expect(html).toContain('id="decision-form"'); expect(html).toContain('id="execution-form"'); expect(html).toContain('id="report-button"'); expect(html).toContain('id="report-export-button"');
     expect(app).toContain('/api/financial/insights'); expect(app).toContain('/api/report'); expect(app).toContain('/api/assistant');
   });
+  test('renders human-readable Persian financial presentation',()=>{
+    expect(html).toContain('واقعیت تأییدشده / شاخص مشتق‌شده / تفسیر / اقدام مدیریتی');
+    expect(app).toContain('buildFinancialAssistantAnswer');
+    expect(app).toContain('buildUserFacingFindingGroups');
+    expect(app).toContain('formatFaAmount');
+    expect(app).not.toContain('result.textContent = text(payload);');
+  });
   test('distinguishes result semantics without exposing private reasoning',()=>{
     expect(html).toContain('واقعیت تأییدشده'); expect(html).toContain('شاخص مشتق‌شده'); expect(html).toContain('اقدام مدیریتی'); expect(app).toContain('evidenceBadge'); expect(app).not.toContain('chain-of-thought');
   });

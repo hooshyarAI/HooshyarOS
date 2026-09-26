@@ -42,8 +42,8 @@ describe("ReportsEngine", () => {
         expect(artifact.sha256).toHaveLength(64);
         const text = artifact.bytes.toString("utf8");
         expect(text).toContain("Monthly Financial Report");
-        expect(text).toContain("Tenant: tenant-a");
-        expect(text).toContain("Source: ledger.csv");
+        expect(text).toContain("سازمان: tenant-a");
+        expect(text).toContain("منبع: ledger.csv");
         expect(text).toContain("* Revenue: 1000");
     });
 
@@ -53,8 +53,8 @@ describe("ReportsEngine", () => {
         if (result.status !== "READY") return;
         expect(result.artifact.contentType).toBe("text/csv; charset=utf-8");
         const lines = result.artifact.bytes.toString("utf8").trim().split("\r\n");
-        expect(lines[0]).toBe('"Section","Entry"');
-        expect(lines).toContain('"Report","Tenant: tenant-a"');
+        expect(lines[0]).toBe('"بخش","محتوا"');
+        expect(lines).toContain('"گزارش","سازمان: tenant-a"');
         expect(lines).toContain('"Overview","Revenue: 1000"');
     });
 
@@ -82,7 +82,7 @@ describe("ReportsEngine", () => {
 
         const workbook = new ExcelJS.Workbook();
         await workbook.xlsx.load(artifact.bytes as unknown as ArrayBuffer);
-        const sheet = workbook.getWorksheet("Report");
+        const sheet = workbook.getWorksheet("گزارش");
         expect(sheet).toBeDefined();
         const entries = (sheet!.getColumn(2).values as unknown as unknown[]).map((value) => String(value ?? ""));
         expect(entries).toContain("Revenue: 1000");

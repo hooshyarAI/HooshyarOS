@@ -667,6 +667,92 @@ function buildFinancialAssistantAnswer(insight, question) {
   return lines.join('\n');
 }
 
+function buildUserFacingFindingGroups(insight) {
+  const currency = insight.currency || 'IRR';
+  const current = key => insight.metrics?.[key];
+  const find = key => (insight.comparative || []).find(item => item.line === key);
+  const groups = { strengths: [], weaknesses: [], risks: [], opportunities: [], actions: [] };
+
+  if (current('netProfit') != null && Number(current('netProfit')) > 0) {
+    groups.strengths.push({ message: `سود خالص مثبت است: ${formatFaAmount(current('netProfit'), currency)}.`, evidenceLevel: 'EXTRACTED_FACT' });
+  }
+  if (insight.ratios?.currentRatio != null && insight.ratios.currentRatio >= 1) {
+    groups.strengths.push({ message: `دارایی‌های جاری با نسبت جاری ${formatFaNumber(insight.ratios.currentRatio)} برابر، بدهی‌های جاری را پوشش می‌دهند.`, evidenceLevel: 'DERIVED_METRIC' });
+  }
+  if (insight.cashFlow?.operating != null && insight.cashFlow.operating > 0) {
+    groups.strengths.push({ message: `فعالیت‌های عملیاتی ${formatFaAmount(insight.cashFlow.operating, currency)} جریان نقد ایجاد کرده‌اند.`, evidenceLevel: 'EXTRACTED_FACT' });
+  }
+
+  const revenue = find('revenue');
+  const profit = find('netIncome');
+  const gross = find('grossProfit');
+  const opx = find('operatingExpenses');
+  const opProfit = find('operatingIncome');
+
+  if (revenue?.absoluteChange > 0) {
+    groups.strengths.push({ message: 'درآمد نسبت به دوره قبل افزایش یافته است.', evidenceLevel: 'INTERPRETATION' });
+    groups.opportunities.push({ message: `درآمد ${revenue.pctChange == null ? 'افزایش یافته' : formatFaPercent(revenue.pctChange) + ' رشد کرده'} است؛ علت این رشد و نیاز به سرمایه در گردش بررسی شود.`, evidenceLevel: 'INTERPRETATION' });
+  } else if (revenue?.absoluteChange < 0) {
+    groups.weaknesses.push({ message: 'درآمد نسبت به دوره قبل کاهش یافته است.', evidenceLevel: 'INTERPRETATION' });
+    groups.actions.push({ message: `علت کاهش درآمد به میزان ${formatFaAmount(Math.abs(revenue.absoluteChange), currency)} بررسی شود.`, evidenceLevel: 'MANAGEMENT_RECOMMENDATION' });
+  }
+  if (profit?.absoluteChange > 0) {
+    groups.strengths.push({ message: `سود خالص نسبت به دوره قبل ${profit.pctChange == null ? 'افزایش یافته است' : formatFaPercent(profit.pctChange) + ' رشد کرده است'}.`, evidenceLevel: 'INTERPRETATION' });
+  } else if (profit?.absoluteChange < 0) {
+    groups.weaknesses.push({ message: 'سود خالص نسبت به دوره قبل کاهش یافته است.', evidenceLevel: 'INTERPRETATION' });
+  }
+  if (gross?.absoluteChange > 0) {
+    groups.strengths.push({ message: `سود ناخالص ${gross.pctChange == null ? 'افزایش یافته است' : formatFaPercent(gross.pctChange) + ' رشد کرده است'}.`, evidenceLevel: 'INTERPRETATION' });
+  }
+  if (opx?.absoluteChange < 0) {
+    groups.strengths.push({ message: `هزینه‌های عملیاتی ${formatFaPercent(Math.abs(opx.pctChange || 0))} کاهش یافته‌اند.`, evidenceLevel: 'INTERPRETATION' });
+  }
+  if (opProfit?.absoluteChange > 0) {
+    groups.strengths.push({ message: `سود عملیاتی ${opProfit.pctChange == null ? 'افزایش یافته است' : formatFaPercent(opProfit.pctChange) + ' رشد کرده است'}.`, evidenceLevel: 'INTERPRETATION' });
+  }
+
+  const liabilities = current('totalLiabilities');
+  const equity = current('equity');
+  if (liabilities != null && equity != null && liabilities > equity) {
+    groups.risks.push({ message: `کل بدهی‌ها ${formatFaAmount(liabilities, currency)} است و ${formatFaAmount(liabilities - equity, currency)} بیشتر از حقوق مالکانه است؛ ساختار تأمین مالی باید بررسی شود.`, evidenceLevel: 'INTERPRETATION' });
+    groups.actions.push({ message: 'ساختار بدهی و منابع سرمایه بررسی و برنامه کاهش اهرم یا تقویت حقوق مالکانه تدوین شود.', evidenceLevel: 'MANAGEMENT_RECOMMENDATION' });
+  }
+  const mismatch = (insight.integrity || []).find(check => check.status === 'MISMATCH');
+  if (mismatch) {
+    const label = FINANCIAL_INTEGRITY_LABELS_FA[mismatch.id] || 'حسابداری';
+    groups.risks.push({ message: `در کنترل «${label}» اختلاف ${formatFaAmount(Math.abs(mismatch.difference || 0), currency)} ثبت شده است.`, evidenceLevel: 'DERIVED_METRIC' });
+    groups.actions.push({ message: `اقلام تشکیل‌دهنده «${label}» تطبیق داده شوند تا علت اختلاف مشخص شود.`, evidenceLevel: 'MANAGEMENT_RECOMMENDATION' });
+  }
+  if (insight.documentStatus !== 'COMPLETED') {
+    groups.risks.push({ message: 'سند کامل نیست؛ بعضی نتیجه‌گیری‌ها ممکن است به اطلاعات تکمیلی نیاز داشته باشند.', evidenceLevel: 'INTERPRETATION' });
+  }
+  if (insight.cashFlow?.qualityOfEarnings === 'PROFIT_NOT_CASH_BACKED') {
+    groups.weaknesses.push({ message: 'همه سود گزارش‌شده هنوز به جریان نقد تبدیل نشده است.', evidenceLevel: 'DERIVED_METRIC' });
+    groups.actions.push({ message: `اختلاف سود خالص و جریان نقد عملیاتی ${formatFaAmount(Math.abs(Number(current('netProfit') || 0) - Number(insight.cashFlow.operating || 0)), currency)} است؛ علت آن بررسی شود.`, evidenceLevel: 'MANAGEMENT_RECOMMENDATION' });
+  }
+
+  if (!groups.strengths.length) groups.strengths.push({ message: 'در داده‌های فعلی نقطه قوت مشخصی با شواهد کافی ثبت نشده است.', evidenceLevel: 'INTERPRETATION' });
+  if (!groups.weaknesses.length) groups.weaknesses.push({ message: 'در داده‌های فعلی نقطه ضعف مشخصی با شواهد کافی ثبت نشده است.', evidenceLevel: 'INTERPRETATION' });
+  if (!groups.risks.length) groups.risks.push({ message: 'در داده‌های فعلی ریسک مشخصی با شواهد کافی ثبت نشده است.', evidenceLevel: 'INTERPRETATION' });
+  if (!groups.opportunities.length) groups.opportunities.push({ message: 'فرصت رشد مشخصی بدون شواهد تکمیلی قابل نتیجه‌گیری نیست.', evidenceLevel: 'INTERPRETATION' });
+  if (!groups.actions.length) groups.actions.push({ message: 'اقدام اصلاحی مشخصی از شواهد فعلی استخراج نشده است.', evidenceLevel: 'MANAGEMENT_RECOMMENDATION' });
+  return groups;
+}
+
+function localizeFinancialLimitation(value) {
+  const textValue = String(value || '');
+  if (textValue.startsWith('Accounting check "')) {
+    const match = textValue.match(/^Accounting check "([^"]+)"/);
+    const label = match ? (FINANCIAL_INTEGRITY_LABELS_FA[match[1]] || 'حسابداری') : 'حسابداری';
+    return `کنترل «${label}» با اقلام استخراج‌شده کاملاً منطبق نیست؛ جزئیات آن باید بررسی شود.`;
+  }
+  if (textValue === 'The document is PARTIAL; some sections may be incomplete.') return 'سند ناقص است و ممکن است بخشی از اطلاعات در دسترس نباشد.';
+  if (textValue.startsWith('Ratios unavailable for lack of evidence:')) return 'بعضی نسبت‌ها به دلیل کمبود شواهد قابل محاسبه نیستند.';
+  if (textValue.startsWith('Measure ')) return `قلم «${textValue.replace(/^Measure /, '').replace(/ was not extracted\.$/, '')}» از سند استخراج نشده است.`;
+  if (textValue.startsWith('This statement cannot establish market demand')) return 'این صورت مالی به‌تنهایی درباره بازار، رقبا یا فروش آینده نتیجه قطعی نمی‌دهد؛ این تحلیل فقط بر شواهد مالی موجود تکیه دارد.';
+  return localizeFinancialText(textValue);
+}
+
 function renderStatementInsight(insight) {
   const container = document.querySelector('#statement-insight');
   container.textContent = '';
@@ -729,11 +815,12 @@ function renderStatementInsight(insight) {
     append(textSection('نسبت‌های مالی', lines));
   }
 
-  append(insightList('نقاط قوت', insight.strengths));
-  append(insightList('نقاط ضعف', insight.weaknesses));
-  append(insightList('ریسک‌ها', insight.risks));
-  append(insightList('فرصت‌ها و رشد', insight.opportunities));
-  append(insightList('اقدامات مدیریتی پیشنهادی', insight.managementActions));
+  const groups = buildUserFacingFindingGroups(insight);
+  append(insightList('نقاط قوت', groups.strengths));
+  append(insightList('نقاط ضعف', groups.weaknesses));
+  append(insightList('ریسک‌ها', groups.risks));
+  append(insightList('فرصت‌ها و رشد', groups.opportunities));
+  append(insightList('اقدامات پیشنهادی', groups.actions));
 
   if (Array.isArray(insight.comparative) && insight.comparative.length > 0) {
     append(textSection('مقایسه با دوره قبل', insight.comparative.map(entry=>comparativeLine(entry, insight.currency || 'IRR')));
@@ -762,7 +849,7 @@ function renderStatementInsight(insight) {
     ]));
   }
 
-  append(textSection('محدودیت‌ها و داده‌های نامشخص', (insight.limitations || []).map(localizeFinancialText)));
+  append(textSection('محدودیت‌ها و داده‌های نامشخص', (insight.limitations || []).map(localizeFinancialLimitation)));
 }
 
 

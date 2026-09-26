@@ -816,7 +816,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
             const actions: string[] = [];
             if (current("totalLiabilities") !== null && current("equity") !== null && current("totalLiabilities")! > current("equity")!) actions.push("ساختار بدهی و منابع سرمایه بررسی و برنامه کاهش اهرم یا تقویت حقوق مالکانه تدوین شود.");
             if (mismatch) actions.push("اختلاف کنترل حسابداری مربوط به سود عملیاتی با اقلام میانی صورت مالی تطبیق داده شود.");
-            if (!current("preTaxIncome") || !current("taxes")) actions.push("سود قبل از مالیات و مالیات از سند یا یادداشت‌های مالی تکمیل شود تا پل سود خالص قابل بررسی باشد.");
+            if (current("preTaxIncome") === null || current("taxes") === null) actions.push("سود قبل از مالیات و مالیات از سند یا یادداشت‌های مالی تکمیل شود تا پل سود خالص قابل بررسی باشد.");
             sections.push({ heading: "اقدامات پیشنهادی", lines: actions.length ? actions : ["اقدام اصلاحی مشخصی از شواهد فعلی استخراج نشده است."] });
 
             if (insight.derivedResidual) {
@@ -1877,7 +1877,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const insight = analytics?.statementInsight
                     ?? await loadStatementInsight(session.tenantId, result.source.sha256, analytics);
                 const flatSections = buildReportSections(session, result, workbench, analytics, insight).flatMap((section) => section.lines);
-                const report = reports.build("HooshyarOS Financial and Executive Report", flatSections);
+                const report = reports.build("گزارش مالی و مدیریتی هوشیارOS", flatSections);
                 return corsJson(report.status === "READY" ? 200 : 422, { ...report, tenantId: session.tenantId, source: result.source });
             }
 
@@ -1897,7 +1897,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                         ?? await loadStatementInsight(session.tenantId, result.source.sha256, analytics);
                     const exported = await reportExport.generate({
                         tenantId: session.tenantId,
-                        title: "HooshyarOS Financial and Executive Report",
+                        title: "گزارش مالی و مدیریتی هوشیارOS",
                         sections: buildReportSections(session, result, workbench, analytics, insight),
                         format: format as ReportFormat,
                         metadata: {
