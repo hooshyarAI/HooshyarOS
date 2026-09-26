@@ -24,11 +24,12 @@ describe("Autonomous productization routing", () => {
 
     it("uses the official Android CLI for SDK provisioning", () => {
         const builder = fs.readFileSync(path.join(root, "Backend", "AI_Runtime", "productization_builder.py"), "utf8");
-        expect(builder).toContain('ANDROID_CLI_URL = "https://dl.google.com/android/cli/latest/windows_x86_64/android.exe"');
+        expect(builder).toContain('ANDROID_CLI_INSTALLER_URL = "https://dl.google.com/android/cli/latest/windows_x86_64/install.cmd"');
+        expect(builder).toContain("install_android_cli");
         expect(builder).toContain('"sdk", "install"');
         expect(builder).toContain("platforms/android-35");
         expect(builder).toContain("build-tools/35.0.0");
-        expect(builder).toContain("download_with_curl(ANDROID_CLI_URL, android_cli)");
+        expect(builder).toContain("download_with_curl(ANDROID_CLI_INSTALLER_URL, installer)");
         expect(builder).toContain('"--retry", "3"');
     });
 });
