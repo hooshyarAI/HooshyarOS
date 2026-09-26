@@ -611,112 +611,248 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
         analytics: StoredAnalytics | undefined,
         insight?: FinancialStatementInsight,
     ): ReportSection[] => {
+        const formatNumber = (value: number, maximumFractionDigits = 2): string =>
+            Number.isFinite(value)
+                ? value.toLocaleString("fa-IR", { maximumFractionDigits, minimumFractionDigits: 0 })
+                : "نامشخص";
+        const formatAmount = (value: number | null | undefined, currency = "IRR"): string => {
+            if (value === null || value === undefined || !Number.isFinite(Number(value))) return "نامشخص";
+            const n = Number(value);
+            const abs = Math.abs(n);
+            const unit = currency === "IRR" ? "ریال" : (currency || "واحد پول");
+            if (abs >= 1e12) return `${formatNumber(n / 1e12)} تریلیون ${unit}`;
+            if (abs >= 1e9) return `${formatNumber(n / 1e9)} میلیارد ${unit}`;
+            if (abs >= 1e6) return `${formatNumber(n / 1e6)} میلیون ${unit}`;
+            return `${formatNumber(n, 0)} ${unit}`;
+        };
+        const formatPercent = (value: number | null | undefined): string =>
+            value === null || value === undefined || !Number.isFinite(Number(value))
+                ? "نامشخص"
+                : `${formatNumber(Number(value) * 100)}٪`;
+        const metricLabels: Record<string, string> = {
+            revenue: "درآمد",
+            cogs: "بهای تمام‌شده",
+            grossProfit: "سود ناخالص",
+            operatingExpenses: "هزینه‌های عملیاتی",
+            operatingProfit: "سود عملیاتی",
+            netProfit: "سود خالص",
+            currentAssets: "دارایی‌های جاری",
+            totalAssets: "کل دارایی‌ها",
+            currentLiabilities: "بدهی‌های جاری",
+            totalLiabilities: "کل بدهی‌ها",
+            equity: "حقوق مالکانه",
+            operatingCashFlow: "جریان نقد عملیاتی",
+            investingCashFlow: "جریان نقد سرمایه‌گذاری",
+            financingCashFlow: "جریان نقد تأمین مالی",
+            netCashFlow: "تغییر خالص وجه نقد",
+        };
+        const ratioLabels: Record<string, string> = {
+            grossMargin: "حاشیه سود ناخالص",
+            operatingMargin: "حاشیه سود عملیاتی",
+            netMargin: "حاشیه سود خالص",
+            roa: "بازده دارایی",
+            roe: "بازده حقوق مالکانه",
+            currentRatio: "نسبت جاری",
+            quickRatio: "نسبت آنی",
+            cashRatio: "نسبت نقد",
+            debtToEquity: "بدهی به حقوق مالکانه",
+            debtToAssets: "بدهی به دارایی",
+            equityRatio: "نسبت حقوق مالکانه",
+        };
+        const percentageRatios = new Set(["grossMargin", "operatingMargin", "netMargin", "roa", "roe", "debtToAssets", "equityRatio"]);
+        const comparativeLabels: Record<string, string> = {
+            revenue: "درآمد",
+            cogs: "بهای تمام‌شده",
+            grossProfit: "سود ناخالص",
+            operatingExpenses: "هزینه‌های عملیاتی",
+            operatingIncome: "سود عملیاتی",
+            netIncome: "سود خالص",
+            totalAssets: "کل دارایی‌ها",
+            totalLiabilities: "کل بدهی‌ها",
+            equity: "حقوق مالکانه",
+        };
+        const integrityLabels: Record<string, string> = {
+            "balance-sheet-identity": "ترازنامه",
+            "gross-profit-identity": "سود ناخالص",
+            "operating-profit-identity": "سود عملیاتی",
+            "pre-tax-identity": "سود قبل از مالیات",
+            "net-profit-identity": "سود خالص",
+            "cash-flow-identity": "جریان نقد",
+        };
+        const localizeLimitation = (value: string): string => value
+            .replace("Revenue minus net profit. This is a derived residual expense burden, not an extracted accounting total; it bundles COGS, operating expenses, finance cost, tax and non-operating items.",
+                "این عدد «درآمد منهای سود خالص» است؛ یک مقدار باقیمانده مشتق‌شده است، نه جمع هزینه‌های استخراج‌شده از صورت مالی و می‌تواند شامل بهای تمام‌شده، هزینه‌های عملیاتی، هزینه مالی، مالیات و اقلام غیرعملیاتی باشد.")
+            .replace(/^The document is PARTIAL; some sections may be incomplete\.$/,
+                "سند ناقص است و ممکن است بخشی از اطلاعات در دسترس نباشد.")
+            .replace(/^The document is (.+); some sections may be incomplete\.$/,
+                "وضعیت سند: $1؛ ممکن است بخشی از اطلاعات ناقص باشد.")
+            .replace(/^Ratios unavailable for lack of evidence: (.+)\.$/,
+                "این نسبت‌ها به دلیل کمبود شواهد قابل محاسبه نیستند: $1.")
+            .replace(/^Measure (.+) was not extracted\.$/,
+                "قلم «$1» از سند استخراج نشده است.")
+            .replace(/^This statement cannot establish market demand, competitive position or future sales; growth-readiness conclusions are limited to financial capacity \((.+)\)\.$/,
+                "این صورت مالی به‌تنهایی تقاضای بازار، جایگاه رقابتی یا فروش آینده را اثبات نمی‌کند؛ نتیجه‌گیری درباره رشد فقط به شواهد مالی موجود محدود است.")
+            .replace(/^Accounting check "([^"]+)" does not reconcile with the extracted lines \(difference (-?\d+(?:\.\d+)?)\)\..*$/,
+                "کنترل حسابداری «$1» با اقلام استخراج‌شده منطبق نیست؛ در اعداد این بخش اختلاف وجود دارد.")
+            .replace(/^([A-Za-z]+) is not applicable: equity is zero or negative, so the ratio would be financially misleading\.$/,
+                "این نسبت به دلیل صفر یا منفی بودن حقوق مالکانه قابل اتکا نیست.");
+        const current = (key: string): number | null => insight?.metrics?.[key] ?? null;
+        const findChange = (key: string) => insight?.comparative?.find((entry) => entry.line === key);
+        const currency = insight?.currency || "IRR";
+        const observationLines = result.observations.map((item) =>
+            item.code === "PROFITABLE"
+                ? "صورت مالی در دوره جاری سود خالص مثبت یا صفر نشان می‌دهد."
+                : item.code === "LOSS"
+                    ? "صورت مالی در دوره جاری زیان خالص نشان می‌دهد."
+                    : item.message
+        );
+
         const sections: ReportSection[] = [
-            { heading: "Overview", lines: [`Tenant: ${session.tenantId}`, `Source: ${result.source.sourceName}`] },
             {
-                heading: "Financial statement",
+                heading: "خلاصه گزارش",
                 lines: [
-                    `Revenue: ${result.metrics.revenue}`,
-                    `Profit: ${result.metrics.profit}`,
-                    `Profit margin: ${result.metrics.profitMargin}`,
-                    `Debt ratio: ${result.metrics.debtRatio}`,
+                    `منبع: ${result.source.sourceName}`,
+                    `وضعیت تحلیل: ${result.status === "READY" ? "آماده" : "نیازمند بررسی"}`,
+                    `درآمد: ${formatAmount(result.metrics.revenue, currency)}`,
+                    `سود خالص: ${formatAmount(result.metrics.profit, currency)}`,
+                    `حاشیه سود خالص: ${formatPercent(result.metrics.profitMargin)}`,
+                    `نسبت بدهی: ${formatPercent(result.metrics.debtRatio)}`,
                 ],
             },
-            { heading: "Observations", lines: [`Observations: ${result.observations.map((item) => item.message).join(" | ")}`] },
+            { heading: "مشاهدات", lines: observationLines.length ? observationLines : ["مشاهده‌ای برای گزارش ثبت نشده است."] },
         ];
+
         if (insight) {
+            const summaryLines: string[] = [];
+            const revenueChange = findChange("revenue");
+            const profitChange = findChange("netIncome");
+            const grossProfitChange = findChange("grossProfit");
+            const operatingExpenseChange = findChange("operatingExpenses");
+            if (revenueChange) summaryLines.push(`درآمد نسبت به دوره قبل ${revenueChange.absoluteChange >= 0 ? "افزایش" : "کاهش"} ${formatAmount(Math.abs(revenueChange.absoluteChange), currency)} داشته است (${revenueChange.pctChange === null ? "درصد قابل محاسبه نیست" : formatPercent(revenueChange.pctChange)}).`);
+            if (profitChange) summaryLines.push(`سود خالص از ${formatAmount(profitChange.prior, currency)} به ${formatAmount(profitChange.current, currency)} رسیده است (${profitChange.pctChange === null ? "درصد قابل اتکا نیست" : formatPercent(profitChange.pctChange)}).`);
+            if (grossProfitChange?.pctChange !== null && grossProfitChange) summaryLines.push(`سود ناخالص ${grossProfitChange.pctChange! >= 0 ? "افزایش" : "کاهش"} ${formatPercent(Math.abs(grossProfitChange.pctChange!))} داشته است.`);
+            if (operatingExpenseChange?.pctChange !== null && operatingExpenseChange) summaryLines.push(`هزینه‌های عملیاتی ${operatingExpenseChange.pctChange! <= 0 ? "کاهش" : "افزایش"} ${formatPercent(Math.abs(operatingExpenseChange.pctChange!))} داشته‌اند.`);
+            if (summaryLines.length) sections.push({ heading: "برداشت مدیریتی", lines: summaryLines });
+
             const metricLines = Object.entries(insight.metrics)
                 .filter(([, value]) => value !== null)
-                .map(([key, value]) => `${key}: ${value}`);
+                .map(([key, value]) => `${metricLabels[key] || key}: ${formatAmount(value as number, currency)}`);
             sections.push({
-                heading: "Extracted statement facts",
+                heading: "ارقام اصلی استخراج‌شده از سند",
                 lines: [
-                    `Document status: ${insight.documentStatus}`,
-                    `Reporting periods: ${insight.periods.map((period) => period.label).join(" | ") || "unavailable"}`,
+                    `وضعیت سند: ${insight.documentStatus === "PARTIAL" ? "ناقص" : insight.documentStatus}`,
+                    `دوره‌های گزارش: ${insight.periods.map((period) => period.label).join(" | ") || "نامشخص"}`,
                     ...metricLines,
                 ],
             });
+
             const ratioLines = Object.entries(insight.ratios)
                 .filter(([key, value]) => key !== "unavailable" && key !== "notApplicable" && value !== null)
-                .map(([key, value]) => `${key}: ${value}`);
-            if (ratioLines.length > 0) sections.push({ heading: "Ratios", lines: ratioLines });
-            if (insight.ratios.unavailable.length > 0) {
-                sections.push({ heading: "Unavailable ratios", lines: insight.ratios.unavailable });
-            }
-            if (insight.ratios.notApplicable.length > 0) {
-                sections.push({ heading: "Not applicable ratios", lines: insight.ratios.notApplicable });
-            }
-            if (insight.comparative.length > 0) {
+                .map(([key, value]) => `${ratioLabels[key] || key}: ${percentageRatios.has(key) ? formatPercent(value as number) : formatNumber(Number(value)) + " برابر"}`);
+            if (ratioLines.length) sections.push({ heading: "نسبت‌های مالی", lines: ratioLines });
+
+            if (insight.comparative.length) {
                 sections.push({
-                    heading: "Comparative analysis",
+                    heading: "مقایسه با دوره قبل",
                     lines: insight.comparative.map((entry) => {
-                        const pct = entry.pctChange === null
-                            ? `${entry.pctChangeUnavailableReason ?? "percentage unavailable"}`
-                            : `${(entry.pctChange * 100).toFixed(2)}%`;
-                        const reversal = entry.signReversal ? " (sign reversal)" : "";
-                        return `${entry.line}: ${entry.prior} -> ${entry.current}; absolute change ${entry.absoluteChange}; ${pct}${reversal}`;
+                        const pct = entry.pctChange === null ? "درصد قابل محاسبه نیست" : formatPercent(entry.pctChange);
+                        const sign = entry.absoluteChange > 0 ? "افزایش" : entry.absoluteChange < 0 ? "کاهش" : "بدون تغییر";
+                        return `${comparativeLabels[entry.line] || entry.line}: ${sign} ${formatAmount(Math.abs(entry.absoluteChange), currency)}؛ دوره قبل ${formatAmount(entry.prior, currency)}؛ دوره جاری ${formatAmount(entry.current, currency)}؛ ${pct}`;
                     }),
                 });
             }
+
             sections.push({
-                heading: "Cash-flow interpretation",
+                heading: "جریان نقدی",
                 lines: [
-                    `Operating: ${insight.cashFlow.operating ?? "unavailable"}`,
-                    `Investing: ${insight.cashFlow.investing ?? "unavailable"}`,
-                    `Financing: ${insight.cashFlow.financing ?? "unavailable"}`,
-                    `Net change: ${insight.cashFlow.net ?? "unavailable"}`,
-                    `Prior-period operating: ${insight.cashFlow.priorOperating ?? "unavailable"}`,
-                    `Quality of earnings: ${insight.cashFlow.qualityOfEarnings}`,
-                    ...(insight.cashFlow.reconciliation
-                        ? [`Cash-flow reconciliation: ${insight.cashFlow.reconciliation.status}`]
-                        : []),
+                    `عملیاتی: ${formatAmount(insight.cashFlow.operating, currency)}`,
+                    `سرمایه‌گذاری: ${formatAmount(insight.cashFlow.investing, currency)}`,
+                    `تأمین مالی: ${formatAmount(insight.cashFlow.financing, currency)}`,
+                    `تغییر خالص وجه نقد: ${formatAmount(insight.cashFlow.net, currency)}`,
+                    `عملیاتی در دوره قبل: ${formatAmount(insight.cashFlow.priorOperating, currency)}`,
+                    `کیفیت سود: ${insight.cashFlow.qualityOfEarnings === "CASH_BACKED" ? "سود از جریان نقد پشتیبانی می‌شود" : insight.cashFlow.qualityOfEarnings === "PROFIT_NOT_CASH_BACKED" ? "همه سود گزارش‌شده هنوز به وجه نقد تبدیل نشده است" : "نامشخص"}`,
                 ],
             });
-            if (insight.integrity.length > 0) {
+
+            if (insight.integrity.length) {
                 sections.push({
-                    heading: "Integrity checks",
-                    lines: insight.integrity.map((check) =>
-                        check.status === "NOT_TESTABLE"
-                            ? `${check.id}: NOT_TESTABLE (missing ${check.missing.join(", ") || "non-operating items"})`
-                            : `${check.id}: ${check.status} (expected ${check.expected}, actual ${check.actual}, difference ${check.difference})`,
-                    ),
+                    heading: "کنترل‌های سازگاری حسابداری",
+                    lines: insight.integrity.map((check) => {
+                        const label = integrityLabels[check.id] || check.id;
+                        if (check.status === "RECONCILED") return `${label}: سازگار با اعداد سند.`;
+                        if (check.status === "NOT_TESTABLE") return `${label}: بررسی کامل ممکن نیست؛ اطلاعات لازم ${check.missing.join("، ") || "در دسترس نیست"}.`;
+                        return `${label}: بین اعداد این بخش اختلاف وجود دارد ${formatAmount(Math.abs(check.difference || 0), currency)}.`;
+                    }),
                 });
             }
+
+            const strengths: string[] = [];
+            if (current("netProfit") !== null && current("netProfit")! > 0) strengths.push(`سود خالص مثبت است: ${formatAmount(current("netProfit"), currency)}.`);
+            if (insight.ratios.currentRatio !== null && insight.ratios.currentRatio >= 1) strengths.push(`دارایی‌های جاری با نسبت جاری ${formatNumber(insight.ratios.currentRatio)} برابر، بدهی‌های جاری را پوشش می‌دهند.`);
+            if (insight.cashFlow.operating !== null && insight.cashFlow.operating > 0) strengths.push(`عملیات ${formatAmount(insight.cashFlow.operating, currency)} جریان نقد ایجاد کرده است.`);
+            if (insight.cashFlow.qualityOfEarnings === "CASH_BACKED") strengths.push("جریان نقد عملیاتی سود گزارش‌شده را پوشش می‌دهد.");
+            if (findChange("revenue")?.absoluteChange && findChange("revenue")!.absoluteChange > 0) strengths.push("درآمد نسبت به دوره قبل رشد کرده است.");
+            sections.push({ heading: "نقاط قوت", lines: strengths.length ? strengths : ["در داده‌های فعلی نقطه قوت مشخصی با شواهد کافی ثبت نشده است."] });
+
+            const weaknesses: string[] = [];
+            if (insight.cashFlow.qualityOfEarnings === "PROFIT_NOT_CASH_BACKED") weaknesses.push("بخشی از سود هنوز به جریان نقد تبدیل نشده است.");
+            if (findChange("revenue")?.absoluteChange && findChange("revenue")!.absoluteChange < 0) weaknesses.push("درآمد نسبت به دوره قبل کاهش یافته است.");
+            sections.push({ heading: "نقاط ضعف", lines: weaknesses.length ? weaknesses : ["در داده‌های فعلی نقطه ضعف مشخصی با شواهد کافی ثبت نشده است."] });
+
+            const risks: string[] = [];
+            if (current("totalLiabilities") !== null && current("equity") !== null && current("totalLiabilities")! > current("equity")!) {
+                risks.push(`کل بدهی‌ها ${formatAmount(current("totalLiabilities"), currency)} است و ${formatAmount(current("totalLiabilities")! - current("equity")!, currency)} بیشتر از حقوق مالکانه است.`);
+            }
+            const mismatch = insight.integrity.find((check) => check.status === "MISMATCH");
+            if (mismatch) risks.push(`در کنترل «${integrityLabels[mismatch.id] || mismatch.id}» اختلاف ${formatAmount(Math.abs(mismatch.difference || 0), currency)} ثبت شده است.`);
+            if (insight.documentStatus !== "COMPLETED") risks.push("سند کامل نیست؛ برخی نتیجه‌گیری‌ها باید با اطلاعات تکمیلی بررسی شوند.");
+            sections.push({ heading: "ریسک‌ها", lines: risks.length ? risks : ["ریسک مشخصی با شواهد کافی در این بخش ثبت نشده است."] });
+
+            const opportunities: string[] = [];
+            if (revenueChange?.absoluteChange && revenueChange.absoluteChange > 0) opportunities.push(`درآمد ${formatPercent(revenueChange.pctChange)} رشد کرده است؛ علت عملیاتی این رشد باید مشخص و ظرفیت سرمایه در گردش حفظ شود.`);
+            if (operatingExpenseChange?.absoluteChange && operatingExpenseChange.absoluteChange < 0) opportunities.push("کاهش هزینه‌های عملیاتی، زمینه بهبود حاشیه سود را فراهم کرده است.");
+            sections.push({ heading: "فرصت‌ها و رشد", lines: opportunities.length ? opportunities : ["فرصت رشد مشخصی بدون شواهد تکمیلی قابل نتیجه‌گیری نیست."] });
+
+            const actions: string[] = [];
+            if (current("totalLiabilities") !== null && current("equity") !== null && current("totalLiabilities")! > current("equity")!) actions.push("ساختار بدهی و منابع سرمایه بررسی و برنامه کاهش اهرم یا تقویت حقوق مالکانه تدوین شود.");
+            if (mismatch) actions.push("اختلاف کنترل حسابداری مربوط به سود عملیاتی با اقلام میانی صورت مالی تطبیق داده شود.");
+            if (!current("preTaxIncome") || !current("taxes")) actions.push("سود قبل از مالیات و مالیات از سند یا یادداشت‌های مالی تکمیل شود تا پل سود خالص قابل بررسی باشد.");
+            sections.push({ heading: "اقدامات پیشنهادی", lines: actions.length ? actions : ["اقدام اصلاحی مشخصی از شواهد فعلی استخراج نشده است."] });
+
             if (insight.derivedResidual) {
-                sections.push({ heading: "Derived residual expense", lines: [insight.derivedResidual.note] });
+                sections.push({ heading: "مقدار باقیمانده مشتق‌شده", lines: [
+                    `مقدار: ${formatAmount(insight.derivedResidual.value, currency)}`,
+                    "این مقدار جمع هزینه‌های استخراج‌شده نیست؛ از درآمد منهای سود خالص به‌صورت مشتق‌شده محاسبه شده است."
+                ] });
             }
-            const buildFindingLines = (label: string, findings: readonly { message: string }[]): void => {
-                if (findings.length === 0) return;
-                sections.push({ heading: label, lines: findings.map((finding) => finding.message) });
-            };
-            buildFindingLines("Interpretation", insight.interpretation);
-            buildFindingLines("Strengths", insight.strengths);
-            buildFindingLines("Weaknesses", insight.weaknesses);
-            buildFindingLines("Risks", insight.risks);
-            buildFindingLines("Financial growth readiness", insight.opportunities);
-            buildFindingLines("Management actions", insight.managementActions);
-            if (insight.limitations.length > 0) {
-                sections.push({ heading: "Data limitations", lines: insight.limitations });
-            }
+            const limitationLines = (insight.limitations || []).map(localizeLimitation);
+            if (limitationLines.length) sections.push({ heading: "محدودیت‌ها و داده‌های نامشخص", lines: limitationLines });
         }
         if (workbench) {
-            sections.push({ heading: "Recommendations", lines: [`Recommendations: ${workbench.recommendations.map((item) => item.action).join(" | ")}`] });
+            const workbenchLines = workbench.recommendations.map((item) =>
+                item.action === "Maintain the current execution path and monitor the KPI."
+                    ? "KPI در محدوده فعلی است؛ پایش آن ادامه یابد."
+                    : item.action === "Review the KPI gap, root causes and corrective actions."
+                        ? "فاصله KPI، علت‌های آن و اقدام اصلاحی بررسی شود."
+                        : item.action
+            );
+            sections.push({ heading: "پیشنهادهای مدیریتی", lines: workbenchLines });
         }
         if (analytics) {
-            const parts: string[] = [];
-            if (analytics.ratios?.profitability?.status === "READY") parts.push(`Net margin: ${analytics.ratios.profitability.netMargin}`);
-            if (analytics.ratios?.leverage?.status === "READY") parts.push(`Debt/equity: ${analytics.ratios.leverage.debtToEquity}`);
-            if (analytics.breakEven?.status === "READY") parts.push(`Break-even units: ${analytics.breakEven.breakEvenUnits}`);
-            if (analytics.forecast?.linearTrend.status === "READY") parts.push(`Cash-flow trend forecast: ${analytics.forecast.linearTrend.forecast}`);
+            const lines: string[] = [];
+            if (analytics.ratios?.profitability?.status === "READY") lines.push(`حاشیه سود خالص: ${formatPercent(analytics.ratios.profitability.netMargin)}`);
+            if (analytics.ratios?.leverage?.status === "READY") lines.push(`بدهی به حقوق مالکانه: ${formatNumber(analytics.ratios.leverage.debtToEquity)} برابر`);
+            if (analytics.breakEven?.status === "READY") lines.push(`نقطه سر‌به‌سر: ${formatNumber(analytics.breakEven.breakEvenUnits, 0)} واحد`);
+            if (analytics.forecast?.linearTrend.status === "READY") lines.push(`برآورد روند جریان نقد: ${formatAmount(analytics.forecast.linearTrend.forecast, currency)}`);
             if (analytics.anomalies) {
                 const alerts = [
                     ...analytics.anomalies.zscore.points,
                     ...analytics.anomalies.iqr.points,
-                    ...analytics.anomalies.modifiedZ.points
+                    ...analytics.anomalies.modifiedZ.points,
                 ].filter((point) => point.flag === "ALERT").length;
-                parts.push(`Anomaly alerts: ${alerts}`);
+                lines.push(`تعداد هشدارهای ناهنجاری: ${formatNumber(alerts, 0)}`);
             }
-            if (parts.length) sections.push({ heading: "Financial analytics", lines: [`Financial analytics: ${parts.join(" | ")}`] });
+            if (lines.length) sections.push({ heading: "تحلیل تکمیلی", lines });
         }
         return sections;
     };
