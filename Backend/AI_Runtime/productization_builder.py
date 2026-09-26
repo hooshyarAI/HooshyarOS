@@ -16,8 +16,6 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-from android_toolchain_repair import AndroidRepairError, install_from_metadata
-from android_toolchain_sources import CMDLINE_TOOLS_URLS
 
 ROOT = Path(__file__).resolve().parents[2]
 RELEASE_ROOT = ROOT / "dist" / "productization"
@@ -28,7 +26,7 @@ ANDROID_RELEASE = RELEASE_ROOT / "android"
 TOOLCACHE = RELEASE_ROOT / ".toolcache"
 
 JDK17_URL = "https://aka.ms/download-jdk/microsoft-jdk-17-windows-x64.zip"
-ANDROID_CLI_URL = "https://dl.google.com/android/repository/commandlinetools-win-15859902_latest.zip"
+ANDROID_CLI_URL = "https://dl.google.com/android/cli/latest/windows_x86_64/android.exe"
 GRADLE_URL = "https://services.gradle.org/distributions/gradle-8.7-bin.zip"
 
 
@@ -180,33 +178,9 @@ def provision_android_toolchain() -> tuple[Path, Path, Path] | None:
         java_home = javac_path.parent.parent
 
     sdk_root = local / "sdk"
-    cmdline_zip = local / "commandlinetools-win-latest.zip"
-    cmdline_root = sdk_root / "cmdline-tools" / "latest"
-    sdkmanager = cmdline_root / "bin" / "sdkmanager.bat"
-    if not sdkmanager.exists():
-        download_failures: list[str] = []
-        for cmdline_url in CMDLINE_TOOLS_URLS:
-            try:
-                download(cmdline_url, cmdline_zip)
-                break
-            except Exception as exc:
-                download_failures.append(f"{cmdline_url}: {exc}")
-                if cmdline_zip.exists():
-                    cmdline_zip.unlink()
-        else:
-            raise RuntimeError(
-                "Android command-line tools download failed: " + " | ".join(download_failures)
-            )
-        temp_extract = local / "cmdline-extract"
-        if temp_extract.exists():
-            shutil.rmtree(temp_extract)
-        extract_zip(cmdline_zip, temp_extract)
-        inner = temp_extract / "cmdline-tools"
-        if inner.exists():
-            cmdline_root.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copytree(inner, cmdline_root, dirs_exist_ok=True)
-        else:
-            return None
+    android_cli = local / "android.exe"
+    if not android_cli.exists():
+        download(ANDROID_CLI_URL, android_cli)
 
     gradle_root = local / "gradle"
     gradle_zip = local / "gradle-8.7-bin.zip"
@@ -223,23 +197,43 @@ def provision_android_toolchain() -> tuple[Path, Path, Path] | None:
         "JAVA_HOME": str(java_home),
         "ANDROID_SDK_ROOT": str(sdk_root),
         "ANDROID_HOME": str(sdk_root),
-        "PATH": str(java_home / "bin") + os.pathsep + str(sdk_root / "platform-tools") + os.pathsep + str(sdk_root / "cmdline-tools" / "latest" / "bin") + os.pathsep + str(gradle_bin.parent) + os.pathsep + env.get("PATH", ""),
+        "PATH": str(java_home / "bin") + os.pathsep + str(sdk_root / "platform-tools") + os.pathsep + str(gradle_bin.parent) + os.pathsep + env.get("PATH", ""),
     })
 
-    sdkmanager_args = [
-        f"--sdk_root={sdk_root}",
+    sdk_root.mkdir(parents=True, exist_ok=True)
+    packages = [
         "platform-tools",
-        "platforms;android-35",
-        "build-tools;35.0.0",
+        "platforms/android-35",
+        "build-tools/35.0.0",
     ]
-    result = run(str(sdkmanager), sdkmanager_args, env=env, timeout=90 * 60, input_text=("y\n" * 30))
+    result = run(
+        str(android_cli),
+        [f"--sdk={sdk_root}", "sdk", "install", *packages],
+        env=env,
+        timeout=90 * 60,
+    )
     if result != 0:
-        emit("AUTONOMOUS_ANDROID_REPAIR", stage="ISOLATE", reason="sdkmanager-repository-metadata-failure", action="metadata-driven-official-fallback")
-        try:
-            install_from_metadata(sdk_root, ["platform-tools", "platforms;android-35", "build-tools;35.0.0"])
-        except AndroidRepairError as exc:
-            emit("AUTONOMOUS_ANDROID_REPAIR", stage="DIAGNOSE", status="BLOCKED", reason=str(exc))
-            return None
+        emit(
+            "AUTONOMOUS_ANDROID_REPAIR",
+            stage="DIAGNOSE",
+            status="BLOCKED",
+            reason="android-cli-sdk-package-install-failed",
+        )
+        return None
+    required = [
+        sdk_root / "platform-tools" / "adb.exe",
+        sdk_root / "platforms" / "android-35" / "android.jar",
+        sdk_root / "build-tools" / "35.0.0" / "aapt2.exe",
+    ]
+    if not all(path.exists() for path in required):
+        emit(
+            "AUTONOMOUS_ANDROID_REPAIR",
+            stage="VERIFY",
+            status="BLOCKED",
+            reason="android-sdk-packages-incomplete",
+            missing=[str(path) for path in required if not path.exists()],
+        )
+        return None
     return java_home, sdk_root, gradle_bin
 
 

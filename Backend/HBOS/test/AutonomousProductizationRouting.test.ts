@@ -22,10 +22,11 @@ describe("Autonomous productization routing", () => {
         expect(worker).not.toContain("no Android application project exists yet");
     });
 
-    it("uses the governed Android command-line tool source fallback policy", () => {
+    it("uses the official Android CLI for SDK provisioning", () => {
         const builder = fs.readFileSync(path.join(root, "Backend", "AI_Runtime", "productization_builder.py"), "utf8");
-        expect(builder).toContain("from android_toolchain_sources import CMDLINE_TOOLS_URLS");
-        expect(builder).toContain("for cmdline_url in CMDLINE_TOOLS_URLS");
-        expect(builder).toContain("Android command-line tools download failed");
+        expect(builder).toContain('ANDROID_CLI_URL = "https://dl.google.com/android/cli/latest/windows_x86_64/android.exe"');
+        expect(builder).toContain('"sdk", "install"');
+        expect(builder).toContain("platforms/android-35");
+        expect(builder).toContain("build-tools/35.0.0");
     });
 });
