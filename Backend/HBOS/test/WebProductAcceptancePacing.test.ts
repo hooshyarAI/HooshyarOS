@@ -123,6 +123,65 @@ describe("web acceptance session rate-limit pacing", () => {
         expect(await simulate({})).toBe(0);
     });
 
+    test("pacer preserves the configured reserve when a token is replenished naturally", async () => {
+        // Proven acceptance race on the trusted commit: after a full burst the
+        // client idled ~one refill window, the mirror's natural refill reached
+        // ~one token, and the old mirror admitted with waited=0, consuming the
+        // token down to zero. Because the previous request had a larger
+        // server-side dispatch latency than the next one, the authoritative
+        // bucket observed less than one full token and answered 429. The
+        // repaired pacer must not admit on natural refill without the reserve.
+        const dispatchLags = [40, 30, 20, 10, 0, 0];
+        const simulate = async (pacerOptions: Record<string, unknown>) => {
+            let virtualNow = 1_700_000_000_000;
+            const waits: number[] = [];
+            const server = { tokens: SESSION_RATE_LIMIT_CAPACITY, lastRefill: virtualNow };
+            const consumeOnServer = (consumedAt: number): boolean => {
+                const elapsed = consumedAt - server.lastRefill;
+                if (elapsed > 0) {
+                    server.tokens = Math.min(SESSION_RATE_LIMIT_CAPACITY, server.tokens + elapsed / 1000);
+                    server.lastRefill = consumedAt;
+                }
+                if (server.tokens >= 1) { server.tokens -= 1; return true; }
+                return false;
+            };
+            const pace = createSessionRateLimitPacer({
+                now: () => virtualNow,
+                sleep: async (ms: number) => { waits.push(ms); virtualNow += ms; },
+                ...pacerOptions,
+            });
+            let rejected = 0;
+            for (let i = 0; i < SESSION_RATE_LIMIT_CAPACITY + 1; i++) {
+                // The sixth request follows a natural (non-sleep) idle of one
+                // full refill window: the mirror replenishes ~one token by itself.
+                if (i === SESSION_RATE_LIMIT_CAPACITY) virtualNow += 1000;
+                await pace.acquire();
+                // Requests are consumed by the authoritative bucket after a
+                // per-request dispatch latency; the previous lag is the largest.
+                const consumedAt = virtualNow + dispatchLags[i];
+                if (!consumeOnServer(consumedAt)) rejected += 1;
+            }
+            return { rejected, waits };
+        };
+
+        const repaired = await simulate({});
+        // Natural refill must NOT admit with zero wait...
+        expect(repaired.waits.length).toBeGreaterThan(0);
+        expect(Math.min(...repaired.waits)).toBeGreaterThan(0);
+        // ...and it must wait long enough to restore the configured reserve.
+        const reserveRefillWindowMs = Math.ceil(
+            SESSION_RATE_LIMIT_PACING_MARGIN_RATIO * (1000 / SESSION_RATE_LIMIT_REFILL_PER_SECOND)
+        );
+        expect(repaired.waits[0]).toBeGreaterThanOrEqual(reserveRefillWindowMs);
+        // The accepted sequence never reproduces the server-side skew 429.
+        expect(repaired.rejected).toBe(0);
+
+        // Disabling the reserve reproduces the same natural-refill + dispatch-lag
+        // skew as an authoritative 429, proving the reserve is what fixes it.
+        const unreserved = await simulate({ marginMs: 0 });
+        expect(unreserved.rejected).toBeGreaterThan(0);
+    });
+
     test("route predicate matches exactly the canonical session-limited POST routes", () => {
         const limited = [
             "/api/analyze",

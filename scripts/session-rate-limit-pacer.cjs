@@ -34,6 +34,13 @@ const SESSION_RATE_LIMIT_REFILL_PER_SECOND = 1;
  * probe (pacer clock 2% fast) reproduces the real
  * `WEB_ACCEPTANCE_XLSX_INGEST_FAILED:429`. A 10% cushion is the same margin the
  * harness already applied by hand (`sleep(1100)` for a 1000 ms window).
+ *
+ * The cushion is turned into a reserve token amount (below) and enforced on
+ * EVERY admission, not only after an explicit sleep. Otherwise a token that was
+ * replenished naturally by elapsed time is consumed down to zero, and the
+ * authoritative server — which consumes it later, after request-dispatch
+ * latency — can observe less than one full token when the previous request had
+ * a larger dispatch latency than the current one, and answer 429.
  */
 const SESSION_RATE_LIMIT_PACING_MARGIN_RATIO = 0.1;
 
@@ -85,14 +92,28 @@ function createSessionRateLimitPacer(options = {}) {
     const refillPerMs = refillPerSecond / 1000;
     const refillWindowMs = 1000 / refillPerSecond;
     const marginMs = options.marginMs ?? Math.ceil(refillWindowMs * SESSION_RATE_LIMIT_PACING_MARGIN_RATIO);
+    // Token-equivalent of the configured safety margin. A mirrored token count
+    // of `1 + reserveTokens` already carries the full margin, so consuming one
+    // token from that point leaves the reserve intact and the authoritative
+    // bucket immune to the dispatch-lag skew that caused the 429.
+    const reserveTokens = marginMs * refillPerMs;
     let tokens = capacity;
     let lastRefill = now();
+    // The reserve is only meaningful once the mirror has actually credited
+    // elapsed-time refill: the initial full bucket is a known-good mirror of the
+    // freshly created server bucket, while every refill-derived token is an
+    // estimate that can be optimistic under clock / dispatch-lag skew. This
+    // keeps the legitimate initial burst of `capacity` intact and enforces the
+    // reserve on naturally replenished tokens.
+    let refillCredited = false;
 
     function refill() {
         const t = now();
         const elapsed = t - lastRefill;
         if (elapsed > 0) {
-            tokens = Math.min(capacity, tokens + elapsed * refillPerMs);
+            const replenished = Math.min(capacity, tokens + elapsed * refillPerMs);
+            if (replenished > tokens) refillCredited = true;
+            tokens = replenished;
             lastRefill = t;
         }
     }
@@ -100,16 +121,20 @@ function createSessionRateLimitPacer(options = {}) {
     async function acquire() {
         for (;;) {
             refill();
-            if (tokens >= 1) {
+            // Admit only when the mirror holds enough tokens to consume one AND
+            // still preserve the configured reserve; otherwise wait until the
+            // reserve has refilled.
+            const threshold = refillCredited ? 1 + reserveTokens : 1;
+            if (tokens >= threshold) {
                 tokens -= 1;
                 return;
             }
-            const deficit = 1 - tokens;
+            const deficit = threshold - tokens;
             await sleep(Math.max(1, Math.ceil(deficit / refillPerMs) + marginMs));
         }
     }
 
-    return { acquire, capacity, refillPerSecond, marginMs };
+    return { acquire, capacity, refillPerSecond, marginMs, reserveTokens };
 }
 
 module.exports = {
