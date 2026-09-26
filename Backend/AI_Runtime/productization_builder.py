@@ -26,7 +26,7 @@ ANDROID_RELEASE = RELEASE_ROOT / "android"
 TOOLCACHE = RELEASE_ROOT / ".toolcache"
 
 JDK17_URL = "https://aka.ms/download-jdk/microsoft-jdk-17-windows-x64.zip"
-ANDROID_CLI_INSTALLER_URL = "https://dl.google.com/android/cli/latest/windows_x86_64/install.cmd"
+ANDROID_CLI_PACKAGE_ID = "Google.AndroidCLI"
 GRADLE_URL = "https://services.gradle.org/distributions/gradle-8.7-bin.zip"
 
 
@@ -62,36 +62,14 @@ def download(url: str, target: Path) -> None:
     with urllib.request.urlopen(url, timeout=120) as response, target.open("wb") as handle:
         shutil.copyfileobj(response, handle)
 
-def download_with_curl(url: str, target: Path) -> None:
-    target.parent.mkdir(parents=True, exist_ok=True)
-    if target.exists() and target.stat().st_size > 32:
-        return
-    curl = shutil.which("curl.exe") or shutil.which("curl")
-    if not curl:
-        raise RuntimeError("curl.exe is required for the official Android CLI installer")
-    emit("AUTONOMOUS_PRODUCTIZATION_DOWNLOAD", url=url, target=str(target.relative_to(ROOT)), transport="curl")
-    temporary = target.with_suffix(target.suffix + ".part")
-    if temporary.exists():
-        temporary.unlink()
+def install_android_cli() -> Path | None:
+    emit("AUTONOMOUS_ANDROID_CLI", stage="INSTALL", method="winget", package=ANDROID_CLI_PACKAGE_ID)
+    winget = shutil.which("winget.exe") or shutil.which("winget")
+    if not winget:
+        raise RuntimeError("winget is required to install the official Android CLI on Windows")
     result = subprocess.run(
-        [curl, "-fsSL", "--retry", "3", "--retry-delay", "2", "--connect-timeout", "30",
-         "--max-time", "300", "-o", str(temporary), url],
-        cwd=ROOT, text=True, encoding="utf-8", errors="replace",
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
-    )
-    if result.stdout:
-        print(result.stdout, end="")
-    if result.returncode != 0 or not temporary.exists() or temporary.stat().st_size <= 32:
-        if temporary.exists():
-            temporary.unlink()
-        raise RuntimeError(f"official Android CLI installer download failed with exit code {result.returncode}")
-    os.replace(temporary, target)
-
-
-def install_android_cli(installer: Path) -> Path | None:
-    emit("AUTONOMOUS_ANDROID_CLI", stage="INSTALL", method="official-install.cmd")
-    result = subprocess.run(
-        ["cmd.exe", "/d", "/c", str(installer)],
+        [winget, "install", "--id", ANDROID_CLI_PACKAGE_ID,
+         "--exact", "--accept-source-agreements", "--accept-package-agreements"],
         cwd=ROOT,
         text=True,
         encoding="utf-8",
@@ -104,9 +82,9 @@ def install_android_cli(installer: Path) -> Path | None:
     if result.stdout:
         print(result.stdout, end="")
     if result.returncode != 0:
-        raise RuntimeError(f"official Android CLI installer failed with exit code {result.returncode}")
+        emit("AUTONOMOUS_ANDROID_CLI", stage="INSTALL", status="NONZERO", exitCode=result.returncode)
 
-    user_path = subprocess.run(
+    user_path_result = subprocess.run(
         ["powershell.exe", "-NoProfile", "-Command",
          "[Environment]::GetEnvironmentVariable('Path','User')"],
         cwd=ROOT,
@@ -117,17 +95,28 @@ def install_android_cli(installer: Path) -> Path | None:
         stderr=subprocess.STDOUT,
         timeout=30,
         check=False,
-    ).stdout.strip()
+    )
+    user_path = user_path_result.stdout.strip()
     search_path = os.pathsep.join(part for part in [user_path, os.environ.get("PATH", "")] if part)
     android_exe = shutil.which("android.exe", path=search_path) or shutil.which("android", path=search_path)
     if android_exe:
         return Path(android_exe)
+
     local_app_data = os.environ.get("LOCALAPPDATA")
-    if local_app_data:
-        candidates = sorted(Path(local_app_data).glob("**/android.exe"))
+    program_files = os.environ.get("ProgramFiles")
+    for root_dir in [p for p in (local_app_data, program_files) if p]:
+        base = Path(root_dir)
+        try:
+            candidates = sorted(
+                (p for p in base.glob("**/android.exe") if p.is_file()),
+                key=lambda p: len(str(p)),
+            )
+        except (OSError, RuntimeError):
+            candidates = []
         if candidates:
             return candidates[0]
     return None
+
 
 
 def extract_zip(archive: Path, destination: Path) -> None:
@@ -249,12 +238,9 @@ def provision_android_toolchain() -> tuple[Path, Path, Path] | None:
     if android_cli:
         android_cli_path = Path(android_cli)
     else:
-        installer = local / "android-cli-install.cmd"
-        download_with_curl(ANDROID_CLI_INSTALLER_URL, installer)
-        installed = install_android_cli(installer)
+        installed = install_android_cli()
         if not installed:
-            raise RuntimeError("official Android CLI installer completed but android.exe was not discoverable")
-
+            raise RuntimeError("WinGet installation completed but android.exe was not discoverable")
         android_cli_path = installed
 
     gradle_root = local / "gradle"
