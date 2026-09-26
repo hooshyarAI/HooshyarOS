@@ -2,6 +2,7 @@ import { AutonomousBuildDaemon } from "./AutonomousBuildDaemon";
 import { AutonomousDevelopmentLoop, AutonomousDevelopmentResult } from "../../Architecture/Autonomous/AutonomousDevelopmentLoop";
 import { AutonomousProjectMission } from "./AutonomousProjectMission";
 import { AutonomousPlatformContinuation } from "./AutonomousPlatformContinuation";
+import { CommercialProductCompletionAudit } from "./CommercialProductCompletionAudit";
 
 describe("AutonomousBuildDaemon", () => {
     it("executes the first real platform capability at the assistant completion handoff", () => {
@@ -31,7 +32,7 @@ describe("AutonomousBuildDaemon", () => {
                 capability: "HooshyarOS Autonomous Assistant completion gate",
                 targetEngine: "Autonomous Operations Engine",
                 dependencies: [],
-                evidence: {} as any,
+                evidence: { clean: true, commit: "before" } as any,
                 directives: [],
                 architectureRules: []
             })),
@@ -80,7 +81,7 @@ describe("AutonomousBuildDaemon", () => {
         expect(developmentExecute.mock.calls[0]?.[0]).toEqual(expect.objectContaining(platformMission));
     });
 
-    it("refuses platform completion when final evidence is incomplete", () => {
+    it("blocks on terminal external dependencies after canonical completion evidence is exhausted", () => {
         const mission = {
             snapshot: jest.fn(() => ({ commit: "abc123", clean: true })),
             nextMission: jest.fn(() => ({
@@ -88,10 +89,11 @@ describe("AutonomousBuildDaemon", () => {
                 capability: "HooshyarOS Autonomous Assistant completion gate",
                 targetEngine: "Autonomous Operations Engine",
                 dependencies: [],
-                evidence: {} as any,
+                evidence: { clean: true, commit: "abc123" } as any,
                 directives: [],
                 architectureRules: []
             })),
+            nextPlatformMission: jest.fn(() => null),
         } as unknown as AutonomousProjectMission;
 
         const continuation = {
@@ -126,10 +128,18 @@ describe("AutonomousBuildDaemon", () => {
 
         expect(result.status).toBe("blocked");
         expect(result.history).toHaveLength(1);
-        expect(execute).toHaveBeenCalledTimes(1);
-        const executedGoal = (execute.mock.calls[0]?.[0] as any);
-        expect(executedGoal.capabilityId).toBe("assistant.completion.evidence");
-        expect(executedGoal.capability).toContain("verification");
+        expect(execute).not.toHaveBeenCalled();
+        expect(result.history[0]).toEqual(expect.objectContaining({
+            cycle: 1,
+            status: "blocked",
+            audit: expect.objectContaining({
+                complete: false,
+                blockedExternalDependencies: expect.arrayContaining([
+                    "payment-provider-activation",
+                    "production-cloud-resources"
+                ])
+            })
+        }));
     });
 
     it("reports assistant and autonomous construction completion separately from commercial product completion", () => {
@@ -193,4 +203,110 @@ describe("AutonomousBuildDaemon", () => {
             logSpy.mockRestore();
         }
     });
+
+    it("marks commercial completion incomplete while required external activation remains blocked", () => {
+        const result = new CommercialProductCompletionAudit().audit(process.cwd());
+        expect(result.complete).toBe(false);
+        expect(result.missingLayers).toEqual([]);
+        expect(result.blockedExternalDependencies).toEqual(expect.arrayContaining([
+            "payment-provider-activation",
+            "production-cloud-resources"
+        ]));
+    });
+
+    function completionGateFixture() {
+        const mission = {
+            snapshot: jest.fn(() => ({ commit: "abc123", clean: true })),
+            nextMission: jest.fn(() => ({
+                capabilityId: "assistant.completion.gate",
+                capability: "HooshyarOS Autonomous Assistant completion gate",
+                targetEngine: "Autonomous Operations Engine",
+                dependencies: [],
+                evidence: { root: process.cwd(), commit: "abc123", clean: true, architectureFiles: [], engineCount: 0, runtimeFileCount: 0, latestCommits: [] },
+                directives: [],
+                architectureRules: []
+            })),
+            nextPlatformMission: jest.fn(() => null)
+        } as unknown as AutonomousProjectMission;
+        const continuation = {
+            createMission: jest.fn(() => ({
+                capabilityId: "platform.continuation" as const,
+                capability: "continue autonomous construction of HooshyarOS platform capabilities",
+                instruction: "AUDIT → SELECT NEXT GENUINELY MISSING CAPABILITY → IMPLEMENT → TEST → INTEGRATE → VERIFY → COMMIT → PUSH → AUDIT AGAIN",
+                source: "assistant.completion.gate" as const
+            })),
+            selectNextCapability: jest.fn(() => null)
+        } as unknown as AutonomousPlatformContinuation;
+        return { mission, continuation };
+    }
+
+    const completeCanonicalAudit = {
+        complete: true,
+        roadmapPresent: true,
+        backlogExhausted: true,
+        missingArtifacts: [] as string[],
+        nonAutonomousProductionItems: [] as string[],
+        nonBehavioralCapabilities: [] as string[]
+    };
+
+    it("fails closed when external dependencies are ready but application/acceptance evidence is insufficient", () => {
+        const { mission, continuation } = completionGateFixture();
+        const daemon = new AutonomousBuildDaemon({ maxCycles: 1, mission, continuation });
+        (daemon as any).canonicalAudit = { audit: jest.fn(() => ({ ...completeCanonicalAudit })) };
+        (daemon as any).commercialAudit = {
+            audit: jest.fn(() => ({
+                complete: true,
+                contractPresent: true,
+                missingLayers: [],
+                blockedExternalDependencies: [],
+                applicationEvidence: { present: false, passed: false, fresh: false },
+                acceptanceEvidence: { present: false, passed: false, fresh: false },
+                evidenceGaps: ["application-evidence-missing", "acceptance-evidence-missing"]
+            }))
+        };
+
+        const logSpy = jest.spyOn(console, "log").mockImplementation(() => undefined);
+        try {
+            const result = daemon.run();
+            expect(result.status).toBe("blocked");
+            expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("COMPLETION_EVIDENCE_INSUFFICIENT"));
+            const blocked = result.history[0] as any;
+            expect(blocked.status).toBe("blocked");
+            expect(blocked.audit.completionIntegrity.complete).toBe(false);
+            expect(blocked.audit.completionIntegrity.nonCompleteReasons).toEqual(expect.arrayContaining([
+                "application-evidence-missing",
+                "acceptance-evidence-missing"
+            ]));
+        } finally {
+            logSpy.mockRestore();
+        }
+    });
+
+    it("preserves legitimate completion when full application/acceptance evidence is present", () => {
+        const { mission, continuation } = completionGateFixture();
+        const daemon = new AutonomousBuildDaemon({ maxCycles: 1, mission, continuation });
+        (daemon as any).canonicalAudit = { audit: jest.fn(() => ({ ...completeCanonicalAudit })) };
+        (daemon as any).commercialAudit = {
+            audit: jest.fn(() => ({
+                complete: true,
+                contractPresent: true,
+                missingLayers: [],
+                blockedExternalDependencies: [],
+                applicationEvidence: { present: true, passed: true, fresh: true },
+                acceptanceEvidence: { present: true, passed: true, fresh: true },
+                evidenceGaps: []
+            }))
+        };
+
+        const logSpy = jest.spyOn(console, "log").mockImplementation(() => undefined);
+        try {
+            const result = daemon.run();
+            expect(result.status).toBe("completed");
+            expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("AUTONOMOUS_PLATFORM_CONSTRUCTION_COMPLETE"));
+            expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("\"productComplete\":true"));
+        } finally {
+            logSpy.mockRestore();
+        }
+    });
 });
+

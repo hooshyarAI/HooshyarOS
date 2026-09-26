@@ -13,21 +13,39 @@
     "product:cline:audit": "node scripts/cline-full-platform-audit.cjs",
     "product:cline:evidence": "node scripts/cline-runtime-evidence-collector.cjs",
     "product:web:acceptance": "node scripts/web-product-acceptance.cjs",
+    "product:web:browser:acceptance": "node scripts/web-browser-acceptance.cjs",
+    "product:pdf:acceptance": "tsx scripts/pdf-acquisition-acceptance.ts",
+    "product:pdf:ingestion:acceptance": "tsx scripts/pdf-ingestion-acceptance.ts",
+    "product:installed:acceptance": "node scripts/installed-product-acceptance.cjs",
     "product:security:acceptance": "node scripts/security-tenant-acceptance.cjs",
+    "product:commercial:acceptance": "node scripts/commercial-application-acceptance.cjs",
+    "product:real:qualification": "node scripts/real-product-qualification.cjs",
     "product:agent:evidence": "node scripts/agent-repair-evidence-check.cjs",
     "product:agent:drill": "node qa/agent-repair-drill/repair-target.cjs",
     "product:windows:installer": "powershell -ExecutionPolicy Bypass -File scripts/build-windows-installer.ps1",
     "autonomous:build": "tsx Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts",
+    "autonomous:factory-loop": "python Backend/AI_Runtime/hooshyar_build.py commercial",
+    "autonomous:ci-repair": "node scripts/autonomous-ci-repair-loop.cjs",
     "autonomous:assistant": "python Backend/AI_Runtime/hooshyar_build.py assistant",
-    "autonomous:platform": "python Backend/AI_Runtime/hooshyar_build.py platform",
-    "autonomous:factory-loop": "node scripts/autonomous-factory-loop.cjs"
+    "autonomous:platform": "python Backend/AI_Runtime/hooshyar_build.py platform"
   },
   "devDependencies": {
+    "@napi-rs/canvas": "^0.1.80",
     "@types/jest": "^30.0.0",
     "@types/node": "^26.1.2",
     "jest": "^29.7.0",
     "ts-jest": "^29.4.0",
     "tsx": "^4.20.3",
     "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@tesseract.js-data/eng": "^1.0.0",
+    "@tesseract.js-data/fas": "^1.0.0",
+    "better-sqlite3": "^13.0.3",
+    "exceljs-hardened": "5.0.0",
+    "mammoth": "^1.12.2",
+    "pdf-parse": "^2.4.5",
+    "tesseract.js": "^7.0.0",
+    "xls-reader": "0.7.0"
   }
 }

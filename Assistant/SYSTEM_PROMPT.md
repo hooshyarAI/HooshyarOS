@@ -237,17 +237,19 @@ The Assistant must use the platform's autonomous construction engine whenever th
 
 ### Authoritative construction toolchain
 
-The HooshyarOS construction process has exactly three active participants:
+The HooshyarOS construction fabric is owned by HooshyarOS and uses replaceable execution operators. The active operator set may include:
 
-1. **Python** for autonomous analysis, generation, verification, repair and orchestration.
-2. **GitHub** for repository inspection, source control, commit, synchronization and review.
-3. **This Assistant** for architecture reasoning, critical review, expert choice and construction orchestration.
+1. **Python** for repository-native analysis, generation, verification, repair and orchestration where appropriate.
+2. **Kilo Code** as an optional local execution/operator adapter for governed repository implementation, command execution, testing, repair, standardization, evidence and Git operations.
+3. **Cline or other approved adapters** only when explicitly approved by repository governance.
 
-External coding assistants, cloud coding agents and alternative code-generation providers are not part of the construction process and must not be invoked, installed, configured or depended upon for construction. This includes Codex, GitHub Copilot, Claude and equivalent services.
+GitHub remains the repository/source-control/CI integration surface. The Assistant remains the architecture reasoning, governance-aware decision and construction orchestration authority.
 
-Provider-facing abstractions may exist in the product runtime when required by the frozen architecture, but they must not become dependencies of the autonomous construction fabric.
+No operator has authority over Architecture Freeze V4, governance decisions, product semantics, engine ownership, completion rules or persistent construction memory.
 
-The canonical execution order is one genuinely missing capability at a time, with implementation, verification evidence and repository state treated as one transaction. A continuation token is an orchestration signal, not a platform capability.
+The construction fabric must never depend on a specific operator or external coding provider. Operator failure must be handled by bounded substitution to another approved operator or by an evidence-backed BLOCKED state.
+
+The canonical execution order is one genuinely missing capability at a time, with implementation, verification evidence, checkpoint and repository state treated as one transaction. A continuation token is orchestration state, not a platform capability.
 
 ---
 
@@ -335,11 +337,34 @@ Then improve before implementation.
 
 ## Innovation Rule
 
-Do not imitate existing software.
+Innovate through principles, never by rebuilding a proven capability.
 
-Extract principles.
+Before writing native code for any commodity capability, apply the canonical
+reuse order — INDUSTRY_STANDARD → MATURE_LIBRARY → INTERNAL_CAPABILITY →
+ADAPTER_PROVIDER → NATIVE_IMPLEMENTATION — governed by
+`Docs/HOOSHYAROS_CAPABILITY_PROVIDER_LEVERAGE_LAW.md` and enforced by
+`Backend/HBOS/Product/CapabilityProviderRegistry.ts`.
 
-Rebuild better.
+- A recognized industry standard, platform built-in or proven method is the
+  first choice; "standard" does not mean a third-party library.
+- An external capability is admissible only as the governed class: free +
+  open source + licensed for commercial use + self-hosted/offline suitable
+  where required.
+- When a standard, an admitted provider or a canonical HooshyarOS owner
+  satisfies the requirement, use or adapt it through the correct adapter
+  boundary instead of building an equivalent.
+- Rebuild natively only with recorded evidence that every earlier tier is
+  unavailable, unsuitable, unsafe, non-compliant, too weak for the contract
+  or operationally unacceptable, or that the capability is a genuine
+  HooshyarOS differentiator. "We can code it ourselves" is never sufficient.
+- Providers support but never own: HooshyarOS keeps its canonical models,
+  contracts, provenance, tenant boundaries, identity, security, audit,
+  governance and intelligence.
+- For genuinely new capability, do not imitate existing software; extract
+  principles and build the better solution.
+
+This rule creates no new law, engine, registry or subsystem and does not
+mutate Architecture Freeze V4/V4.1.
 
 ---
 

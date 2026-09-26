@@ -1,0 +1,107 @@
+
+> hooshyaros@1.0.0 product:web:acceptance
+> node scripts/web-product-acceptance.cjs
+
+{"type":"HOOSHYAR_COMMERCIAL_RUNTIME_STARTED","host":"127.0.0.1","port":4174,"health":"http://127.0.0.1:4174/health"}
+{
+  "type": "WEB_PRODUCT_ACCEPTANCE",
+  "status": "PASS",
+  "tenantId": "tenant:1cdc85e3a7d566d6",
+  "profit": 1000,
+  "root": true,
+  "session": true,
+  "analysis": true,
+  "executive": true,
+  "report": true,
+  "assistant": true,
+  "dashboard": true,
+  "multiFormat": true,
+  "financialAnalytics": true,
+  "decisionWorkbench": true,
+  "organizationalExecution": true,
+  "reportsExport": true,
+  "pdfBoundary": true,
+  "offlineQueue": true,
+  "offlineReload": true,
+  "offlineReconnect": true,
+  "storageQuota": true
+}
+
+> hooshyaros@1.0.0 product:pdf:acceptance
+> tsx scripts/pdf-acquisition-acceptance.ts
+
+{
+  "type": "PDF_ACQUISITION_ACCEPTANCE",
+  "version": 1,
+  "status": "PASS",
+  "createdAt": "2026-09-16T06:09:07.672Z",
+  "runtimePdfSupportClaimed": false,
+  "ocrClaimed": false,
+  "checks": [
+    "text-pdf-magic",
+    "text-pdf-extracted",
+    "text-pdf-not-scanned",
+    "text-pdf-provenance",
+    "text-pdf-canonical-table",
+    "scanned-pdf-precise-limitation"
+  ],
+  "pageCount": 1,
+  "averageCharsPerPage": 215,
+  "transactionCount": 4,
+  "scannedErrorCode": "ingestion-pdf-scanned-no-ocr-yet"
+}
+
+> hooshyaros@1.0.0 product:security:acceptance
+> node scripts/security-tenant-acceptance.cjs
+
+{"type":"HOOSHYAR_COMMERCIAL_RUNTIME_STARTED","host":"127.0.0.1","port":4175,"health":"http://127.0.0.1:4175/health"}
+{
+  "type": "SECURITY_TENANT_ACCEPTANCE_SUCCESS",
+  "version": 4,
+  "status": "PASS",
+  "createdAt": "2026-09-16T06:09:15.373Z",
+  "repository": "D:\\HooshyarOS",
+  "commit": "f132d1de4f427b3886b94d72f872340caaae77b7",
+  "unauthenticatedApiDenied": true,
+  "tenantIsolation": true,
+  "bootstrapHardening": true,
+  "tenants": [
+    {
+      "tenantId": "tenant:ea9f00a6cdae4127",
+      "expectedProfit": 400
+    },
+    {
+      "tenantId": "tenant:9077a35e5e6e6cc4",
+      "expectedProfit": 850
+    }
+  ],
+  "acceptance": [
+    "unauthenticated-dashboard-denied",
+    "unauthenticated-analyze-denied",
+    "distinct-tenant-identities",
+    "tenant-a-data-isolated",
+    "tenant-b-data-isolated",
+    "analytics-tenant-scoped",
+    "analytics-cross-tenant-read-denied",
+    "report-export-tenant-scoped",
+    "report-artifact-download-secure",
+    "report-artifact-cross-tenant-denied",
+    "report-artifact-index-tenant-isolated",
+    "unauthenticated-report-export-denied",
+    "unauthenticated-report-download-denied",
+    "passwordless-bootstrap-takeover-denied",
+    "passwordless-bootstrap-active-account-seizure-denied"
+  ]
+}
+{
+  "type": "COMMERCIAL_APPLICATION_ACCEPTANCE",
+  "version": 1,
+  "status": "PASS",
+  "repositoryCommit": "f132d1de4f427b3886b94d72f872340caaae77b7",
+  "checks": [
+    "web-application",
+    "pdf-acquisition",
+    "security-application"
+  ],
+  "generatedAt": "2026-09-16T06:09:16.125Z"
+}

@@ -1,0 +1,172 @@
+ASSURANCE — WINDOWS NPM LAUNCHER NORMALIZATION — EVIDENCE ARTIFACT
+================================================================================
+KNOT ID        : assurance.windows-npm-launcher-normalization
+DATE           : 2026-09-16
+TYPE           : Bounded repository-local repair of the same REAL launcher defect
+                 class already repaired in the combined acceptance harness. Not a
+                 new stage, not a new audit, no K8 reopening. No product runtime
+                 behavior, engine, architecture freeze, completion gate or
+                 acceptance criterion was changed.
+BRANCH         : fix/autonomous-product-factory
+PRE-CHANGE TRUSTED CHECKPOINT : 50c76a311e1595264c4849320c9acd161070337a
+PREDECESSOR KNOT : assurance.commercial-application-acceptance-harness-repair (8e52acea)
+CLASSIFICATION : IMPLEMENTATION_GAP (Windows `.cmd` npm launcher defect class) — repaired.
+
+1. GOVERNING SOURCES READ
+================================================================================
+- Docs/HOOSHYAROS_MASTER_CHARTER.md (§15.1.1, §15.1.2, §15.1.4)
+- Docs/ARCHITECTURE.md (Architecture Freeze V4 — unchanged by this knot)
+- Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md (§Evidence model, §Completion states)
+- .kilo/plans/ACTIVE-COMMERCIALIZATION-MASTER-LEDGER.md
+- .kilo/plans/AUTONOMOUS-COMMERCIALIZATION-EXECUTION-QUEUE.md
+- .kilo/plans/commercial-application-acceptance-harness-repair-checkpoint.md (predecessor knot)
+
+2. SELECTION BASIS
+================================================================================
+After the predecessor knot closed, the mandated continuation scan searched the
+repository for the same defect class (a Windows `.cmd`/`.bat` launcher spawned with
+`shell: false`, which Node rejects with EINVAL before the child starts). The scan
+found the identical defect in three further canonical launchers:
+
+| Owner | Entry point | Defect |
+|---|---|---|
+| scripts/real-product-qualification.cjs | npm `product:real:qualification` | spawnSync('npm.cmd', …, { shell: false }) |
+| Backend/HBOS/Autonomous/Product/AutonomousProductFactory.ts | npm `product:factory:contract` | spawn('npm.cmd', …) and execFileSync('npm.cmd', …) × 2 |
+| scripts/autonomous-ci-repair-runner.cjs | .github/workflows/autonomous-ci-repair.yml | exec helper spawnSync('npm.cmd', …, { shell: false }) |
+
+One coherent root cause (Node cannot spawn `.cmd`/`.bat` without a shell) ⇒ one
+bounded change set, in accordance with the queue rule "One coherent root cause = one
+bounded change set = one test boundary = one commit". Each owner received the same
+minimal normalization; no unrelated task was combined.
+
+3. ROOT CAUSE (already proven by the predecessor knot, re-used)
+================================================================================
+  shell:false npm.cmd  -> status null  error EINVAL
+  shell:true  npm      -> status 0     error undefined
+  cmd.exe /d /s /c npm -> status 0     error undefined
+No product/runtime behavior caused the failure; the launchers could not start the
+npm CLI at all on Windows.
+
+4. REPAIR (each owner minimal; repository-consistent convention)
+================================================================================
+Common convention: on Windows launch the npm CLI through
+`process.env.ComSpec || 'cmd.exe'` with `/d /s /c "npm <args>"`; on POSIX spawn
+`npm` directly. This is the same convention already used by
+scripts/web-product-acceptance.cjs, scripts/security-tenant-acceptance.cjs,
+scripts/autonomous-factory-loop.cjs, Backend/HBOS/Autonomous/Runtime/FinalProductFactoryRunner.ts,
+LocalConstructionToolset.ts and KiloCodeExecutionAdapter.ts.
+
+- scripts/real-product-qualification.cjs — extracted `launchNpm(args, stdio)` and
+  `run(label, args)`; a failed launch now reports `exitCode`, `signal` and
+  `launcherError` instead of silently collapsing into exit 1; `main()` is guarded by
+  `require.main === module` and the helpers are exported for behavioral testing.
+- Backend/HBOS/Autonomous/Product/AutonomousProductFactory.ts — new exported
+  `npmInvocation(args)` resolver used for the two runtime launches, `npm test` and the
+  `npm --version` prerequisite probe; new `stopChild()` terminates the whole process
+  tree on Windows (`taskkill /PID <pid> /T /F`) instead of `child.kill()`, which would
+  leave the npm/node runtime holding the port and database and could let the restart
+  step observe a stale process instead of a real recovery.
+- scripts/autonomous-ci-repair-runner.cjs — new `normalizeCommand(command, args)`
+  helper routes only `.cmd`/`.bat` commands through the command processor and leaves
+  native executables untouched; the load-time repair-context validation moved into
+  `assertRepairContext()` called by `main()`, and `main()` is now guarded by
+  `require.main === module`, so the module can be imported for testing without
+  executing the CI repair loop.
+
+No capability was reordered/added/removed, no criterion weakened, no completion flag
+changed, and no engine/registry/lifecycle/architecture code touched.
+
+5. NEW FOCUSED BEHAVIORAL TEST SUITE (no mocks)
+================================================================================
+Backend/HBOS/test/WindowsNpmLauncherNormalization.test.ts  (7 tests)
+- spawnable invocation for the product qualification wrapper (real `npm --version`)
+- a real canonical npm script (`npm run product:assurance`) through the wrapper path
+- spawnable invocation for the construction CI repair runner
+- only `.cmd`/`.bat` launchers are normalized; native executables are untouched
+- spawnable invocation for the product factory contract resolver
+- fails closed on an empty product factory npm invocation
+- the qualification steps bind scripts that package.json actually defines
+Importing the launcher modules in this suite also proves they no longer execute or
+exit at load time.
+
+6. VERIFICATION
+================================================================================
+Focused:      jest --runTestsByPath WindowsNpmLauncherNormalization.test.ts
+              -> 7 passed / 7 total
+Regression:   jest --runTestsByPath AutonomousProductFactory.test.ts
+                CommercialApplicationAcceptanceHarness.test.ts CommercialAcceptanceBarrier.test.ts
+              -> 3 suites passed / 20 tests passed
+Typecheck:    tsc --noEmit (AutonomousProductFactory.ts + new test) -> exit 0
+Launch proof: the repaired qualification wrapper launched a real canonical
+              acceptance step through its own path:
+              node tsx -e "require('./scripts/real-product-qualification.cjs').run('web-acceptance', ['run','product:web:acceptance'])"
+              -> {"type":"REAL_PRODUCT_QUALIFICATION","stage":"web-acceptance","status":"PASS"} exit 0
+              Transcript: .kilo/evidence/windows-npm-launcher-normalization-launch-proof-2026-09-16.txt
+Full suite:   jest (full) -> Test Suites: 268 passed / 268 total;
+              Tests: 2089 passed / 2089 total
+              (.kilo/evidence/jest-full-windows-npm-launcher-normalization-2026-09-16.txt)
+
+7. APPLICATION ACCEPTANCE LIMIT (recorded truthfully)
+================================================================================
+The full `product:factory:contract` customer journey requires a clean working tree
+(`AutonomousProductFactory.gitClean()` at the AUDIT stage). This repository carries
+pre-existing unrelated working-tree changes that must be preserved
+(`.kilo/agents/hooshyar-construction.md`, `package-lock.json`, and many untracked
+build/temp/historical artifacts). The journey's end-to-end application acceptance is
+therefore blocked by that pre-existing environment condition, not by this knot; it
+was NOT fabricated and no worktree file was deleted to force it. The full
+`product:real:qualification` wrapper was likewise not executed end-to-end because its
+`factory` step would first clear and overwrite unrelated local evidence under
+`.hooshyar/` before failing the clean-tree precondition. The wrapper's real launch
+path was instead proven directly (see §6).
+
+8. COMPLETION GATE STATE AFTER THE KNOT (unchanged flags)
+================================================================================
+The completion gate is unaffected by launcher repairs: it consumes commit-bound
+application/acceptance evidence and remains fail-closed on the truthful external
+dependency block.
+
+| Flag | Value |
+|---|---|
+| assistantComplete | TRUE |
+| canonicalPlatformConstructionComplete | FALSE |
+| commercialProductRuntimeComplete | FALSE |
+| externalProductionDependenciesComplete | FALSE |
+| productComplete | FALSE |
+
+9. FILES CHANGED BY THIS KNOT
+================================================================================
+- scripts/real-product-qualification.cjs
+- Backend/HBOS/Autonomous/Product/AutonomousProductFactory.ts
+- scripts/autonomous-ci-repair-runner.cjs
+- Backend/HBOS/test/WindowsNpmLauncherNormalization.test.ts (new)
+- .kilo/evidence/assurance-windows-npm-launcher-normalization-2026-09-16.txt
+- .kilo/evidence/windows-npm-launcher-normalization-launch-proof-2026-09-16.txt
+- .kilo/evidence/jest-full-windows-npm-launcher-normalization-2026-09-16.txt
+- .kilo/plans/windows-npm-launcher-normalization-checkpoint.md
+- .kilo/plans/ACTIVE-COMMERCIALIZATION-MASTER-LEDGER.md
+- .kilo/plans/AUTONOMOUS-COMMERCIALIZATION-EXECUTION-QUEUE.md
+- Docs/HOOSHYAROS_MASTER_CHARTER.md §15.1.1/§15.1.2
+
+10. REMAINING DEFECT-CLASS FINDING (recorded, not selected)
+================================================================================
+`scripts/product-web-acceptance.cjs` contains the identical `npm.cmd` / `shell:false`
+defect at its `spawn(command, ['run','start:commercial'], …)` call, but it is an
+UNREFERENCED DUPLICATE of the canonical `scripts/web-product-acceptance.cjs`:
+`git grep` over all tracked files (including `.github/workflows/` and `package.json`)
+finds no reference, and `product:web:acceptance` maps to
+`scripts/web-product-acceptance.cjs`.
+CLASSIFICATION: NOT_NEEDED — unreachable by any tracked script, workflow or npm
+entry point; it also executes at load time, so it has no test boundary without a
+restructuring that is outside this knot's scope. Recommended owner action (separate
+decision): delete the duplicate rather than maintain a second acceptance harness.
+This is not a product-completion blocker.
+
+11. REMAINING AFTER THIS KNOT
+================================================================================
+No further depended-ready repository-local knot was found by the current-state scan
+beyond the NOT_NEEDED duplicate above. Remaining items are unchanged:
+- Human approval: B1 05C encryption-at-rest / key-management decisions.
+- External: B2 payment-provider activation; B3 production cloud/DNS/TLS; code-signing certificate.
+- Environment/device: B4 Android toolchain + device; B5 AVAILABLE ON THIS HOST.
+- Conditional: K5 subscription/entitlements; K6 Android build/test evidence; K7 NOT_NEEDED.

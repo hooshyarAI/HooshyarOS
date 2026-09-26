@@ -1,0 +1,315 @@
+﻿node.exe : PASS Backend/HBOS/test/PredictionInterval.07-D.B.test.ts (8.464 s)
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (PASS Backend/HB...st.ts (8.464 s):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+PASS Backend/HBOS/test/IntelligenceEngine.06-E.test.ts (9.408 s)
+PASS Backend/HBOS/test/Calibration.07-D.C.test.ts
+PASS Backend/HBOS/test/TemporalData.07-A.test.ts
+PASS Backend/HBOS/test/GovernanceEngine.06-F.test.ts
+PASS Backend/HBOS/test/Baselines.07-B.test.ts
+PASS Backend/HBOS/test/Forecasting.07-C.A.test.ts
+PASS Backend/HBOS/test/Phase05C-D4.test.ts (16.172 s)
+PASS Backend/HBOS/test/DecisionEngine.06-D.test.ts
+PASS Backend/HBOS/test/Phase05C-D2.test.ts
+PASS Backend/HBOS/test/ExecutiveIntelligenceEngine.phase-11-1.4.test.ts
+PASS Backend/HBOS/test/Causal.07-H.test.ts
+PASS Backend/HBOS/test/MonteCarlo.07-E.test.ts
+PASS Backend/HBOS/test/Phase05B.test.ts (6.331 s)
+PASS Backend/HBOS/test/Forecasting.07-C.B.test.ts
+PASS Backend/HBOS/test/Backtest.07-C.C.test.ts
+PASS Backend/HBOS/test/OrganizationalIntelligenceEngine.phase-11-1.3.test.ts
+PASS Backend/HBOS/test/Bayesian.07-G.test.ts
+PASS Backend/HBOS/test/ML.07-F.test.ts
+PASS Backend/HBOS/test/NLP.07-I.test.ts
+PASS Backend/HBOS/test/EngineRegistry.phase-11-1.2.test.ts
+PASS Backend/HBOS/test/Uncertainty.07-D.A.test.ts
+PASS Backend/HBOS/test/ProvenanceTrace.test.ts
+PASS Backend/HBOS/test/Evaluation.07-J.test.ts
+PASS Backend/HBOS/test/ModelSelection.07-C.D.test.ts
+PASS Backend/HBOS/test/Phase14-IngestionRuntime.test.ts (15.734 s)
+PASS Backend/HBOS/test/CommercialRuntimeServer.e2e.test.ts (16.96 s)
+PASS Backend/HBOS/test/OrganizationalExecutionRuntime.test.ts
+PASS Backend/HBOS/test/OfflineSyncClient.test.ts
+PASS Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.test.ts
+PASS Backend/HBOS/test/Phase06H.test.ts
+PASS Backend/HBOS/test/RuntimeIdempotency.test.ts (15.872 s)
+PASS Backend/HBOS/test/FinancialDataIngestionAdapter.test.ts (49.731 s)
+PASS Backend/HBOS/test/Phase05C-C.test.ts
+PASS Backend/HBOS/test/Phase08-09.OperationalClosure.test.ts (6.577 s)
+PASS Backend/HBOS/test/CommercialAcceptanceBarrier.test.ts
+PASS Backend/HBOS/test/FileSourceContract.test.ts
+PASS Backend/HBOS/test/AutonomousOperationsEngine.phase-11-1.5.test.ts
+PASS Backend/HBOS/test/CrossEngineOrchestration.phase-11-1.9.test.ts
+PASS Backend/HBOS/test/OrganizationalExecutionCoordinator.test.ts
+PASS Backend/HBOS/test/CommercialRuntimeServer.rateLimiting.test.ts (6.847 s)
+PASS Backend/HBOS/test/RuntimePagination.test.ts
+PASS Backend/HBOS/test/Phase05C-B.test.ts
+PASS Backend/HBOS/test/RuntimeObservability.test.ts
+PASS Backend/HBOS/test/AuthorizationGuard.phase-10-1.4.test.ts
+PASS Backend/HBOS/test/SecurityAuditEngine.phase-10-1.5.test.ts (13.948 s)
+PASS Backend/HBOS/test/RetentionBackup.test.ts (6.741 s)
+PASS Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.test.ts
+PASS Backend/HBOS/test/GovernanceEngine.phase-11-1.6.test.ts
+{"type":"ANDROID_ACCEPTANCE_EVIDENCE","status":"BLOCKED","error":"ANDROID_ACCEPTANCE_UNKNOWN_STEP:totally-made-up-step"
+}
+{"type":"ANDROID_ACCEPTANCE_EVIDENCE","status":"BLOCKED","error":"ANDROID_ACCEPTANCE_EVIDENCE_INCOMPLETE:main-activity-
+visible"}
+PASS Backend/HBOS/test/AutonomousPlatformWeaving.test.ts (5.322 s)
+{"type":"ANDROID_ACCEPTANCE_EVIDENCE","status":"BLOCKED","error":"ANDROID_ACCEPTANCE_EVIDENCE_INVALID:ANDROID_PRODUCT_A
+CCEPTANCE_SUCCESS/IN_PROGRESS"}
+PASS Backend/HBOS/test/HealthMonitorEngine.phase-11-1.1.test.ts
+{"type":"ANDROID_ACCEPTANCE_EVIDENCE","status":"BLOCKED","error":"ANDROID_ACCEPTANCE_EVIDENCE_INVALID:ANDROID_PRODUCT_A
+CCEPTANCE_SUCCESS/IN_PROGRESS"}
+{"type":"ANDROID_ACCEPTANCE_EVIDENCE","status":"BLOCKED","error":"ANDROID_ACCEPTANCE_EVIDENCE_MISSING"}
+[KILO] EXECUTION_STARTED
+[KILO] PROCESS_STARTED pid=1864 command=cmd.exe
+[KILO] HEARTBEAT pid=1864 state=RUNNING elapsedSeconds=0
+[KILO] [STDOUT] Pinging 127.0.0.1 with 32 bytes of data:
+[KILO] [STDOUT] Reply from 127.0.0.1: bytes=32 time<1ms TTL=128
+[KILO] [STDOUT] Reply from 127.0.0.1: bytes=32 time<1ms TTL=128
+[KILO] [STDOUT] Reply from 127.0.0.1: bytes=32 time<1ms TTL=128
+[KILO] [STDOUT] Reply from 127.0.0.1: bytes=32 time<1ms TTL=128
+[KILO] HEARTBEAT pid=1864 state=RUNNING elapsedSeconds=6
+PASS Backend/HBOS/test/AndroidAcceptanceEvidence.test.ts (18.592 s)
+PASS Backend/HBOS/test/ReportsExportRuntime.test.ts
+PASS Backend/HBOS/test/WebProductAcceptancePacing.test.ts
+[KILO] [STDOUT] Reply from 127.0.0.1: bytes=32 time<1ms TTL=128
+[KILO] [STDOUT] Reply from 127.0.0.1: bytes=32 time<1ms TTL=128
+[KILO] [STDOUT] Reply from 127.0.0.1: bytes=32 time<1ms TTL=128
+[KILO] [STDOUT] Reply from 127.0.0.1: bytes=32 time<1ms TTL=128
+[KILO] [STDOUT] Reply from 127.0.0.1: bytes=32 time<1ms TTL=128
+[KILO] HEARTBEAT pid=1864 state=RUNNING elapsedSeconds=11
+PASS Backend/HBOS/test/ProductOfflineSync.test.ts (6.015 s)
+[KILO] EXECUTION_TIMEOUT
+PASS Backend/HBOS/test/CommercialRuntimeServer.resilience.test.ts
+SUCCESS: The process with PID 6328 (child process of PID 5668) has been terminated.
+SUCCESS: The process with PID 5668 (child process of PID 1864) has been terminated.
+SUCCESS: The process with PID 1864 (child process of PID 11812) has been terminated.
+PASS Backend/HBOS/test/Phase06I.test.ts
+PASS Backend/HBOS/test/CanonicalCapabilityAudit.test.ts
+PASS Backend/HBOS/test/SecurityAuditEngine.phase-10-1.2.test.ts (47.779 s)
+PASS Backend/HBOS/test/UserManagementEngine.test.ts
+PASS Backend/HBOS/test/Phase10-3.IdentityHardening.test.ts
+PASS Backend/HBOS/test/AutonomousFailureAnalyzer.test.ts
+PASS Backend/HBOS/test/AssistantEngine.phase-11-1.8.test.ts
+PASS Backend/HBOS/Autonomous/Runtime/KiloCodeExecutionAdapter.test.ts (28.031 s)
+PASS Backend/HBOS/test/CapabilityEvidenceAudit.test.ts
+PASS Backend/HBOS/test/FinancialAnalyticsRuntime.test.ts
+PASS Backend/HBOS/test/EngineDependencyVerifier.test.ts
+PASS Backend/HBOS/test/SecurityEventFailure.test.ts (6.53 s)
+PASS Backend/HBOS/test/AuditEventStore.test.ts (5.219 s)
+PASS Backend/HBOS/test/SecurityLayerEngine.phase-10-1.3.test.ts
+PASS Backend/HBOS/test/Phase13-E2E.test.ts (5.269 s)
+PASS Backend/HBOS/test/CommercialRuntimeApiValidation.test.ts
+PASS Backend/HBOS/test/CommercialWebEntrypoint.test.ts
+PASS Backend/HBOS/test/TenantIsolationMemoryKnowledge.test.ts
+PASS Backend/HBOS/test/DecisionWorkbenchRuntime.test.ts
+PASS Backend/HBOS/test/Phase12-E2E.test.ts
+PASS Backend/HBOS/test/CommercialProductCompletionAudit.test.ts
+PASS Backend/HBOS/test/SecurityEventLogger.phase-10-1.3.test.ts
+PASS Backend/HBOS/test/ReasoningEngine.phase-11-1.7.test.ts
+PASS Backend/HBOS/test/ResilienceAnalyticsService.phase-12-1.1.test.ts
+PASS Backend/HBOS/test/DecisionIntelligenceEngine.phase-09-1-11-12.test.ts
+PASS Backend/HBOS/test/PdfAcquisition.test.ts
+PASS Backend/HBOS/test/FinalProductRuntimeQualification.test.ts
+PASS Backend/HBOS/test/OcrAdapter.test.ts
+PASS Backend/HBOS/test/AssistantEngineOrchestratedIntegration.phase-09-activation.test.ts
+PASS Backend/HBOS/test/ReportsEngine.test.ts
+PASS Backend/HBOS/test/AutonomousPlatformContinuation.test.ts
+PASS Backend/HBOS/test/LocalFolderWatcher.test.ts
+PASS Backend/HBOS/test/Phase11-HostileQC.test.ts
+PASS Backend/HBOS/test/SecurityLayerEngine.phase-10-1.1.test.ts
+PASS Backend/HBOS/test/GenericApiConnector.test.ts
+PASS Backend/HBOS/test/ImageAcquisition.test.ts
+PASS Backend/HBOS/test/ReportExportService.test.ts
+PASS Backend/HBOS/test/FormatDetection.test.ts
+PASS Backend/HBOS/test/AssistantCompletionGate.test.ts
+PASS Backend/HBOS/test/WindowsNpmLauncherNormalization.test.ts (7.237 s)
+PASS Backend/HBOS/test/ConnectorRegistry.test.ts
+PASS Backend/HBOS/test/Phase13-RBAC.test.ts
+PASS Backend/HBOS/test/DecisionWorkbench.test.ts
+PASS Backend/HBOS/test/ImpactMeasurementService.phase-12-1.3.test.ts
+PASS Backend/HBOS/test/SyncStateStore.test.ts (6.773 s)
+PASS Backend/HBOS/test/InstalledProductPackagingRepair.test.ts
+PASS Backend/HBOS/test/IncrementalIngest.test.ts (6.551 s)
+PASS Backend/HBOS/test/ContinuousImprovementEngine.phase-12-1.4.test.ts
+PASS Backend/HBOS/test/GenericDbConnector.test.ts
+PASS Backend/HBOS/test/ExecutiveIntelligenceWorkbench.runtime.test.ts
+PASS Backend/HBOS/test/AutonomousProjectMission.test.ts
+PASS Backend/HBOS/test/CommercialSessionBootstrapSecurity.test.ts
+PASS Backend/HBOS/test/FinancialIntelligenceEngine.phase-09-1-1.test.ts
+PASS Backend/HBOS/test/ScannedPdfRouter.test.ts
+PASS Backend/HBOS/test/RuntimeSessionLifecycleSweep.test.ts (12.963 s)
+PASS Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.recovery.test.ts
+PASS Backend/HBOS/test/AutonomousProjectMission.platform-order.test.ts
+PASS Backend/HBOS/test/RiskIntelligenceEngine.phase-09-2-1-2.test.ts
+PASS Backend/HBOS/test/OrchestratedDecisionIntelligenceService.phase-09-1-15.test.ts
+PASS Backend/HBOS/test/DocumentTableExtractor.test.ts
+PASS Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.test.ts
+PASS Backend/HBOS/test/AutonomousCompletionGate.test.ts
+PASS Backend/HBOS/test/BreakEvenAnalysisService.phase-09-1-5.test.ts
+PASS Backend/HBOS/test/FinancialAnalyticsService.test.ts
+PASS Backend/HBOS/test/AutonomousConstructionEngine.quality-gate.test.ts
+PASS Backend/HBOS/test/AuditAnalyticsService.phase-09-2-7.test.ts
+PASS Backend/HBOS/test/AssistantPlatformHandoff.test.ts
+PASS Backend/HBOS/test/AutonomousAudit.test.ts (5.5 s)
+PASS Backend/HBOS/test/HooshyarAutonomousAssistant.test.ts
+PASS Backend/HBOS/test/CredentialVault.test.ts
+PASS Backend/HBOS/test/CommercialRuntimePersistenceRecovery.test.ts (8.89 s)
+PASS Backend/HBOS/Engines/ExecutiveIntelligenceEngine.test.ts
+PASS Backend/HBOS/test/RatioAnalysisService.phase-09-1-13.test.ts
+PASS Backend/HBOS/test/KiloCodeExecutionAdapterObservability.test.ts
+PASS Backend/HBOS/test/RiskIntelligenceEngine.phase-09-1-8.test.ts
+PASS Backend/HBOS/test/OrganizationModelEngine.test.ts
+PASS Backend/HBOS/test/InstallerSilentInstallContract.test.ts
+PASS Backend/HBOS/test/DocxAcquisition.test.ts
+PASS Backend/HBOS/test/CommercialApplicationAcceptanceHarness.test.ts
+PASS Backend/HBOS/test/CommercialRuntimeBusinessFlow.test.ts
+PASS Backend/HBOS/test/OcrProvenance.test.ts
+PASS Backend/HBOS/test/RiskIntelligenceEngine.phase-09-1-7.test.ts
+PASS Backend/HBOS/Product/FinancialDataIngestionAdapter.test.ts
+PASS Backend/HBOS/test/AutonomousCapabilityDiscovery.test.ts
+PASS Backend/HBOS/test/RetryWithBackoff.test.ts
+PASS Backend/HBOS/test/TextFileAcquisition.test.ts
+PASS Backend/HBOS/test/FinancialIntelligenceEngine.phase-09-1-4.test.ts
+PASS Backend/HBOS/test/WindowsProductInstallerContract.test.ts
+PASS Backend/HBOS/test/AutonomousConstructionEngine.idempotent.test.ts
+PASS Backend/HBOS/test/FinancialIntelligenceEngine.phase-09-1-2.test.ts
+PASS Backend/HBOS/test/AnomalyDetectionService.phase-09-2-6.test.ts
+PASS Backend/HBOS/test/TestReferenceIntegrity.test.ts
+PASS Backend/HBOS/test/EngineUniqueness.test.ts
+PASS Backend/HBOS/test/DeploymentReadinessEngine.test.ts
+PASS Backend/HBOS/test/DecisionIntelligenceEngine.phase-09-1-10.test.ts
+PASS Backend/HBOS/test/FinancialIntelligenceEngine.phase-09-1-3.test.ts
+PASS Backend/HBOS/test/CashFlowForecastingService.phase-09-1-6.test.ts
+PASS Backend/HBOS/test/FinancialStatementAnalysisService.test.ts
+PASS Backend/HBOS/Product/FinancialStatementAnalysisService.test.ts
+PASS Backend/HBOS/test/KiloCodeExecutionAdapter.test.ts
+PASS Backend/HBOS/test/AutonomousBuildDaemonWorkspaceRecovery.test.ts
+PASS Backend/HBOS/test/RatioAnalysisService.test.ts
+PASS Backend/HBOS/test/AcquisitionResourcePolicy.test.ts
+PASS Backend/HBOS/test/AutonomousPerformanceBudget.test.ts
+PASS Backend/HBOS/test/ProductPlatformAssurance.test.ts
+PASS Backend/HBOS/test/AutonomousCiRepairKiloInvocation.test.ts
+PASS Backend/HBOS/test/CommercialAuthenticationAuthorizationBoundary.test.ts
+PASS Backend/HBOS/test/KpiIntelligenceService.phase-09-1-14.test.ts
+PASS Backend/HBOS/test/ProductionReadinessEngine.test.ts
+PASS Backend/HBOS/test/CanonicalIntelligenceEngines.test.ts
+PASS Backend/HBOS/test/AutonomousWeavingPlanner.test.ts
+PASS Backend/HBOS/test/ExecutiveIntelligenceWorkbench.test.ts
+PASS Backend/HBOS/test/BreakEvenAnalysisService.test.ts
+PASS Backend/HBOS/test/CommercialIdentityService.test.ts
+PASS Backend/HBOS/test/FinalPersistenceRecoveryQualification.test.ts
+PASS Backend/HBOS/test/ExponentialSmoothingService.phase-09-1-9.test.ts
+PASS Backend/HBOS/test/LearningFeedbackLoop.test.ts
+PASS Backend/HBOS/test/BootReport.test.ts
+PASS Backend/HBOS/test/AutonomousAssistantConstructionHandoff.test.ts
+PASS Backend/HBOS/Autonomous/Runtime/ExternalProductionDependencyAudit.test.ts
+PASS Backend/HBOS/test/CommercialCapabilityDiscovery.test.ts
+PASS Backend/HBOS/test/AutonomousConstructionBatchPlanner.test.ts
+PASS Backend/HBOS/test/NpmLockfileIntegrity.test.ts (14.674 s)
+PASS Backend/HBOS/test/FinalArchitectureQualification.test.ts
+PASS Backend/HBOS/test/SystemReadiness.test.ts
+PASS Backend/HBOS/test/Memory.test.ts
+PASS Backend/HBOS/test/CommercialRuntimeEntrypoint.test.ts
+PASS Backend/HBOS/test/KiloPythonExecutionContract.test.ts
+PASS Backend/HBOS/test/AutonomousDevelopmentLoop.repair.test.ts
+PASS Backend/HBOS/test/ExecutiveIntelligenceEngine.test.ts
+PASS Backend/HBOS/test/HealthMonitor.test.ts
+PASS Backend/HBOS/test/AutonomousProductizationRouting.test.ts
+PASS Backend/HBOS/test/AutonomousKnotRecovery.test.ts
+PASS Backend/HBOS/test/GovernanceEngine.test.ts
+PASS Backend/HBOS/test/CloudDeploymentEngine.test.ts
+PASS Backend/HBOS/Engines/OrganizationalIntelligenceEngine.test.ts
+PASS Backend/HBOS/test/WorkspaceRepairRunner.test.ts
+PASS Backend/HBOS/test/AuditAnalyticsService.test.ts
+PASS Backend/HBOS/Engines/AutonomousOperationsEngine.test.ts
+PASS Backend/HBOS/test/CashFlowForecastingService.test.ts
+PASS Backend/HBOS/test/AutonomousDevelopmentLoopIntegrity.test.ts
+PASS Backend/HBOS/test/AutonomousRepairProductBoundary.test.ts
+PASS Backend/HBOS/test/ProjectPilot.test.ts
+PASS Backend/HBOS/test/FinancialIntelligenceEngine.test.ts
+PASS Backend/HBOS/test/KpiIntelligenceService.test.ts
+PASS Backend/HBOS/test/BudgetIntelligenceEngine.test.ts
+PASS Backend/HBOS/test/CustomerTestingEngine.test.ts
+PASS Backend/HBOS/test/AnomalyDetectionService.test.ts
+PASS Backend/HBOS/test/EngineDependencyManager.test.ts
+PASS Backend/HBOS/test/AutonomousMissionController.test.ts
+PASS Backend/HBOS/test/PerformanceTestingEngine.test.ts
+PASS Backend/HBOS/Autonomous/Analyzer/CommercialReadinessGate.test.ts
+PASS Backend/HBOS/test/ProductionAcceptanceEngine.test.ts (12.094 s)
+PASS Backend/HBOS/test/TenantIsolationVerification.test.ts
+PASS Backend/HBOS/test/AutonomousProjectConductor.test.ts
+PASS Backend/HBOS/test/DeploymentContractEngine.test.ts
+PASS Backend/HBOS/test/AutonomousBuilderAgent.test.ts
+PASS Backend/HBOS/test/EngineLifecycleManager.test.ts
+PASS Backend/HBOS/test/AutonomousDevelopmentLoop.repair-intent.test.ts
+PASS Backend/HBOS/Engines/ReasoningEngine.test.ts
+PASS Backend/HBOS/AI/test/AIRuntime.test.ts
+PASS Backend/HBOS/test/AutonomousAssistantRuntime.test.ts
+PASS Backend/HBOS/test/ExponentialSmoothingService.test.ts
+PASS Backend/HBOS/test/SecurityAuditEngine.test.ts (11.735 s)
+PASS Backend/HBOS/test/HooshyarSelfOperatingAssistant.test.ts
+PASS Backend/HBOS/test/BootDependencyValidator.test.ts
+PASS Backend/HBOS/test/CommercialPersistenceBoundary.test.ts
+PASS Backend/HBOS/test/AssistantConstructionProviderPolicy.test.ts
+PASS Backend/HBOS/test/HBOSBootIntegration.test.ts
+PASS Backend/HBOS/test/Assistant.test.ts
+PASS Backend/HBOS/Autonomous/Analyzer/RiskActionOrchestrator.test.ts
+PASS Backend/HBOS/test/AutonomousMemoryEngine.test.ts
+PASS Backend/HBOS/test/AutonomousAssistantPlatform.test.ts
+PASS Backend/HBOS/test/APIGatewayEngine.test.ts
+PASS Backend/HBOS/test/DashboardEngine.test.ts
+PASS Backend/HBOS/test/TaxIntelligenceEngine.test.ts
+PASS Backend/HBOS/test/AutonomousProductFactory.test.ts
+PASS Backend/HBOS/test/ProductionEvolution.test.ts
+PASS Backend/HBOS/test/AutonomousOperationsEngine.test.ts
+PASS Backend/HBOS/test/HooshyarAutonomousAssistant.platform-construction.test.ts
+PASS Backend/HBOS/test/Knowledge.test.ts
+PASS Backend/HBOS/test/AlertsEngine.test.ts
+PASS Backend/HBOS/test/RiskIntelligenceEngine.test.ts
+PASS Backend/HBOS/test/Insight.test.ts
+PASS Backend/HBOS/test/BootTimer.test.ts
+PASS Backend/HBOS/test/ReasoningEngine.test.ts
+PASS Backend/HBOS/test/AssistantOrchestrator.test.ts
+PASS Backend/HBOS/test/BuilderReportGenerator.test.ts
+PASS Backend/HBOS/test/PythonReasoningAdapter.test.ts
+PASS Backend/HBOS/test/BuilderPipeline.test.ts
+PASS Backend/HBOS/test/BuilderProjectConnector.test.ts
+PASS Backend/HBOS/test/BuilderDecisionAdapter.test.ts
+PASS Backend/HBOS/test/Reaction.test.ts
+PASS Backend/HBOS/test/OrganizationalIntelligenceEngine.test.ts
+PASS Backend/HBOS/test/BuilderMemoryConnector.test.ts
+PASS Backend/HBOS/Autonomous/RepairEngine/AutonomousRepairIntegration.test.ts
+PASS Backend/HBOS/Autonomous/RepairEngine/AutonomousPatchExecutor.test.ts
+PASS Backend/HBOS/test/BuilderActionExecutor.test.ts
+PASS Backend/HBOS/test/ChiefEngineerController.test.ts
+PASS Backend/HBOS/test/BuilderAutonomousController.test.ts
+PASS Backend/HBOS/test/Decision.test.ts
+PASS Backend/HBOS/test/SecurityLayerEngine.test.ts
+PASS Backend/HBOS/test/BuilderEventBus.test.ts
+PASS Backend/HBOS/test/Autonomous.test.ts
+PASS Backend/HBOS/test/BuilderApprovalManager.test.ts
+PASS Backend/HBOS/test/AutonomousOperatingSystem.test.ts
+PASS Backend/HBOS/Autonomous/RepairEngine/AutonomousRepairEngine.test.ts
+PASS Backend/HBOS/test/BuilderAnalyzer.test.ts
+PASS Backend/HBOS/Autonomous/Runtime/AutonomousContinuationContract.test.ts
+PASS Backend/HBOS/test/AutonomousChiefEngineer.test.ts
+PASS Backend/HBOS/test/BuilderLifecycleManager.test.ts
+PASS Backend/HBOS/Autonomous/Repair/AutonomousRepairAgent.test.ts
+PASS Backend/HBOS/test/BuilderLearningLoop.test.ts
+PASS Backend/HBOS/test/AutonomousAssistant.test.ts
+PASS Backend/HBOS/test/DecisionIntelligenceEngine.test.ts
+PASS Backend/HBOS/test/BuilderEngine.test.ts
+PASS Backend/HBOS/test/AutonomousPlatform.test.ts
+PASS Backend/HBOS/test/TestAIEngine.test.ts
+PASS Backend/HBOS/test/HBOS.test.ts
+PASS Backend/HBOS/test/ProductionSecurityEvidence.test.ts (12.677 s)
+
+Test Suites: 276 passed, 276 total
+Tests:       2126 passed, 2126 total
+Snapshots:   0 total
+Time:        205.508 s

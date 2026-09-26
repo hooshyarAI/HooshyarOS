@@ -16,7 +16,6 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-from android_toolchain_repair import AndroidRepairError, install_from_metadata
 
 ROOT = Path(__file__).resolve().parents[2]
 RELEASE_ROOT = ROOT / "dist" / "productization"
@@ -27,7 +26,8 @@ ANDROID_RELEASE = RELEASE_ROOT / "android"
 TOOLCACHE = RELEASE_ROOT / ".toolcache"
 
 JDK17_URL = "https://aka.ms/download-jdk/microsoft-jdk-17-windows-x64.zip"
-ANDROID_CLI_URL = "https://dl.google.com/android/repository/commandlinetools-win-15859902_latest.zip"
+ANDROID_CLI_PACKAGE_ID = "Google.AndroidCLI"
+ANDROID_CLI_INSTALL_URL = "https://dl.google.com/android/cli/latest/windows_x86_64/install.cmd"
 GRADLE_URL = "https://services.gradle.org/distributions/gradle-8.7-bin.zip"
 
 
@@ -62,6 +62,110 @@ def download(url: str, target: Path) -> None:
     emit("AUTONOMOUS_PRODUCTIZATION_DOWNLOAD", url=url, target=str(target.relative_to(ROOT)))
     with urllib.request.urlopen(url, timeout=120) as response, target.open("wb") as handle:
         shutil.copyfileobj(response, handle)
+
+def install_android_cli() -> Path | None:
+    emit("AUTONOMOUS_ANDROID_CLI", stage="INSTALL", method="winget", package=ANDROID_CLI_PACKAGE_ID)
+    winget = shutil.which("winget.exe") or shutil.which("winget")
+    if not winget:
+        emit("AUTONOMOUS_ANDROID_CLI", stage="INSTALL", status="FALLBACK", method="google-official-installer")
+        return install_android_cli_official()
+
+    result = subprocess.run(
+        [winget, "install", "--id", ANDROID_CLI_PACKAGE_ID, "--exact",
+         "--source", "winget", "--accept-source-agreements", "--accept-package-agreements"],
+        cwd=ROOT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        timeout=15 * 60,
+        check=False,
+    )
+    if result.stdout:
+        print(result.stdout, end="")
+    if result.returncode != 0:
+        emit("AUTONOMOUS_ANDROID_CLI", stage="INSTALL", status="NONZERO", exitCode=result.returncode, source="winget")
+
+    found = discover_android_cli()
+    if found:
+        return found
+
+    emit("AUTONOMOUS_ANDROID_CLI", stage="INSTALL", status="FALLBACK", method="google-official-installer")
+    return install_android_cli_official()
+
+
+def discover_android_cli() -> Path | None:
+    user_path_result = subprocess.run(
+        ["powershell.exe", "-NoProfile", "-Command",
+         "[Environment]::GetEnvironmentVariable('Path','User')"],
+        cwd=ROOT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        timeout=30,
+        check=False,
+    )
+    user_path = user_path_result.stdout.strip()
+    search_path = os.pathsep.join(part for part in [user_path, os.environ.get("PATH", "")] if part)
+    android_exe = shutil.which("android.exe", path=search_path) or shutil.which("android", path=search_path)
+    if android_exe:
+        return Path(android_exe)
+
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    program_files = os.environ.get("ProgramFiles")
+    roots = [Path(p) for p in (local_app_data, program_files) if p]
+    roots.append(TOOLCACHE / "android")
+    for base in roots:
+        try:
+            candidates = sorted(
+                (p for p in base.glob("**/android.exe") if p.is_file()),
+                key=lambda p: len(str(p)),
+            )
+        except (OSError, RuntimeError):
+            candidates = []
+        if candidates:
+            return candidates[0]
+    return None
+
+
+def install_android_cli_official() -> Path | None:
+    local = TOOLCACHE / "android"
+    installer = local / "android-cli-install.cmd"
+    download(ANDROID_CLI_INSTALL_URL, installer)
+    if not installer.exists() or installer.stat().st_size < 256:
+        emit("AUTONOMOUS_ANDROID_CLI", stage="INSTALL", status="BLOCKED", reason="official-android-cli-installer-not-downloaded")
+        return None
+
+    result = subprocess.run(
+        ["cmd.exe", "/d", "/c", str(installer)],
+        cwd=ROOT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        timeout=15 * 60,
+        check=False,
+    )
+    if result.stdout:
+        print(result.stdout, end="")
+    if result.returncode != 0:
+        emit("AUTONOMOUS_ANDROID_CLI", stage="INSTALL", status="NONZERO", exitCode=result.returncode, method="google-official-installer")
+
+    found = discover_android_cli()
+    if found:
+        return found
+
+    emit(
+        "AUTONOMOUS_ANDROID_CLI",
+        stage="VERIFY",
+        status="BLOCKED",
+        reason="android-executable-not-discoverable-after-install",
+    )
+    return None
 
 
 def extract_zip(archive: Path, destination: Path) -> None:
@@ -179,21 +283,15 @@ def provision_android_toolchain() -> tuple[Path, Path, Path] | None:
         java_home = javac_path.parent.parent
 
     sdk_root = local / "sdk"
-    cmdline_zip = local / "commandlinetools-win-latest.zip"
-    cmdline_root = sdk_root / "cmdline-tools" / "latest"
-    sdkmanager = cmdline_root / "bin" / "sdkmanager.bat"
-    if not sdkmanager.exists():
-        download(ANDROID_CLI_URL, cmdline_zip)
-        temp_extract = local / "cmdline-extract"
-        if temp_extract.exists():
-            shutil.rmtree(temp_extract)
-        extract_zip(cmdline_zip, temp_extract)
-        inner = temp_extract / "cmdline-tools"
-        if inner.exists():
-            cmdline_root.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copytree(inner, cmdline_root, dirs_exist_ok=True)
-        else:
+    android_cli = shutil.which("android.exe") or shutil.which("android")
+    if android_cli:
+        android_cli_path = Path(android_cli)
+    else:
+        installed = install_android_cli()
+        if not installed:
+            emit("AUTONOMOUS_ANDROID_REPAIR", stage="VERIFY", status="BLOCKED", reason="android-cli-not-discoverable")
             return None
+        android_cli_path = installed
 
     gradle_root = local / "gradle"
     gradle_zip = local / "gradle-8.7-bin.zip"
@@ -210,23 +308,43 @@ def provision_android_toolchain() -> tuple[Path, Path, Path] | None:
         "JAVA_HOME": str(java_home),
         "ANDROID_SDK_ROOT": str(sdk_root),
         "ANDROID_HOME": str(sdk_root),
-        "PATH": str(java_home / "bin") + os.pathsep + str(sdk_root / "platform-tools") + os.pathsep + str(sdk_root / "cmdline-tools" / "latest" / "bin") + os.pathsep + str(gradle_bin.parent) + os.pathsep + env.get("PATH", ""),
+        "PATH": str(java_home / "bin") + os.pathsep + str(sdk_root / "platform-tools") + os.pathsep + str(gradle_bin.parent) + os.pathsep + env.get("PATH", ""),
     })
 
-    sdkmanager_args = [
-        f"--sdk_root={sdk_root}",
+    sdk_root.mkdir(parents=True, exist_ok=True)
+    packages = [
         "platform-tools",
-        "platforms;android-35",
-        "build-tools;35.0.0",
+        "platforms/android-35",
+        "build-tools/35.0.0",
     ]
-    result = run(str(sdkmanager), sdkmanager_args, env=env, timeout=90 * 60, input_text=("y\n" * 30))
+    result = run(
+        str(android_cli_path),
+        [f"--sdk={sdk_root}", "sdk", "install", *packages],
+        env=env,
+        timeout=90 * 60,
+    )
     if result != 0:
-        emit("AUTONOMOUS_ANDROID_REPAIR", stage="ISOLATE", reason="sdkmanager-repository-metadata-failure", action="metadata-driven-official-fallback")
-        try:
-            install_from_metadata(sdk_root, ["platform-tools", "platforms;android-35", "build-tools;35.0.0"])
-        except AndroidRepairError as exc:
-            emit("AUTONOMOUS_ANDROID_REPAIR", stage="DIAGNOSE", status="BLOCKED", reason=str(exc))
-            return None
+        emit(
+            "AUTONOMOUS_ANDROID_REPAIR",
+            stage="DIAGNOSE",
+            status="BLOCKED",
+            reason="android-cli-sdk-package-install-failed",
+        )
+        return None
+    required = [
+        sdk_root / "platform-tools" / "adb.exe",
+        sdk_root / "platforms" / "android-35" / "android.jar",
+        sdk_root / "build-tools" / "35.0.0" / "aapt2.exe",
+    ]
+    if not all(path.exists() for path in required):
+        emit(
+            "AUTONOMOUS_ANDROID_REPAIR",
+            stage="VERIFY",
+            status="BLOCKED",
+            reason="android-sdk-packages-incomplete",
+            missing=[str(path) for path in required if not path.exists()],
+        )
+        return None
     return java_home, sdk_root, gradle_bin
 
 

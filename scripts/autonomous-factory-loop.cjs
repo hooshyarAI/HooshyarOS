@@ -9,6 +9,8 @@ const dir = path.join(root, '.hooshyar');
 const statePath = path.join(dir, 'autonomous-factory-loop.json');
 const failurePath = path.join(dir, 'factory-failure.json');
 const evidencePath = path.join(dir, 'cline-runtime-evidence.json');
+const auditPath = path.join(dir, 'cline-platform-audit.json');
+const handoffPath = path.join(dir, 'autonomous-repair-handoff.json');
 const maxAttempts = Number(process.env.HOOSHYAR_AUTONOMOUS_MAX_ATTEMPTS || 12);
 const branchResult = cp.spawnSync('git', ['branch', '--show-current'], { cwd: root, encoding: 'utf8' });
 const branch = (branchResult.stdout || '').trim();
@@ -55,51 +57,74 @@ function repositoryChanged() {
   return git(['status', '--porcelain']).stdout.trim().length > 0;
 }
 
-function pushCurrentHead() {
-  if (process.env.HOOSHYAR_AUTONOMOUS_ALLOW_PUSH !== '1') {
-    console.log(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_PUSH_SKIPPED', reason: 'PUSH_DISABLED_BY_POLICY', branch }));
-    return false;
-  }
-  const push = run('git', ['push', 'origin', branch]);
-  if ((push.status ?? 1) !== 0) throw new Error('git push failed');
-  console.log(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_PUSHED', branch }));
-  return true;
-}
-
 function commitAndPush() {
   const status = git(['status', '--porcelain']);
   if (status.code !== 0) throw new Error('git status failed');
-  if (!status.stdout.trim()) return pushCurrentHead();
-
+  if (!status.stdout.trim()) return { changed: false, pushed: false };
   const add = run('git', ['add', '--all']);
   if ((add.status ?? 1) !== 0) throw new Error('git add failed');
   const message = process.env.HOOSHYAR_AUTONOMOUS_COMMIT_MESSAGE || 'fix(autonomous): repair commercial product factory failure';
   const commit = run('git', ['commit', '-m', message]);
   if ((commit.status ?? 1) !== 0) throw new Error('git commit failed');
-  return pushCurrentHead();
+  if (process.env.HOOSHYAR_AUTONOMOUS_ALLOW_PUSH !== '1') {
+    console.log(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_COMMITTED', pushed: false, reason: 'PUSH_DISABLED_BY_POLICY', branch }));
+    return { changed: true, pushed: false };
+  }
+  const push = run('git', ['push', 'origin', branch]);
+  if ((push.status ?? 1) !== 0) throw new Error('git push failed');
+  console.log(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_COMMITTED', pushed: true, branch }));
+  return { changed: true, pushed: true };
 }
 
-function invokeKilo(prompt) {
-  if (process.platform !== 'win32') return run('kilo', ['run', '--auto', prompt]).status ?? 1;
-  const comspec = process.env.ComSpec || 'cmd.exe';
-  const quotedPrompt = `"${prompt.replace(/"/g, '""')}"`;
-  return run(comspec, ['/d', '/s', '/c', `kilo.cmd run --auto ${quotedPrompt}`]).status ?? 1;
-}
-
-function repairPrompt(payload) {
-  return [
+function invokeKilo(handoffFile) {
+  const shortPrompt = [
     'You are the HooshyarOS autonomous repair operator.',
-    'Obey AGENTS.md, .clinerules, Architecture Freeze V4, governance, the commercial completion contract, and the qualification matrix.',
-    'Repair the FIRST concrete failure or unresolved qualification cell in the supplied evidence.',
-    'Do not weaken tests, bypass gates, invent completion, or change frozen architecture semantics.',
-    'Reuse existing implementations. Make the smallest coherent change.',
-    'Add or update a focused regression test and run the relevant acceptance test.',
-    'Do not stop at a plan: implement the repair.',
-    'Do not create unrelated changes or force-push.',
-    '',
-    'FAILURE / QUALIFICATION HANDOFF:',
-    payload
-  ].join('\n');
+    `Read the exact repair handoff file: ${handoffFile}`,
+    'Repair ONLY the FIRST target in that file.',
+    'Do not broaden scope, scan the repository, run full Jest, run npm test, or run repository-wide verification.',
+    'Implement the repair, add/update ONE focused regression test, run only its focused verification, then STOP.',
+    'Do not modify generated evidence merely to claim success. Do not force-push or create unrelated changes.',
+    'The outer factory owns full verification, evidence, commit, push, and continuation.'
+  ].join(' ');
+  const args = ['run', '--auto', '--agent', 'hooshyar-repair', '-f', handoffFile, shortPrompt];
+  if (process.platform !== 'win32') return run('kilo', args).status ?? 1;
+  const comspec = process.env.ComSpec || 'cmd.exe';
+  const parts = args.map(value => `"${value.replace(/"/g, '""')}"`);
+  return run(comspec, ['/d', '/s', '/c', `kilo.cmd ${parts.join(' ')}`]).status ?? 1;
+}
+
+function buildFailurePayload(before, currentEvidence, factoryResult, auditResult, failureOverride = null) {
+  return {
+    failure: failureOverride || (readJson(failurePath)?.failure || {}),
+    platformAudit: readJson(auditPath) || {
+      exitCode: auditResult?.code ?? null,
+      stdout: auditResult?.stdout || '',
+      stderr: auditResult?.stderr || ''
+    },
+    qualification: currentEvidence || null,
+    factory: {
+      exitCode: factoryResult?.status ?? null,
+      stdout: factoryResult?.stdout || '',
+      stderr: factoryResult?.stderr || ''
+    },
+    branch,
+    commit: before
+  };
+}
+
+function runFullJest() {
+  const jestCli = path.join(root, 'node_modules', 'jest', 'bin', 'jest.js');
+  return run(process.execPath, [jestCli, '--runInBand']);
+}
+
+function runPlatformAudit() {
+  const auditScript = path.join(root, 'scripts', 'cline-full-platform-audit.cjs');
+  return capture(process.execPath, [auditScript]);
+}
+
+function writeHandoff(payload) {
+  fs.writeFileSync(handoffPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+  return handoffPath;
 }
 
 fs.mkdirSync(dir, { recursive: true });
@@ -122,17 +147,60 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     process.exit(2);
   }
 
-  const audit = run(executable('npm'), ['run', 'product:cline:audit']);
-  if ((audit.status ?? 1) !== 0) {
-    console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'PLATFORM_AUDIT_FAILED' }));
+  for (const file of [auditPath, failurePath, evidencePath, handoffPath]) {
+    if (fs.existsSync(file)) fs.unlinkSync(file);
+  }
+
+  const audit = runPlatformAudit();
+  const auditEvidence = readJson(auditPath);
+  if (auditEvidence && auditEvidence.git?.commit !== before) {
+    console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'STALE_PLATFORM_AUDIT_EVIDENCE', expectedCommit: before, observedCommit: auditEvidence.git?.commit || null }));
     process.exit(1);
+  }
+
+  if (audit.code !== 0) {
+    const failureOverride = { type: 'PLATFORM_AUDIT_EXECUTION_FAILURE', message: 'Canonical platform audit exited non-zero.', exitCode: audit.code, stdout: audit.stdout, stderr: audit.stderr };
+    const payloadObject = buildFailurePayload(before, null, null, audit, failureOverride);
+    const payload = JSON.stringify(payloadObject, null, 2);
+    const fingerprint = sha256(payload);
+    if (state.lastFailureFingerprint === fingerprint) {
+      console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'REPEATED_IDENTICAL_AUDIT_FAILURE', fingerprint }));
+      state.attempts.push({ attempt, before, reason: 'REPEATED_IDENTICAL_AUDIT_FAILURE', fingerprint, at: new Date().toISOString() });
+      fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
+      process.exit(1);
+    }
+    state.lastFailureFingerprint = fingerprint;
+    fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
+    const handoffFile = writeHandoff(payloadObject);
+    console.error(JSON.stringify({ type: 'AUTONOMOUS_AUDIT_REPAIR', attempt, reason: 'PLATFORM_AUDIT_EXECUTION_FAILED', fingerprint, handoff: handoffFile }));
+    const kiloExit = invokeKilo(handoffFile);
+    if (kiloExit !== 0) {
+      console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'KILO_REPAIR_FAILED_AFTER_AUDIT', kiloExit, fingerprint }));
+      process.exit(1);
+    }
+    const tests = runFullJest();
+    if ((tests.status ?? 1) !== 0) {
+      state.attempts.push({ attempt, before, repair: 'KILO', fullJest: 'FAIL', audit: 'FAIL', at: new Date().toISOString() });
+      fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
+      console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'FULL_JEST_FAILED_AFTER_AUDIT_REPAIR' }));
+      process.exit(1);
+    }
+    if (repositoryChanged()) commitAndPush();
+    else if (git(['rev-parse', 'HEAD']).stdout.trim() === before) {
+      console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'KILO_PRODUCED_NO_REPOSITORY_CHANGE_AFTER_AUDIT', fingerprint }));
+      process.exit(1);
+    }
+    const after = git(['rev-parse', 'HEAD']).stdout.trim();
+    state.attempts.push({ attempt, before, after, audit: 'FAIL', repair: 'KILO', fullJest: 'PASS', at: new Date().toISOString() });
+    fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
+    console.log(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_PROGRESS', attempt, status: 'AUDIT_REPAIRED', before, after }));
+    continue;
   }
 
   const factory = run(executable('npm'), ['run', 'product:factory']);
   const evidence = run(executable('npm'), ['run', 'product:cline:evidence']);
   const currentEvidence = readJson(evidencePath);
-
-  if ((factory.status ?? 1) === 0 && currentEvidence?.verdict === 'QUALIFICATION_COMPLETE') {
+  if ((factory.status ?? 1) === 0 && evidence.status === 0 && currentEvidence?.verdict === 'QUALIFICATION_COMPLETE') {
     const after = git(['rev-parse', 'HEAD']).stdout.trim();
     state.attempts.push({ attempt, before, after, factory: 'PASS', qualification: 'COMPLETE', at: new Date().toISOString() });
     fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
@@ -140,17 +208,10 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     process.exit(0);
   }
 
-  const handoff = capture(executable('npm'), ['run', 'product:factory:handoff']);
-  const failure = readJson(failurePath) || {};
-  const payload = JSON.stringify({
-    failure: failure.failure || failure,
-    qualification: currentEvidence || null,
-    handoff: handoff.stdout || handoff.stderr,
-    branch,
-    commit: before
-  }, null, 2);
+  const payloadObject = buildFailurePayload(before, currentEvidence, factory, null);
+  payloadObject.handoff = capture(executable('npm'), ['run', 'product:factory:handoff']).stdout;
+  const payload = JSON.stringify(payloadObject, null, 2);
   const fingerprint = sha256(payload);
-
   if (state.lastFailureFingerprint === fingerprint) {
     console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'REPEATED_IDENTICAL_FAILURE', fingerprint }));
     state.attempts.push({ attempt, before, reason: 'REPEATED_IDENTICAL_FAILURE', fingerprint, at: new Date().toISOString() });
@@ -159,24 +220,29 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
   }
   state.lastFailureFingerprint = fingerprint;
   fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
+  const handoffFile = writeHandoff(payloadObject);
+  console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_REPAIR', attempt, fingerprint, handoff: handoffFile }));
 
-  const kiloExit = invokeKilo(repairPrompt(payload));
+  const kiloExit = invokeKilo(handoffFile);
   if (kiloExit !== 0) {
     console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'KILO_REPAIR_FAILED', kiloExit, fingerprint }));
     process.exit(1);
   }
 
-  const tests = run(executable('npm'), ['test', '--', '--runInBand']);
+  const tests = runFullJest();
   if ((tests.status ?? 1) !== 0) {
-    state.attempts.push({ attempt, before, factory: 'FAIL', repair: 'KILO', fullJest: 'FAIL', at: new Date().toISOString() });
+    state.attempts.push({ attempt, before, repair: 'KILO', fullJest: 'FAIL', at: new Date().toISOString() });
     fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
     console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'FULL_JEST_FAILED_AFTER_REPAIR' }));
     process.exit(1);
   }
 
-  const repoChanged = repositoryChanged();
-  const headAfterKilo = git(['rev-parse', 'HEAD']).stdout.trim();
-  if (repoChanged || headAfterKilo !== before) commitAndPush();
+  if (repositoryChanged()) commitAndPush();
+  else if (git(['rev-parse', 'HEAD']).stdout.trim() === before) {
+    console.error(JSON.stringify({ type: 'AUTONOMOUS_FACTORY_BLOCKED', attempt, reason: 'KILO_PRODUCED_NO_REPOSITORY_CHANGE', fingerprint }));
+    process.exit(1);
+  }
+
   const after = git(['rev-parse', 'HEAD']).stdout.trim();
   state.attempts.push({ attempt, before, after, factory: 'REPAIR', repair: 'KILO', fullJest: 'PASS', at: new Date().toISOString() });
   fs.writeFileSync(statePath, JSON.stringify(state, null, 2));

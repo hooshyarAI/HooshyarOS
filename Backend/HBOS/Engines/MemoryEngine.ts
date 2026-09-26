@@ -1,11 +1,11 @@
-import { MemoryEvent } from "../Entities/MemoryEvent";
-import { ReactionEngine } from "./ReactionEngine";
-import { EventListener } from "../Interfaces/EventListener";
+import { MemoryEvent } from '../Entities/MemoryEvent';
+import { ReactionEngine } from './ReactionEngine';
+import { EventListener } from '../Interfaces/EventListener';
 
 
 export class MemoryEngine {
 
-    name: string = "MemoryEngine";
+    name: string = 'MemoryEngine';
 
 
     private memories: MemoryEvent[] = [];
@@ -17,11 +17,10 @@ export class MemoryEngine {
     private listeners: EventListener[] = [];
 
 
-
     initialize(): void {
 
         console.log(
-            "Memory Engine Started"
+            'Memory Engine Started'
         );
 
     }
@@ -60,8 +59,18 @@ export class MemoryEngine {
 
 
     store(
-        event: MemoryEvent
+        event: MemoryEvent,
+        tenantId?: string
     ): void {
+
+
+        if (tenantId !== undefined && event.tenantId === undefined) {
+
+
+            event.tenantId = tenantId;
+
+
+        }
 
 
         this.memories.push(
@@ -69,8 +78,6 @@ export class MemoryEngine {
         );
 
 
-
-        // Notify Reaction Engine
 
         if (this.reactionEngine) {
 
@@ -81,8 +88,6 @@ export class MemoryEngine {
         }
 
 
-
-        // Broadcast Event To Listeners
 
         this.listeners.forEach(
 
@@ -97,13 +102,20 @@ export class MemoryEngine {
         );
 
 
+
     }
 
 
 
-    retrieve(): MemoryEvent[] {
+    retrieve(tenantId?: string): MemoryEvent[] {
 
-        return this.memories;
+        if (tenantId === undefined) {
+
+            return this.memories;
+
+        }
+
+        return this.memories.filter(event => event.tenantId === tenantId);
 
     }
 

@@ -1,0 +1,40 @@
+name: Web Product Acceptance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'Backend/HBOS/Autonomous/Runtime/**'
+      - 'Backend/HBOS/Product/**'
+      - 'Docs/Product/PRODUCT_PLATFORM_MANIFEST.json'
+      - 'Docs/Product/PRODUCT_QUALIFICATION_MATRIX.json'
+      - 'scripts/web-product-acceptance.cjs'
+      - 'scripts/web-browser-acceptance.cjs'
+  workflow_dispatch:
+
+jobs:
+  web-product-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm install
+      - name: Validate canonical product assurance contract
+        run: npm run product:assurance
+      - name: Run executable web acceptance
+        run: npm run product:web:acceptance
+      - name: Run real browser workspace acceptance
+        run: npm run product:web:browser:acceptance
+      - name: Upload browser acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hooshyar-web-browser-acceptance-evidence
+          path: .hooshyar/web-browser-acceptance.json
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,0 +1,27 @@
+{
+  "type": "WEB_BROWSER_ACCEPTANCE",
+  "version": 1,
+  "status": "PASS",
+  "createdAt": "2026-09-19T07:10:14.302Z",
+  "commit": "d06156ba7451390c30833ba2ef52a1223d789355",
+  "browser": "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+  "appUrl": "http://127.0.0.1:4176/",
+  "checks": [
+    "render-shell",
+    "register-interaction",
+    "dashboard-rendered",
+    "analysis-interaction",
+    "analysis-rendered-profit",
+    "logout-interaction",
+    "login-interaction"
+  ],
+  "expected": [
+    "render-shell",
+    "register-interaction",
+    "dashboard-rendered",
+    "analysis-interaction",
+    "analysis-rendered-profit",
+    "logout-interaction",
+    "login-interaction"
+  ]
+}

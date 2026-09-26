@@ -1,0 +1,154 @@
+ANDROID ACCEPTANCE EVIDENCE OWNERSHIP — KNOT EVIDENCE
+================================================================
+Knot ID            : assurance.android-acceptance-evidence-ownership
+Date               : 2026-09-16
+Branch             : fix/autonomous-product-factory
+Pre-change HEAD    : 3ce244579ebb5497bf16c3bbaa7b4d3c99036369
+Classification     : EVIDENCE_INTEGRITY_GAP (acceptance evidence authored by CI workflow, not by the harness that runs the real checks)
+Type               : bounded, non-stage, non-reopening repository-local knot
+K8                 : CLOSED / not reopened. B1-B5 classifications unchanged.
+
+----------------------------------------------------------------
+1. DISCOVERY (current-state scan)
+----------------------------------------------------------------
+`scripts/cline-runtime-evidence-collector.cjs` marks the `android-release`
+qualification cell PASS when `.hooshyar/android-acceptance-success.json` is
+present, commit-current and `status: PASS` (cline-runtime-evidence-collector.cjs:25,31,53).
+
+That artifact was NOT produced by the Android acceptance harness. It was
+hand-authored by the CI workflow step in `.github/workflows/final-product-factory.yml`:
+
+    cat > .hooshyar/android-acceptance-success.json <<EOF
+    { "type": "ANDROID_PRODUCT_ACCEPTANCE_SUCCESS", "status": "PASS",
+      "commit": "$(git rev-parse HEAD)",
+      "acceptance": ["apk-build","emulator-install","launcher-start",
+                     "process-alive","main-activity-visible"] }
+    EOF
+
+while `scripts/android-product-acceptance.sh` (the owner that runs the real
+adb install / launch / liveness / foreground checks) produced no evidence at
+all. A hard-coded marker list asserted by the caller is exactly the
+marker-only evidence the governance/K3 evidence rule forbids
+("Hard-coded method markers are hints only and must never be the sole source
+of truth for capability completion") and it decouples the artifact from the
+checks that justify it.
+
+----------------------------------------------------------------
+2. ROOT CAUSE
+----------------------------------------------------------------
+Evidence ownership was inverted: the CI workflow (a caller) authored the
+qualification artifact for the `android-release` cell instead of the
+canonical Android acceptance harness that performs the verifications.
+
+----------------------------------------------------------------
+3. REPAIR (one coherent root cause -> one bounded change set)
+----------------------------------------------------------------
+NEW  scripts/android-acceptance-evidence.cjs
+     Canonical owner of the artifact. Commands: begin | record <step> |
+     complete | fail <reason> | verify. Fail-closed:
+       - begin clears any previous result (no stale PASS can be inherited);
+       - record rejects unknown steps and refuses to append to a finished run;
+       - complete refuses until all 8 required real steps were recorded;
+       - fail deletes the artifact so no success survives a failure;
+       - verify rejects missing / non-PASS / incomplete / unbound artifacts.
+     Env override HOOSHYAR_ANDROID_EVIDENCE_PATH isolates the artifact in tests.
+
+MOD  scripts/android-product-acceptance.sh
+     Now emits its own evidence: `begin`, one `record` after each real check
+     (apk-present, device-online, android-booted, package-manager-ready,
+     apk-installed, launcher-start, process-alive, main-activity-visible),
+     then `complete`. An ERR trap calls `fail`, so an interrupted/failed run
+     leaves no PASS artifact. Adds an explicit pre-flight APK existence check
+     and env-overridable APK/NODE for device-free verification.
+
+MOD  .github/workflows/final-product-factory.yml
+     Removed the hand-authored heredoc evidence step. Replaced with a
+     fail-closed validation of the harness-produced artifact:
+        run: node scripts/android-acceptance-evidence.cjs verify
+
+NEW  Backend/HBOS/test/AndroidAcceptanceEvidence.test.ts
+     Focused behavioral suite (real subprocesses, real filesystem, no mocks).
+
+No engine, registry, lifecycle, memory, knowledge, decision, assistant,
+project-pilot, reaction, health-monitor, boot, persistence, observability,
+security or tenant-isolation implementation was modified. No capability
+reordered/added/removed. No criterion weakened. No completion flag changed.
+
+----------------------------------------------------------------
+4. VERIFICATION (commands actually run)
+----------------------------------------------------------------
+bash -n scripts/android-product-acceptance.sh
+  -> exit 0 (syntax valid)
+
+YAML parse of .github/workflows/final-product-factory.yml (js-yaml)
+  -> android-product-acceptance steps: [..., 'Build debug APK',
+     'Install and launch Android application',
+     'Verify harness-produced Android acceptance evidence',
+     'Upload Android acceptance evidence']
+  -> fabricated 'Write Android acceptance evidence' step is GONE
+
+node ./node_modules/typescript/bin/tsc --noEmit ... AndroidAcceptanceEvidence.test.ts
+  -> exit 0
+
+jest --runTestsByPath Backend/HBOS/test/AndroidAcceptanceEvidence.test.ts
+  -> 7/7 PASS, 1 suite
+     - commit-bound IN_PROGRESS artifact
+     - unknown step rejected, artifact unchanged
+     - complete refused until all real steps recorded
+     - PASS artifact lists exactly the recorded steps
+     - a new run clears a previous PASS
+     - fail removes the artifact and verify refuses a missing artifact
+     - REAL SHELL INTEGRATION: `bash scripts/android-product-acceptance.sh`
+       executed with a fake adb and a real temp APK produced its own PASS
+       artifact (acceptance == the 8 required steps, commit == HEAD)
+
+jest (full suite), run twice
+  -> 269/269 suites, 2096/2096 tests, exit 0 (run 1)
+  -> 269/269 suites, 2096/2096 tests, exit 0 (run 2)
+  (baseline before this knot: 268/268 suites, 2089/2089 tests)
+
+node scripts/product-platform-assurance.cjs
+  -> status PASS, 10 qualification cells, productComplete false
+
+CommercialProductCompletionAudit (tsx)
+  -> complete=false; applicationEvidence=application-evidence-passed (fresh);
+     acceptanceEvidence=acceptance-evidence-passed (fresh);
+     evidenceGaps=["external-dependency-blocked"]
+     (payment-provider-activation, production-cloud-resources)
+
+node scripts/cline-runtime-evidence-collector.cjs
+  -> android-release = REQUIRES_DEVICE_EXECUTION (no fabricated artifact
+     exists); web-core/web-business/win-security/tenant-isolation PASS from
+     commit-current real evidence; verdict REQUIRES_ADDITIONAL_EVIDENCE.
+     Truthful: no repository-local fabricated Android evidence remains.
+
+----------------------------------------------------------------
+5. HONEST LIMITATIONS
+----------------------------------------------------------------
+- No physical Android device / emulator / JDK / Gradle / Android SDK exists on
+  this host (B4 = BLOCKED_ENVIRONMENT). The real device acceptance was NOT run
+  here and is NOT claimed. The harness's real launch path was verified
+  device-free through a fake adb, and the evidence producer is unit-verified.
+- The Android release gate still requires the CI `android-product-acceptance`
+  job (emulator) to pass; this knot does not and cannot substitute for it.
+- `.github/workflows/android-release.yml` contains an inline adb verification
+  copy that is separate from the canonical harness and does not emit evidence.
+  Recorded, not selected (no evidence-consumer impact); a future bounded
+  consolidation owner decision.
+
+----------------------------------------------------------------
+6. COMPLETION FLAGS (unchanged)
+----------------------------------------------------------------
+assistantComplete                   = TRUE
+canonicalPlatformConstructionComplete = FALSE
+commercialProductRuntimeComplete    = FALSE
+externalProductionDependenciesComplete = FALSE
+productComplete                     = FALSE
+
+----------------------------------------------------------------
+7. OUTCOME
+----------------------------------------------------------------
+The `android-release` qualification cell can no longer be satisfied by a
+workflow-authored marker list; it is now satisfied only by evidence that the
+canonical Android acceptance harness produced after its real device checks
+passed, commit-bound and fail-closed.
