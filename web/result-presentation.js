@@ -117,6 +117,23 @@
     UNKNOWN: 'نامشخص'
   };
 
+  const TRUST_STATE_LABELS = {
+    RECEIVED: 'دریافت شد',
+    IDENTIFIED: 'شناسایی شد',
+    VALIDATED: 'اعتبارسنجی شد',
+    CROSS_CHECKED: 'بررسی متقابل شد',
+    RECONCILED: 'تطبیق شد',
+    TRUSTED: 'مورد اعتماد',
+    QUARANTINED: 'قرنطینه‌شده (نیازمند بازبینی)',
+    REJECTED: 'ردشده'
+  };
+
+  const DUAL_STATUS_LABELS = {
+    AGREEMENT: 'هم‌خوان',
+    DISAGREEMENT: 'اختلاف',
+    NOT_TESTABLE: 'قابل آزمون نیست'
+  };
+
   function faNumber(value, options) {
     const number = Number(value);
     if (!Number.isFinite(number)) return String(value === null || value === undefined ? '—' : value);
@@ -223,6 +240,49 @@
   function withTrust(payload, lines) {
     const line = trustLine(payload);
     return line ? [line].concat(lines) : lines;
+  }
+
+  /**
+   * Concise, honest Persian status for the additive source-trust assessment.
+   * Returns null when no trust metadata is present; never invents a state.
+   */
+  function summarizeTrust(trust) {
+    if (!trust || typeof trust !== 'object' || !trust.state) return null;
+    const state = TRUST_STATE_LABELS[trust.state] || String(trust.state);
+    const binding = trust.canonicalBinding === true
+      ? 'دارای اتصال به منبع معتبر'
+      : 'بدون اتصال به منبع معتبر';
+    const blocking = Array.isArray(trust.blockingFindings) && trust.blockingFindings.length
+      ? ` — موارد مسدودکننده: ${faNumber(trust.blockingFindings.length)}`
+      : '';
+    return `اعتبار منبع: ${state} (${binding})${blocking}`;
+  }
+
+  /**
+   * Concise Persian status of two-path independent validation. Reports the
+   * number of agreeing, disagreeing and not-testable subjects; a missing
+   * independent path is never counted as agreement.
+   */
+  function summarizeDualValidation(dual) {
+    const summary = dual && dual.summary;
+    if (!summary || typeof summary !== 'object') return null;
+    const agreements = Number.isFinite(summary.agreements) ? summary.agreements : 0;
+    const disagreements = Number.isFinite(summary.disagreements) ? summary.disagreements : 0;
+    const notTestable = Number.isFinite(summary.notTestable) ? summary.notTestable : 0;
+    let line = `اعتبارسنجی دوگانه: ${faNumber(agreements)} هم‌خوان، ${faNumber(disagreements)} اختلاف، ${faNumber(notTestable)} قابل آزمون نیست`;
+    const reviews = Array.isArray(summary.requiredReviews) ? summary.requiredReviews.length : 0;
+    if (reviews > 0) line += ` — نیازمند بازبینی: ${faNumber(reviews)}`;
+    return line;
+  }
+
+  /** Detailed per-subject dual-validation lines for progressive disclosure. */
+  function describeDualValidation(dual) {
+    const outcomes = dual && Array.isArray(dual.outcomes) ? dual.outcomes : [];
+    return outcomes.map(outcome => {
+      const status = DUAL_STATUS_LABELS[outcome && outcome.status] || String((outcome && outcome.status) || 'نامشخص');
+      const method = `${(outcome && outcome.pathA && outcome.pathA.method) || '—'} / ${(outcome && outcome.pathB && outcome.pathB.method) || '—'}`;
+      return `${(outcome && outcome.subject) || '—'}: ${status} — ${method}`;
+    });
   }
 
   /**
@@ -370,11 +430,16 @@
   return {
     LABELS,
     TRUST_LABELS,
+    TRUST_STATE_LABELS,
+    DUAL_STATUS_LABELS,
     faNumber,
     humanizeKey,
     describeValue,
     buildLines,
     trustLine,
+    summarizeTrust,
+    summarizeDualValidation,
+    describeDualValidation,
     deriveRestoredContext,
     summarizeExecutive,
     summarizeDecision,

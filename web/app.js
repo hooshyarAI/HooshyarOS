@@ -193,7 +193,7 @@ async function refreshDashboard() {
     try {
       const latest = await getJson('/api/financial/insights/latest');
       if (latest.statementInsight) {
-        renderStatementInsight(latest.statementInsight);
+        renderStatementInsight(latest.statementInsight, { trust: latest.trust, dualValidation: latest.dualValidation });
         restoreWorkspaceContextFromLatest(latest);
         syncWorkspaceSnapshot();
       }
@@ -477,7 +477,7 @@ async function finishIngestJob(job, entry) {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ sourceSha256: job.result.sha256 })
     });
-    renderStatementInsight(insights.statementInsight || null);
+    renderStatementInsight(insights.statementInsight || null, { trust: insights.trust, dualValidation: insights.dualValidation });
     syncWorkspaceSnapshot();
     setWorkspaceContext({title:'نتیجه آماده است',description:'یافته‌ها، شواهد و محدودیت‌ها از همان منبع معتبر نمایش داده شده‌اند.',source:entry.sourceName,state:'تحلیل و بینش آماده',revealActions:true});
   } catch (error) {
@@ -814,7 +814,48 @@ function localizeFinancialLimitation(value) {
   return localizeFinancialText(textValue);
 }
 
-function renderStatementInsight(insight) {
+function renderSourceTrustStatus(container, statusMeta) {
+  if (!container || !statusMeta) return;
+  const lines = [];
+  if (presentationApi && typeof presentationApi.summarizeTrust === 'function') {
+    const trustLine = presentationApi.summarizeTrust(statusMeta.trust);
+    if (trustLine) lines.push(trustLine);
+  }
+  if (presentationApi && typeof presentationApi.summarizeDualValidation === 'function') {
+    const dualLine = presentationApi.summarizeDualValidation(statusMeta.dualValidation);
+    if (dualLine) lines.push(dualLine);
+  }
+  if (!lines.length) return;
+  const block = document.createElement('section');
+  block.className = 'result-block trust-status';
+  const heading = document.createElement('h4');
+  heading.textContent = 'اعتبار منبع و اعتبارسنجی مستقل';
+  block.appendChild(heading);
+  const list = document.createElement('ul');
+  for (const line of lines) {
+    const item = document.createElement('li');
+    item.textContent = line;
+    list.appendChild(item);
+  }
+  block.appendChild(list);
+  if (presentationApi && typeof presentationApi.describeDualValidation === 'function') {
+    const details = document.createElement('details');
+    const detailSummary = document.createElement('summary');
+    detailSummary.textContent = 'جزئیات اعتبارسنجی دوگانه';
+    details.appendChild(detailSummary);
+    const detailList = document.createElement('ul');
+    for (const line of presentationApi.describeDualValidation(statusMeta.dualValidation)) {
+      const item = document.createElement('li');
+      item.textContent = line;
+      detailList.appendChild(item);
+    }
+    details.appendChild(detailList);
+    block.appendChild(details);
+  }
+  container.appendChild(block);
+}
+
+function renderStatementInsight(insight, statusMeta) {
   const container = document.querySelector('#statement-insight');
   container.textContent = '';
   latestStatementInsight = insight || null;
@@ -833,6 +874,8 @@ function renderStatementInsight(insight) {
   const periods = Array.isArray(insight.periods) ? insight.periods.map(p => p.label).join(' | ') : 'نامشخص';
   meta.textContent = `وضعیت سند: ${humanizeStatementStatus(insight.documentStatus)} — دوره‌ها: ${periods}`;
   container.appendChild(meta);
+
+  renderSourceTrustStatus(container, statusMeta);
 
   const snapshot = document.createElement('div');
   snapshot.className='financial-snapshot';

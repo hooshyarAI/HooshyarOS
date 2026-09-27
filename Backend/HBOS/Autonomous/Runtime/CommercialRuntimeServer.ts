@@ -27,6 +27,7 @@ import { ExecutiveIntelligenceWorkbench, ExecutiveIntelligenceWorkbenchInput, Ex
 import { DecisionWorkbench, DecisionWorkbenchInput, DecisionWorkbenchResult } from "../../Product/DecisionWorkbench";
 import { FinancialAnalyticsService, FinancialAnalyticsResult, FinancialAnalyticsInput } from "../../Product/FinancialAnalyticsService";
 import { TrustAssessmentService, type TrustAssessment } from "../../Product/TrustAssessment";
+import { fromReconciliation, summarizeDualValidations, type DualValidationOutcome } from "../../Product/IndependentValidation";
 import { ReportExportService } from "../../Product/ReportExportService";
 import {
     OrganizationalExecutionCoordinator,
@@ -355,6 +356,18 @@ const withInputTrust = <T extends object>(result: T, endpoint: string) => ({
     inputTrust: Object.freeze({ ...CLIENT_SUPPLIED_UNVERIFIED, endpoint })
 });
 
+/**
+ * Two-path independent validation subjects for a statement insight. PATH A is
+ * the canonical calculated metric; PATH B is the existing accounting-identity
+ * reconciliation output. No financial calculation is re-implemented here.
+ */
+const DUAL_VALIDATION_SUBJECTS = [
+    { subject: "ترازنامه", metric: "totalAssets", identity: "balance-sheet-identity", scope: "صورت وضعیت مالی" },
+    { subject: "سود ناخالص", metric: "grossProfit", identity: "gross-profit-identity", scope: "صورت سود و زیان" },
+    { subject: "سود خالص", metric: "netProfit", identity: "net-profit-identity", scope: "صورت سود و زیان" },
+    { subject: "جریان نقد", metric: "netCashFlow", identity: "cash-flow-identity", scope: "جریان وجوه نقد" },
+] as const;
+
 const asset = async (res: ServerResponse, name: string, contentType: string) => {
     try {
         const body = await readFile(resolve(WEB_ROOT, name), "utf8");
@@ -552,6 +565,32 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     /** Attach the trust assessment as a backward-compatible sibling field. */
     const withTrust = <T extends object>(payload: T, trust: TrustAssessment | undefined): T | (T & { trust: TrustAssessment }) =>
         trust ? { ...payload, trust } : payload;
+
+    /**
+     * Build two-path independent validations for an existing statement insight.
+     * A subject whose independent path cannot run is reported NOT_TESTABLE; a
+     * missing path is never converted into a confirmation.
+     */
+    const buildDualValidations = (insight?: FinancialStatementInsight): DualValidationOutcome[] => {
+        if (!insight) return [];
+        return DUAL_VALIDATION_SUBJECTS.map((spec) => {
+            const value = insight.metrics[spec.metric];
+            const checks = insight.integrity.filter((check) => check.id === spec.identity);
+            return fromReconciliation(
+                spec.subject,
+                value === null || value === undefined ? null : value,
+                checks,
+                { scope: spec.scope },
+            );
+        });
+    };
+
+    /** Attach dual-validation results as a backward-compatible sibling field. */
+    const withDualValidation = <T extends object>(payload: T, insight?: FinancialStatementInsight) => {
+        if (!insight) return payload;
+        const outcomes = buildDualValidations(insight);
+        return { ...payload, dualValidation: { summary: summarizeDualValidations(outcomes), outcomes } };
+    };
 
     /**
      * Grounded statement insight for a tenant-scoped canonical source. Reuses
@@ -851,6 +890,26 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 });
             }
 
+            // Two-path independent validation: the canonical calculated metric
+            // (PATH A) versus the independent accounting-identity control
+            // (PATH B). A subject whose independent path cannot run is reported
+            // as not testable rather than silently confirmed.
+            const dualOutcomes = buildDualValidations(insight);
+            if (dualOutcomes.length) {
+                sections.push({
+                    heading: "اعتبارسنجی دوگانه (مسیر کاننیکال در برابر کنترل مستقل)",
+                    lines: dualOutcomes.map((outcome) => {
+                        if (outcome.status === "AGREEMENT") {
+                            return `${outcome.subject}: هر دو مسیر مستقل هم‌خوان‌اند (${formatAmount(outcome.pathA.value, currency)}).`;
+                        }
+                        if (outcome.status === "DISAGREEMENT") {
+                            return `${outcome.subject}: اختلاف ${formatAmount(outcome.absoluteDifference, currency)} بین مسیر کاننیکال و کنترل مستقل؛ نیازمند بازبینی است.`;
+                        }
+                        return `${outcome.subject}: مسیر دوم مستقل برای این قلم قابل آزمون نیست؛ تأیید مستقل ادعا نمی‌شود.`;
+                    }),
+                });
+            }
+
             const strengths: string[] = [];
             if (current("netProfit") !== null && current("netProfit")! > 0) strengths.push(`سود خالص مثبت است: ${formatAmount(current("netProfit"), currency)}.`);
             if (insight.ratios.currentRatio !== null && insight.ratios.currentRatio >= 1) strengths.push(`دارایی‌های جاری با نسبت جاری ${formatNumber(insight.ratios.currentRatio)} برابر، بدهی‌های جاری را پوشش می‌دهند.`);
@@ -1000,7 +1059,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 return res.end();
             }
             if (req.method === "GET" && path === "/health") return corsJson(200, { status: "ok", service: "hooshyar-commercial-runtime" });
-            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", dependencies: runtimeDependencies(), capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "financial-analytics", "ingested-source-analysis", "tenant-scoped-persistence", "offline-sync", "reasoning", "executive-intelligence-workbench", "decision-workbench", "expert-choice", "organizational-execution", "governed-approval", "work-item-lifecycle", "kpi-outcome", "reports", "reports-export", "report-artifact-download", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "auth-rate-limiting", "rbac", "session-lifecycle", "request-observability", "bounded-pagination", "idempotency-keys", "organizational-problem-solving", "ingestion-job-status", "scanned-statement-normalization", "source-trust-assessment"] });
+            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", dependencies: runtimeDependencies(), capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "financial-analytics", "ingested-source-analysis", "tenant-scoped-persistence", "offline-sync", "reasoning", "executive-intelligence-workbench", "decision-workbench", "expert-choice", "organizational-execution", "governed-approval", "work-item-lifecycle", "kpi-outcome", "reports", "reports-export", "report-artifact-download", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "auth-rate-limiting", "rbac", "session-lifecycle", "request-observability", "bounded-pagination", "idempotency-keys", "organizational-problem-solving", "ingestion-job-status", "scanned-statement-normalization", "source-trust-assessment", "independent-dual-validation"] });
             if (req.method === "GET" && path === "/") return asset(res, "index.html", "text/html; charset=utf-8");
             if (req.method === "GET" && path === "/app.js") return asset(res, "app.js", "text/javascript; charset=utf-8");
             if (req.method === "GET" && path === "/offline-sync.js") return asset(res, "offline-sync.js", "text/javascript; charset=utf-8");
@@ -1671,7 +1730,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 latestAnalyticsResults.set(session.tenantId, record);
                 const trust = await assessSourceTrust(session.tenantId, documentModel?.source.sha256, documentInsight?.integrity);
                 const payload = ingestedSource ? { ...record, ingestedSource } : record;
-                return corsJson(200, withTrust(payload, trust));
+                return corsJson(200, withDualValidation(withTrust(payload, trust), documentInsight));
             }
 
             if (req.method === "GET" && path === "/api/financial/insights/latest") {
@@ -1679,7 +1738,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const result = await loadAnalytics(session.tenantId);
                 if (!result) return corsJson(404, { error: "ANALYTICS_NOT_FOUND" });
                 const trust = await assessSourceTrust(session.tenantId, result.source?.sha256, result.statementInsight?.integrity);
-                return corsJson(200, withTrust(result, trust));
+                return corsJson(200, withDualValidation(withTrust(result, trust), result.statementInsight));
             }
 
             if (path === "/api/execution/work-items" && req.method === "POST") {
@@ -1947,7 +2006,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const flatSections = buildReportSections(session, result, workbench, analytics, insight).flatMap((section) => section.lines);
                 const report = reports.build("گزارش مالی و مدیریتی هوشیارOS", flatSections);
                 const trust = await assessSourceTrust(session.tenantId, result.source.sha256, insight?.integrity);
-                return corsJson(report.status === "READY" ? 200 : 422, withTrust({ ...report, tenantId: session.tenantId, source: result.source }, trust));
+                return corsJson(report.status === "READY" ? 200 : 422, withDualValidation(withTrust({ ...report, tenantId: session.tenantId, source: result.source }, trust), insight));
             }
 
             if (req.method === "POST" && path === "/api/report/export") {

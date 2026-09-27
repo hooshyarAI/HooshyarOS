@@ -152,4 +152,50 @@ describe('Result presentation layer (Persian-first, progressive disclosure)', ()
     const sw = read('web/sw.js');
     expect(sw).toContain('/result-presentation.js');
   });
+
+  test('summarizes the additive source-trust state without inventing trust', () => {
+    const quarantined = P.summarizeTrust({
+      state: 'QUARANTINED',
+      canonicalBinding: true,
+      blockingFindings: ['duplicate-intra-source']
+    });
+    expect(quarantined).toContain('قرنطینه');
+    expect(quarantined).toContain('دارای اتصال به منبع معتبر');
+    expect(quarantined).toContain('موارد مسدودکننده');
+    expect(P.summarizeTrust(null)).toBeNull();
+    expect(P.summarizeTrust({})).toBeNull();
+  });
+
+  test('summarizes dual validation counts and never counts a missing path as agreement', () => {
+    const line = P.summarizeDualValidation({
+      summary: { agreements: 1, disagreements: 1, notTestable: 2, requiredReviews: ['b', 'c', 'd'] }
+    });
+    expect(line).toContain('هم‌خوان');
+    expect(line).toContain('اختلاف');
+    expect(line).toContain('قابل آزمون نیست');
+    expect(line).toContain('نیازمند بازبینی');
+    expect(P.summarizeDualValidation(null)).toBeNull();
+    expect(P.summarizeDualValidation({})).toBeNull();
+  });
+
+  test('describes each dual-validation subject for progressive disclosure', () => {
+    const lines = P.describeDualValidation({
+      outcomes: [
+        { subject: 'ترازنامه', status: 'AGREEMENT', pathA: { method: 'canonical-calculation' }, pathB: { method: 'reconciliation-identity' } },
+        { subject: 'جریان نقد', status: 'NOT_TESTABLE', pathA: { method: 'canonical-calculation' }, pathB: { method: 'reconciliation-identity' } }
+      ]
+    });
+    expect(lines).toHaveLength(2);
+    expect(lines.join('\n')).toContain('ترازنامه');
+    expect(lines.join('\n')).toContain('reconciliation-identity');
+  });
+
+  test('app.js surfaces trust and dual validation without raw JSON on the normal surface', () => {
+    const app = read('web/app.js');
+    expect(app).toContain('renderSourceTrustStatus');
+    expect(app).toContain('summarizeTrust');
+    expect(app).toContain('summarizeDualValidation');
+    expect(app).toContain('dualValidation: latest.dualValidation');
+    expect(app).toContain('dualValidation: insights.dualValidation');
+  });
 });
