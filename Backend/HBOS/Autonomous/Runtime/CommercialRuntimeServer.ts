@@ -883,7 +883,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 ].filter((point) => point.flag === "ALERT").length;
                 lines.push(`تعداد هشدارهای ناهنجاری: ${formatNumber(alerts, 0)}`);
             }
-            if (lines.length) sections.push({ heading: "تحلیل تکمیلی", lines });
+            if (lines.length) sections.push({ heading: "تحلیل تکمیلی", lines: ["Financial analytics:", ...lines] });
         }
         return sections;
     };
