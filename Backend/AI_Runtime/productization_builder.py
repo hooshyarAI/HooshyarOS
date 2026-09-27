@@ -25,6 +25,20 @@ ANDROID_ROOT = ROOT / "android"
 ANDROID_RELEASE = RELEASE_ROOT / "android"
 TOOLCACHE = RELEASE_ROOT / ".toolcache"
 
+# The Windows bootstrap EXE is a thin IExpress wrapper around the canonical,
+# behaviorally validated customer payload produced by release_product_builder.py.
+RELEASE_PRODUCT_BUILDER = ROOT / "Backend" / "AI_Runtime" / "release_product_builder.py"
+WINDOWS_BOOTSTRAP_NAME = "HooshyarOS-Windows-Bootstrap.zip"
+WINDOWS_INSTALL_ROOT_NAME = "HooshyarOS"
+WINDOWS_BOOTSTRAP_REQUIRED_MEMBERS = (
+    "launch-hooshyar.vbs",
+    "launch-hooshyar.ps1",
+    "node-runtime/node.exe",
+    "node_modules/tsx/dist/cli.mjs",
+    "Backend/HBOS/Autonomous/Runtime/start-commercial-runtime.ts",
+    "web/index.html",
+)
+
 JDK17_URL = "https://aka.ms/download-jdk/microsoft-jdk-17-windows-x64.zip"
 ANDROID_CLI_PACKAGE_ID = "Google.AndroidCLI"
 ANDROID_CLI_INSTALL_URL = "https://dl.google.com/android/cli/latest/windows_x86_64/install.cmd"
@@ -185,57 +199,173 @@ def find_file(root: Path, name: str) -> Path | None:
     return None
 
 
-def windows() -> int:
-    WINDOWS_INSTALLER.mkdir(parents=True, exist_ok=True)
-    install = WINDOWS_INSTALLER / "install.ps1"
-    uninstall = WINDOWS_INSTALLER / "uninstall.ps1"
-    build = WINDOWS_INSTALLER / "build-installer.ps1"
-    readme = WINDOWS_INSTALLER / "README.md"
+def _write_windows_installer_scripts(installer: Path) -> dict[str, Path]:
+    """Write the deterministic, self-contained Windows installer scripts.
 
-    install.write_text(r'''$ErrorActionPreference = "Stop"
-$Root = Split-Path -Parent $PSScriptRoot
-$InstallRoot = Join-Path $env:ProgramData "HooshyarOS"
-$RuntimeRoot = Join-Path $InstallRoot "runtime"
-$DataRoot = Join-Path $InstallRoot "data"
-New-Item -ItemType Directory -Force -Path $RuntimeRoot, $DataRoot | Out-Null
-Copy-Item -Path (Join-Path $Root "payload\*") -Destination $RuntimeRoot -Recurse -Force
-$Launcher = Join-Path $RuntimeRoot "start-hooshyar.cmd"
-@"
-@echo off
-cd /d "$RuntimeRoot"
-call npm.cmd start
-"@ | Set-Content -Encoding ASCII $Launcher
-Write-Host "HooshyarOS installed to $InstallRoot"
-Write-Host "Start with: $Launcher"
+    The IExpress EXE carries its own copy of the complete customer payload as
+    ``HooshyarOS-Windows-Bootstrap.zip`` next to these scripts. ``install.ps1``
+    expands that bundled archive from its own extracted directory, so no sibling
+    ``payload`` directory, repository path or ``D:\\HooshyarOS`` checkout is ever
+    required at install time.
+    """
+    installer.mkdir(parents=True, exist_ok=True)
+    install = installer / "install.ps1"
+    uninstall = installer / "uninstall.ps1"
+    build = installer / "build-installer.ps1"
+    readme = installer / "README.md"
+    install_cmd = installer / "install.cmd"
+
+    install.write_text(r'''param(
+    [string]$InstallRoot = (Join-Path $env:ProgramData "HooshyarOS"),
+    [switch]$NoElevate
+)
+$ErrorActionPreference = "Stop"
+$BundleName = "HooshyarOS-Windows-Bootstrap.zip"
+function Show-HooshyarFailure([string]$Message) {
+    try { (New-Object -ComObject WScript.Shell).Popup($Message, 0, "HooshyarOS installation failed", 16) | Out-Null } catch { }
+    Write-Host $Message
+}
+try {
+    $Here = $PSScriptRoot
+    if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Path }
+    $ScriptPath = $MyInvocation.MyCommand.Path
+    if (-not $ScriptPath) { $ScriptPath = $PSCommandPath }
+
+    if (-not $NoElevate) {
+        $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+        if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+            $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`" -InstallRoot `"$InstallRoot`""
+            $elevated = Start-Process -FilePath "powershell.exe" -ArgumentList $arguments -Verb RunAs -Wait -PassThru
+            exit $elevated.ExitCode
+        }
+    }
+
+    $Bundle = Join-Path $Here $BundleName
+    if (-not (Test-Path -LiteralPath $Bundle)) {
+        throw "Installer payload not found next to install.ps1: $Bundle"
+    }
+    $Bundle = (Resolve-Path -LiteralPath $Bundle).Path
+
+    $RuntimeRoot = Join-Path $InstallRoot "runtime"
+    $DataRoot = Join-Path $InstallRoot "data"
+    if (Test-Path -LiteralPath $RuntimeRoot) { Remove-Item -LiteralPath $RuntimeRoot -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path $RuntimeRoot, $DataRoot | Out-Null
+    Expand-Archive -Path $Bundle -DestinationPath $RuntimeRoot -Force
+
+    $RuntimeLauncher = Join-Path $RuntimeRoot "launch-hooshyar.vbs"
+    if (-not (Test-Path -LiteralPath $RuntimeLauncher)) {
+        throw "Packaged runtime is incomplete: launch-hooshyar.vbs missing after extraction."
+    }
+
+    $Launcher = Join-Path $InstallRoot "Start HooshyarOS.cmd"
+    Set-Content -LiteralPath $Launcher -Encoding ASCII -Value @(
+        "@echo off",
+        "cd /d `"$RuntimeRoot`"",
+        "start `"`" wscript.exe `"$RuntimeLauncher`""
+    )
+
+    $UninstallSource = Join-Path $Here "uninstall.ps1"
+    $UninstallTarget = Join-Path $InstallRoot "uninstall.ps1"
+    if (Test-Path -LiteralPath $UninstallSource) {
+        Copy-Item -LiteralPath $UninstallSource -Destination $UninstallTarget -Force
+    }
+    $Uninstaller = Join-Path $InstallRoot "Uninstall HooshyarOS.cmd"
+    Set-Content -LiteralPath $Uninstaller -Encoding ASCII -Value @(
+        "@echo off",
+        "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$UninstallTarget`""
+    )
+
+    Write-Host "HooshyarOS installed to $InstallRoot"
+    Write-Host "Start with: $Launcher"
+    exit 0
+}
+catch {
+    Show-HooshyarFailure ("HooshyarOS could not be installed.`r`n`r`n" + $_.Exception.Message)
+    exit 1
+}
 ''', encoding="utf-8")
 
-    uninstall.write_text(r'''$ErrorActionPreference = "Stop"
-$InstallRoot = Join-Path $env:ProgramData "HooshyarOS"
-if (Test-Path $InstallRoot) { Remove-Item $InstallRoot -Recurse -Force }
-Write-Host "HooshyarOS uninstalled."
+    uninstall.write_text(r'''param(
+    [string]$InstallRoot = (Join-Path $env:ProgramData "HooshyarOS"),
+    [switch]$NoElevate
+)
+$ErrorActionPreference = "Stop"
+try {
+    $ScriptPath = $MyInvocation.MyCommand.Path
+    if (-not $ScriptPath) { $ScriptPath = $PSCommandPath }
+
+    if (-not $NoElevate) {
+        $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+        if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+            $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`" -InstallRoot `"$InstallRoot`""
+            $elevated = Start-Process -FilePath "powershell.exe" -ArgumentList $arguments -Verb RunAs -Wait -PassThru
+            exit $elevated.ExitCode
+        }
+    }
+
+    if (Test-Path -LiteralPath $InstallRoot) { Remove-Item -LiteralPath $InstallRoot -Recurse -Force }
+    Write-Host "HooshyarOS uninstalled from $InstallRoot."
+    exit 0
+}
+catch {
+    Write-Host ("HooshyarOS could not be uninstalled: " + $_.Exception.Message)
+    exit 1
+}
 ''', encoding="utf-8")
 
     build.write_text(r'''$ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
-$Payload = Join-Path $Root "payload"
+$Repo = (Resolve-Path (Join-Path $Root "..\..\..")).Path
+Push-Location $Repo
+try {
+    python Backend\AI_Runtime\release_product_builder.py
+    if ($LASTEXITCODE -ne 0) { throw "release_product_builder.py failed with exit code $LASTEXITCODE" }
+} finally {
+    Pop-Location
+}
 $Package = Join-Path $Root "HooshyarOS-Windows-Bootstrap.zip"
-if (Test-Path $Payload) { Remove-Item $Payload -Recurse -Force }
-New-Item -ItemType Directory -Force -Path $Payload | Out-Null
-Copy-Item -Path (Join-Path $Root "..\..\..\package.json") -Destination $Payload -Force
-Copy-Item -Path (Join-Path $Root "..\..\..\Backend") -Destination $Payload -Recurse -Force
-Copy-Item -Path (Join-Path $Root "..\..\..\Frontend") -Destination $Payload -Recurse -Force -ErrorAction SilentlyContinue
-Compress-Archive -Path (Join-Path $Payload "*") -DestinationPath $Package -Force
+if (-not (Test-Path $Package)) { throw "bootstrap payload was not produced: $Package" }
 Write-Host "Built $Package"
 ''', encoding="utf-8")
 
-    readme.write_text("""# HooshyarOS Windows Productization\n\nThe Windows release contains the existing HooshyarOS runtime and a native bootstrap EXE when IExpress is available.\n\n- `install.ps1`: installs runtime files and creates the local data directory.\n- `uninstall.ps1`: removes the local installation.\n- `build-installer.ps1`: builds the deterministic bootstrap ZIP payload.\n""", encoding="utf-8")
+    readme.write_text("""# HooshyarOS Windows Productization\n\nThe Windows release ships one self-contained native IExpress bootstrap executable\n(`HooshyarOS-Setup.exe`). The complete, behaviorally validated customer runtime\npayload is bundled inside the EXE as `HooshyarOS-Windows-Bootstrap.zip`.\n\n- `install.cmd` / `install.ps1`: expand the bundled payload from the EXE's own\nextracted directory into `%ProgramData%\\HooshyarOS\\runtime`, create the data\ndirectory and a launcher, and self-elevate for the ProgramData install root.\n- `uninstall.ps1`: removes the installation (self-elevates).\n- `build-installer.ps1`: builds the complete payload by delegating to\n`Backend/AI_Runtime/release_product_builder.py`.\n""", encoding="utf-8")
 
-    payload_script = WINDOWS_INSTALLER / "install.cmd"
-    payload_script.write_text("@echo off\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File \"%~dp0install.ps1\"\n", encoding="ascii")
+    install_cmd.write_text("@echo off\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File \"%~dp0install.ps1\"\n", encoding="ascii")
 
-    zip_result = WINDOWS_ROOT / "HooshyarOS-Windows-Bootstrap.zip"
-    if run("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(build)], timeout=45 * 60) != 0:
+    return {"install": install, "uninstall": uninstall, "build": build, "readme": readme, "install_cmd": install_cmd}
+
+
+def _validate_windows_bootstrap(zip_path: Path) -> list[str]:
+    """Return the required runtime members missing from the bundled payload ZIP.
+
+    This guards the packaging boundary: the EXE must carry the real runtime
+    payload, never the thin developer tree that previously omitted the node
+    runtime, dependency closure, web surface and launch scripts.
+    """
+    if not zip_path.exists():
+        return [str(zip_path)]
+    with zipfile.ZipFile(zip_path) as archive:
+        members = set(archive.namelist())
+    return [name for name in WINDOWS_BOOTSTRAP_REQUIRED_MEMBERS if name not in members]
+
+
+def windows() -> int:
+    scripts = _write_windows_installer_scripts(WINDOWS_INSTALLER)
+    install = scripts["install"]
+    uninstall = scripts["uninstall"]
+    build = scripts["build"]
+    payload_script = scripts["install_cmd"]
+
+    if run("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(build)], timeout=90 * 60) != 0:
+        emit("AUTONOMOUS_PRODUCTIZATION_BUILDER", platform="WINDOWS", status="BLOCKED", reason="windows-payload-build-failed")
         return 21
+
+    zip_result = WINDOWS_ROOT / WINDOWS_BOOTSTRAP_NAME
+    missing = _validate_windows_bootstrap(zip_result)
+    if missing:
+        emit("AUTONOMOUS_PRODUCTIZATION_BUILDER", platform="WINDOWS", status="BLOCKED",
+             reason="windows-bootstrap-payload-incomplete", missing=missing)
+        return 24
 
     iexpress = shutil.which("iexpress.exe") or shutil.which("iexpress") or (Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "iexpress.exe")
     exe = WINDOWS_ROOT / "HooshyarOS-Setup.exe"
