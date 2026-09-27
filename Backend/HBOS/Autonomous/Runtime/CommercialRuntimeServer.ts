@@ -17,6 +17,11 @@ import {
     composeFinancialStatementInsight,
     type FinancialStatementInsight,
 } from "../../Product/FinancialStatementInsight";
+import {
+    composeAnswer,
+    composeFindingGroups,
+    composeScenarios,
+} from "../../Product/FinancialDecisionNarrativeService";
 import { FinancialIngestionService, IngestionFormat, SUPPORTED_INGESTION_FORMATS } from "../../Product/FinancialIngestionService";
 import { IngestionJobService } from "../../Product/IngestionJobService";
 import { isTerminalIngestionStage } from "../../Product/IngestionProgress";
@@ -457,6 +462,9 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     // not an Engine and never mutates the protected ingestion adapter or the
     // canonical model.
     const trustAssessment = new TrustAssessmentService();
+    // Persian-first decision-support narrative is composed from the governed
+    // statement insight by `FinancialDecisionNarrativeService` (composition only:
+    // it owns no financial mathematics and never overrides canonical calculations).
     // Tenant-scoped assistant conversation continuity. Supporting service only;
     // it persists the user's own Q&A and never reasons or calculates.
     const conversationHistory = new AssistantConversationHistory(persistence, () => now());
@@ -766,13 +774,11 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 : "نامشخص";
         const formatAmount = (value: number | null | undefined, currency = "IRR"): string => {
             if (value === null || value === undefined || !Number.isFinite(Number(value))) return "نامشخص";
-            const n = Number(value);
-            const abs = Math.abs(n);
+            // Exact canonical magnitude with grouping: the amount is never scaled
+            // or rounded to a different figure, so the same metric never appears
+            // as two contradictory values across report, dashboard and assistant.
             const unit = currency === "IRR" ? "ریال" : (currency || "واحد پول");
-            if (abs >= 1e12) return `${formatNumber(n / 1e12)} تریلیون ${unit}`;
-            if (abs >= 1e9) return `${formatNumber(n / 1e9)} میلیارد ${unit}`;
-            if (abs >= 1e6) return `${formatNumber(n / 1e6)} میلیون ${unit}`;
-            return `${formatNumber(n, 0)} ${unit}`;
+            return `${formatNumber(Math.round(Number(value)), 0)} ${unit}`;
         };
         const formatPercent = (value: number | null | undefined): string =>
             value === null || value === undefined || !Number.isFinite(Number(value))
@@ -965,38 +971,16 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 });
             }
 
-            const strengths: string[] = [];
-            if (current("netProfit") !== null && current("netProfit")! > 0) strengths.push(`سود خالص مثبت است: ${formatAmount(current("netProfit"), currency)}.`);
-            if (insight.ratios.currentRatio !== null && insight.ratios.currentRatio >= 1) strengths.push(`دارایی‌های جاری با نسبت جاری ${formatNumber(insight.ratios.currentRatio)} برابر، بدهی‌های جاری را پوشش می‌دهند.`);
-            if (insight.cashFlow.operating !== null && insight.cashFlow.operating > 0) strengths.push(`عملیات ${formatAmount(insight.cashFlow.operating, currency)} جریان نقد ایجاد کرده است.`);
-            if (insight.cashFlow.qualityOfEarnings === "CASH_BACKED") strengths.push("جریان نقد عملیاتی سود گزارش‌شده را پوشش می‌دهد.");
-            if (findChange("revenue")?.absoluteChange && findChange("revenue")!.absoluteChange > 0) strengths.push("درآمد نسبت به دوره قبل رشد کرده است.");
-            sections.push({ heading: "نقاط قوت", lines: strengths.length ? strengths : ["در داده‌های فعلی نقطه قوت مشخصی با شواهد کافی ثبت نشده است."] });
-
-            const weaknesses: string[] = [];
-            if (insight.cashFlow.qualityOfEarnings === "PROFIT_NOT_CASH_BACKED") weaknesses.push("بخشی از سود هنوز به جریان نقد تبدیل نشده است.");
-            if (findChange("revenue")?.absoluteChange && findChange("revenue")!.absoluteChange < 0) weaknesses.push("درآمد نسبت به دوره قبل کاهش یافته است.");
-            sections.push({ heading: "نقاط ضعف", lines: weaknesses.length ? weaknesses : ["در داده‌های فعلی نقطه ضعف مشخصی با شواهد کافی ثبت نشده است."] });
-
-            const risks: string[] = [];
-            if (current("totalLiabilities") !== null && current("equity") !== null && current("totalLiabilities")! > current("equity")!) {
-                risks.push(`کل بدهی‌ها ${formatAmount(current("totalLiabilities"), currency)} است و ${formatAmount(current("totalLiabilities")! - current("equity")!, currency)} بیشتر از حقوق مالکانه است.`);
-            }
-            const mismatch = insight.integrity.find((check) => check.status === "MISMATCH");
-            if (mismatch) risks.push(`در کنترل «${integrityLabels[mismatch.id] || mismatch.id}» اختلاف ${formatAmount(Math.abs(mismatch.difference || 0), currency)} ثبت شده است.`);
-            if (insight.documentStatus !== "COMPLETED") risks.push("سند کامل نیست؛ برخی نتیجه‌گیری‌ها باید با اطلاعات تکمیلی بررسی شوند.");
-            sections.push({ heading: "ریسک‌ها", lines: risks.length ? risks : ["ریسک مشخصی با شواهد کافی در این بخش ثبت نشده است."] });
-
-            const opportunities: string[] = [];
-            if (revenueChange?.absoluteChange && revenueChange.absoluteChange > 0) opportunities.push(`درآمد ${formatPercent(revenueChange.pctChange)} رشد کرده است؛ علت عملیاتی این رشد باید مشخص و ظرفیت سرمایه در گردش حفظ شود.`);
-            if (operatingExpenseChange?.absoluteChange && operatingExpenseChange.absoluteChange < 0) opportunities.push("کاهش هزینه‌های عملیاتی، زمینه بهبود حاشیه سود را فراهم کرده است.");
-            sections.push({ heading: "فرصت‌ها و رشد", lines: opportunities.length ? opportunities : ["فرصت رشد مشخصی بدون شواهد تکمیلی قابل نتیجه‌گیری نیست."] });
-
-            const actions: string[] = [];
-            if (current("totalLiabilities") !== null && current("equity") !== null && current("totalLiabilities")! > current("equity")!) actions.push("ساختار بدهی و منابع سرمایه بررسی و برنامه کاهش اهرم یا تقویت حقوق مالکانه تدوین شود.");
-            if (mismatch) actions.push("اختلاف کنترل حسابداری مربوط به سود عملیاتی با اقلام میانی صورت مالی تطبیق داده شود.");
-            if (current("preTaxIncome") === null || current("taxes") === null) actions.push("سود قبل از مالیات و مالیات از سند یا یادداشت‌های مالی تکمیل شود تا پل سود خالص قابل بررسی باشد.");
-            sections.push({ heading: "اقدامات پیشنهادی", lines: actions.length ? actions : ["اقدام اصلاحی مشخصی از شواهد فعلی استخراج نشده است."] });
+            // Grounded Persian findings. These are composed once by the
+            // canonical narrative service from the same verified insight that the
+            // assistant and UI consume, so the report and the conversation never
+            // disagree about strengths, weaknesses, risks or actions.
+            const groups = composeFindingGroups(insight);
+            sections.push({ heading: "نقاط قوت", lines: groups.strengths.map((finding) => finding.message) });
+            sections.push({ heading: "نقاط ضعف", lines: groups.weaknesses.map((finding) => finding.message) });
+            sections.push({ heading: "ریسک‌ها", lines: groups.risks.map((finding) => finding.message) });
+            sections.push({ heading: "فرصت‌ها و رشد", lines: groups.opportunities.map((finding) => finding.message) });
+            sections.push({ heading: "اقدامات پیشنهادی", lines: groups.actions.map((finding) => finding.message) });
 
             if (insight.derivedResidual) {
                 sections.push({ heading: "مقدار باقیمانده مشتق‌شده", lines: [
@@ -1031,7 +1015,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 ].filter((point) => point.flag === "ALERT").length;
                 lines.push(`تعداد هشدارهای ناهنجاری: ${formatNumber(alerts, 0)}`);
             }
-            if (lines.length) sections.push({ heading: "تحلیل تکمیلی", lines: ["Financial analytics:", ...lines] });
+            if (lines.length) sections.push({ heading: "تحلیل تکمیلی", lines });
         }
         return sections;
     };
@@ -1785,7 +1769,10 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 latestAnalyticsResults.set(session.tenantId, record);
                 const trust = await assessSourceTrust(session.tenantId, documentModel?.source.sha256, documentInsight?.integrity);
                 const payload = ingestedSource ? { ...record, ingestedSource } : record;
-                return corsJson(200, withDualValidation(withTrust(payload, trust), documentInsight));
+                const withMeta = withDualValidation(withTrust(payload, trust), documentInsight);
+                return corsJson(200, documentInsight
+                    ? { ...withMeta, presentation: { findings: composeFindingGroups(documentInsight), scenarios: composeScenarios(documentInsight) } }
+                    : withMeta);
             }
 
             if (req.method === "GET" && path === "/api/financial/insights/latest") {
@@ -1793,7 +1780,10 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const result = await loadAnalytics(session.tenantId);
                 if (!result) return corsJson(404, { error: "ANALYTICS_NOT_FOUND" });
                 const trust = await assessSourceTrust(session.tenantId, result.source?.sha256, result.statementInsight?.integrity);
-                return corsJson(200, withDualValidation(withTrust(result, trust), result.statementInsight));
+                const withMeta = withDualValidation(withTrust(result, trust), result.statementInsight);
+                return corsJson(200, result.statementInsight
+                    ? { ...withMeta, presentation: { findings: composeFindingGroups(result.statementInsight), scenarios: composeScenarios(result.statementInsight) } }
+                    : withMeta);
             }
 
             if (path === "/api/execution/work-items" && req.method === "POST") {
@@ -2076,7 +2066,11 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const analytics = await correlatedAnalyticsFor(session.tenantId, result.source.sha256);
                 const insight = analytics?.statementInsight
                     ?? await loadStatementInsight(session.tenantId, result.source.sha256, analytics);
-                const flatSections = buildReportSections(session, result, workbench, analytics, insight).flatMap((section) => section.lines);
+                // Preserve the section structure in the JSON report: the heading
+                // is emitted before its lines so a user-facing report keeps its
+                // meaningful section titles instead of a flat, heading-less list.
+                const flatSections = buildReportSections(session, result, workbench, analytics, insight)
+                    .flatMap((section) => [section.heading, ...section.lines]);
                 const report = reports.build("گزارش مالی و مدیریتی هوشیارOS", flatSections);
                 const trust = await assessSourceTrust(session.tenantId, result.source.sha256, insight?.integrity);
                 return corsJson(report.status === "READY" ? 200 : 422, withDualValidation(withTrust({ ...report, tenantId: session.tenantId, source: result.source }, trust), insight));
@@ -2161,27 +2155,49 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const analytics = await correlatedAnalyticsFor(session.tenantId, result.source.sha256);
                 const insight = analytics?.statementInsight
                     ?? await loadStatementInsight(session.tenantId, result.source.sha256, analytics);
-                const statementContext = insight ? describeStatementContext(insight) : [];
-                const context = [
-                    `Answer using only verified persisted context for tenant ${session.tenantId}.`,
-                    "Separate extracted facts, derived metrics, interpretation and management recommendations.",
-                    "Never contradict the deterministic calculations; a ratio reported as unavailable or not-applicable must be described as such.",
-                    "Do not infer market demand, competitive position or future sales from statement-only evidence.",
-                    "If a value or period is absent from the context, say the evidence is unavailable; never invent it.",
-                    `Question: ${question}`,
-                    `SourceSha256=${result.source.sha256}`,
-                    `Revenue=${result.metrics.revenue}`,
-                    `Profit=${result.metrics.profit}`,
-                    `ProfitMargin=${result.metrics.profitMargin}`,
-                    `DebtRatio=${result.metrics.debtRatio}`,
-                    `Observations=${result.observations.map((item) => item.message).join(" | ")}`,
-                    workbench ? `Recommendations=${workbench.recommendations.map((item) => item.action).join(" | ")}` : "No executive workbench result is available yet.",
-                    ...statementContext,
-                ].join(" | ");
-                const answer = reasoning.reason(context);
-                if (!answer.success) return corsJson(503, { error: "ASSISTANT_REASONING_UNAVAILABLE" });
+
+                /**
+                 * Question-specific decision-support answer. When governed
+                 * statement evidence exists, the question is routed to the
+                 * appropriate answer structure and composed deterministically
+                 * from the verified insight (intent, evidence, drivers, options,
+                 * actions, limitations). The reasoning engine is used only as the
+                 * fallback for a source with no statement insight (for example a
+                 * ledger), so the product never degrades to a generic metric echo
+                 * when a governed capability already owns the answer.
+                 */
+                let resolvedAnswer: string;
+                let response: { intent: string; sections: readonly { heading: string; lines: readonly string[] }[]; scenarios: readonly unknown[]; limitations: readonly string[] } | undefined;
+                if (insight) {
+                    const composed = composeAnswer(insight, question);
+                    resolvedAnswer = composed.answer;
+                    response = {
+                        intent: composed.intent,
+                        sections: composed.sections,
+                        scenarios: composed.scenarios,
+                        limitations: composed.limitations,
+                    };
+                } else {
+                    const context = [
+                        `Answer using only verified persisted context for tenant ${session.tenantId}.`,
+                        "Separate extracted facts, derived metrics, interpretation and management recommendations.",
+                        "Never contradict the deterministic calculations; a ratio reported as unavailable or not-applicable must be described as such.",
+                        "Do not infer market demand, competitive position or future sales from statement-only evidence.",
+                        "If a value or period is absent from the context, say the evidence is unavailable; never invent it.",
+                        `Question: ${question}`,
+                        `SourceSha256=${result.source.sha256}`,
+                        `Revenue=${result.metrics.revenue}`,
+                        `Profit=${result.metrics.profit}`,
+                        `ProfitMargin=${result.metrics.profitMargin}`,
+                        `DebtRatio=${result.metrics.debtRatio}`,
+                        `Observations=${result.observations.map((item) => item.message).join(" | ")}`,
+                        workbench ? `Recommendations=${workbench.recommendations.map((item) => item.action).join(" | ")}` : "No executive workbench result is available yet.",
+                    ].join(" | ");
+                    const answer = reasoning.reason(context);
+                    if (!answer.success) return corsJson(503, { error: "ASSISTANT_REASONING_UNAVAILABLE" });
+                    resolvedAnswer = answer.answer ?? answer.status;
+                }
                 const trust = await assessSourceTrust(session.tenantId, result.source.sha256, insight?.integrity);
-                const resolvedAnswer = answer.answer ?? answer.status;
                 // Conversation continuity is secondary: a persistence failure
                 // must never replace a verified answer with an error.
                 let conversationId: string | undefined;
@@ -2203,6 +2219,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                     tenantId: session.tenantId,
                     question,
                     answer: resolvedAnswer,
+                    ...(response ? { response } : {}),
                     ...(conversationId ? { conversationId } : {}),
                     evidence: {
                         analysisSource: result.source,

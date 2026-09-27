@@ -241,7 +241,7 @@ async function refreshDashboard() {
     try {
       const latest = await getJson('/api/financial/insights/latest');
       if (latest.statementInsight) {
-        renderStatementInsight(latest.statementInsight, { trust: latest.trust, dualValidation: latest.dualValidation });
+        renderStatementInsight(latest.statementInsight, { trust: latest.trust, dualValidation: latest.dualValidation, findings: latest.presentation && latest.presentation.findings });
         restoreWorkspaceContextFromLatest(latest);
         syncWorkspaceSnapshot();
         if (snapshotStore) snapshotStore.save({ savedAt: new Date().toISOString(), source: latest.source, statementInsight: latest.statementInsight, trust: latest.trust, dualValidation: latest.dualValidation });
@@ -518,7 +518,15 @@ async function finishIngestJob(job, entry) {
   });
   const provenance = analysis.inputProvenance || {};
   const originLabel = value => value === 'DOCUMENT' ? 'از سند' : value === 'LEDGER' ? 'از دفتر معاملات' : 'ورودی دستی';
-  result.textContent = `تحلیل موفق (${job.result.sourceType}): ${Number(job.result.transactionCount).toLocaleString('fa-IR')} تراکنش، سود ${Number(analysis.metrics.profit).toLocaleString('fa-IR')}، نسبت بدهی ${Number(analysis.metrics.debtRatio * 100).toLocaleString('fa-IR')}٪ (دارایی‌ها: ${originLabel(provenance.assets)}، بدهی‌ها: ${originLabel(provenance.liabilities)}). وضعیت: ${analysis.status}`;
+  const transactions = Number(job.result.transactionCount);
+  // Zero extracted transactions is not transaction-level analysis: the product
+  // must not imply a ledger/transaction analysis when only statement facts were
+  // read. The scope is stated truthfully and READY is rendered in Persian.
+  const scopeLabel = transactions > 0
+    ? `${transactions.toLocaleString('fa-IR')} تراکنش`
+    : 'تحلیل در سطح صورت مالی (بدون تراکنش استخراج‌شده)';
+  const statusLabel = analysis.status === 'READY' ? 'آماده' : 'نیازمند بررسی';
+  result.textContent = `تحلیل ${job.result.sourceType} انجام شد: ${scopeLabel}، سود ${Number(analysis.metrics.profit).toLocaleString('fa-IR')}، نسبت بدهی ${Number(analysis.metrics.debtRatio * 100).toLocaleString('fa-IR')}٪ (دارایی‌ها: ${originLabel(provenance.assets)}، بدهی‌ها: ${originLabel(provenance.liabilities)}). وضعیت: ${statusLabel}`;
   clearPersistedIngestJob();
   renderStatementInsight(null);
   syncWorkspaceSnapshot();
@@ -529,7 +537,7 @@ async function finishIngestJob(job, entry) {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ sourceSha256: job.result.sha256 })
     });
-    renderStatementInsight(insights.statementInsight || null, { trust: insights.trust, dualValidation: insights.dualValidation });
+    renderStatementInsight(insights.statementInsight || null, { trust: insights.trust, dualValidation: insights.dualValidation, findings: insights.presentation && insights.presentation.findings });
     if (snapshotStore && insights.statementInsight) snapshotStore.save({ savedAt: new Date().toISOString(), source: insights.source, statementInsight: insights.statementInsight, trust: insights.trust, dualValidation: insights.dualValidation });
     syncWorkspaceSnapshot();
     setWorkspaceContext({title:'نتیجه آماده است',description:'یافته‌ها، شواهد و محدودیت‌ها از همان منبع معتبر نمایش داده شده‌اند.',source:entry.sourceName,state:'تحلیل و بینش آماده',revealActions:true});
@@ -970,7 +978,7 @@ function renderStatementInsight(insight, statusMeta) {
     append(textSection('نسبت‌های مالی', lines));
   }
 
-  const groups = buildUserFacingFindingGroups(insight);
+  const groups = (statusMeta && statusMeta.findings) || buildUserFacingFindingGroups(insight);
   append(insightList('نقاط قوت', groups.strengths));
   append(insightList('نقاط ضعف', groups.weaknesses));
   append(insightList('ریسک‌ها', groups.risks));
@@ -1205,7 +1213,14 @@ async function refreshExecution() {
       status.textContent = item.status;
       heading.append(title, status);
       const details = document.createElement('p');
-      details.textContent = `پیشنهاد تصمیم: ${item.decision?.recommendation ?? '—'} | مسئول: ${item.assignment?.assigneeId ?? '—'} | موعد: ${item.dueDate ?? '—'}`;
+      const planning = [];
+      if (item.decision?.recommendation) planning.push(`پیشنهاد تصمیم: ${item.decision.recommendation}`);
+      planning.push(`مسئول: ${item.assignment?.assigneeId || 'تعیین‌نشده'}`);
+      planning.push(`موعد: ${item.dueDate || 'تعیین‌نشده'}`);
+      // A card with an unassigned owner and no due date is not a complete
+      // execution plan: say so explicitly instead of presenting "—" as if done.
+      if (!item.assignment?.assigneeId || !item.dueDate) planning.push('این کار هنوز کامل برنامه‌ریزی نشده است (نیازمند مسئول و موعد).');
+      details.textContent = planning.join(' | ');
       card.append(heading, details);
       if (item.kpi) {
         const kpi = document.createElement('p');
@@ -1365,7 +1380,15 @@ document.querySelector('#assistant-form').addEventListener('submit', async event
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ question: document.querySelector('#assistant-question').value })
     });
-    result.textContent = buildFinancialAssistantAnswer(latestStatementInsight, payload.question) || localizeFinancialText(payload.answer || 'پاسخی در دسترس نیست.');
+    // The canonical runtime now returns a question-specific, Persian-first
+    // decision-support answer composed from the governed insight (intent,
+    // evidence, drivers, options, actions, limitations). Prefer it verbatim so
+    // the user sees the answer to THEIR question; the local builder remains only
+    // as a fallback for a legacy payload with no server answer.
+    const serverAnswer = payload && typeof payload.answer === 'string' ? payload.answer.trim() : '';
+    result.textContent = serverAnswer
+      || buildFinancialAssistantAnswer(latestStatementInsight, payload.question)
+      || 'پاسخی در دسترس نیست.';
     refreshConversations();
   } catch (error) {
     result.textContent = `دستیار در دسترس نیست: ${error.message}`;

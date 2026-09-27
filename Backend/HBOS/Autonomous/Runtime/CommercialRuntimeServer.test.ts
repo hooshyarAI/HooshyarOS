@@ -157,12 +157,14 @@ describe("CommercialRuntimeServer financial analytics report composition", () =>
         expect(insights.status).toBe("READY");
         expect(insights.breakEven?.breakEvenUnits).toBe(200);
 
-        // After financial analytics, /api/report must surface a section labelled
-        // "Financial analytics:" in its flattened section lines.
+        // After financial analytics, /api/report must surface the Persian-first
+        // "تحلیل تکمیلی" section heading (and must never leak the internal
+        // English "Financial analytics:" label to the user surface).
         const reportRes = await requestJson(server, "GET", "/api/report", { cookie });
         expect(reportRes.status).toBe(200);
         const report = JSON.parse(reportRes.body);
         expect(Array.isArray(report.sections)).toBe(true);
-        expect(report.sections.some((section: string) => section.includes("Financial analytics:"))).toBe(true);
+        expect(report.sections.some((section: string) => section.includes("تحلیل تکمیلی"))).toBe(true);
+        expect(report.sections.some((section: string) => section.includes("Financial analytics:"))).toBe(false);
     }, 30000);
 });

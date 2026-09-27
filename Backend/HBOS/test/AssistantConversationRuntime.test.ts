@@ -88,7 +88,9 @@ describe("assistant conversation continuity — runtime HTTP", () => {
 
         const single = await request(`/api/conversations/${encodeURIComponent(assistantBody.conversationId)}`, { headers: { cookie } });
         expect(single.status).toBe(200);
-        expect((await single.json()).answer).toBe("verified-answer");
+        // The durable conversation records exactly the answer the user received
+        // (a question-specific composed answer for a governed statement source).
+        expect((await single.json()).answer).toBe(assistantBody.answer);
     });
 
     test("isolates conversation history per tenant", async () => {
