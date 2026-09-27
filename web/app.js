@@ -830,7 +830,7 @@ function renderStatementInsight(insight) {
   append(insightList('اقدامات پیشنهادی', groups.actions));
 
   if (Array.isArray(insight.comparative) && insight.comparative.length > 0) {
-    append(textSection('مقایسه با دوره قبل', insight.comparative.map(entry=>comparativeLine(entry, insight.currency || 'IRR')));
+    append(textSection('مقایسه با دوره قبل', insight.comparative.map(entry=>comparativeLine(entry, insight.currency || 'IRR'))));
   }
 
   if (insight.cashFlow) {
