@@ -31,6 +31,12 @@
   if (root) root.HooshyarOfflineSync = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   const QUEUE_KEY = "hooshyar.offline.ingest.queue.v1";
+  /**
+   * Locally cached last server-authoritative result. Used ONLY to READ a
+   * previously synced source while offline; it is never an offline calculation
+   * engine and never replaces server-authoritative reconciliation.
+   */
+  const SNAPSHOT_KEY = "hooshyar.offline.snapshot.v1";
   const IDB_NAME = "hooshyar-offline-sync";
   const IDB_STORE = "queue";
   const MUTATING_URL = "/api/ingest";
@@ -362,6 +368,52 @@
     };
   }
 
+  /**
+   * Read-only cache of the last server-authoritative result. This gives the user
+   * an end-to-end path to READ a previously synced source while offline. It
+   * stores the server's own answer and never computes, mutates or replaces any
+   * canonical reconciliation.
+   */
+  function createSnapshotStore(storage) {
+    let store = storage;
+    if (!store) {
+      try {
+        store = typeof localStorage !== "undefined" ? localStorage : null;
+      } catch {
+        store = null;
+      }
+    }
+    return {
+      async save(snapshot) {
+        if (!store || typeof store.setItem !== "function") return false;
+        try {
+          store.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot));
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      async load() {
+        if (!store || typeof store.getItem !== "function") return null;
+        try {
+          const raw = store.getItem(SNAPSHOT_KEY);
+          return raw ? JSON.parse(raw) : null;
+        } catch {
+          return null;
+        }
+      },
+      async clear() {
+        if (!store || typeof store.removeItem !== "function") return false;
+        try {
+          store.removeItem(SNAPSHOT_KEY);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+    };
+  }
+
   function createOfflineSync(options) {
     options = options || {};
     const queueStore = resolveQueueStore(options.storage, options.indexedDB);
@@ -573,7 +625,9 @@
   return {
     createOfflineSync,
     resolveQueueStore,
+    createSnapshotStore,
     QUEUE_KEY,
+    SNAPSHOT_KEY,
     IDB_NAME,
     IDB_STORE,
     DEFAULT_MAX_JOBS,

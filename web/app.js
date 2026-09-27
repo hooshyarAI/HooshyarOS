@@ -48,6 +48,10 @@ const offlineSync = typeof window !== 'undefined' && window.HooshyarOfflineSync
   ? window.HooshyarOfflineSync.createOfflineSync({})
   : null;
 
+const snapshotStore = typeof window !== 'undefined' && window.HooshyarOfflineSync && typeof window.HooshyarOfflineSync.createSnapshotStore === 'function'
+  ? window.HooshyarOfflineSync.createSnapshotStore()
+  : null;
+
 const lastSyncCursors = new Map();
 let lastRemoteAvailable = null;
 let availabilitySyncing = false;
@@ -179,6 +183,21 @@ function presentUserResult(container, summarizerName, payload) {
   container.textContent = 'نتیجه دریافت شد. جزئیات فنی در دسترس است.';
 }
 
+async function renderOfflineSnapshot() {
+  if (!snapshotStore) return false;
+  const snapshot = await snapshotStore.load();
+  if (!snapshot || !snapshot.statementInsight) return false;
+  renderStatementInsight(snapshot.statementInsight, { trust: snapshot.trust, dualValidation: snapshot.dualValidation });
+  setWorkspaceContext({
+    title: 'نمایش آفلاین آخرین نتیجهٔ همگام‌شده',
+    description: 'اتصال برقرار نیست؛ آخرین نتیجهٔ تأییدشدهٔ سرور از حافظهٔ محلی نمایش داده می‌شود و هیچ محاسبهٔ جدیدی انجام نمی‌شود.',
+    source: (snapshot.source && snapshot.source.sourceName) || 'آخرین منبع همگام‌شده',
+    state: 'آفلاین — فقط خواندن آخرین نتیجهٔ همگام‌شده',
+    revealActions: true
+  });
+  return true;
+}
+
 async function refreshConversations() {
   const container = document.querySelector('#conversation-list');
   if (!container) return;
@@ -225,9 +244,12 @@ async function refreshDashboard() {
         renderStatementInsight(latest.statementInsight, { trust: latest.trust, dualValidation: latest.dualValidation });
         restoreWorkspaceContextFromLatest(latest);
         syncWorkspaceSnapshot();
+        if (snapshotStore) snapshotStore.save({ savedAt: new Date().toISOString(), source: latest.source, statementInsight: latest.statementInsight, trust: latest.trust, dualValidation: latest.dualValidation });
       }
     } catch {
-      /* persisted insight is optional during first login or before first analysis */
+      // Connectivity loss: fall back to the last server-authoritative snapshot
+      // cached locally so a previously synced source stays readable offline.
+      await renderOfflineSnapshot();
     }
     refreshConversations();
   } catch (error) {
@@ -508,6 +530,7 @@ async function finishIngestJob(job, entry) {
       body: JSON.stringify({ sourceSha256: job.result.sha256 })
     });
     renderStatementInsight(insights.statementInsight || null, { trust: insights.trust, dualValidation: insights.dualValidation });
+    if (snapshotStore && insights.statementInsight) snapshotStore.save({ savedAt: new Date().toISOString(), source: insights.source, statementInsight: insights.statementInsight, trust: insights.trust, dualValidation: insights.dualValidation });
     syncWorkspaceSnapshot();
     setWorkspaceContext({title:'نتیجه آماده است',description:'یافته‌ها، شواهد و محدودیت‌ها از همان منبع معتبر نمایش داده شده‌اند.',source:entry.sourceName,state:'تحلیل و بینش آماده',revealActions:true});
   } catch (error) {
@@ -1522,7 +1545,7 @@ wireWorkspaceInteractions();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => undefined);
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => { refreshAvailabilityState(); flushOfflineQueue(); });
-  window.addEventListener('offline', () => { refreshAvailabilityState(); });
+  window.addEventListener('offline', () => { refreshAvailabilityState(); renderOfflineSnapshot(); });
 }
 refreshSessionState();
 refreshDashboard();

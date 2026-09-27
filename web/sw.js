@@ -1,4 +1,4 @@
-const CACHE = 'hooshyar-shell-v4';
+const CACHE = 'hooshyar-shell-v5';
 const APP_SHELL = ['/', '/index.html', '/app.js', '/result-presentation.js', '/offline-sync.js', '/styles.css', '/manifest.webmanifest'];
 
 self.addEventListener('install', event => {
