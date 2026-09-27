@@ -1,0 +1,72 @@
+HOOSHYAROS — PRODUCT INTELLIGENCE QUALITY REPAIR — EVIDENCE
+Date: 2026-09-27
+Branch: fix/autonomous-product-factory
+Operator: Kilo (bounded execution layer), model deepseek/deepseek-flash
+Baseline HEAD at start: ddb53e2fc3278f760e948b394bc5aa4bb1904724
+
+=== ROOT CAUSES FOUND (AUDIT) ===
+1. /api/assistant passed one mixed English/Persian context blob to
+   ReasoningEngine.reasonNative(), which parses Revenue=/Profit=/DebtRatio= and
+   returns a fixed metric echo for every question (no intent routing).
+2. buildReportSections() rebuilt strengths/weaknesses/risks/opportunities/actions
+   with much narrower conditions than the governed FinancialStatementInsight
+   findings already computed; the deeper findings were never consumed.
+3. Report numeric formatting scaled/rounded amounts (تریلیون/میلیارد) while other
+   surfaces showed the exact grouped integer, and the client re-localized the
+   server answer through a numeric regex that parsed scientific notation
+   (3.21294e+13 -> 32,129,400,000,000), producing the 32,129,418,000,000 vs
+   32,129,400,000,000 contradiction.
+4. English canonical identifiers leaked to the user: describeStatementContext()
+   emitted preTaxIncome/taxes/balance-sheet-identity, the native reasoner echoed
+   them, the report emitted "Financial analytics:", and the assistant answered a
+   three-scenario question with a raw metric bundle (no scenario capability).
+5. web/app.js reported "تحلیل موفق ... ۰ تراکنش ... READY" for a statement with
+   zero transactions, implying transaction-level analysis.
+6. web/app.js rendered execution cards as "مسئول: — | موعد: —" as if the plan
+   were complete.
+
+=== CHANGES ===
+New: Backend/HBOS/Product/FinancialDecisionNarrativeService.ts
+  - classifyQuestion(): SCENARIOS / RISK / PROFIT_CHANGE / DATA_GAPS / ANALYZE /
+    GENERAL.
+  - composeFindingGroups(): grounded Persian strengths/weaknesses/risks/
+    opportunities/actions with evidence levels; a ratio is never a risk without
+    an explicit rationale/threshold.
+  - composeScenarios(): exactly three scenarios (محافظه‌کارانه/متوازن/تهاجمی)
+    with objective, assumptions, actions, expected direction, principal risks,
+    early warnings, decision criteria and required evidence. No fabricated
+    future numbers.
+  - composeAnswer(): question-specific sections + answer.
+  - Exact Persian formatting (manual digit/grouping): 32,129,418,000,000 renders
+    as ۳۲٬۱۲۹٬۴۱۸٬۰۰۰٬۰۰۰, never rounded.
+  - localizeStatementLimitation(): canonical English limitations -> Persian,
+    including measure/ratio/integrity label maps.
+Modified: Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts
+  - /api/assistant routed through composeAnswer; returns { response } with
+    intent/sections/scenarios/limitations; reasoning is the no-insight fallback.
+  - report + /api/financial/insights(+latest) consume composeFindingGroups/
+    composeScenarios; report keeps section headings; removed "Financial
+    analytics:"; exact amounts.
+Modified: web/app.js
+  - assistant renders the server answer verbatim (fallback kept).
+  - finding groups propagated from presentation with client fallback.
+  - truthful transaction/statement scope label and Persian READY rendering.
+  - execution card states "تعیین‌نشده" / incomplete plan instead of "—".
+Tests: FinancialDecisionNarrativeService.test.ts (9), ProductIntelligenceRuntime
+  .test.ts (7), web/product-intelligence.test.js (6), AssistantConversationRuntime
+  and CommercialRuntimeServer.test updated to the Persian-first contract.
+
+=== VERIFICATION ===
+Focused: new 22 tests PASS.
+Affected runtime suites (14 suites / 102 tests) PASS.
+Full regression: 310 suites / 2445 tests PASS (224.351 s).
+
+=== GOLDEN-CASE RESULTS (real statement path, HTTP) ===
+- insight.presentation.findings non-empty; 3 scenarios present.
+- RISK question -> intent RISK, evidence-based drivers (اهرم/بدهی/کنترل
+  حسابداری), monitoring list, no bare ratio.
+- SCENARIOS question -> exactly 3 scenarios, keys CONSERVATIVE/BALANCED/AGGRESSIVE.
+- ANALYZE question -> contains ۳۲٬۱۲۹٬۴۱۸٬۰۰۰٬۰۰۰, not ۳۲٬۱۲۹٬۴۰۰٬۰۰۰٬۰۰۰.
+- DATA_GAPS -> separate data/validation/operational gaps.
+- Repeated questions produce different, intent-specific answers.
+- No internal identifiers or English limitation text in answers/report.
