@@ -139,6 +139,15 @@ describe('Result presentation layer (Persian-first, progressive disclosure)', ()
     }
   });
 
+  test('app.js exposes a truthful availability state bound to connectivity and sync', () => {
+    const app = read('web/app.js');
+    const html = read('web/index.html');
+    expect(app).toContain('refreshAvailabilityState');
+    expect(app).toContain('classifyAvailability');
+    expect(app).toContain("addEventListener('offline'");
+    expect(html).toContain('id="context-availability"');
+  });
+
   test('offline app shell caches the presentation layer', () => {
     const sw = read('web/sw.js');
     expect(sw).toContain('/result-presentation.js');

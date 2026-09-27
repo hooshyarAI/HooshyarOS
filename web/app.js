@@ -49,6 +49,27 @@ const offlineSync = typeof window !== 'undefined' && window.HooshyarOfflineSync
   : null;
 
 const lastSyncCursors = new Map();
+let lastRemoteAvailable = null;
+let availabilitySyncing = false;
+
+function currentOnlineSignal() {
+  return typeof navigator !== 'undefined' && typeof navigator.onLine === 'boolean' ? navigator.onLine : null;
+}
+
+function refreshAvailabilityState() {
+  const el = document.querySelector('#context-availability');
+  if (!el) return null;
+  const api = syncApi && typeof syncApi.classifyAvailability === 'function' ? syncApi : null;
+  const state = api
+    ? api.classifyAvailability({
+        online: currentOnlineSignal(),
+        remoteAvailable: lastRemoteAvailable === null ? undefined : lastRemoteAvailable,
+        syncing: availabilitySyncing
+      })
+    : 'LOCAL';
+  el.textContent = api && typeof api.availabilityLabelFa === 'function' ? api.availabilityLabelFa(state) : state;
+  return state;
+}
 
 function classifyErrorKind(error) {
   return syncApi
@@ -99,18 +120,28 @@ function describeFailure(error) {
 }
 
 async function refreshSyncState() {
-  if (!offlineSync) return;
+  if (!offlineSync) {
+    refreshAvailabilityState();
+    return;
+  }
   try {
     const state = await offlineSync.serverState();
+    lastRemoteAvailable = true;
     lastSyncCursors.clear();
     for (const entry of state.cursors || []) lastSyncCursors.set(entry.sourceKey, entry.cursor.lastWatermark);
-  } catch {
-    /* server state is a reconciliation aid, not a hard requirement */
+  } catch (error) {
+    // A connectivity failure means the network is down; any other failure while
+    // the browser reports online means the remote service is only partially available.
+    if (!isConnectivityError(error)) lastRemoteAvailable = false;
+  } finally {
+    refreshAvailabilityState();
   }
 }
 
 async function flushOfflineQueue() {
   if (!offlineSync) return;
+  availabilitySyncing = true;
+  refreshAvailabilityState();
   try {
     const report = await offlineSync.sync();
     if (report.attempted > 0) {
@@ -130,6 +161,7 @@ async function flushOfflineQueue() {
       await refreshDashboard();
     }
   } finally {
+    availabilitySyncing = false;
     await refreshSyncState();
   }
 }
@@ -1363,8 +1395,12 @@ document.querySelector('#analytics-form').addEventListener('submit', async event
 
 wireWorkspaceInteractions();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => undefined);
-if (typeof window !== 'undefined') window.addEventListener('online', () => { flushOfflineQueue(); });
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => { refreshAvailabilityState(); flushOfflineQueue(); });
+  window.addEventListener('offline', () => { refreshAvailabilityState(); });
+}
 refreshSessionState();
 refreshDashboard();
+refreshAvailabilityState();
 refreshSyncState();
 resumePersistedIngestJob();
