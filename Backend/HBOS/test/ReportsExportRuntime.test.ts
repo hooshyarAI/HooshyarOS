@@ -114,14 +114,20 @@ describe("product.reports-export — commercial runtime path", () => {
         const txtBody = await txt.json();
         const txtDownload = await request(server, txtBody.downloadUrl, { headers: { cookie } });
         expect(txtDownload.headers.get("content-type")).toBe("text/plain; charset=utf-8");
-        expect(await txtDownload.text()).toContain("Tenant:");
+        // The tenant-scoped identity is rendered in the artifact. Assert on the
+        // canonical tenant id so the check does not depend on the report being
+        // localized to Persian-first human-readable labels.
+        const txtText = await txtDownload.text();
+        expect(txtText).toContain(txtBody.tenantId);
+        expect(txtText).toContain("ledger.csv");
 
         const csv = await exportReport(cookie, "CSV");
         expect(csv.status).toBe(201);
         const csvBody = await csv.json();
         const csvDownload = await request(server, csvBody.downloadUrl, { headers: { cookie } });
         expect(csvDownload.headers.get("content-type")).toBe("text/csv; charset=utf-8");
-        expect((await csvDownload.text()).trim().split("\r\n")[0]).toBe('"Section","Entry"');
+        // CSV header is part of the approved Persian-first report contract.
+        expect((await csvDownload.text()).trim().split("\r\n")[0]).toBe('"بخش","محتوا"');
 
         const json = await exportReport(cookie, "JSON");
         expect(json.status).toBe(201);

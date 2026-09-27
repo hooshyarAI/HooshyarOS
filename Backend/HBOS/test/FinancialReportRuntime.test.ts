@@ -223,14 +223,24 @@ describe("financial report ingestion — runtime HTTP", () => {
     const report = await request("/api/report", { headers: { cookie } });
     expect(report.status).toBe(200);
     const reportBody = await report.json();
+    expect(reportBody.source.sha256).toBe(sha256);
     const reportText = JSON.stringify(reportBody);
-    expect(reportText).toContain("Document status: COMPLETED");
-    expect(reportText).toContain("Reporting periods: 1402 | 1401");
-    expect(reportText).toContain("positive net profit");
+    // The report is Persian-first: assert the approved human-readable contract
+    // (never internal English field names) for the same verified facts.
+    expect(reportText).toContain("وضعیت سند: COMPLETED");
+    expect(reportText).toContain("دوره‌های گزارش: 1402 | 1401");
+    expect(reportText).toContain("سود خالص مثبت است");
     // The report carries the same integrity and cash-flow evidence.
-    expect(reportText).toContain("balance-sheet-identity");
-    expect(reportText).toContain("Quality of earnings:");
-    expect(reportText).toContain("derived residual");
+    expect(reportText).toContain("ترازنامه: سازگار با اعداد سند.");
+    expect(reportText).toContain("کیفیت سود");
+    expect(reportText).toContain("این مقدار جمع هزینه‌های استخراج‌شده نیست");
+    // Requirement 2: the Persian-first user-facing report must not leak the
+    // canonical English limitation text; the localized equivalents are shown.
+    expect(reportText).not.toContain("liquidity ratios are unavailable");
+    expect(reportText).not.toContain("Operating cash-flow evidence is absent");
+    expect(reportText).not.toContain("profitability interpretation is unavailable");
+    expect(reportText).toContain("نسبت‌های نقدینگی قابل محاسبه نیستند");
+    expect(reportText).toContain("شواهد جریان نقد عملیاتی در دسترس نیست");
   });
 
   test("analysis still requires balance-sheet fields when no facts exist", async () => {

@@ -161,6 +161,12 @@ describe("financial context integrity — runtime HTTP", () => {
     });
     expect(analysis.status).toBe(200);
 
+    // Capture source A's report before any analytics exists for source B.
+    const before = await request("/api/report", { headers: { cookie } });
+    expect(before.status).toBe(200);
+    const beforeBody = await before.json();
+    expect(beforeBody.source.sha256).toBe(shaA);
+
     // Make source B the tenant's latest analytics; A remains the latest analysis.
     const insightsB = await request("/api/financial/insights", {
       method: "POST",
@@ -173,11 +179,12 @@ describe("financial context integrity — runtime HTTP", () => {
     expect(report.status).toBe(200);
     const reportBody = await report.json();
     expect(reportBody.source.sha256).toBe(shaA);
+    // Source B's cached analytics must never enter source A's report. Asserting
+    // the rendered sections are identical whether or not B's analytics exists
+    // proves the one-source guarantee independently of how numbers are
+    // localized for display (the report is Persian-first and formatted).
+    expect(JSON.stringify(reportBody.sections)).toBe(JSON.stringify(beforeBody.sections));
     const reportText = JSON.stringify(reportBody);
-    // The report describes source A's verified facts only; source B's figures
-    // must never appear even though B is the tenant's latest analytics result.
-    expect(reportText).toContain(String(STATEMENT_FIGURES.revenue * MILLION));
-    expect(reportText).not.toContain(String(OTHER_STATEMENT_FIGURES.revenue * MILLION));
-    expect(reportText).not.toContain(String(OTHER_STATEMENT_FIGURES.assets * MILLION));
+    expect(reportText).not.toContain(shaB);
   });
 });

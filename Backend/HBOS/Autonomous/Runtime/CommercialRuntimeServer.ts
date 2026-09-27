@@ -682,6 +682,12 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
         const localizeLimitation = (value: string): string => value
             .replace("Revenue minus net profit. This is a derived residual expense burden, not an extracted accounting total; it bundles COGS, operating expenses, finance cost, tax and non-operating items.",
                 "این عدد «درآمد منهای سود خالص» است؛ یک مقدار باقیمانده مشتق‌شده است، نه جمع هزینه‌های استخراج‌شده از صورت مالی و می‌تواند شامل بهای تمام‌شده، هزینه‌های عملیاتی، هزینه مالی، مالیات و اقلام غیرعملیاتی باشد.")
+            .replace("Net profit or revenue evidence is absent; profitability interpretation is unavailable.",
+                "شواهد سود خالص یا درآمد در دسترس نیست؛ تفسیر سودآوری ممکن نیست.")
+            .replace("Current assets/current liabilities evidence is incomplete; liquidity ratios are unavailable.",
+                "شواهد دارایی‌ها و بدهی‌های جاری ناقص است؛ نسبت‌های نقدینگی قابل محاسبه نیستند.")
+            .replace("Operating cash-flow evidence is absent.",
+                "شواهد جریان نقد عملیاتی در دسترس نیست.")
             .replace(/^The document is PARTIAL; some sections may be incomplete\.$/,
                 "سند ناقص است و ممکن است بخشی از اطلاعات در دسترس نباشد.")
             .replace(/^The document is (.+); some sections may be incomplete\.$/,
@@ -695,7 +701,11 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
             .replace(/^Accounting check "([^"]+)" does not reconcile with the extracted lines \(difference (-?\d+(?:\.\d+)?)\)\..*$/,
                 "کنترل حسابداری «$1» با اقلام استخراج‌شده منطبق نیست؛ در اعداد این بخش اختلاف وجود دارد.")
             .replace(/^([A-Za-z]+) is not applicable: equity is zero or negative, so the ratio would be financially misleading\.$/,
-                "این نسبت به دلیل صفر یا منفی بودن حقوق مالکانه قابل اتکا نیست.");
+                (_match: string, ratio: string) => `نسبت «${ratioLabels[ratio] || ratio}» به دلیل صفر یا منفی بودن حقوق مالکانه قابل اتکا نیست.`)
+            .replace(/^([A-Za-z]+) is not applicable: current liabilities are zero or negative, so the ratio denominator is undefined\.$/,
+                (_match: string, ratio: string) => `نسبت «${ratioLabels[ratio] || ratio}» به دلیل صفر یا منفی بودن بدهی‌های جاری قابل محاسبه نیست.`)
+            .replace(/^([A-Za-z]+) is not applicable \(([^)]+)\)\.$/,
+                (_match: string, ratio: string) => `نسبت «${ratioLabels[ratio] || ratio}» با شواهد فعلی قابل محاسبه نیست.`);
         const current = (key: string): number | null => insight?.metrics?.[key] ?? null;
         const findChange = (key: string) => insight?.comparative?.find((entry) => entry.line === key);
         const currency = insight?.currency || "IRR";
