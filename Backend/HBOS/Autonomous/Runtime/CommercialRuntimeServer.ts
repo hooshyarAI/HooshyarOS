@@ -27,6 +27,7 @@ import { ExecutiveIntelligenceWorkbench, ExecutiveIntelligenceWorkbenchInput, Ex
 import { DecisionWorkbench, DecisionWorkbenchInput, DecisionWorkbenchResult } from "../../Product/DecisionWorkbench";
 import { FinancialAnalyticsService, FinancialAnalyticsResult, FinancialAnalyticsInput } from "../../Product/FinancialAnalyticsService";
 import { TrustAssessmentService, type TrustAssessment } from "../../Product/TrustAssessment";
+import { AssistantConversationHistory } from "../../Product/AssistantConversationHistory";
 import { fromReconciliation, summarizeDualValidations, type DualValidationOutcome } from "../../Product/IndependentValidation";
 import { ReportExportService } from "../../Product/ReportExportService";
 import {
@@ -405,6 +406,9 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     // not an Engine and never mutates the protected ingestion adapter or the
     // canonical model.
     const trustAssessment = new TrustAssessmentService();
+    // Tenant-scoped assistant conversation continuity. Supporting service only;
+    // it persists the user's own Q&A and never reasons or calculates.
+    const conversationHistory = new AssistantConversationHistory(persistence, () => now());
     const latestResults = new Map<string, StoredAnalysis>();
     const latestWorkbenchResults = new Map<string, ExecutiveIntelligenceWorkbenchResult>();
     const latestDecisionResults = new Map<string, DecisionWorkbenchResult>();
@@ -1059,7 +1063,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 return res.end();
             }
             if (req.method === "GET" && path === "/health") return corsJson(200, { status: "ok", service: "hooshyar-commercial-runtime" });
-            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", dependencies: runtimeDependencies(), capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "financial-analytics", "ingested-source-analysis", "tenant-scoped-persistence", "offline-sync", "reasoning", "executive-intelligence-workbench", "decision-workbench", "expert-choice", "organizational-execution", "governed-approval", "work-item-lifecycle", "kpi-outcome", "reports", "reports-export", "report-artifact-download", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "auth-rate-limiting", "rbac", "session-lifecycle", "request-observability", "bounded-pagination", "idempotency-keys", "organizational-problem-solving", "ingestion-job-status", "scanned-statement-normalization", "source-trust-assessment", "independent-dual-validation"] });
+            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", dependencies: runtimeDependencies(), capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "financial-analytics", "ingested-source-analysis", "tenant-scoped-persistence", "offline-sync", "reasoning", "executive-intelligence-workbench", "decision-workbench", "expert-choice", "organizational-execution", "governed-approval", "work-item-lifecycle", "kpi-outcome", "reports", "reports-export", "report-artifact-download", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "auth-rate-limiting", "rbac", "session-lifecycle", "request-observability", "bounded-pagination", "idempotency-keys", "organizational-problem-solving", "ingestion-job-status", "scanned-statement-normalization", "source-trust-assessment", "independent-dual-validation", "assistant-conversation-history"] });
             if (req.method === "GET" && path === "/") return asset(res, "index.html", "text/html; charset=utf-8");
             if (req.method === "GET" && path === "/app.js") return asset(res, "app.js", "text/javascript; charset=utf-8");
             if (req.method === "GET" && path === "/offline-sync.js") return asset(res, "offline-sync.js", "text/javascript; charset=utf-8");
@@ -2108,11 +2112,29 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const answer = reasoning.reason(context);
                 if (!answer.success) return corsJson(503, { error: "ASSISTANT_REASONING_UNAVAILABLE" });
                 const trust = await assessSourceTrust(session.tenantId, result.source.sha256, insight?.integrity);
+                const resolvedAnswer = answer.answer ?? answer.status;
+                // Conversation continuity is secondary: a persistence failure
+                // must never replace a verified answer with an error.
+                let conversationId: string | undefined;
+                try {
+                    const recorded = await conversationHistory.record({
+                        tenantId: session.tenantId,
+                        userId: session.userId,
+                        username: session.username,
+                        question,
+                        answer: resolvedAnswer,
+                        ...(result.source?.sha256 ? { sourceSha256: result.source.sha256 } : {}),
+                    });
+                    conversationId = recorded.conversationId;
+                } catch {
+                    conversationId = undefined;
+                }
                 return corsJson(200, {
                     status: "READY",
                     tenantId: session.tenantId,
                     question,
-                    answer: answer.answer ?? answer.status,
+                    answer: resolvedAnswer,
+                    ...(conversationId ? { conversationId } : {}),
                     evidence: {
                         analysisSource: result.source,
                         executiveWorkbench: Boolean(workbench),
@@ -2130,6 +2152,22 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                             : {}),
                     },
                 });
+            }
+
+            if (req.method === "GET" && path === "/api/conversations") {
+                if (!ensurePermission("READ_DASHBOARD")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                const pagination = parsePagination(query);
+                if (pagination.ok === false) return corsJson(400, { error: pagination.error });
+                const page = await conversationHistory.list(session.tenantId, pagination.page.limit, pagination.page.offset);
+                return corsJson(200, { status: "READY", tenantId: session.tenantId, conversations: page.items, pagination: toPageMeta(pagination.page, page) });
+            }
+
+            if (req.method === "GET" && path.startsWith("/api/conversations/")) {
+                if (!ensurePermission("READ_DASHBOARD")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                const conversationId = decodeURIComponent(path.slice("/api/conversations/".length));
+                const conversation = await conversationHistory.get(session.tenantId, conversationId);
+                if (!conversation) return corsJson(404, { error: "CONVERSATION_NOT_FOUND" });
+                return corsJson(200, conversation);
             }
 
             if (req.method === "GET" && path === "/api/dashboard") {

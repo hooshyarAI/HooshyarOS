@@ -179,6 +179,35 @@ function presentUserResult(container, summarizerName, payload) {
   container.textContent = 'نتیجه دریافت شد. جزئیات فنی در دسترس است.';
 }
 
+async function refreshConversations() {
+  const container = document.querySelector('#conversation-list');
+  if (!container) return;
+  try {
+    const payload = await getJson('/api/conversations?limit=10');
+    const items = Array.isArray(payload.conversations) ? payload.conversations : [];
+    container.textContent = '';
+    if (!items.length) {
+      container.textContent = 'گفتگویی ثبت نشده است.';
+      return;
+    }
+    for (const item of items) {
+      const row = document.createElement('article');
+      row.className = 'conversation-history-item';
+      const question = document.createElement('p');
+      question.className = 'conversation-question';
+      question.textContent = `پرسش: ${localizeFinancialText(item.question || '')}`;
+      const answer = document.createElement('p');
+      answer.className = 'conversation-answer';
+      answer.textContent = localizeFinancialText(item.answer || '');
+      row.appendChild(question);
+      row.appendChild(answer);
+      container.appendChild(row);
+    }
+  } catch {
+    container.textContent = 'تاریخچه گفتگو در دسترس نیست.';
+  }
+}
+
 async function refreshDashboard() {
   try {
     const ready = await getJson('/api/ready');
@@ -200,6 +229,7 @@ async function refreshDashboard() {
     } catch {
       /* persisted insight is optional during first login or before first analysis */
     }
+    refreshConversations();
   } catch (error) {
     document.querySelector('#readiness').textContent = `برای ادامه ابتدا نشست ایجاد کنید: ${error.message}`;
   }
@@ -1265,10 +1295,14 @@ document.querySelector('#assistant-form').addEventListener('submit', async event
       body: JSON.stringify({ question: document.querySelector('#assistant-question').value })
     });
     result.textContent = buildFinancialAssistantAnswer(latestStatementInsight, payload.question) || localizeFinancialText(payload.answer || 'پاسخی در دسترس نیست.');
+    refreshConversations();
   } catch (error) {
     result.textContent = `دستیار در دسترس نیست: ${error.message}`;
   }
 });
+
+const conversationRefreshButton = document.querySelector('#conversation-refresh');
+if (conversationRefreshButton) conversationRefreshButton.addEventListener('click', () => { refreshConversations(); });
 
 document.querySelector('#resilience-form').addEventListener('submit', async event => {
   event.preventDefault();
