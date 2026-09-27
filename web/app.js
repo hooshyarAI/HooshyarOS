@@ -134,8 +134,17 @@ async function flushOfflineQueue() {
   }
 }
 
-function text(value) {
-  return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+const presentationApi = typeof window !== 'undefined' && window.HooshyarResultPresentation
+  ? window.HooshyarResultPresentation
+  : null;
+
+function presentUserResult(container, summarizerName, payload) {
+  if (!container) return;
+  if (presentationApi && typeof presentationApi[summarizerName] === 'function') {
+    presentationApi.renderResult(container, presentationApi[summarizerName](payload));
+    return;
+  }
+  container.textContent = 'نتیجه دریافت شد. جزئیات فنی در دسترس است.';
 }
 
 async function refreshDashboard() {
@@ -950,12 +959,7 @@ document.querySelector('#executive-form').addEventListener('submit', async event
         }
       })
     });
-    result.textContent = JSON.stringify({
-      status: payload.status,
-      kpis: payload.kpis,
-      performance: payload.performance,
-      recommendations: payload.recommendations
-    }, null, 2);
+    presentUserResult(result, 'summarizeExecutive', payload);
     await refreshDashboard();
   } catch (error) {
     result.textContent = `محاسبه مدیریتی ناموفق بود: ${error.message}`;
@@ -989,13 +993,7 @@ document.querySelector('#decision-form').addEventListener('submit', async event 
         scores
       })
     });
-    result.textContent = JSON.stringify({
-      status: payload.status,
-      recommendation: payload.recommendation,
-      weightsSource: payload.weightsSource,
-      consistency: payload.consistency,
-      evaluations: payload.evaluations
-    }, null, 2);
+    presentUserResult(result, 'summarizeDecision', payload);
   } catch (error) {
     result.textContent = `ارزیابی تصمیم ناموفق بود: ${error.message}`;
   }
@@ -1101,7 +1099,7 @@ document.querySelector('#execution-refresh').addEventListener('click', refreshEx
 document.querySelector('#report-button').addEventListener('click', async () => {  const result = document.querySelector('#report-result');
   try {
     const payload = await getJson('/api/report');
-    result.textContent = JSON.stringify(payload, null, 2);
+    presentUserResult(result, 'summarizeReport', payload);
   } catch (error) {
     result.textContent = `تولید گزارش ناموفق بود: ${error.message}`;
   }
@@ -1200,7 +1198,7 @@ document.querySelector('#resilience-form').addEventListener('submit', async even
         scenarios: [{ name: 'base', description: 'Base', shockPercent: 0, appliedAt: 1 }]
       })
     });
-    result.textContent = JSON.stringify(payload, null, 2);
+    presentUserResult(result, 'summarizeResilience', payload);
   } catch (error) {
     result.textContent = `تحلیل تاب‌آوری ناموفق بود: ${error.message}`;
   }
@@ -1244,7 +1242,7 @@ document.querySelector('#impact-form').addEventListener('submit', async event =>
         }
       })
     });
-    result.textContent = JSON.stringify(payload, null, 2);
+    presentUserResult(result, 'summarizeImpact', payload);
   } catch (error) {
     result.textContent = `سنجش تأثیر ناموفق بود: ${error.message}`;
   }
@@ -1274,7 +1272,7 @@ document.querySelector('#improvement-form').addEventListener('submit', async eve
         }
       })
     });
-    result.textContent = JSON.stringify(payload, null, 2);
+    presentUserResult(result, 'summarizeImprovement', payload);
   } catch (error) {
     result.textContent = `تحلیل بهبود ناموفق بود: ${error.message}`;
   }
@@ -1346,7 +1344,7 @@ document.querySelector('#analytics-form').addEventListener('submit', async event
         iqrAlerts: payload.anomalies.iqr.points.filter(point => point.flag !== 'NORMAL').length
       };
     }
-    result.textContent = JSON.stringify(summary, null, 2);
+    presentUserResult(result, 'summarizeAnalytics', summary);
   } catch (error) {
     result.textContent = `تحلیل پیشرفته ناموفق بود: ${error.message}`;
   }
