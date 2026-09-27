@@ -348,7 +348,37 @@ def provision_android_toolchain() -> tuple[Path, Path, Path] | None:
     return java_home, sdk_root, gradle_bin
 
 
-def android() -> int:
+CANONICAL_ANDROID_CLIENT_ACTIVITY = (
+    ANDROID_ROOT / "app" / "src" / "main" / "java" / "ai" / "hooshyar" / "client" / "MainActivity.java"
+)
+
+
+def _write_if_absent(path: Path, content: str) -> bool:
+    """Write generated scaffolding only when the repository does not provide it.
+
+    Returns True when a new file was created, False when an existing file was
+    preserved. Productization must never overwrite tracked, improved sources.
+    """
+    if path.exists():
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    return True
+
+
+def scaffold_android_project() -> list[str]:
+    """Create Android build scaffolding only when the canonical project is absent.
+
+    The repository ships a hardened client runtime at
+    ``android/app/src/main/java/ai/hooshyar/client/MainActivity.java``
+    (HTTPS-only configuration, ``/health`` preflight, cleartext disabled). When
+    that canonical client exists the tracked project is authoritative and is
+    left untouched; only a repository without the canonical client receives the
+    minimal fallback scaffold below.
+    """
+    if CANONICAL_ANDROID_CLIENT_ACTIVITY.exists():
+        return []
+
     app = ANDROID_ROOT / "app"
     src = app / "src" / "main" / "java" / "ai" / "hooshyar" / "app"
     main = src / "MainActivity.java"
@@ -356,16 +386,28 @@ def android() -> int:
     gradle = app / "build.gradle"
     settings = ANDROID_ROOT / "settings.gradle"
     root_gradle = ANDROID_ROOT / "build.gradle"
+    styles = app / "src" / "main" / "res" / "values" / "styles.xml"
 
-    src.mkdir(parents=True, exist_ok=True)
-    (app / "src" / "main" / "res" / "values").mkdir(parents=True, exist_ok=True)
+    candidates: list[tuple[Path, str]] = [
+        (settings, """pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }\ndependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }\nrootProject.name='HooshyarOS'\ninclude ':app'\n"""),
+        (root_gradle, """plugins { id 'com.android.application' version '8.6.1' apply false }\n"""),
+        (gradle, """plugins { id 'com.android.application' }\n\nandroid { namespace 'ai.hooshyar.app'; compileSdk 35\n    defaultConfig { applicationId 'ai.hooshyar.app'; minSdk 26; targetSdk 35; versionCode 1; versionName '1.0.0' }\n}\n\ndependencies { implementation 'androidx.appcompat:appcompat:1.7.0'; implementation 'androidx.webkit:webkit:1.12.1' }\n"""),
+        (manifest, """<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\">\n    <uses-permission android:name=\"android.permission.INTERNET\"/>\n    <application android:theme=\"@style/Theme.AppCompat.Light.NoActionBar\" android:label=\"HooshyarOS\">\n        <activity android:name=\".MainActivity\" android:exported=\"true\">\n            <intent-filter><action android:name=\"android.intent.action.MAIN\"/><category android:name=\"android.intent.category.LAUNCHER\"/></intent-filter>\n        </activity>\n    </application>\n</manifest>\n"""),
+        (styles, """<resources><style name=\"Theme.AppCompat.Light.NoActionBar\" parent=\"Theme.AppCompat.Light.NoActionBar\"/></resources>\n"""),
+        (main, """package ai.hooshyar.app;\n\nimport android.app.Activity;\nimport android.os.Bundle;\nimport android.webkit.WebView;\nimport android.webkit.WebViewClient;\n\npublic class MainActivity extends Activity {\n    @Override public void onCreate(Bundle savedInstanceState) {\n        super.onCreate(savedInstanceState);\n        WebView web = new WebView(this);\n        web.setWebViewClient(new WebViewClient());\n        web.getSettings().setJavaScriptEnabled(true);\n        String endpoint = getSharedPreferences(\"hooshyar\", MODE_PRIVATE).getString(\"endpoint\", \"http://10.0.2.2:3000\");\n        web.loadUrl(endpoint);\n        setContentView(web);\n    }\n}\n"""),
+    ]
 
-    settings.write_text("""pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }\ndependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }\nrootProject.name='HooshyarOS'\ninclude ':app'\n""", encoding="utf-8")
-    root_gradle.write_text("""plugins { id 'com.android.application' version '8.6.1' apply false }\n""", encoding="utf-8")
-    gradle.write_text("""plugins { id 'com.android.application' }\n\nandroid { namespace 'ai.hooshyar.app'; compileSdk 35\n    defaultConfig { applicationId 'ai.hooshyar.app'; minSdk 26; targetSdk 35; versionCode 1; versionName '1.0.0' }\n}\n\ndependencies { implementation 'androidx.appcompat:appcompat:1.7.0'; implementation 'androidx.webkit:webkit:1.12.1' }\n""", encoding="utf-8")
-    manifest.write_text("""<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\">\n    <uses-permission android:name=\"android.permission.INTERNET\"/>\n    <application android:theme=\"@style/Theme.AppCompat.Light.NoActionBar\" android:label=\"HooshyarOS\">\n        <activity android:name=\".MainActivity\" android:exported=\"true\">\n            <intent-filter><action android:name=\"android.intent.action.MAIN\"/><category android:name=\"android.intent.category.LAUNCHER\"/></intent-filter>\n        </activity>\n    </application>\n</manifest>\n""", encoding="utf-8")
-    (app / "src" / "main" / "res" / "values" / "styles.xml").write_text("""<resources><style name=\"Theme.AppCompat.Light.NoActionBar\" parent=\"Theme.AppCompat.Light.NoActionBar\"/></resources>\n""", encoding="utf-8")
-    main.write_text("""package ai.hooshyar.app;\n\nimport android.app.Activity;\nimport android.os.Bundle;\nimport android.webkit.WebView;\nimport android.webkit.WebViewClient;\n\npublic class MainActivity extends Activity {\n    @Override public void onCreate(Bundle savedInstanceState) {\n        super.onCreate(savedInstanceState);\n        WebView web = new WebView(this);\n        web.setWebViewClient(new WebViewClient());\n        web.getSettings().setJavaScriptEnabled(true);\n        String endpoint = getSharedPreferences(\"hooshyar\", MODE_PRIVATE).getString(\"endpoint\", \"http://10.0.2.2:3000\");\n        web.loadUrl(endpoint);\n        setContentView(web);\n    }\n}\n""", encoding="utf-8")
+    created: list[str] = []
+    for path, content in candidates:
+        if _write_if_absent(path, content):
+            created.append(str(path.relative_to(ROOT)))
+    return created
+
+
+def android() -> int:
+    created = scaffold_android_project()
+    if created:
+        emit("AUTONOMOUS_PRODUCTIZATION_SCAFFOLD", platform="ANDROID", created=created)
 
     toolchain = provision_android_toolchain()
     if toolchain is None:
