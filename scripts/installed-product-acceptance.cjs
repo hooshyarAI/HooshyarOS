@@ -164,7 +164,10 @@ function buildIsolatedInstaller() {
 
   fs.rmSync(workDir, { recursive: true, force: true });
   fs.mkdirSync(installerOut, { recursive: true });
-  const appId = `{{${crypto.randomUUID().replace(/-/g, '').toUpperCase()}}}`;
+  // Inno's `AppId={{GUID}` escapes a literal leading brace, so the logical
+  // AppId (and its uninstall registry key) is `{GUID}` with single braces.
+  const appId = `{${crypto.randomUUID().replace(/-/g, '').toUpperCase()}}`;
+  const appIdDirective = `{${appId}`;
   const canonical = fs.readFileSync(path.join(root, 'installer', 'HooshyarOS.iss'), 'utf8');
   // The canonical installer must itself skip the post-install launch in silent
   // mode. This harness used to inject that guard into its isolated copy only,
@@ -175,7 +178,7 @@ function buildIsolatedInstaller() {
     fail('installer/HooshyarOS.iss must guard the post-install [Run] with skipifsilent');
   }
   const isolated = canonical
-    .replace(/AppId=\{\{[0-9A-Fa-f-]+\}/, `AppId=${appId}`)
+    .replace(/AppId=\{\{[0-9A-Fa-f-]+\}/, `AppId=${appIdDirective}`)
     .replace(/DefaultDirName=\{localappdata\}\\Programs\\HooshyarOS\r?\n/, `DefaultDirName={localappdata}\\Programs\\HooshyarOS-Acceptance\n`)
     .replace(/OutputDir=.*\r?\n/, `OutputDir=${installerOut}\n`)
     .replace(/OutputBaseFilename=.*\r?\n/, 'OutputBaseFilename=HooshyarOS-Acceptance-Setup\n')

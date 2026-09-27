@@ -2,8 +2,12 @@
 
 This module is invoked by the autonomous productization worker. It creates
 real Windows and Android release artifacts without changing the HBOS business
-architecture. Windows uses the native IExpress tool when available. Android
-provisions a user-local JDK/Android SDK/Gradle toolchain when missing.
+architecture. Windows ships the canonical Inno Setup customer wizard built from
+``installer/HooshyarOS.iss``; the complete, behaviorally validated runtime
+payload produced by ``release_product_builder.py`` is embedded in the Setup EXE
+itself, so no bootstrap script, sibling payload directory or repository checkout
+is required at install time. Android provisions a user-local JDK/Android
+SDK/Gradle toolchain when missing.
 """
 from __future__ import annotations
 
@@ -12,6 +16,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -25,11 +30,14 @@ ANDROID_ROOT = ROOT / "android"
 ANDROID_RELEASE = RELEASE_ROOT / "android"
 TOOLCACHE = RELEASE_ROOT / ".toolcache"
 
-# The Windows bootstrap EXE is a thin IExpress wrapper around the canonical,
-# behaviorally validated customer payload produced by release_product_builder.py.
+# Windows productization reuses the canonical, user-facing Inno Setup wizard
+# definition and the canonical, behaviorally validated customer payload. The
+# IExpress bootstrap (scripts + thin ZIP) has been removed: the Setup EXE is the
+# real Windows installer wizard and embeds the complete runtime payload.
 RELEASE_PRODUCT_BUILDER = ROOT / "Backend" / "AI_Runtime" / "release_product_builder.py"
+WINDOWS_INSTALLER_SCRIPT = ROOT / "installer" / "HooshyarOS.iss"
+INNO_SETUP_PACKAGE_ID = "JRSoftware.InnoSetup.7"
 WINDOWS_BOOTSTRAP_NAME = "HooshyarOS-Windows-Bootstrap.zip"
-WINDOWS_INSTALL_ROOT_NAME = "HooshyarOS"
 WINDOWS_BOOTSTRAP_REQUIRED_MEMBERS = (
     "launch-hooshyar.vbs",
     "launch-hooshyar.ps1",
@@ -199,140 +207,114 @@ def find_file(root: Path, name: str) -> Path | None:
     return None
 
 
-def _write_windows_installer_scripts(installer: Path) -> dict[str, Path]:
-    """Write the deterministic, self-contained Windows installer scripts.
+def discover_inno_setup() -> Path | None:
+    """Return the installed Inno Setup compiler (ISCC.exe), if present.
 
-    The IExpress EXE carries its own copy of the complete customer payload as
-    ``HooshyarOS-Windows-Bootstrap.zip`` next to these scripts. ``install.ps1``
-    expands that bundled archive from its own extracted directory, so no sibling
-    ``payload`` directory, repository path or ``D:\\HooshyarOS`` checkout is ever
-    required at install time.
+    The customer-facing Windows installer is Inno Setup. An already installed
+    compiler is always preferred over provisioning a new one.
     """
-    installer.mkdir(parents=True, exist_ok=True)
-    install = installer / "install.ps1"
-    uninstall = installer / "uninstall.ps1"
-    build = installer / "build-installer.ps1"
-    readme = installer / "README.md"
-    install_cmd = installer / "install.cmd"
+    on_path = shutil.which("ISCC.exe") or shutil.which("ISCC")
+    if on_path:
+        return Path(on_path)
 
-    install.write_text(r'''param(
-    [string]$InstallRoot = (Join-Path $env:ProgramData "HooshyarOS"),
-    [switch]$NoElevate
-)
-$ErrorActionPreference = "Stop"
-$BundleName = "HooshyarOS-Windows-Bootstrap.zip"
-function Show-HooshyarFailure([string]$Message) {
-    try { (New-Object -ComObject WScript.Shell).Popup($Message, 0, "HooshyarOS installation failed", 16) | Out-Null } catch { }
-    Write-Host $Message
-}
-try {
-    $Here = $PSScriptRoot
-    if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Path }
-    $ScriptPath = $MyInvocation.MyCommand.Path
-    if (-not $ScriptPath) { $ScriptPath = $PSCommandPath }
+    roots = [
+        os.environ.get("ProgramFiles(x86)"),
+        os.environ.get("ProgramFiles"),
+        os.environ.get("LOCALAPPDATA"),
+    ]
+    candidates: list[Path] = []
+    for root in roots:
+        if not root:
+            continue
+        base = Path(root)
+        for version in ("Inno Setup 7", "Inno Setup 6"):
+            candidates.append(base / version / "ISCC.exe")
+            candidates.append(base / "Programs" / version / "ISCC.exe")
+        try:
+            candidates.extend(sorted(base.glob("Inno Setup */ISCC.exe")))
+            candidates.extend(sorted(base.glob("Programs/Inno Setup */ISCC.exe")))
+        except (OSError, RuntimeError):
+            continue
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
 
-    if (-not $NoElevate) {
-        $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
-        if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-            $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`" -InstallRoot `"$InstallRoot`""
-            $elevated = Start-Process -FilePath "powershell.exe" -ArgumentList $arguments -Verb RunAs -Wait -PassThru
-            exit $elevated.ExitCode
-        }
-    }
 
-    $Bundle = Join-Path $Here $BundleName
-    if (-not (Test-Path -LiteralPath $Bundle)) {
-        throw "Installer payload not found next to install.ps1: $Bundle"
-    }
-    $Bundle = (Resolve-Path -LiteralPath $Bundle).Path
+def provision_inno_setup() -> Path | None:
+    """Provision the official Inno Setup compiler through winget when absent.
 
-    $RuntimeRoot = Join-Path $InstallRoot "runtime"
-    $DataRoot = Join-Path $InstallRoot "data"
-    if (Test-Path -LiteralPath $RuntimeRoot) { Remove-Item -LiteralPath $RuntimeRoot -Recurse -Force }
-    New-Item -ItemType Directory -Force -Path $RuntimeRoot, $DataRoot | Out-Null
-    Expand-Archive -Path $Bundle -DestinationPath $RuntimeRoot -Force
+    ``JRSoftware.InnoSetup.7`` is the canonical winget package. The silent flags
+    keep autonomous construction non-interactive while still using the standard
+    Windows package mechanism; no arbitrary third-party installer is downloaded.
+    """
+    winget = shutil.which("winget.exe") or shutil.which("winget")
+    if not winget:
+        emit("AUTONOMOUS_PRODUCTIZATION_INNO_SETUP", stage="PROVISION", status="BLOCKED", reason="winget-unavailable")
+        return None
 
-    $RuntimeLauncher = Join-Path $RuntimeRoot "launch-hooshyar.vbs"
-    if (-not (Test-Path -LiteralPath $RuntimeLauncher)) {
-        throw "Packaged runtime is incomplete: launch-hooshyar.vbs missing after extraction."
-    }
-
-    $Launcher = Join-Path $InstallRoot "Start HooshyarOS.cmd"
-    Set-Content -LiteralPath $Launcher -Encoding ASCII -Value @(
-        "@echo off",
-        "cd /d `"$RuntimeRoot`"",
-        "start `"`" wscript.exe `"$RuntimeLauncher`""
+    emit("AUTONOMOUS_PRODUCTIZATION_INNO_SETUP", stage="PROVISION", method="winget", package=INNO_SETUP_PACKAGE_ID)
+    result = subprocess.run(
+        [winget, "install", "--id", INNO_SETUP_PACKAGE_ID, "--exact", "--source", "winget",
+         "--accept-source-agreements", "--accept-package-agreements", "--silent"],
+        cwd=ROOT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        timeout=30 * 60,
+        check=False,
     )
+    if result.stdout:
+        print(result.stdout, end="")
+    if result.returncode != 0:
+        emit("AUTONOMOUS_PRODUCTIZATION_INNO_SETUP", stage="PROVISION", status="NONZERO", exitCode=result.returncode)
+    return discover_inno_setup()
 
-    $UninstallSource = Join-Path $Here "uninstall.ps1"
-    $UninstallTarget = Join-Path $InstallRoot "uninstall.ps1"
-    if (Test-Path -LiteralPath $UninstallSource) {
-        Copy-Item -LiteralPath $UninstallSource -Destination $UninstallTarget -Force
-    }
-    $Uninstaller = Join-Path $InstallRoot "Uninstall HooshyarOS.cmd"
-    Set-Content -LiteralPath $Uninstaller -Encoding ASCII -Value @(
-        "@echo off",
-        "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$UninstallTarget`""
-    )
 
-    Write-Host "HooshyarOS installed to $InstallRoot"
-    Write-Host "Start with: $Launcher"
-    exit 0
-}
-catch {
-    Show-HooshyarFailure ("HooshyarOS could not be installed.`r`n`r`n" + $_.Exception.Message)
-    exit 1
-}
-''', encoding="utf-8")
+def _iss_define(script: str, name: str) -> str | None:
+    prefix = f"#define {name} "
+    for line in script.splitlines():
+        stripped = line.strip()
+        if stripped.startswith(prefix):
+            return stripped[len(prefix):].strip().strip('"')
+    return None
 
-    uninstall.write_text(r'''param(
-    [string]$InstallRoot = (Join-Path $env:ProgramData "HooshyarOS"),
-    [switch]$NoElevate
-)
-$ErrorActionPreference = "Stop"
-try {
-    $ScriptPath = $MyInvocation.MyCommand.Path
-    if (-not $ScriptPath) { $ScriptPath = $PSCommandPath }
 
-    if (-not $NoElevate) {
-        $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
-        if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-            $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`" -InstallRoot `"$InstallRoot`""
-            $elevated = Start-Process -FilePath "powershell.exe" -ArgumentList $arguments -Verb RunAs -Wait -PassThru
-            exit $elevated.ExitCode
-        }
-    }
+def _iss_value(script: str, name: str) -> str | None:
+    prefix = f"{name}="
+    for line in script.splitlines():
+        stripped = line.strip()
+        if stripped.startswith(prefix):
+            return stripped[len(prefix):].strip()
+    return None
 
-    if (Test-Path -LiteralPath $InstallRoot) { Remove-Item -LiteralPath $InstallRoot -Recurse -Force }
-    Write-Host "HooshyarOS uninstalled from $InstallRoot."
-    exit 0
-}
-catch {
-    Write-Host ("HooshyarOS could not be uninstalled: " + $_.Exception.Message)
-    exit 1
-}
-''', encoding="utf-8")
 
-    build.write_text(r'''$ErrorActionPreference = "Stop"
-$Root = Split-Path -Parent $PSScriptRoot
-$Repo = (Resolve-Path (Join-Path $Root "..\..\..")).Path
-Push-Location $Repo
-try {
-    python Backend\AI_Runtime\release_product_builder.py
-    if ($LASTEXITCODE -ne 0) { throw "release_product_builder.py failed with exit code $LASTEXITCODE" }
-} finally {
-    Pop-Location
-}
-$Package = Join-Path $Root "HooshyarOS-Windows-Bootstrap.zip"
-if (-not (Test-Path $Package)) { throw "bootstrap payload was not produced: $Package" }
-Write-Host "Built $Package"
-''', encoding="utf-8")
+def windows_setup_output() -> Path:
+    """Resolve the Setup EXE path declared by the canonical ``.iss`` script.
 
-    readme.write_text("""# HooshyarOS Windows Productization\n\nThe Windows release ships one self-contained native IExpress bootstrap executable\n(`HooshyarOS-Setup.exe`). The complete, behaviorally validated customer runtime\npayload is bundled inside the EXE as `HooshyarOS-Windows-Bootstrap.zip`.\n\n- `install.cmd` / `install.ps1`: expand the bundled payload from the EXE's own\nextracted directory into `%ProgramData%\\HooshyarOS\\runtime`, create the data\ndirectory and a launcher, and self-elevate for the ProgramData install root.\n- `uninstall.ps1`: removes the installation (self-elevates).\n- `build-installer.ps1`: builds the complete payload by delegating to\n`Backend/AI_Runtime/release_product_builder.py`.\n""", encoding="utf-8")
+    The wizard definition is the single source of truth for the artifact name,
+    so the builder never hard-codes a version string that could drift.
+    """
+    script = WINDOWS_INSTALLER_SCRIPT.read_text(encoding="utf-8")
+    version = _iss_define(script, "AppVersion") or "1.0.0"
+    output_dir = _iss_value(script, "OutputDir") or r"..\dist\productization\windows\installer"
+    base = (_iss_value(script, "OutputBaseFilename") or "HooshyarOS-Setup-{#AppVersion}").replace("{#AppVersion}", version)
+    resolved = (WINDOWS_INSTALLER_SCRIPT.parent / output_dir.replace("\\", "/")).resolve()
+    return resolved / f"{base}.exe"
 
-    install_cmd.write_text("@echo off\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File \"%~dp0install.ps1\"\n", encoding="ascii")
 
-    return {"install": install, "uninstall": uninstall, "build": build, "readme": readme, "install_cmd": install_cmd}
+def _validate_windows_setup_exe(exe: Path) -> str | None:
+    """Return a BLOCKED reason when the Setup EXE is not a real installer."""
+    if not exe.exists():
+        return "windows-setup-exe-not-produced"
+    if exe.stat().st_size < 1 * 1024 * 1024:
+        return "windows-setup-exe-too-small"
+    with exe.open("rb") as handle:
+        if handle.read(2) != b"MZ":
+            return "windows-setup-exe-not-pe"
+    return None
 
 
 def _validate_windows_bootstrap(zip_path: Path) -> list[str]:
@@ -350,13 +332,15 @@ def _validate_windows_bootstrap(zip_path: Path) -> list[str]:
 
 
 def windows() -> int:
-    scripts = _write_windows_installer_scripts(WINDOWS_INSTALLER)
-    install = scripts["install"]
-    uninstall = scripts["uninstall"]
-    build = scripts["build"]
-    payload_script = scripts["install_cmd"]
+    """Build the canonical Windows Setup Wizard with its embedded runtime payload.
 
-    if run("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(build)], timeout=90 * 60) != 0:
+    The complete, behaviorally validated customer payload is produced by
+    ``release_product_builder.py`` and then embedded into the Setup EXE by the
+    canonical Inno Setup definition. There is no IExpress bootstrap step and no
+    install-time dependency on a repository checkout, a sibling payload
+    directory or a developer PowerShell session.
+    """
+    if run(sys.executable, [str(RELEASE_PRODUCT_BUILDER)], timeout=90 * 60) != 0:
         emit("AUTONOMOUS_PRODUCTIZATION_BUILDER", platform="WINDOWS", status="BLOCKED", reason="windows-payload-build-failed")
         return 21
 
@@ -367,31 +351,28 @@ def windows() -> int:
              reason="windows-bootstrap-payload-incomplete", missing=missing)
         return 24
 
-    iexpress = shutil.which("iexpress.exe") or shutil.which("iexpress") or (Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "iexpress.exe")
-    exe = WINDOWS_ROOT / "HooshyarOS-Setup.exe"
-    if iexpress and Path(iexpress).exists():
-        sed_root = WINDOWS_ROOT / "iexpress"
-        if sed_root.exists():
-            shutil.rmtree(sed_root)
-        sed_root.mkdir(parents=True)
-        source = sed_root / "source"
-        source.mkdir()
-        shutil.copy2(payload_script, source / payload_script.name)
-        shutil.copy2(install, source / install.name)
-        shutil.copy2(uninstall, source / uninstall.name)
-        shutil.copy2(zip_result, source / zip_result.name)
+    if not WINDOWS_INSTALLER_SCRIPT.exists():
+        emit("AUTONOMOUS_PRODUCTIZATION_BUILDER", platform="WINDOWS", status="BLOCKED", reason="windows-installer-script-missing")
+        return 25
 
-        sed = sed_root / "HooshyarOS.sed"
-        sed.write_text(f'''[Version]\nClass=IEXPRESS\nSEDVersion=3\n[Options]\nPackagePurpose=InstallApp\nShowInstallProgramWindow=1\nHideExtractAnimation=1\nUseLongFileName=1\nInsideCompressed=1\nCABFileName=HooshyarOS.cab\nTargetName={exe}\nFriendlyName=HooshyarOS\nAppLaunched=install.cmd\nPostInstallCmd=<None>\nSourceFiles=SourceFiles\n[Strings]\nFILE0="install.cmd"\nFILE1="install.ps1"\nFILE2="uninstall.ps1"\nFILE3="{zip_result.name}"\n[SourceFiles]\nSourceFiles0={source}\n[SourceFiles0]\n%FILE0%=\n%FILE1%=\n%FILE2%=\n%FILE3%=\n''', encoding="utf-8")
-        if run(str(iexpress), ["/N", "/Q", str(sed)], timeout=15 * 60) != 0:
-            return 22
+    iscc = discover_inno_setup() or provision_inno_setup()
+    if iscc is None:
+        emit("AUTONOMOUS_PRODUCTIZATION_BUILDER", platform="WINDOWS", status="BLOCKED", reason="windows-inno-setup-compiler-unavailable")
+        return 26
 
-    if not exe.exists() or exe.stat().st_size < 100 * 1024:
-        emit("AUTONOMOUS_PRODUCTIZATION_BUILDER", platform="WINDOWS", status="BLOCKED", reason="real-exe-not-produced")
-        return 23
+    if run(str(iscc), [str(WINDOWS_INSTALLER_SCRIPT)], timeout=60 * 60) != 0:
+        emit("AUTONOMOUS_PRODUCTIZATION_BUILDER", platform="WINDOWS", status="BLOCKED", reason="windows-inno-setup-compile-failed")
+        return 27
+
+    exe = windows_setup_output()
+    problem = _validate_windows_setup_exe(exe)
+    if problem:
+        emit("AUTONOMOUS_PRODUCTIZATION_BUILDER", platform="WINDOWS", status="BLOCKED", reason=problem, artifact=str(exe))
+        return 28
 
     emit("AUTONOMOUS_PRODUCTIZATION_BUILDER", platform="WINDOWS", status="COMPLETE",
-         artifact=str(exe.relative_to(ROOT)), bootstrap=str(zip_result.relative_to(ROOT)))
+         artifact=str(exe.relative_to(ROOT)), setupWizard=True, compiler=str(iscc),
+         bootstrap=str(zip_result.relative_to(ROOT)))
     return 0
 
 

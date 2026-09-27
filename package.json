@@ -23,6 +23,7 @@
     "product:agent:evidence": "node scripts/agent-repair-evidence-check.cjs",
     "product:agent:drill": "node qa/agent-repair-drill/repair-target.cjs",
     "product:windows:installer": "powershell -ExecutionPolicy Bypass -File scripts/build-windows-installer.ps1",
+    "product:windows:smoke": "node scripts/windows-setup-wizard-smoke.cjs",
     "autonomous:build": "tsx Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.ts",
     "autonomous:factory-loop": "python Backend/AI_Runtime/hooshyar_build.py commercial",
     "autonomous:ci-repair": "node scripts/autonomous-ci-repair-loop.cjs",
