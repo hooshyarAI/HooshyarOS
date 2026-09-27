@@ -162,6 +162,7 @@ async function refreshDashboard() {
       const latest = await getJson('/api/financial/insights/latest');
       if (latest.statementInsight) {
         renderStatementInsight(latest.statementInsight);
+        restoreWorkspaceContextFromLatest(latest);
         syncWorkspaceSnapshot();
       }
     } catch {
@@ -380,6 +381,16 @@ function setWorkspaceContext({title,description,source,state,revealActions=false
     const el=document.querySelector(selector); if(el&&value!==undefined)el.textContent=value;
   }
   const actions=document.querySelector('#context-actions'); if(actions&&revealActions)actions.hidden=false;
+}
+function restoreWorkspaceContextFromLatest(latest) {
+  if (!presentationApi || typeof presentationApi.deriveRestoredContext !== 'function') return false;
+  const insight = latest && latest.statementInsight;
+  if (!insight) return false;
+  const status = insight.documentStatus ? humanizeStatementStatus(insight.documentStatus) : 'نامشخص';
+  const context = presentationApi.deriveRestoredContext(latest, status);
+  if (!context) return false;
+  setWorkspaceContext(context);
+  return true;
 }
 function wireWorkspaceInteractions() {
   document.querySelectorAll('[data-scroll-target]').forEach(button=>button.addEventListener('click',()=>{

@@ -97,6 +97,31 @@ describe('Result presentation layer (Persian-first, progressive disclosure)', ()
     expect(presentation.technical.sections.length).toBe(2);
   });
 
+  test('derives a truthful workspace context from the persisted latest analysis', () => {
+    const context = P.deriveRestoredContext({
+      source: { sourceName: 'صورت‌مالی.xlsx' },
+      statementInsight: { documentStatus: 'COMPLETED', periods: [{ label: '1402' }, { label: '1401' }] }
+    }, 'کامل');
+    expect(context.title).toBe('ادامه از آخرین تحلیل');
+    expect(context.source).toBe('صورت‌مالی.xlsx');
+    expect(context.state).toBe('زمینه بازیابی‌شده');
+    expect(context.description).toContain('کامل');
+    expect(context.description).toContain('1402');
+    expect(context.revealActions).toBe(true);
+  });
+
+  test('does not invent a restored context when nothing was persisted', () => {
+    expect(P.deriveRestoredContext(null, 'کامل')).toBeNull();
+    expect(P.deriveRestoredContext({ source: { sourceName: 'x' } }, 'کامل')).toBeNull();
+  });
+
+  test('app.js restores the workspace context rail from the persisted analysis', () => {
+    const app = read('web/app.js');
+    expect(app).toContain('restoreWorkspaceContextFromLatest');
+    expect(app).toContain('deriveRestoredContext');
+    expect(app).toContain('/api/financial/insights/latest');
+  });
+
   test('app.js routes workspace results through the presentation layer, not raw JSON', () => {
     const app = read('web/app.js');
     expect(app).toContain('presentUserResult');

@@ -225,6 +225,30 @@
     return line ? [line].concat(lines) : lines;
   }
 
+  /**
+   * Derive a truthful workspace-context rail from the server-persisted latest
+   * analysis, so a returning user recovers the previous context instead of
+   * restarting. Returns null when there is no persisted insight to recover.
+   */
+  function deriveRestoredContext(latest, statusLabel) {
+    const insight = latest && latest.statementInsight;
+    if (!insight) return null;
+    const sourceName = latest && latest.source && latest.source.sourceName
+      ? latest.source.sourceName
+      : 'آخرین منبع تحلیل‌شده';
+    const status = statusLabel || 'نامشخص';
+    const periods = Array.isArray(insight.periods) && insight.periods.length
+      ? insight.periods.map(period => period && period.label).filter(Boolean).join('، ')
+      : 'نامشخص';
+    return {
+      title: 'ادامه از آخرین تحلیل',
+      description: `زمینه از آخرین تحلیل ذخیره‌شده بازیابی شد (وضعیت سند: ${status} — دوره‌ها: ${periods}).`,
+      source: sourceName,
+      state: 'زمینه بازیابی‌شده',
+      revealActions: true
+    };
+  }
+
   function summarizeExecutive(payload) {
     const lines = [];
     if (payload && payload.status) lines.push(`وضعیت: ${describeValue(payload.status)}`);
@@ -351,6 +375,7 @@
     describeValue,
     buildLines,
     trustLine,
+    deriveRestoredContext,
     summarizeExecutive,
     summarizeDecision,
     summarizeResilience,
