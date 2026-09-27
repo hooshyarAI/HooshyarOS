@@ -64,12 +64,14 @@ export function createAnnotatedPolicy(
     xlsMaxSizeBytes: {
       value: config.xlsMaxSizeBytes,
       classification: "PROPOSED_POLICY",
-      rationale: "XLS not yet supported; placeholder limit pending dependency resolution",
+      rationale:
+        "XLS is supported through the admitted xls-reader provider (fail-closed when absent); engineering default size limit pending empirical verification on real tenant workloads",
     },
     xlsParseBudgetMs: {
       value: config.xlsParseBudgetMs,
       classification: "PROPOSED_POLICY",
-      rationale: "XLS not yet supported; placeholder budget pending dependency resolution",
+      rationale:
+        "XLS is supported through the admitted xls-reader provider (fail-closed when absent); engineering default parse budget pending empirical verification on real tenant workloads",
     },
     xlsxMaxSizeBytes: {
       value: config.xlsxMaxSizeBytes,

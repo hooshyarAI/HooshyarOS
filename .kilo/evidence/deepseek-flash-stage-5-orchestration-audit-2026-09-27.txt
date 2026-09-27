@@ -1,0 +1,85 @@
+STAGE 5 — CAPABILITY ORCHESTRATION & ARCHITECTURE COHERENCE AUDIT (READ-ONLY)
+Model: deepseek/deepseek-flash (no Pro model)
+Date: 2026-09-27
+Branch: fix/autonomous-product-factory
+HEAD at audit: 6c0742da
+Operator: Kilo (bounded execution layer)
+
+SCOPE
+Inventory canonical engine ownership, lifecycle/orchestration boundaries and known
+architecture conflicts; record ACC items for anything that would change a frozen
+boundary. No source/runtime/test change in this stage.
+
+================================================================================
+1. ENGINE INVENTORY (Backend/HBOS/Engines) — 43 files
+================================================================================
+Alerts, APIGateway, Assistant, AssistantConfidence, AssistantReasoning,
+AutonomousMemory, AutonomousOperations, BudgetIntelligence, CloudDeployment,
+Conversation, CustomerTesting, Dashboard, Decision, DecisionIntelligence,
+DeploymentContract, DeploymentReadiness, EngineRegistry, ExecutiveIntelligence,
+FinancialIntelligence, Governance, HealthMonitorEngine, Intelligence, Knowledge,
+LifecycleManager, Memory, OrganizationModel, OrganizationalIntelligence,
+PerformanceTesting, ProductionAcceptance, ProductionReadiness, ProjectPilot,
+Reaction, Reasoning, Reports, RiskIntelligence, SecurityAudit, SecurityLayer,
+TaxIntelligence, TestAI, UserManagement (+ their focused tests).
+
+Canonical five intelligence engines (Architecture Freeze V4) remain intact:
+Reasoning, Governance, ExecutiveIntelligence, OrganizationalIntelligence,
+FinancialIntelligence/Reports. No sixth engine or "super engine" was introduced.
+
+================================================================================
+2. KNOWN ARCHITECTURE CONFLICTS — RECONCILED AGAINST CURRENT EVIDENCE
+================================================================================
+C1. Duplicate EngineRegistry
+    Core/EngineRegistry.ts (array, non-singleton; used by Core/HBOS.ts)
+    vs Engines/EngineRegistry.ts (singleton Map; used by Lifecycle/Health/Orchestration).
+    CONFIRMED present. Documented:
+      .kilo/plans/ACC-duplicate-engine-registry-2026-09-27.md
+    STATUS: REQUIRES_ARCHITECTURE_CHANGE_CONTROL. No consolidation performed.
+
+C2. GovernanceEngine fail-open default
+    GovernanceEngine.ts::determineOutcome (lines 303-329): when no policy matched the
+    action is ALLOWED by default (private policies initialized to [] at line 137).
+    CONFIRMED by reading current source. Documented:
+      .kilo/plans/ACC-governance-engine-default-allow-2026-09-27.md
+    STATUS: REQUIRES_ARCHITECTURE_CHANGE_CONTROL. No posture change performed.
+
+C3. GovernanceEngine fragmentation / installed policies
+    GovernanceEngine exposes addGovernancePolicy/getPolicies/clearPolicies; policy
+    installation is a governance/configuration concern. Consolidation is coupled to C2
+    and to the Governance Charter. STATUS: REQUIRES_ARCHITECTURE_CHANGE_CONTROL (C2).
+
+C4. Lifecycle ownership ambiguity
+    Core/HBOS.ts registers engines into the Core array registry; some engines also
+    self-register into the Engines singleton (e.g. AutonomousOperationsEngine.initialize()).
+    This is the direct consequence of C1. STATUS: coupled to C1 ACC.
+
+    No silent consolidation was attempted for C1–C4.
+
+================================================================================
+3. SAFE NON-ACC IMPROVEMENTS ALREADY DELIVERED (this program)
+================================================================================
+- Additive trust-state assessment service (Product/TrustAssessment.ts) — consumes the
+  canonical ingestion result without modifying the protected adapter or schema.
+- Two-path independent validation primitives (Product/IndependentValidation.ts) — compose
+  PATH A (canonical calculation) and PATH B (existing reconciliation identity) without
+  re-implementing financial mathematics.
+These are new supporting modules, not engines, and do not alter any frozen owner.
+
+================================================================================
+4. CONSUMER / TRUST BOUNDARY NOTES
+================================================================================
+- Engine registration remains split (C1); no single health authority. Documented, not changed.
+- Governance decisions remain fail-open on no-match (C2). Documented, not changed.
+- Product runtime trust labels (Stage 2 inputTrust) remain additive on client-supplied
+  analytics endpoints and do not assert canonical verification.
+
+================================================================================
+5. DECLARATIONS
+================================================================================
+- No frozen architecture was silently consolidated.
+- No completed financial/ingestion/Android work was modified.
+- Two ACC items now exist for the two verified conflicts (C1 duplicate registry, C2
+  fail-open governance default); C3/C4 are recorded as coupled to them.
+- Nothing is reported DONE on the strength of tests alone; each ACC item carries its own
+  evidence and required-test list.

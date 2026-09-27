@@ -32,7 +32,7 @@ describe("AcquisitionResourcePolicy (Stage 08-F.3)", () => {
     expect(policy.xlsxMaxSizeBytes.classification).toBe("PROPOSED_POLICY");
   });
 
-  test("XLS limits are PROPOSED_POLICY (XLS is blocked)", () => {
+  test("XLS limits are PROPOSED_POLICY (XLS supported via admitted provider)", () => {
     const policy = createAnnotatedPolicy(DEFAULT_SPREADSHEET_CONFIG);
     expect(policy.xlsMaxSizeBytes.classification).toBe("PROPOSED_POLICY");
     expect(policy.xlsParseBudgetMs.classification).toBe("PROPOSED_POLICY");

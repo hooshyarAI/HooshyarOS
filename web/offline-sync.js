@@ -256,6 +256,49 @@
   }
 
   /**
+   * Canonical offline availability states. These distinguish "the page loaded"
+   * from "the platform is actually usable", and never let an unavailable remote
+   * service masquerade as success.
+   */
+  const AVAILABILITY_STATES = {
+    ONLINE: "ONLINE",
+    OFFLINE: "OFFLINE",
+    LOCAL: "LOCAL",
+    SYNCING: "SYNCING",
+    PARTIALLY_AVAILABLE: "PARTIALLY_AVAILABLE",
+    BLOCKED_BY_EXTERNAL_DEPENDENCY: "BLOCKED_BY_EXTERNAL_DEPENDENCY",
+  };
+
+  const AVAILABILITY_LABELS_FA = {
+    ONLINE: "آنلاین",
+    OFFLINE: "آفلاین",
+    LOCAL: "فقط محلی",
+    SYNCING: "در حال همگام‌سازی",
+    PARTIALLY_AVAILABLE: "دسترس‌پذیری جزئی",
+    BLOCKED_BY_EXTERNAL_DEPENDENCY: "مسدود به دلیل سرویس بیرونی",
+  };
+
+  /**
+   * Classify availability from observable signals only. Unknown connectivity is
+   * never promoted to ONLINE: the honest fallback is LOCAL.
+   */
+  function classifyAvailability(input) {
+    const signals = input || {};
+    if (signals.blockedByExternalDependency === true) return AVAILABILITY_STATES.BLOCKED_BY_EXTERNAL_DEPENDENCY;
+    if (signals.syncing === true) return AVAILABILITY_STATES.SYNCING;
+    if (signals.online === false) {
+      return signals.localOnly === true ? AVAILABILITY_STATES.LOCAL : AVAILABILITY_STATES.OFFLINE;
+    }
+    if (signals.online === true && signals.remoteAvailable === false) return AVAILABILITY_STATES.PARTIALLY_AVAILABLE;
+    if (signals.online === true) return AVAILABILITY_STATES.ONLINE;
+    return AVAILABILITY_STATES.LOCAL;
+  }
+
+  function availabilityLabelFa(state) {
+    return AVAILABILITY_LABELS_FA[state] || String(state || "");
+  }
+
+  /**
    * Canonical, human-readable Persian ingestion stage labels. The technical
    * stage code stays available for diagnostics; the label is the primary
    * user-facing message.
@@ -538,6 +581,10 @@
     FAILURE_KINDS,
     FORMAT_BY_EXTENSION,
     INGEST_STAGE_LABELS_FA,
+    AVAILABILITY_STATES,
+    AVAILABILITY_LABELS_FA,
+    classifyAvailability,
+    availabilityLabelFa,
     ingestStageLabelFa,
     describeIngestProgress,
     memoryStorage,

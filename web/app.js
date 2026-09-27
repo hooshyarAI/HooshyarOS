@@ -49,6 +49,27 @@ const offlineSync = typeof window !== 'undefined' && window.HooshyarOfflineSync
   : null;
 
 const lastSyncCursors = new Map();
+let lastRemoteAvailable = null;
+let availabilitySyncing = false;
+
+function currentOnlineSignal() {
+  return typeof navigator !== 'undefined' && typeof navigator.onLine === 'boolean' ? navigator.onLine : null;
+}
+
+function refreshAvailabilityState() {
+  const el = document.querySelector('#context-availability');
+  if (!el) return null;
+  const api = syncApi && typeof syncApi.classifyAvailability === 'function' ? syncApi : null;
+  const state = api
+    ? api.classifyAvailability({
+        online: currentOnlineSignal(),
+        remoteAvailable: lastRemoteAvailable === null ? undefined : lastRemoteAvailable,
+        syncing: availabilitySyncing
+      })
+    : 'LOCAL';
+  el.textContent = api && typeof api.availabilityLabelFa === 'function' ? api.availabilityLabelFa(state) : state;
+  return state;
+}
 
 function classifyErrorKind(error) {
   return syncApi
@@ -99,18 +120,28 @@ function describeFailure(error) {
 }
 
 async function refreshSyncState() {
-  if (!offlineSync) return;
+  if (!offlineSync) {
+    refreshAvailabilityState();
+    return;
+  }
   try {
     const state = await offlineSync.serverState();
+    lastRemoteAvailable = true;
     lastSyncCursors.clear();
     for (const entry of state.cursors || []) lastSyncCursors.set(entry.sourceKey, entry.cursor.lastWatermark);
-  } catch {
-    /* server state is a reconciliation aid, not a hard requirement */
+  } catch (error) {
+    // A connectivity failure means the network is down; any other failure while
+    // the browser reports online means the remote service is only partially available.
+    if (!isConnectivityError(error)) lastRemoteAvailable = false;
+  } finally {
+    refreshAvailabilityState();
   }
 }
 
 async function flushOfflineQueue() {
   if (!offlineSync) return;
+  availabilitySyncing = true;
+  refreshAvailabilityState();
   try {
     const report = await offlineSync.sync();
     if (report.attempted > 0) {
@@ -130,12 +161,22 @@ async function flushOfflineQueue() {
       await refreshDashboard();
     }
   } finally {
+    availabilitySyncing = false;
     await refreshSyncState();
   }
 }
 
-function text(value) {
-  return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+const presentationApi = typeof window !== 'undefined' && window.HooshyarResultPresentation
+  ? window.HooshyarResultPresentation
+  : null;
+
+function presentUserResult(container, summarizerName, payload) {
+  if (!container) return;
+  if (presentationApi && typeof presentationApi[summarizerName] === 'function') {
+    presentationApi.renderResult(container, presentationApi[summarizerName](payload));
+    return;
+  }
+  container.textContent = 'نتیجه دریافت شد. جزئیات فنی در دسترس است.';
 }
 
 async function refreshDashboard() {
@@ -153,6 +194,7 @@ async function refreshDashboard() {
       const latest = await getJson('/api/financial/insights/latest');
       if (latest.statementInsight) {
         renderStatementInsight(latest.statementInsight);
+        restoreWorkspaceContextFromLatest(latest);
         syncWorkspaceSnapshot();
       }
     } catch {
@@ -371,6 +413,16 @@ function setWorkspaceContext({title,description,source,state,revealActions=false
     const el=document.querySelector(selector); if(el&&value!==undefined)el.textContent=value;
   }
   const actions=document.querySelector('#context-actions'); if(actions&&revealActions)actions.hidden=false;
+}
+function restoreWorkspaceContextFromLatest(latest) {
+  if (!presentationApi || typeof presentationApi.deriveRestoredContext !== 'function') return false;
+  const insight = latest && latest.statementInsight;
+  if (!insight) return false;
+  const status = insight.documentStatus ? humanizeStatementStatus(insight.documentStatus) : 'نامشخص';
+  const context = presentationApi.deriveRestoredContext(latest, status);
+  if (!context) return false;
+  setWorkspaceContext(context);
+  return true;
 }
 function wireWorkspaceInteractions() {
   document.querySelectorAll('[data-scroll-target]').forEach(button=>button.addEventListener('click',()=>{
@@ -950,12 +1002,7 @@ document.querySelector('#executive-form').addEventListener('submit', async event
         }
       })
     });
-    result.textContent = JSON.stringify({
-      status: payload.status,
-      kpis: payload.kpis,
-      performance: payload.performance,
-      recommendations: payload.recommendations
-    }, null, 2);
+    presentUserResult(result, 'summarizeExecutive', payload);
     await refreshDashboard();
   } catch (error) {
     result.textContent = `محاسبه مدیریتی ناموفق بود: ${error.message}`;
@@ -989,13 +1036,7 @@ document.querySelector('#decision-form').addEventListener('submit', async event 
         scores
       })
     });
-    result.textContent = JSON.stringify({
-      status: payload.status,
-      recommendation: payload.recommendation,
-      weightsSource: payload.weightsSource,
-      consistency: payload.consistency,
-      evaluations: payload.evaluations
-    }, null, 2);
+    presentUserResult(result, 'summarizeDecision', payload);
   } catch (error) {
     result.textContent = `ارزیابی تصمیم ناموفق بود: ${error.message}`;
   }
@@ -1101,7 +1142,7 @@ document.querySelector('#execution-refresh').addEventListener('click', refreshEx
 document.querySelector('#report-button').addEventListener('click', async () => {  const result = document.querySelector('#report-result');
   try {
     const payload = await getJson('/api/report');
-    result.textContent = JSON.stringify(payload, null, 2);
+    presentUserResult(result, 'summarizeReport', payload);
   } catch (error) {
     result.textContent = `تولید گزارش ناموفق بود: ${error.message}`;
   }
@@ -1200,7 +1241,7 @@ document.querySelector('#resilience-form').addEventListener('submit', async even
         scenarios: [{ name: 'base', description: 'Base', shockPercent: 0, appliedAt: 1 }]
       })
     });
-    result.textContent = JSON.stringify(payload, null, 2);
+    presentUserResult(result, 'summarizeResilience', payload);
   } catch (error) {
     result.textContent = `تحلیل تاب‌آوری ناموفق بود: ${error.message}`;
   }
@@ -1244,7 +1285,7 @@ document.querySelector('#impact-form').addEventListener('submit', async event =>
         }
       })
     });
-    result.textContent = JSON.stringify(payload, null, 2);
+    presentUserResult(result, 'summarizeImpact', payload);
   } catch (error) {
     result.textContent = `سنجش تأثیر ناموفق بود: ${error.message}`;
   }
@@ -1274,7 +1315,7 @@ document.querySelector('#improvement-form').addEventListener('submit', async eve
         }
       })
     });
-    result.textContent = JSON.stringify(payload, null, 2);
+    presentUserResult(result, 'summarizeImprovement', payload);
   } catch (error) {
     result.textContent = `تحلیل بهبود ناموفق بود: ${error.message}`;
   }
@@ -1346,7 +1387,7 @@ document.querySelector('#analytics-form').addEventListener('submit', async event
         iqrAlerts: payload.anomalies.iqr.points.filter(point => point.flag !== 'NORMAL').length
       };
     }
-    result.textContent = JSON.stringify(summary, null, 2);
+    presentUserResult(result, 'summarizeAnalytics', summary);
   } catch (error) {
     result.textContent = `تحلیل پیشرفته ناموفق بود: ${error.message}`;
   }
@@ -1354,8 +1395,12 @@ document.querySelector('#analytics-form').addEventListener('submit', async event
 
 wireWorkspaceInteractions();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => undefined);
-if (typeof window !== 'undefined') window.addEventListener('online', () => { flushOfflineQueue(); });
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => { refreshAvailabilityState(); flushOfflineQueue(); });
+  window.addEventListener('offline', () => { refreshAvailabilityState(); });
+}
 refreshSessionState();
 refreshDashboard();
+refreshAvailabilityState();
 refreshSyncState();
 resumePersistedIngestJob();
