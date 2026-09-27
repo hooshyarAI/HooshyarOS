@@ -333,6 +333,27 @@ const parseActualImpact = (value: unknown): { readonly timeSaved: number; readon
     };
 };
 
+/**
+ * Stage 2 epistemic boundary. The analytics endpoints below accept numerical
+ * inputs supplied directly by the caller (before/after metrics, shock ranges,
+ * optimization bounds). Those inputs are NOT bound to a canonical, verified
+ * source, so the response must carry an explicit trust label instead of
+ * implying canonical verification for unverified numbers. This is additive
+ * metadata only: it does not alter any computation, engine result contract or
+ * frozen schema.
+ */
+const CLIENT_SUPPLIED_UNVERIFIED = Object.freeze({
+    classification: "UNVERIFIED_INFORMATION" as const,
+    source: "CLIENT_SUPPLIED" as const,
+    canonicalBinding: false,
+    note: "Inputs were supplied by the caller and are not bound to a canonical verified source; treat the result as computed from unverified input."
+});
+
+const withInputTrust = <T extends object>(result: T, endpoint: string) => ({
+    ...result,
+    inputTrust: Object.freeze({ ...CLIENT_SUPPLIED_UNVERIFIED, endpoint })
+});
+
 const asset = async (res: ServerResponse, name: string, contentType: string) => {
     try {
         const body = await readFile(resolve(WEB_ROOT, name), "utf8");
@@ -2034,7 +2055,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                     seed: Number(body.seed),
                     residuals: Array.isArray(body.residuals) ? body.residuals.filter((r: unknown): r is { readonly residual: number } => !!r && typeof r === "object" && typeof (r as any).residual === "number") : undefined
                 });
-                return corsJson(result.status === "READY" ? 200 : 422, result);
+                return corsJson(result.status === "READY" ? 200 : 422, withInputTrust(result, "/api/resilience/stress-test"));
             }
 
             if (req.method === "POST" && path === "/api/resilience/sensitivity") {
@@ -2043,8 +2064,8 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const body = await readJson(req);
                 const shockRange = Array.isArray(body.shockRange) ? body.shockRange.filter((s: unknown): s is number => typeof s === "number" && Number.isFinite(s)) : [];
                 const result = resilience.sensitivityAnalysis(session.tenantId, String(body.metric ?? "revenue"), Number(body.baseValue), shockRange);
-                if ((result as any).status === "BLOCKED") return corsJson(422, result);
-                return corsJson(200, result);
+                if ((result as any).status === "BLOCKED") return corsJson(422, withInputTrust(result as object, "/api/resilience/sensitivity"));
+                return corsJson(200, withInputTrust(result as object, "/api/resilience/sensitivity"));
             }
 
             if (req.method === "POST" && path === "/api/resilience/optimize") {
@@ -2061,7 +2082,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                     linearConstraints: Array.isArray(body.linearConstraints) ? body.linearConstraints.filter((lc: unknown) => !!lc && typeof lc === "object" && Array.isArray((lc as any).coefficients) && typeof (lc as any).bound === "number" && typeof (lc as any).inequality === "string") : undefined,
                     maxIterations: Number(body.maxIterations)
                 });
-                return corsJson(result.status === "READY" ? 200 : 422, result);
+                return corsJson(result.status === "READY" ? 200 : 422, withInputTrust(result, "/api/resilience/optimize"));
             }
 
             if (req.method === "POST" && path === "/api/impact/measure") {
@@ -2072,7 +2093,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const post = parsePost(body.post, session.tenantId);
                 if (!baseline || !post) return corsJson(400, { error: "BASELINE_AND_POST_REQUIRED" });
                 const result = impact.measure(baseline, post, body.expectedImpact as any);
-                return corsJson(result.status === "READY" ? 200 : 422, result);
+                return corsJson(result.status === "READY" ? 200 : 422, withInputTrust(result, "/api/impact/measure"));
             }
 
             if (req.method === "POST" && path === "/api/improvement/improve") {
@@ -2090,7 +2111,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                     expectedImpact: body.expectedImpact as any,
                     currentState
                 });
-                return corsJson(result.status === "READY" ? 200 : 422, result);
+                return corsJson(result.status === "READY" ? 200 : 422, withInputTrust(result, "/api/improvement/improve"));
             }
 
             return corsJson(404, { error: "NOT_FOUND", requestId });
