@@ -38,7 +38,8 @@ import {
     KpiOutcomeInput,
     WorkItemEvidence,
     WorkItemFeedbackInput,
-    CompleteWorkItemInput
+    CompleteWorkItemInput,
+    OrganizationalWorkItem
 } from "../../Product/OrganizationalExecutionCoordinator";
 import { SecurityContext } from "../../Security/SecurityContext";
 import { Principal } from "../../Security/Principals";
@@ -368,6 +369,56 @@ const DUAL_VALIDATION_SUBJECTS = [
     { subject: "سود خالص", metric: "netProfit", identity: "net-profit-identity", scope: "صورت سود و زیان" },
     { subject: "جریان نقد", metric: "netCashFlow", identity: "cash-flow-identity", scope: "جریان وجوه نقد" },
 ] as const;
+
+/** Work-item statuses that no longer need a reminder. */
+const WORK_ITEM_TERMINAL_STATUSES = new Set(["COMPLETED", "CANCELLED", "REJECTED"]);
+/** A due date within this horizon is DUE_SOON rather than UPCOMING. */
+const REMINDER_HORIZON_MS = 3 * 24 * 60 * 60 * 1000;
+
+/**
+ * Derive reminders and escalations from existing governed work items. This is a
+ * read-only projection of the canonical Organizational Intelligence owner: it
+ * adds no persistence, no new engine and no state, so due dates, priorities and
+ * block reasons stay owned by `OrganizationalExecutionCoordinator`.
+ */
+const buildWorkspaceAttention = (
+    items: readonly OrganizationalWorkItem[],
+    nowMs: number,
+): {
+    readonly reminders: readonly Record<string, unknown>[];
+    readonly escalations: readonly Record<string, unknown>[];
+} => {
+    const reminders: Record<string, unknown>[] = [];
+    const escalations: Record<string, unknown>[] = [];
+    for (const item of items) {
+        const lastBlock = [...(item.history ?? [])].reverse().find((event) => event.action === "BLOCK");
+        if (item.status === "BLOCKED") {
+            escalations.push({
+                workItemId: item.workItemId,
+                title: item.title,
+                priority: item.priority,
+                status: item.status,
+                assigneeId: item.assignment?.assigneeId ?? null,
+                reason: lastBlock?.reason ?? null,
+                blockedAt: lastBlock?.at ?? null,
+            });
+        }
+        if (WORK_ITEM_TERMINAL_STATUSES.has(item.status) || !item.dueDate) continue;
+        const due = Date.parse(item.dueDate);
+        if (!Number.isFinite(due)) continue;
+        const bucket = due < nowMs ? "OVERDUE" : due - nowMs <= REMINDER_HORIZON_MS ? "DUE_SOON" : "UPCOMING";
+        reminders.push({
+            workItemId: item.workItemId,
+            title: item.title,
+            priority: item.priority,
+            status: item.status,
+            dueDate: item.dueDate,
+            bucket,
+            assigneeId: item.assignment?.assigneeId ?? null,
+        });
+    }
+    return { reminders, escalations };
+};
 
 const asset = async (res: ServerResponse, name: string, contentType: string) => {
     try {
@@ -1063,7 +1114,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 return res.end();
             }
             if (req.method === "GET" && path === "/health") return corsJson(200, { status: "ok", service: "hooshyar-commercial-runtime" });
-            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", dependencies: runtimeDependencies(), capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "financial-analytics", "ingested-source-analysis", "tenant-scoped-persistence", "offline-sync", "reasoning", "executive-intelligence-workbench", "decision-workbench", "expert-choice", "organizational-execution", "governed-approval", "work-item-lifecycle", "kpi-outcome", "reports", "reports-export", "report-artifact-download", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "auth-rate-limiting", "rbac", "session-lifecycle", "request-observability", "bounded-pagination", "idempotency-keys", "organizational-problem-solving", "ingestion-job-status", "scanned-statement-normalization", "source-trust-assessment", "independent-dual-validation", "assistant-conversation-history"] });
+            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", dependencies: runtimeDependencies(), capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "financial-analytics", "ingested-source-analysis", "tenant-scoped-persistence", "offline-sync", "reasoning", "executive-intelligence-workbench", "decision-workbench", "expert-choice", "organizational-execution", "governed-approval", "work-item-lifecycle", "kpi-outcome", "reports", "reports-export", "report-artifact-download", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "auth-rate-limiting", "rbac", "session-lifecycle", "request-observability", "bounded-pagination", "idempotency-keys", "organizational-problem-solving", "ingestion-job-status", "scanned-statement-normalization", "source-trust-assessment", "independent-dual-validation", "assistant-conversation-history", "workspace-attention"] });
             if (req.method === "GET" && path === "/") return asset(res, "index.html", "text/html; charset=utf-8");
             if (req.method === "GET" && path === "/app.js") return asset(res, "app.js", "text/javascript; charset=utf-8");
             if (req.method === "GET" && path === "/offline-sync.js") return asset(res, "offline-sync.js", "text/javascript; charset=utf-8");
@@ -1768,6 +1819,24 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 if (pagination.ok === false) return corsJson(400, { error: pagination.error });
                 const page = await organizationalExecution.listWorkItemsPage(executionContext(session), pagination.page.limit, pagination.page.offset);
                 return corsJson(200, { status: "READY", tenantId: session.tenantId, workItems: page.items, pagination: toPageMeta(pagination.page, page) });
+            }
+
+            if (path === "/api/execution/attention" && req.method === "GET") {
+                if (!ensurePermission("READ_DASHBOARD")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                const items = await organizationalExecution.listWorkItems(executionContext(session));
+                const { reminders, escalations } = buildWorkspaceAttention(items, now());
+                return corsJson(200, {
+                    status: "READY",
+                    tenantId: session.tenantId,
+                    reminders,
+                    escalations,
+                    counts: {
+                        reminders: reminders.length,
+                        overdue: reminders.filter((item) => item.bucket === "OVERDUE").length,
+                        dueSoon: reminders.filter((item) => item.bucket === "DUE_SOON").length,
+                        escalations: escalations.length,
+                    },
+                });
             }
 
             if (path.startsWith("/api/execution/work-items/")) {

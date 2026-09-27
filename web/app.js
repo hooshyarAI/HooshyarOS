@@ -1115,6 +1115,52 @@ document.querySelector('#decision-form').addEventListener('submit', async event 
   }
 });
 
+async function refreshAttention() {
+  const container = document.querySelector('#attention-list');
+  if (!container) return;
+  try {
+    const payload = await getJson('/api/execution/attention');
+    const reminders = Array.isArray(payload.reminders) ? payload.reminders : [];
+    const escalations = Array.isArray(payload.escalations) ? payload.escalations : [];
+    container.textContent = '';
+    if (!reminders.length && !escalations.length) {
+      container.textContent = 'یادآوری یا ارجاع فعالی وجود ندارد.';
+      return;
+    }
+    const bucketLabels = { OVERDUE: 'گذشته', DUE_SOON: 'نزدیک', UPCOMING: 'آینده' };
+    if (escalations.length) {
+      const heading = document.createElement('p');
+      heading.className = 'execution-heading';
+      const headingText = document.createElement('strong');
+      headingText.textContent = 'ارجاع‌های نیازمند تصمیم';
+      heading.appendChild(headingText);
+      container.appendChild(heading);
+      for (const item of escalations) {
+        const row = document.createElement('p');
+        row.className = 'attention-item';
+        row.textContent = `${item.title} — ${item.reason || 'دلیل ثبت‌نشده'} (${item.priority})`;
+        container.appendChild(row);
+      }
+    }
+    if (reminders.length) {
+      const heading = document.createElement('p');
+      heading.className = 'execution-heading';
+      const headingText = document.createElement('strong');
+      headingText.textContent = 'یادآوری موعدها';
+      heading.appendChild(headingText);
+      container.appendChild(heading);
+      for (const item of reminders) {
+        const row = document.createElement('p');
+        row.className = 'attention-item';
+        row.textContent = `${item.title} — ${bucketLabels[item.bucket] || item.bucket}`;
+        container.appendChild(row);
+      }
+    }
+  } catch {
+    container.textContent = 'دریافت یادآوری‌ها و ارجاع‌ها ناموفق بود.';
+  }
+}
+
 async function refreshExecution() {
   const container = document.querySelector('#execution-list');
   try {
@@ -1157,6 +1203,8 @@ async function refreshExecution() {
     }
   } catch (error) {
     container.textContent = `دریافت کارهای اجرایی ناموفق بود: ${error.message}`;
+  } finally {
+    refreshAttention();
   }
 }
 

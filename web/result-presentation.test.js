@@ -198,4 +198,15 @@ describe('Result presentation layer (Persian-first, progressive disclosure)', ()
     expect(app).toContain('dualValidation: latest.dualValidation');
     expect(app).toContain('dualValidation: insights.dualValidation');
   });
+
+  test('workspace exposes conversation history and derived attention through the runtime', () => {
+    const app = read('web/app.js');
+    const html = read('web/index.html');
+    expect(app).toContain('refreshConversations');
+    expect(app).toContain('/api/conversations');
+    expect(app).toContain('refreshAttention');
+    expect(app).toContain('/api/execution/attention');
+    expect(html).toContain('id="conversation-list"');
+    expect(html).toContain('id="attention-list"');
+  });
 });
