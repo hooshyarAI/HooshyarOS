@@ -26,6 +26,7 @@ import { SecurityEventLogger } from "../../Entities/SecurityEventLogger";
 import { ExecutiveIntelligenceWorkbench, ExecutiveIntelligenceWorkbenchInput, ExecutiveIntelligenceWorkbenchResult } from "../../Product/ExecutiveIntelligenceWorkbench";
 import { DecisionWorkbench, DecisionWorkbenchInput, DecisionWorkbenchResult } from "../../Product/DecisionWorkbench";
 import { FinancialAnalyticsService, FinancialAnalyticsResult, FinancialAnalyticsInput } from "../../Product/FinancialAnalyticsService";
+import { TrustAssessmentService, type TrustAssessment } from "../../Product/TrustAssessment";
 import { ReportExportService } from "../../Product/ReportExportService";
 import {
     OrganizationalExecutionCoordinator,
@@ -386,6 +387,11 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     // Canonical owner for the persistent, cross-engine organizational
     // problem-solving lifecycle (product.organizational-problem-solving).
     const problemSolving = new OrganizationalProblemSolvingService(persistence);
+    // Additive source-trust assessment supporting service. It consumes an
+    // already-accepted canonical ingestion result and returns metadata; it is
+    // not an Engine and never mutates the protected ingestion adapter or the
+    // canonical model.
+    const trustAssessment = new TrustAssessmentService();
     const latestResults = new Map<string, StoredAnalysis>();
     const latestWorkbenchResults = new Map<string, ExecutiveIntelligenceWorkbenchResult>();
     const latestDecisionResults = new Map<string, DecisionWorkbenchResult>();
@@ -518,6 +524,34 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
         if (!model || model.tenantId !== tenantId || !Array.isArray(model.transactions)) return undefined;
         return model;
     };
+
+    /**
+     * Additive source-trust assessment for a tenant-scoped canonical source.
+     *
+     * Metadata-only: it consumes the accepted canonical ingestion result and any
+     * accounting-identity checks the caller already holds, and returns the
+     * explicit trust lifecycle. It never mutates the canonical model, the
+     * protected `FinancialDataIngestionAdapter`, or any calculation. When the
+     * source is unknown it returns `undefined` rather than a fabricated state.
+     */
+    const assessSourceTrust = async (
+        tenantId: string,
+        sha256: string | undefined,
+        integrityChecks?: FinancialStatementInsight["integrity"],
+    ): Promise<TrustAssessment | undefined> => {
+        if (!sha256) return undefined;
+        const model = await loadIngestedModel(tenantId, sha256);
+        if (!model) return undefined;
+        return trustAssessment.assess({
+            result: { evidence: model.source, model, persisted: true },
+            ...(integrityChecks ? { integrityChecks } : {}),
+            now: new Date(now()),
+        });
+    };
+
+    /** Attach the trust assessment as a backward-compatible sibling field. */
+    const withTrust = <T extends object>(payload: T, trust: TrustAssessment | undefined): T | (T & { trust: TrustAssessment }) =>
+        trust ? { ...payload, trust } : payload;
 
     /**
      * Grounded statement insight for a tenant-scoped canonical source. Reuses
@@ -966,7 +1000,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 return res.end();
             }
             if (req.method === "GET" && path === "/health") return corsJson(200, { status: "ok", service: "hooshyar-commercial-runtime" });
-            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", dependencies: runtimeDependencies(), capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "financial-analytics", "ingested-source-analysis", "tenant-scoped-persistence", "offline-sync", "reasoning", "executive-intelligence-workbench", "decision-workbench", "expert-choice", "organizational-execution", "governed-approval", "work-item-lifecycle", "kpi-outcome", "reports", "reports-export", "report-artifact-download", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "auth-rate-limiting", "rbac", "session-lifecycle", "request-observability", "bounded-pagination", "idempotency-keys", "organizational-problem-solving", "ingestion-job-status", "scanned-statement-normalization"] });
+            if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", dependencies: runtimeDependencies(), capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "financial-analytics", "ingested-source-analysis", "tenant-scoped-persistence", "offline-sync", "reasoning", "executive-intelligence-workbench", "decision-workbench", "expert-choice", "organizational-execution", "governed-approval", "work-item-lifecycle", "kpi-outcome", "reports", "reports-export", "report-artifact-download", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "auth-rate-limiting", "rbac", "session-lifecycle", "request-observability", "bounded-pagination", "idempotency-keys", "organizational-problem-solving", "ingestion-job-status", "scanned-statement-normalization", "source-trust-assessment"] });
             if (req.method === "GET" && path === "/") return asset(res, "index.html", "text/html; charset=utf-8");
             if (req.method === "GET" && path === "/app.js") return asset(res, "app.js", "text/javascript; charset=utf-8");
             if (req.method === "GET" && path === "/offline-sync.js") return asset(res, "offline-sync.js", "text/javascript; charset=utf-8");
@@ -1635,14 +1669,17 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 };
                 await persistence.write({ tenantId: session.tenantId }, LATEST_ANALYTICS_KEY, record);
                 latestAnalyticsResults.set(session.tenantId, record);
-                return corsJson(200, ingestedSource ? { ...record, ingestedSource } : record);
+                const trust = await assessSourceTrust(session.tenantId, documentModel?.source.sha256, documentInsight?.integrity);
+                const payload = ingestedSource ? { ...record, ingestedSource } : record;
+                return corsJson(200, withTrust(payload, trust));
             }
 
             if (req.method === "GET" && path === "/api/financial/insights/latest") {
                 if (!ensurePermission("READ_DASHBOARD")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
                 const result = await loadAnalytics(session.tenantId);
                 if (!result) return corsJson(404, { error: "ANALYTICS_NOT_FOUND" });
-                return corsJson(200, result);
+                const trust = await assessSourceTrust(session.tenantId, result.source?.sha256, result.statementInsight?.integrity);
+                return corsJson(200, withTrust(result, trust));
             }
 
             if (path === "/api/execution/work-items" && req.method === "POST") {
@@ -1909,7 +1946,8 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                     ?? await loadStatementInsight(session.tenantId, result.source.sha256, analytics);
                 const flatSections = buildReportSections(session, result, workbench, analytics, insight).flatMap((section) => section.lines);
                 const report = reports.build("گزارش مالی و مدیریتی هوشیارOS", flatSections);
-                return corsJson(report.status === "READY" ? 200 : 422, { ...report, tenantId: session.tenantId, source: result.source });
+                const trust = await assessSourceTrust(session.tenantId, result.source.sha256, insight?.integrity);
+                return corsJson(report.status === "READY" ? 200 : 422, withTrust({ ...report, tenantId: session.tenantId, source: result.source }, trust));
             }
 
             if (req.method === "POST" && path === "/api/report/export") {
@@ -2010,6 +2048,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 ].join(" | ");
                 const answer = reasoning.reason(context);
                 if (!answer.success) return corsJson(503, { error: "ASSISTANT_REASONING_UNAVAILABLE" });
+                const trust = await assessSourceTrust(session.tenantId, result.source.sha256, insight?.integrity);
                 return corsJson(200, {
                     status: "READY",
                     tenantId: session.tenantId,
@@ -2019,6 +2058,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                         analysisSource: result.source,
                         executiveWorkbench: Boolean(workbench),
                         statementContext: Boolean(insight),
+                        ...(trust ? { trust } : {}),
                         ...(insight
                             ? {
                                 documentStatus: insight.documentStatus,
@@ -2038,7 +2078,8 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const result = await loadAnalysis(session.tenantId);
                 if (!result) return corsJson(200, { status: "READY", tenantId: session.tenantId, metrics: { revenue: 0, profit: 0, risk: 0 }, analysisAvailable: false, executiveIntelligence: null });
                 const workbench = await loadWorkbench(session.tenantId);
-                return corsJson(200, dashboardPayload(result, workbench));
+                const trust = await assessSourceTrust(session.tenantId, result.source?.sha256);
+                return corsJson(200, withTrust(dashboardPayload(result, workbench), trust));
             }
 
             if (req.method === "POST" && path === "/api/resilience/stress-test") {
