@@ -220,7 +220,11 @@ async function main() {
     const analyticsLatest = await request('/api/financial/insights/latest', { headers: { cookie } });
     if (analyticsLatest.status !== 200 || analyticsLatest.body.capabilityId !== 'product.financial-analytics' || analyticsLatest.body.tenantId !== session.body.tenantId) throw new Error(`WEB_ACCEPTANCE_ANALYTICS_LATEST_FAILED:${analyticsLatest.status}`);
     const enrichedReport = await request('/api/report', { headers: { cookie } });
-    if (enrichedReport.status !== 200 || !enrichedReport.body.sections.some(section => section.includes('Financial analytics:'))) throw new Error(`WEB_ACCEPTANCE_ANALYTICS_REPORT_FAILED:${enrichedReport.status}`);
+    // The report surfaces the Persian-first analytics section heading and must
+    // never leak the internal English "Financial analytics:" label to the user
+    // surface. See Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts
+    // (buildReportSections) and its regression test.
+    if (enrichedReport.status !== 200 || !enrichedReport.body.sections.some(section => section.includes('تحلیل تکمیلی')) || enrichedReport.body.sections.some(section => section.includes('Financial analytics:'))) throw new Error(`WEB_ACCEPTANCE_ANALYTICS_REPORT_FAILED:${enrichedReport.status}`);
 
     // Layer 9: real report file export, persistence and secure download.
     const reportExport = await request('/api/report/export', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ format: 'XLSX' }) });
