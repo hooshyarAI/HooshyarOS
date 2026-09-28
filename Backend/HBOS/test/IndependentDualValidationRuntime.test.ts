@@ -10,6 +10,7 @@
 import { readFileSync } from "node:fs";
 import { Server } from "node:http";
 import { resolve } from "node:path";
+import ExcelJS from "exceljs-hardened";
 import { createCommercialRuntimeServer } from "../Autonomous/Runtime/CommercialRuntimeServer";
 
 const REPO_ROOT = resolve(__dirname, "..", "..", "..");
@@ -96,9 +97,36 @@ describe("independent dual validation — runtime propagation", () => {
 
     test("a subject without an independent control is NOT_TESTABLE, not a confirmation", async () => {
         const cookie = await register("dual-not-testable", "Dual Org");
-        const sha256 = await ingestReport(cookie);
+        // The canonical tax/pre-tax extraction now reconciles net profit on the
+        // real synthetic report, so that report no longer exercises the missing-
+        // control path. This purpose-built source deliberately omits the pre-tax
+        // and income-tax lines (and any balance sheet / cash flow), so several
+        // subjects genuinely have no independent control and must be reported
+        // NOT_TESTABLE rather than confirmed.
+        const workbook = new ExcelJS.Workbook();
+        const income = workbook.addWorksheet("سود و زیان");
+        [
+            ["صورت سود و زیان"],
+            ["(ارقام به میلیون ریال)"],
+            ["شرح", "1402", "1401"],
+            ["درآمد عملیاتی", 2400000, 2100000],
+            ["بهای تمام‌شده کالای فروش رفته", -1600000, -1400000],
+            ["سود ناخالص", 800000, 700000],
+            ["هزینه‌های فروش، اداری و عمومی", -430000, -400000],
+            ["سود (زیان) عملیاتی", 370000, 300000],
+            ["سود (زیان) خالص", 220000, 170000],
+        ].forEach((row) => income.addRow(row));
+        const bytes = Buffer.from(await workbook.xlsx.writeBuffer());
+        const ingest = await jsonPost("/api/ingest", cookie, {
+            sourceName: "no-tax-report.xlsx",
+            format: "XLSX",
+            contentBase64: bytes.toString("base64"),
+        });
+        expect(ingest.status).toBe(201);
+        const sha256 = (await ingest.json()).evidence.sha256;
 
         const insights = await jsonPost("/api/financial/insights", cookie, { sourceSha256: sha256 });
+        expect(insights.status).toBe(200);
         const body = await insights.json();
         const notTestable = body.dualValidation.outcomes.filter(
             (outcome: { status: string }) => outcome.status === "NOT_TESTABLE",
