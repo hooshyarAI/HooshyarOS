@@ -152,6 +152,14 @@ const MEASURE_LABELS_FA: Readonly<Record<string, string>> = {
   currentLiabilities: "بدهی‌های جاری",
   totalLiabilities: "کل بدهی‌ها",
   equity: "حقوق مالکانه",
+  cash: "موجودی نقد",
+  receivables: "دریافتنی‌های تجاری",
+  inventory: "موجودی مواد و کالا",
+  ppe: "دارایی‌های ثابت مشهود",
+  payables: "پرداختنی‌های تجاری",
+  shortTermDebt: "تسهیلات مالی کوتاه‌مدت",
+  longTermDebt: "تسهیلات مالی بلندمدت",
+  interest: "هزینه مالی",
   operatingCashFlow: "جریان نقد عملیاتی",
   investingCashFlow: "جریان نقد سرمایه‌گذاری",
   financingCashFlow: "جریان نقد تأمین مالی",
@@ -190,6 +198,15 @@ const STATEMENT_MEASURE_LABELS_FA: Readonly<Record<string, string>> = {
   INVESTING_CASH_FLOW: "جریان نقد سرمایه‌گذاری",
   FINANCING_CASH_FLOW: "جریان نقد تأمین مالی",
   NET_CASH_FLOW: "تغییر خالص وجه نقد",
+  CASH: "موجودی نقد",
+  RECEIVABLES: "دریافتنی‌های تجاری",
+  INVENTORY: "موجودی مواد و کالا",
+  PPE: "دارایی‌های ثابت مشهود",
+  PAYABLES: "پرداختنی‌های تجاری",
+  SHORT_TERM_DEBT: "تسهیلات مالی کوتاه‌مدت",
+  LONG_TERM_DEBT: "تسهیلات مالی بلندمدت",
+  INTEREST: "هزینه مالی",
+  PRE_TAX_INCOME: "سود قبل از مالیات",
 };
 
 const INTEGRITY_LABELS_FA: Readonly<Record<string, string>> = {
@@ -550,6 +567,45 @@ export function composeFindingGroups(insight: FinancialStatementInsight): Findin
     });
   }
 
+  const workingCapital = insight.workingCapital;
+  if (workingCapital) {
+    const ccc = workingCapital.cashConversionCycle;
+    if (ccc > 0) {
+      weaknesses.push({
+        message: `چرخه تبدیل نقد ${formatFaDecimal(ccc, 0)} روز است (دوره وصول مطالبات ${formatFaDecimal(workingCapital.dso, 0)} روز، دوره نگهداری موجودی ${formatFaDecimal(workingCapital.dio, 0)} روز، دوره پرداخت به تأمین‌کنندگان ${formatFaDecimal(workingCapital.dpo, 0)} روز)؛ وجه نقد بیش از پوشش تأمین مالی تأمین‌کننده در عملیات درگیر می‌ماند.`,
+        evidenceLevel: "DERIVED_METRIC",
+        evidence: [`cashConversionCycle=${ccc}`],
+      });
+      actions.push({
+        message: `کوتاه‌کردن چرخه تبدیل نقد (اکنون ${formatFaDecimal(ccc, 0)} روز) از طریق تسریع وصول مطالبات یا هم‌ترازی شرایط پرداخت با گردش موجودی.`,
+        evidenceLevel: "MANAGEMENT_RECOMMENDATION",
+        evidence: [`cashConversionCycle=${ccc}`],
+      });
+    } else if (ccc < 0) {
+      strengths.push({
+        message: `چرخه تبدیل نقد منفی (${formatFaDecimal(ccc, 0)} روز) است؛ تأمین مالی تأمین‌کننده دوره عملیاتی را پوشش می‌دهد و عملیات نقد آزاد می‌کند.`,
+        evidenceLevel: "DERIVED_METRIC",
+        evidence: [`cashConversionCycle=${ccc}`],
+      });
+    }
+  }
+  if (insight.coverage?.interestCoverage !== null && insight.coverage?.interestCoverage !== undefined) {
+    const coverage = insight.coverage.interestCoverage;
+    if (coverage < 1) {
+      risks.push({
+        message: `پوشش هزینه مالی ${formatFaRatio(coverage)} است؛ سود عملیاتی به‌تنهایی هزینه مالی دوره را پوشش نمی‌دهد.`,
+        evidenceLevel: "INTERPRETATION",
+        evidence: [`interestCoverage=${coverage}`],
+      });
+    } else {
+      strengths.push({
+        message: `سود عملیاتی ${formatFaRatio(coverage)} هزینه مالی را پوشش می‌دهد.`,
+        evidenceLevel: "DERIVED_METRIC",
+        evidence: [`interestCoverage=${coverage}`],
+      });
+    }
+  }
+
   if (missingEvidence(insight).length > 0) {
     actions.push({
       message: `شواهد ناقص برای نتیجه‌گیری دقیق‌تر: ${missingEvidence(insight).map(faMeasure).join("، ")}. تکمیل این اقلام کیفیت تصمیم را بالا می‌برد.`,
@@ -760,7 +816,12 @@ export function composeAnswer(insight: FinancialStatementInsight, question: stri
   const intent = classifyQuestion(question);
   const groups = composeFindingGroups(insight);
   const scenarios = composeScenarios(insight);
-  const limitations = localizeStatementLimitations(insight);
+  // Honest capability disclosure: product/segment profitability requires a
+  // segment extraction contract that this canonical version does not yet own.
+  // It is stated explicitly rather than inferred from company-level totals.
+  const productSegmentDisclosure =
+    "سودآوری در سطح محصول/بخش در مدل کاننیکال این نسخه استخراج و تحلیل نمی‌شود؛ در صورت وجود این داده در سند، به قرارداد تحلیل بخش نیاز است و از جمع‌های کل شرکت استنتاج نمی‌شود.";
+  const limitations = [...localizeStatementLimitations(insight), productSegmentDisclosure];
   const currency = insight.currency || "IRR";
   const sections: NarrativeSection[] = [];
 

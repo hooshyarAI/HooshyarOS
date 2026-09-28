@@ -51,15 +51,24 @@ export type StatementMeasure =
   | "ASSETS"
   | "CURRENT_ASSETS"
   | "NON_CURRENT_ASSETS"
+  | "CASH"
+  | "RECEIVABLES"
+  | "INVENTORY"
+  | "PPE"
   | "LIABILITIES"
   | "CURRENT_LIABILITIES"
   | "NON_CURRENT_LIABILITIES"
+  | "PAYABLES"
+  | "SHORT_TERM_DEBT"
+  | "LONG_TERM_DEBT"
   | "EQUITY"
   | "REVENUE"
   | "COGS"
   | "GROSS_PROFIT"
   | "OPERATING_EXPENSES"
   | "OPERATING_PROFIT"
+  | "INTEREST"
+  | "PRE_TAX_INCOME"
   | "EXPENSES"
   | "NET_PROFIT"
   | "OPERATING_CASH_FLOW"
@@ -71,15 +80,24 @@ export const STATEMENT_MEASURES: ReadonlyArray<StatementMeasure> = [
   "ASSETS",
   "CURRENT_ASSETS",
   "NON_CURRENT_ASSETS",
+  "CASH",
+  "RECEIVABLES",
+  "INVENTORY",
+  "PPE",
   "LIABILITIES",
   "CURRENT_LIABILITIES",
   "NON_CURRENT_LIABILITIES",
+  "PAYABLES",
+  "SHORT_TERM_DEBT",
+  "LONG_TERM_DEBT",
   "EQUITY",
   "REVENUE",
   "COGS",
   "GROSS_PROFIT",
   "OPERATING_EXPENSES",
   "OPERATING_PROFIT",
+  "INTEREST",
+  "PRE_TAX_INCOME",
   "EXPENSES",
   "NET_PROFIT",
   "OPERATING_CASH_FLOW",
@@ -228,6 +246,21 @@ const MEASURE_ALIASES = buildAliasMap([
   ["INVESTING_CASH_FLOW", ["جریان نقدی سرمایه‌گذاری", "جریان‌های نقدی سرمایه‌گذاری", "خالص جریان‌های نقدی سرمایه‌گذاری", "جریان خالص ورود خروج نقد حاصل از فعالیت های سرمایه گذاری", "جریان خالص ورود خروج نقد حاصل از فعالیتهای سرمایه‌گذاری", "net cash from investing activities", "cash flows from investing activities"]],
   ["FINANCING_CASH_FLOW", ["جریان نقدی تامین مالی", "جریان‌های نقدی تامین مالی", "خالص جریان‌های نقدی تامین مالی", "جریان خالص ورود خروج نقد حاصل از فعالیت های تامین مالی", "جریان خالص ورود خروج نقد حاصل از فعالیتهای تامین مالی", "net cash from financing activities", "cash flows from financing activities"]],
   ["NET_CASH_FLOW", ["خالص افزایش کاهش نقد", "خالص افزایش کاهش در موجودی نقد", "خالص جریان نقدی", "افزایش کاهش خالص نقد", "net increase in cash", "net decrease in cash", "net cash flow"]],
+  // Working-capital / capital-structure detail measures. These are the exact
+  // line items the canonical `FinancialIntelligenceEngine.workingCapital` /
+  // `liquidityRatios` and the `RatioStatement` contract require; without them
+  // the platform cannot compute quick/cash liquidity, DSO/DIO/DPO/CCC or
+  // interest coverage from a real statement. Only explicit label matches are
+  // accepted — nothing is inferred.
+  ["CASH", ["موجودی نقد", "موجودی نقد و بانک", "نقد و بانک", "موجودی نقد و معادل نقد", "موجودی نقد و بانک‌ها", "cash", "cash and cash equivalents", "cash and bank balances"]],
+  ["RECEIVABLES", ["دریافتنی‌های تجاری و سایر دریافتنی‌ها", "دریافتنی‌های تجاری", "حساب‌های دریافتنی تجاری", "حساب‌های دریافتنی", "مطالبات تجاری", "طلب از مشتریان", "trade receivables", "accounts receivable", "receivables"]],
+  ["INVENTORY", ["موجودی مواد و کالا", "موجودی کالا", "موجودی مواد", "inventory", "inventories"]],
+  ["PPE", ["دارایی‌های ثابت مشهود", "دارایی ثابت مشهود", "اموال ماشین آلات و تجهیزات", "property plant and equipment", "property, plant and equipment", "ppe", "fixed tangible assets"]],
+  ["PAYABLES", ["پرداختنی‌های تجاری و سایر پرداختنی‌ها", "پرداختنی‌های تجاری", "حساب‌های پرداختنی تجاری", "حساب‌های پرداختنی", "بدهی به تامین کنندگان", "trade payables", "accounts payable", "payables"]],
+  ["SHORT_TERM_DEBT", ["تسهیلات مالی", "تسهیلات مالی کوتاه مدت", "تسهیلات کوتاه مدت", "بدهی‌های کوتاه مدت", "short-term debt", "short term debt", "short-term borrowings"]],
+  ["LONG_TERM_DEBT", ["تسهیلات مالی بلندمدت", "تسهیلات مالی بلند مدت", "بدهی‌های بلندمدت", "long-term debt", "long term debt", "long-term borrowings"]],
+  ["INTEREST", ["هزینه‌های مالی", "هزینه مالی", "هزینه‌های تامین مالی", "finance costs", "finance cost", "interest expense", "interest expenses"]],
+  ["PRE_TAX_INCOME", ["سود(زیان) عملیاتی در حال تداوم قبل از مالیات", "سود زیان عملیاتی در حال تداوم قبل از مالیات", "سود(زیان) قبل از مالیات", "سود قبل از مالیات", "سود و زیان قبل از مالیات", "profit before tax", "income before tax", "pre-tax profit", "profit before income tax"]],
 ]);
 
 /** Map a statement label to a canonical measure, or null when unrecognized. */
@@ -570,10 +603,10 @@ function extractSectionFacts(
 
 function isMeasureForSection(measure: StatementMeasure, sectionType: FinancialSectionType): boolean {
   if (sectionType === "BALANCE_SHEET") {
-    return ["ASSETS", "CURRENT_ASSETS", "NON_CURRENT_ASSETS", "LIABILITIES", "CURRENT_LIABILITIES", "NON_CURRENT_LIABILITIES", "EQUITY"].includes(measure);
+    return ["ASSETS", "CURRENT_ASSETS", "NON_CURRENT_ASSETS", "CASH", "RECEIVABLES", "INVENTORY", "PPE", "LIABILITIES", "CURRENT_LIABILITIES", "NON_CURRENT_LIABILITIES", "PAYABLES", "SHORT_TERM_DEBT", "LONG_TERM_DEBT", "EQUITY"].includes(measure);
   }
   if (sectionType === "INCOME_STATEMENT") {
-    return ["REVENUE", "COGS", "GROSS_PROFIT", "OPERATING_EXPENSES", "OPERATING_PROFIT", "EXPENSES", "NET_PROFIT"].includes(measure);
+    return ["REVENUE", "COGS", "GROSS_PROFIT", "OPERATING_EXPENSES", "OPERATING_PROFIT", "INTEREST", "PRE_TAX_INCOME", "EXPENSES", "NET_PROFIT"].includes(measure);
   }
   if (sectionType === "CASH_FLOW_STATEMENT") {
     return ["OPERATING_CASH_FLOW", "INVESTING_CASH_FLOW", "FINANCING_CASH_FLOW", "NET_CASH_FLOW"].includes(measure);
@@ -923,10 +956,19 @@ function statementForPeriod(
   set("grossProfit", "GROSS_PROFIT");
   set("operatingExpenses", "OPERATING_EXPENSES", true);
   set("operatingIncome", "OPERATING_PROFIT");
+  set("interest", "INTEREST", true);
+  set("preTaxIncome", "PRE_TAX_INCOME");
   set("netIncome", "NET_PROFIT");
+  set("cash", "CASH");
+  set("receivables", "RECEIVABLES");
+  set("inventory", "INVENTORY");
   set("currentAssets", "CURRENT_ASSETS");
+  set("ppe", "PPE");
   set("totalAssets", "ASSETS");
+  set("payables", "PAYABLES");
+  set("shortTermDebt", "SHORT_TERM_DEBT");
   set("currentLiabilities", "CURRENT_LIABILITIES");
+  set("longTermDebt", "LONG_TERM_DEBT");
   set("totalLiabilities", "LIABILITIES");
   set("equity", "EQUITY");
   return statement;

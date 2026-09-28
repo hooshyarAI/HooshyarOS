@@ -796,6 +796,15 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
             currentLiabilities: "بدهی‌های جاری",
             totalLiabilities: "کل بدهی‌ها",
             equity: "حقوق مالکانه",
+            cash: "موجودی نقد",
+            receivables: "دریافتنی‌های تجاری",
+            inventory: "موجودی مواد و کالا",
+            ppe: "دارایی‌های ثابت مشهود",
+            payables: "پرداختنی‌های تجاری",
+            shortTermDebt: "تسهیلات مالی کوتاه‌مدت",
+            longTermDebt: "تسهیلات مالی بلندمدت",
+            interest: "هزینه مالی",
+            preTaxIncome: "سود قبل از مالیات",
             operatingCashFlow: "جریان نقد عملیاتی",
             investingCashFlow: "جریان نقد سرمایه‌گذاری",
             financingCashFlow: "جریان نقد تأمین مالی",
@@ -915,6 +924,44 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 .filter(([key, value]) => key !== "unavailable" && key !== "notApplicable" && value !== null)
                 .map(([key, value]) => `${ratioLabels[key] || key}: ${percentageRatios.has(key) ? formatPercent(value as number) : formatNumber(Number(value)) + " برابر"}`);
             if (ratioLines.length) sections.push({ heading: "نسبت‌های مالی", lines: ratioLines });
+
+            const wc = insight.workingCapital;
+            if (wc) {
+                sections.push({
+                    heading: "سرمایه در گردش و چرخه تبدیل نقد",
+                    lines: [
+                        `خالص سرمایه در گردش عملیاتی: ${formatAmount(wc.netWorkingCapital, currency)}`,
+                        `دوره وصول مطالبات (DSO): ${formatNumber(wc.dso, 1)} روز`,
+                        `دوره نگهداری موجودی (DIO): ${formatNumber(wc.dio, 1)} روز`,
+                        `دوره پرداخت به تأمین‌کنندگان (DPO): ${formatNumber(wc.dpo, 1)} روز`,
+                        `چرخه تبدیل نقد (CCC): ${formatNumber(wc.cashConversionCycle, 1)} روز`,
+                    ],
+                });
+            }
+            if (insight.coverage?.interestCoverage !== null && insight.coverage?.interestCoverage !== undefined) {
+                sections.push({ heading: "پوشش هزینه مالی", lines: [`پوشش هزینه مالی: ${formatNumber(insight.coverage.interestCoverage)} برابر`] });
+            }
+            const eff = insight.efficiency;
+            if (eff) {
+                const effLines: string[] = [];
+                if (eff.assetTurnover !== null) effLines.push(`گردش دارایی: ${formatNumber(eff.assetTurnover)} برابر`);
+                if (eff.receivablesTurnover !== null) effLines.push(`گردش دریافتنی‌ها: ${formatNumber(eff.receivablesTurnover)} برابر`);
+                if (eff.inventoryTurnover !== null) effLines.push(`گردش موجودی: ${formatNumber(eff.inventoryTurnover)} برابر`);
+                if (eff.payablesTurnover !== null) effLines.push(`گردش پرداختنی‌ها: ${formatNumber(eff.payablesTurnover)} برابر`);
+                if (effLines.length) sections.push({ heading: "کارایی", lines: effLines });
+            }
+            const dp = insight.duPont;
+            if (dp?.roe !== null && dp?.roe !== undefined) {
+                sections.push({
+                    heading: "تحلیل دوپون (تفکیک بازده حقوق مالکانه)",
+                    lines: [
+                        `بازده حقوق مالکانه: ${formatPercent(dp.roe)}`,
+                        `حاشیه سود خالص: ${dp.netMargin !== null ? formatPercent(dp.netMargin) : "نامشخص"}`,
+                        `گردش دارایی: ${dp.assetTurnover !== null ? `${formatNumber(dp.assetTurnover)} برابر` : "نامشخص"}`,
+                        `ضریب حقوق مالکانه: ${dp.equityMultiplier !== null ? `${formatNumber(dp.equityMultiplier)} برابر` : "نامشخص"}`,
+                    ],
+                });
+            }
 
             if (insight.comparative.length) {
                 sections.push({

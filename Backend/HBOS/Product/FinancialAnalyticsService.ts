@@ -17,6 +17,9 @@
  */
 import {
     RatioAnalysisService,
+    type CoverageResult,
+    type DuPontResult,
+    type EfficiencyResult,
     type HorizontalAnalysisResult,
     type RatioStatement,
     type VerticalAnalysisResult,
@@ -33,6 +36,7 @@ import {
     type MovingAverageResult,
 } from "./CashFlowForecastingService";
 import { AnomalyDetectionService, type AnomalyResult } from "./AnomalyDetectionService";
+import { FinancialIntelligenceEngine } from "../Engines/FinancialIntelligenceEngine";
 
 export interface FinancialAnalyticsInput {
     readonly tenantId: string;
@@ -52,12 +56,30 @@ export interface FinancialAnalyticsInput {
     readonly movingAverageWindow?: number;
 }
 
+export interface WorkingCapitalAnalytics {
+    readonly netWorkingCapital: number;
+    readonly receivablesDays: number;
+    readonly inventoryDays: number;
+    readonly payablesDays: number;
+    readonly cashConversionCycle: number;
+}
+
 export interface RatioAnalytics {
     readonly vertical: VerticalAnalysisResult | null;
     readonly horizontal: HorizontalAnalysisResult | null;
     readonly profitability: ReturnType<RatioAnalysisService["profitability"]> | null;
     readonly leverage: ReturnType<RatioAnalysisService["leverage"]> | null;
     readonly liquidity: ReturnType<RatioAnalysisService["liquidity"]> | null;
+    /**
+     * Working-capital cycle (net working capital, DSO/DIO/DPO and cash
+     * conversion cycle) computed by the canonical `FinancialIntelligenceEngine`
+     * owner. Null when any required measure (revenue, COGS, receivables,
+     * inventory, payables) is absent — never a fabricated zero.
+     */
+    readonly workingCapital: WorkingCapitalAnalytics | null;
+    readonly efficiency: EfficiencyResult | null;
+    readonly coverage: CoverageResult | null;
+    readonly duPont: DuPontResult | null;
 }
 
 export interface ForecastAnalytics {
@@ -98,6 +120,7 @@ export class FinancialAnalyticsService {
         private readonly breakEven: BreakEvenAnalysisService = new BreakEvenAnalysisService(),
         private readonly cashFlow: CashFlowForecastingService = new CashFlowForecastingService(),
         private readonly anomaly: AnomalyDetectionService = new AnomalyDetectionService(),
+        private readonly financialIntelligence: FinancialIntelligenceEngine = new FinancialIntelligenceEngine(),
     ) {}
 
     initialize(): { status: "READY" } {
@@ -116,6 +139,10 @@ export class FinancialAnalyticsService {
                 profitability: this.ratios.profitability(input.statement),
                 leverage: this.ratios.leverage(input.statement),
                 liquidity: this.ratios.liquidity(input.statement),
+                workingCapital: this.workingCapital(input.statement),
+                efficiency: this.ratios.efficiency(input.statement),
+                coverage: this.ratios.coverage(input.statement),
+                duPont: this.ratios.duPont(input.statement),
             }
             : null;
 
@@ -151,6 +178,36 @@ export class FinancialAnalyticsService {
         };
     }
 
+    /**
+     * Working-capital cycle computed by the canonical `FinancialIntelligenceEngine`
+     * owner. Delegating here keeps a single mathematics owner: this service only
+     * extracts the evidence-backed inputs and returns the engine's verified
+     * result, or null when a required input is absent.
+     */
+    private workingCapital(statement: Partial<RatioStatement>): WorkingCapitalAnalytics | null {
+        const num = (field: keyof RatioStatement): number | null => {
+            const value = (statement as Record<string, unknown>)[field];
+            return typeof value === "number" && Number.isFinite(value) ? value : null;
+        };
+        const revenue = num("revenue");
+        const cogs = num("cogs");
+        const receivables = num("receivables");
+        const inventory = num("inventory");
+        const payables = num("payables");
+        if (revenue === null || cogs === null || receivables === null || inventory === null || payables === null) {
+            return null;
+        }
+        const result = this.financialIntelligence.workingCapital({ revenue, cogs, receivables, inventory, payables });
+        if (result.status !== "READY") return null;
+        return {
+            netWorkingCapital: result.netWorkingCapital,
+            receivablesDays: result.receivablesDays,
+            inventoryDays: result.inventoryDays,
+            payablesDays: result.payablesDays,
+            cashConversionCycle: result.cashConversionCycle,
+        };
+    }
+
     private windowFor(series: readonly number[], requested: number | undefined): number {
         const candidate = Number.isFinite(requested) && (requested as number) > 0 ? Math.floor(requested as number) : 3;
         return Math.max(1, Math.min(candidate, series.length));
@@ -169,6 +226,10 @@ export class FinancialAnalyticsService {
             if (ratios.profitability) statuses.push(ratios.profitability.status);
             if (ratios.leverage) statuses.push(ratios.leverage.status);
             if (ratios.liquidity) statuses.push(ratios.liquidity.status);
+            if (ratios.workingCapital) statuses.push("READY");
+            if (ratios.efficiency) statuses.push(ratios.efficiency.status);
+            if (ratios.coverage) statuses.push(ratios.coverage.status);
+            if (ratios.duPont) statuses.push(ratios.duPont.status);
         }
         if (breakEven) statuses.push(breakEven.status);
         if (forecast) statuses.push(forecast.naive.status, forecast.movingAverage.status, forecast.linearTrend.status);

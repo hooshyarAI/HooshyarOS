@@ -146,6 +146,35 @@ export interface LiquidityResult {
     notApplicable: string[];
 }
 
+export interface EfficiencyResult {
+    assetTurnover: number | null;
+    receivablesTurnover: number | null;
+    inventoryTurnover: number | null;
+    payablesTurnover: number | null;
+    status: "READY" | "BLOCKED";
+    unavailable: string[];
+    notApplicable: string[];
+}
+
+export interface CoverageResult {
+    /** Operating profit / finance cost. Undefined when there is no finance cost. */
+    interestCoverage: number | null;
+    status: "READY" | "BLOCKED";
+    unavailable: string[];
+    notApplicable: string[];
+}
+
+export interface DuPontResult {
+    netMargin: number | null;
+    assetTurnover: number | null;
+    equityMultiplier: number | null;
+    /** netMargin × assetTurnover × equityMultiplier, only when all three exist. */
+    roe: number | null;
+    status: "READY" | "BLOCKED";
+    unavailable: string[];
+    notApplicable: string[];
+}
+
 export class RatioAnalysisService {
     /**
      * True when a field is present but is not a valid non-negative finite
@@ -318,6 +347,76 @@ export class RatioAnalysisService {
         const computed = { currentRatio, quickRatio, cashRatio };
         const notApplicable = currentLiabilities !== null && currentLiabilities <= 0
             ? ["currentRatio:current-liabilities-non-positive", "quickRatio:current-liabilities-non-positive", "cashRatio:current-liabilities-non-positive"]
+            : [];
+        const notApplicableKeys = new Set(notApplicable.map((reason) => reason.split(":")[0]));
+        const unavailable = unavailableAll.filter(
+            (key) => computed[key as keyof typeof computed] === null && !notApplicableKeys.has(key),
+        );
+        const status = Object.values(computed).some((value) => value !== null) ? "READY" : "BLOCKED";
+        return { ...computed, status, unavailable, notApplicable };
+    }
+
+    /** Ownership-turnover efficiency ratios. Days/CCC are owned by the Engine. */
+    efficiency(statement: Partial<RatioStatement>): EfficiencyResult {
+        const unavailableAll = ["assetTurnover", "receivablesTurnover", "inventoryTurnover", "payablesTurnover"];
+        if (this.hasInvalidProvidedField(statement)) {
+            return { assetTurnover: null, receivablesTurnover: null, inventoryTurnover: null, payablesTurnover: null, status: "BLOCKED", unavailable: unavailableAll, notApplicable: [] };
+        }
+        const revenue = this.value(statement, "revenue");
+        const cogs = this.value(statement, "cogs");
+        const totalAssets = this.value(statement, "totalAssets");
+        const receivables = this.value(statement, "receivables");
+        const inventory = this.value(statement, "inventory");
+        const payables = this.value(statement, "payables");
+
+        const computed = {
+            assetTurnover: this.ratio(revenue, totalAssets),
+            receivablesTurnover: this.ratio(revenue, receivables),
+            inventoryTurnover: this.ratio(cogs, inventory),
+            payablesTurnover: this.ratio(cogs, payables),
+        };
+        const unavailable = unavailableAll.filter((key) => computed[key as keyof typeof computed] === null);
+        const status = Object.values(computed).some((value) => value !== null) ? "READY" : "BLOCKED";
+        return { ...computed, status, unavailable, notApplicable: [] };
+    }
+
+    /** Finance-cost coverage. Undefined when finance cost is zero/absent. */
+    coverage(statement: Partial<RatioStatement>): CoverageResult {
+        if (this.hasInvalidProvidedField(statement)) {
+            return { interestCoverage: null, status: "BLOCKED", unavailable: ["interestCoverage"], notApplicable: [] };
+        }
+        const operatingIncome = this.value(statement, "operatingIncome");
+        const interest = this.value(statement, "interest");
+        const interestCoverage = interest !== null && interest > 0 ? this.ratio(operatingIncome, interest) : null;
+        const notApplicable = interest !== null && interest <= 0 ? ["interestCoverage:non-positive-finance-cost"] : [];
+        const status = interestCoverage !== null ? "READY" : "BLOCKED";
+        return { interestCoverage, status, unavailable: interestCoverage === null && notApplicable.length === 0 ? ["interestCoverage"] : [], notApplicable };
+    }
+
+    /**
+     * DuPont decomposition: ROE = net margin × asset turnover × equity multiplier.
+     * ROE is only reported when all three factors are defined and equity is positive.
+     */
+    duPont(statement: Partial<RatioStatement>): DuPontResult {
+        const unavailableAll = ["netMargin", "assetTurnover", "equityMultiplier", "roe"];
+        if (this.hasInvalidProvidedField(statement)) {
+            return { netMargin: null, assetTurnover: null, equityMultiplier: null, roe: null, status: "BLOCKED", unavailable: unavailableAll, notApplicable: [] };
+        }
+        const netIncome = this.value(statement, "netIncome");
+        const revenue = this.value(statement, "revenue");
+        const totalAssets = this.value(statement, "totalAssets");
+        const rawEquity = (statement as Record<string, unknown>).equity;
+        const equity = typeof rawEquity === "number" && Number.isFinite(rawEquity) ? rawEquity : null;
+
+        const netMargin = this.ratio(netIncome, revenue);
+        const assetTurnover = this.ratio(revenue, totalAssets);
+        const equityMultiplier = equity !== null && equity > 0 ? this.ratio(totalAssets, equity) : null;
+        const roe = netMargin !== null && assetTurnover !== null && equityMultiplier !== null
+            ? netMargin * assetTurnover * equityMultiplier
+            : null;
+        const computed = { netMargin, assetTurnover, equityMultiplier, roe };
+        const notApplicable = equityMultiplier === null && equity !== null && equity <= 0
+            ? ["equityMultiplier:equity-non-positive", "roe:equity-non-positive"]
             : [];
         const notApplicableKeys = new Set(notApplicable.map((reason) => reason.split(":")[0]));
         const unavailable = unavailableAll.filter(

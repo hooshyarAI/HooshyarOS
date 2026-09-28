@@ -112,6 +112,33 @@ export interface StatementDerivedResidual {
   readonly note: string;
 }
 
+/** Operating working-capital cycle. All values come from the canonical engine. */
+export interface StatementWorkingCapitalView {
+  readonly netWorkingCapital: number;
+  readonly dso: number;
+  readonly dio: number;
+  readonly dpo: number;
+  readonly cashConversionCycle: number;
+}
+
+export interface StatementEfficiencyView {
+  readonly assetTurnover: number | null;
+  readonly receivablesTurnover: number | null;
+  readonly inventoryTurnover: number | null;
+  readonly payablesTurnover: number | null;
+}
+
+export interface StatementCoverageView {
+  readonly interestCoverage: number | null;
+}
+
+export interface StatementDuPontView {
+  readonly netMargin: number | null;
+  readonly assetTurnover: number | null;
+  readonly equityMultiplier: number | null;
+  readonly roe: number | null;
+}
+
 export type MetricEvidence = "EXTRACTED_FACT" | "DERIVED_METRIC" | "UNAVAILABLE";
 
 export interface FinancialStatementInsight {
@@ -129,6 +156,11 @@ export interface FinancialStatementInsight {
   readonly comparative: readonly ComparativeEntry[];
   readonly integrity: readonly StatementIntegrityCheck[];
   readonly unavailableRatios: readonly string[];
+  /** Working-capital cycle (DSO/DIO/DPO/CCC/NWC), or null when evidence is absent. */
+  readonly workingCapital: StatementWorkingCapitalView | null;
+  readonly efficiency: StatementEfficiencyView | null;
+  readonly coverage: StatementCoverageView | null;
+  readonly duPont: StatementDuPontView | null;
   /** Derived residual expense (revenue − net profit), clearly labelled. */
   readonly derivedResidual: StatementDerivedResidual | null;
   readonly limitations: readonly string[];
@@ -217,6 +249,37 @@ export function composeFinancialStatementInsight(
     ],
   };
 
+  // Working-capital / efficiency / coverage / DuPont views. Each is the verified
+  // canonical owner output; absent evidence yields null rather than a number.
+  const workingCapitalView: StatementWorkingCapitalView | null = analytics?.ratios?.workingCapital
+    ? {
+        netWorkingCapital: analytics.ratios.workingCapital.netWorkingCapital,
+        dso: analytics.ratios.workingCapital.receivablesDays,
+        dio: analytics.ratios.workingCapital.inventoryDays,
+        dpo: analytics.ratios.workingCapital.payablesDays,
+        cashConversionCycle: analytics.ratios.workingCapital.cashConversionCycle,
+      }
+    : null;
+  const efficiencyView: StatementEfficiencyView | null = analytics?.ratios?.efficiency
+    ? {
+        assetTurnover: viewFor(analytics.ratios.efficiency.assetTurnover),
+        receivablesTurnover: viewFor(analytics.ratios.efficiency.receivablesTurnover),
+        inventoryTurnover: viewFor(analytics.ratios.efficiency.inventoryTurnover),
+        payablesTurnover: viewFor(analytics.ratios.efficiency.payablesTurnover),
+      }
+    : null;
+  const coverageView: StatementCoverageView | null = analytics?.ratios?.coverage
+    ? { interestCoverage: viewFor(analytics.ratios.coverage.interestCoverage) }
+    : null;
+  const duPontView: StatementDuPontView | null = analytics?.ratios?.duPont
+    ? {
+        netMargin: viewFor(analytics.ratios.duPont.netMargin),
+        assetTurnover: viewFor(analytics.ratios.duPont.assetTurnover),
+        equityMultiplier: viewFor(analytics.ratios.duPont.equityMultiplier),
+        roe: viewFor(analytics.ratios.duPont.roe),
+      }
+    : null;
+
   const revenue = viewFor(derived.statement.revenue);
   const cogs = viewFor(derived.statement.cogs);
   const grossProfit = viewFor(derived.statement.grossProfit);
@@ -230,6 +293,14 @@ export function composeFinancialStatementInsight(
   const currentLiabilities = viewFor(derived.statement.currentLiabilities);
   const totalLiabilities = viewFor(derived.statement.totalLiabilities);
   const equity = viewFor(derived.statement.equity);
+  const interest = viewFor(derived.statement.interest);
+  const cash = viewFor(derived.statement.cash);
+  const receivables = viewFor(derived.statement.receivables);
+  const inventory = viewFor(derived.statement.inventory);
+  const ppe = viewFor(derived.statement.ppe);
+  const payables = viewFor(derived.statement.payables);
+  const shortTermDebt = viewFor(derived.statement.shortTermDebt);
+  const longTermDebt = viewFor(derived.statement.longTermDebt);
 
   const operatingCashFlow = currentFact(facts, "OPERATING_CASH_FLOW");
   const investingCashFlow = currentFact(facts, "INVESTING_CASH_FLOW");
@@ -243,10 +314,19 @@ export function composeFinancialStatementInsight(
     grossProfit,
     operatingExpenses,
     operatingProfit,
+    interest,
+    preTaxIncome,
     netProfit,
+    cash,
+    receivables,
+    inventory,
     currentAssets,
+    ppe,
     totalAssets,
+    payables,
+    shortTermDebt,
     currentLiabilities,
+    longTermDebt,
     totalLiabilities,
     equity,
     operatingCashFlow,
@@ -269,6 +349,15 @@ export function composeFinancialStatementInsight(
     currentLiabilities: hasMeasure("CURRENT_LIABILITIES") ? "EXTRACTED_FACT" : "UNAVAILABLE",
     totalLiabilities: hasMeasure("LIABILITIES") ? "EXTRACTED_FACT" : "UNAVAILABLE",
     equity: hasMeasure("EQUITY") ? "EXTRACTED_FACT" : "UNAVAILABLE",
+    interest: hasMeasure("INTEREST") ? "EXTRACTED_FACT" : "UNAVAILABLE",
+    preTaxIncome: hasMeasure("PRE_TAX_INCOME") ? "EXTRACTED_FACT" : "UNAVAILABLE",
+    cash: hasMeasure("CASH") ? "EXTRACTED_FACT" : "UNAVAILABLE",
+    receivables: hasMeasure("RECEIVABLES") ? "EXTRACTED_FACT" : "UNAVAILABLE",
+    inventory: hasMeasure("INVENTORY") ? "EXTRACTED_FACT" : "UNAVAILABLE",
+    ppe: hasMeasure("PPE") ? "EXTRACTED_FACT" : "UNAVAILABLE",
+    payables: hasMeasure("PAYABLES") ? "EXTRACTED_FACT" : "UNAVAILABLE",
+    shortTermDebt: hasMeasure("SHORT_TERM_DEBT") ? "EXTRACTED_FACT" : "UNAVAILABLE",
+    longTermDebt: hasMeasure("LONG_TERM_DEBT") ? "EXTRACTED_FACT" : "UNAVAILABLE",
     operatingCashFlow: operatingCashFlow !== null ? "EXTRACTED_FACT" : "UNAVAILABLE",
     investingCashFlow: investingCashFlow !== null ? "EXTRACTED_FACT" : "UNAVAILABLE",
     financingCashFlow: financingCashFlow !== null ? "EXTRACTED_FACT" : "UNAVAILABLE",
@@ -689,6 +778,68 @@ export function composeFinancialStatementInsight(
     }
   }
 
+  /* Working-capital cycle, finance-cost coverage and DuPont decomposition */
+  if (workingCapitalView) {
+    push(
+      interpretation,
+      `Working-capital cycle: DSO ${workingCapitalView.dso.toFixed(1)} days, DIO ${workingCapitalView.dio.toFixed(1)} days, DPO ${workingCapitalView.dpo.toFixed(1)} days, cash conversion cycle ${workingCapitalView.cashConversionCycle.toFixed(1)} days (net operating working capital ${workingCapitalView.netWorkingCapital}).`,
+      "DERIVED_METRIC",
+      [`dso=${workingCapitalView.dso}`, `dio=${workingCapitalView.dio}`, `dpo=${workingCapitalView.dpo}`, `cashConversionCycle=${workingCapitalView.cashConversionCycle}`],
+    );
+    if (workingCapitalView.cashConversionCycle > 0) {
+      push(
+        weaknesses,
+        `The cash conversion cycle is positive (${workingCapitalView.cashConversionCycle.toFixed(1)} days): cash is tied up in receivables and inventory longer than supplier financing covers it.`,
+        "INTERPRETATION",
+        [`cashConversionCycle=${workingCapitalView.cashConversionCycle}`],
+      );
+      push(
+        managementActions,
+        `Shorten the cash conversion cycle (currently ${workingCapitalView.cashConversionCycle.toFixed(1)} days) by accelerating collections or aligning supplier payment terms with inventory turnover.`,
+        "MANAGEMENT_RECOMMENDATION",
+        [`cashConversionCycle=${workingCapitalView.cashConversionCycle}`],
+      );
+    } else if (workingCapitalView.cashConversionCycle < 0) {
+      push(
+        strengths,
+        `The cash conversion cycle is negative (${workingCapitalView.cashConversionCycle.toFixed(1)} days): supplier financing covers the operating cycle and operations release cash.`,
+        "DERIVED_METRIC",
+        [`cashConversionCycle=${workingCapitalView.cashConversionCycle}`],
+      );
+    }
+  } else {
+    limitations.push("Working-capital cycle evidence is incomplete; DSO/DIO/DPO/CCC are unavailable.");
+  }
+
+  if (coverageView && coverageView.interestCoverage !== null) {
+    push(
+      interpretation,
+      `Finance-cost coverage: operating profit covers finance cost ${coverageView.interestCoverage.toFixed(2)} times.`,
+      "DERIVED_METRIC",
+      [`interestCoverage=${coverageView.interestCoverage}`],
+    );
+    if (coverageView.interestCoverage < 1) {
+      push(
+        risks,
+        `Operating profit covers finance cost only ${coverageView.interestCoverage.toFixed(2)} times; operating earnings do not fully cover the finance cost.`,
+        "INTERPRETATION",
+        [`interestCoverage=${coverageView.interestCoverage}`],
+      );
+    }
+  }
+
+  if (
+    duPontView && duPontView.roe !== null && duPontView.netMargin !== null &&
+    duPontView.assetTurnover !== null && duPontView.equityMultiplier !== null
+  ) {
+    push(
+      interpretation,
+      `DuPont decomposition of ROE ${(duPontView.roe * 100).toFixed(2)}% = net margin ${(duPontView.netMargin * 100).toFixed(2)}% × asset turnover ${duPontView.assetTurnover.toFixed(2)} × equity multiplier ${duPontView.equityMultiplier.toFixed(2)}.`,
+      "DERIVED_METRIC",
+      [`roe=${duPontView.roe}`, `netMargin=${duPontView.netMargin}`, `assetTurnover=${duPontView.assetTurnover}`, `equityMultiplier=${duPontView.equityMultiplier}`],
+    );
+  }
+
   /* Derived residual disclosure — never presented as an extracted expense */
   let derivedResidual: StatementDerivedResidual | null = null;
   if (derived.analysisExpenses !== null) {
@@ -763,6 +914,10 @@ export function composeFinancialStatementInsight(
     comparative,
     integrity,
     unavailableRatios: ratios.unavailable,
+    workingCapital: workingCapitalView,
+    efficiency: efficiencyView,
+    coverage: coverageView,
+    duPont: duPontView,
     derivedResidual,
     limitations,
     interpretation,
