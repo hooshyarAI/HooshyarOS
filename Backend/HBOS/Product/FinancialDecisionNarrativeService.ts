@@ -28,6 +28,7 @@ export type AssistantIntent =
   | "SCENARIOS"
   | "RISK"
   | "PROFIT_CHANGE"
+  | "PRODUCT"
   | "DATA_GAPS"
   | "ANALYZE"
   | "GENERAL";
@@ -287,6 +288,9 @@ export function classifyQuestion(question: string): AssistantIntent {
   if (/سناریو|scenario/i.test(q)) return "SCENARIOS";
   if (/ریسک|خطر|risk/i.test(q)) return "RISK";
   if (/(چرا|why).*(سود|profit)|سود.*(تغییر|عوض|چرا)|profit.*(chang|why)/i.test(q)) return "PROFIT_CHANGE";
+  // Product / segment / sales-mix questions are answered from the document's own
+  // per-product revenue table when it exists (never from company totals).
+  if (/محصول|بخش|ترکیب فروش|segment|product|sales mix|mix/i.test(q)) return "PRODUCT";
   if (/(چه چیزی|چه اطلاعاتی|چه داده|what).*(کم|ناقص|نیاز|missing|gap)|کم است|کم است؟|ناقص|missing|data gap/i.test(q)) return "DATA_GAPS";
   if (/تحلیل کن|تحلیل.*(صورت|مالی)|این صورت مالی|analy[sz]e/i.test(q)) return "ANALYZE";
   return "GENERAL";
@@ -812,16 +816,64 @@ const monitorLine = (insight: FinancialStatementInsight): readonly string[] => {
   return lines;
 };
 
+/**
+ * Persian product/segment profitability section, built only from the
+ * document's own per-product evidence. Returns [] when the document has no
+ * per-product table, so the caller keeps the honest "not modeled" disclosure.
+ */
+const productSegmentSections = (insight: FinancialStatementInsight): NarrativeSection[] => {
+  const segments = insight.productSegments;
+  if (!segments) return [];
+  const currency = insight.currency || "IRR";
+  const overall = segments.overallGrossMargin;
+  const contributions = [...segments.contributions]
+    .filter((entry) => entry.revenue !== 0)
+    .sort((a, b) => b.revenueShare - a.revenueShare);
+  const lines: string[] = [
+    `درآمد محصولات: ${formatFaAmount(segments.totalRevenue, currency)}؛ سود ناخالص محصولات: ${formatFaAmount(segments.totalGrossProfit, currency)}${overall === null ? "" : `؛ حاشیه سود ناخالص محصولات ${formatFaPercent(overall)}`}.`,
+  ];
+  if (segments.topRevenueContribution) {
+    lines.push(`بیشترین سهم درآمد مربوط به «${segments.topRevenueContribution.name}» با ${formatFaPercent(segments.topRevenueContribution.revenueShare)} از درآمد محصولات است.`);
+  }
+  lines.push("تفکیک محصول:");
+  for (const entry of contributions) {
+    const margin = entry.grossMargin === null ? "نامشخص" : formatFaPercent(entry.grossMargin);
+    const grossProfit = entry.grossProfit === null ? "نامشخص" : formatFaAmount(entry.grossProfit, currency);
+    lines.push(`• ${entry.name}: درآمد ${formatFaAmount(entry.revenue, currency)}، سود ناخالص ${grossProfit}، حاشیه ${margin}، سهم درآمد ${formatFaPercent(entry.revenueShare)}.`);
+  }
+  if (segments.highMargin.length > 0) {
+    lines.push("محصولات با حاشیه بالاتر از میانگین شرکت:");
+    for (const entry of segments.highMargin) lines.push(`• ${entry.name} با حاشیه ${formatFaPercent(entry.grossMargin)}.`);
+  }
+  if (segments.negativeMargin.length > 0) {
+    lines.push("محصولات با حاشیه منفی:");
+    for (const entry of segments.negativeMargin) lines.push(`• ${entry.name} با حاشیه ${formatFaPercent(entry.grossMargin)} و سود ناخالص ${formatFaAmount(entry.grossProfit, currency)}.`);
+  }
+  if (segments.mixEffect) {
+    const mix = segments.mixEffect;
+    lines.push(`اثر ترکیب فروش: حاشیه سود محصولات از ${formatFaPercent(mix.priorOverallGrossMargin)} به ${formatFaPercent(mix.currentOverallGrossMargin)} رسیده است؛ سهم تغییر ترکیب فروش ${formatFaPercent(mix.mixEffect)} و سهم تغییر نرخ/بهای تمام شده ${formatFaPercent(mix.rateCostEffect)} است.`);
+  }
+  const sections: NarrativeSection[] = [{ heading: "سودآوری محصول/بخش", lines }];
+  if (segments.limitations.length > 0) {
+    sections.push({ heading: "محدودیتهای تحلیل محصول/بخش", lines: [...segments.limitations] });
+  }
+  return sections;
+};
+
 export function composeAnswer(insight: FinancialStatementInsight, question: string): ComposedAnswer {
   const intent = classifyQuestion(question);
   const groups = composeFindingGroups(insight);
   const scenarios = composeScenarios(insight);
-  // Honest capability disclosure: product/segment profitability requires a
-  // segment extraction contract that this canonical version does not yet own.
-  // It is stated explicitly rather than inferred from company-level totals.
-  const productSegmentDisclosure =
-    "سودآوری در سطح محصول/بخش در مدل کاننیکال این نسخه استخراج و تحلیل نمی‌شود؛ در صورت وجود این داده در سند، به قرارداد تحلیل بخش نیاز است و از جمع‌های کل شرکت استنتاج نمی‌شود.";
-  const limitations = [...localizeStatementLimitations(insight), productSegmentDisclosure];
+  // Honest capability disclosure: only when the document actually lacks a
+  // per-product revenue table. When the capability is present it is answered
+  // from the document's own product evidence instead of a blanket disclaimer.
+  const productSegmentDisclosure = insight.productSegments
+    ? null
+    : "سودآوری در سطح محصول/بخش در مدل کاننیکال این نسخه استخراج و تحلیل نمی‌شود؛ در صورت وجود این داده در سند، به قرارداد تحلیل بخش نیاز است و از جمع‌های کل شرکت استنتاج نمی‌شود.";
+  const limitations = [
+    ...localizeStatementLimitations(insight),
+    ...(productSegmentDisclosure ? [productSegmentDisclosure] : []),
+  ];
   const currency = insight.currency || "IRR";
   const sections: NarrativeSection[] = [];
 
@@ -894,6 +946,15 @@ export function composeAnswer(insight: FinancialStatementInsight, question: stri
       ],
     });
     sections.push({ heading: "محدودیتها", lines: limitations.length ? limitations : ["محدودیت ثبتشدهای برای این تحلیل وجود ندارد."] });
+  } else if (intent === "PRODUCT") {
+    const productSections = productSegmentSections(insight);
+    if (productSections.length > 0) {
+      for (const section of productSections) sections.push(section);
+    } else {
+      sections.push({ heading: "Product/segment profitability", lines: ["داده سودآوری محصول/بخش در منبع موجود نیست؛ از جمع‌های کل شرکت استنتاج نمی‌شود و برای تحلیل بخش به جدول درآمد و بهای تمام شده محصول نیاز است."] });
+    }
+    if (groups.actions.length > 0) sections.push({ heading: "اقدامات پیشنهادی مرتبط", lines: linesOf(groups.actions) });
+    sections.push({ heading: "محدودیت‌ها", lines: limitations.length ? limitations : ["محدودیت ثبت‌شده‌ای برای این تحلیل وجود ندارد."] });
   } else if (intent === "DATA_GAPS") {
     const integrityGaps = (insight.integrity ?? [])
       .filter((check) => check.status === "NOT_TESTABLE")
@@ -924,6 +985,7 @@ export function composeAnswer(insight: FinancialStatementInsight, question: stri
     ] });
     sections.push({ heading: "ریسکها", lines: linesOf(groups.risks) });
     sections.push({ heading: "فرصتها و رشد", lines: linesOf(groups.opportunities) });
+    for (const section of productSegmentSections(insight)) sections.push(section);
     sections.push({ heading: "اقدامات پیشنهادی", lines: linesOf(groups.actions) });
     sections.push({ heading: "محدودیتها", lines: limitations.length ? limitations : ["محدودیت ثبتشدهای برای این تحلیل وجود ندارد."] });
   } else {
@@ -933,7 +995,8 @@ export function composeAnswer(insight: FinancialStatementInsight, question: stri
       metric(insight, "netProfit") !== null ? `سود خالص: ${formatFaAmount(metric(insight, "netProfit"), currency)}.` : "سود خالص: در سند استخراج نشده است.",
     ] });
     sections.push({ heading: "نقاط قوت", lines: linesOf(groups.strengths) });
-    sections.push({ heading: "ریسکها", lines: linesOf(groups.risks) });
+    sections.push({ heading: "ریسک‌ها", lines: linesOf(groups.risks) });
+    for (const section of productSegmentSections(insight)) sections.push(section);
     sections.push({ heading: "اقدامات پیشنهادی", lines: linesOf(groups.actions) });
     sections.push({ heading: "محدودیتها", lines: limitations.length ? limitations : ["محدودیت ثبتشدهای برای این تحلیل وجود ندارد."] });
   }

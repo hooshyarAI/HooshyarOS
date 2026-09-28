@@ -26,6 +26,7 @@ import type {
 } from "./FinancialDocumentUnderstanding";
 import type { RatioStatement } from "./RatioAnalysisService";
 import type { FinancialAnalyticsResult } from "./FinancialAnalyticsService";
+import { analyzeProductSegments, type ProductSegmentAnalytics } from "./ProductSegmentAnalysis";
 
 export type EvidenceLevel =
   | "EXTRACTED_FACT"
@@ -161,6 +162,8 @@ export interface FinancialStatementInsight {
   readonly efficiency: StatementEfficiencyView | null;
   readonly coverage: StatementCoverageView | null;
   readonly duPont: StatementDuPontView | null;
+  /** Product/segment profitability from the document's own per-product table, or null. */
+  readonly productSegments: ProductSegmentAnalytics | null;
   /** Derived residual expense (revenue − net profit), clearly labelled. */
   readonly derivedResidual: StatementDerivedResidual | null;
   readonly limitations: readonly string[];
@@ -220,6 +223,8 @@ export function composeFinancialStatementInsight(
   const facts = document.facts;
   const prior = input.prior ?? {};
   const analytics = input.analytics;
+
+  const productSegments = analyzeProductSegments(document);
 
   const profitability = analytics?.ratios?.profitability ?? null;
   const leverage = analytics?.ratios?.leverage ?? null;
@@ -316,6 +321,7 @@ export function composeFinancialStatementInsight(
     operatingProfit,
     interest,
     preTaxIncome,
+    taxes,
     netProfit,
     cash,
     receivables,
@@ -351,6 +357,7 @@ export function composeFinancialStatementInsight(
     equity: hasMeasure("EQUITY") ? "EXTRACTED_FACT" : "UNAVAILABLE",
     interest: hasMeasure("INTEREST") ? "EXTRACTED_FACT" : "UNAVAILABLE",
     preTaxIncome: hasMeasure("PRE_TAX_INCOME") ? "EXTRACTED_FACT" : "UNAVAILABLE",
+    taxes: hasMeasure("TAX") ? "EXTRACTED_FACT" : "UNAVAILABLE",
     cash: hasMeasure("CASH") ? "EXTRACTED_FACT" : "UNAVAILABLE",
     receivables: hasMeasure("RECEIVABLES") ? "EXTRACTED_FACT" : "UNAVAILABLE",
     inventory: hasMeasure("INVENTORY") ? "EXTRACTED_FACT" : "UNAVAILABLE",
@@ -887,6 +894,58 @@ export function composeFinancialStatementInsight(
       limitations.push(`${ratio} is not applicable (${cause}).`);
     }
   }
+  // Product/segment profitability, only when the document carries its own
+  // per-product revenue table. Every figure below is the document's own
+  // extracted product evidence; nothing is inferred from company totals.
+  if (productSegments) {
+    const active = productSegments.contributions.filter((entry) => entry.revenue !== 0);
+    const overallPct = productSegments.overallGrossMargin === null
+      ? null
+      : (productSegments.overallGrossMargin * 100).toFixed(2);
+    push(
+      interpretation,
+      overallPct === null
+        ? `Per-product revenue was extracted for ${active.length} product(s); an overall product gross margin could not be computed because a product's gross profit is incomplete.`
+        : `Product gross margin is ${overallPct}% across ${active.length} revenue-generating product(s).`,
+      "DERIVED_METRIC",
+      [`productRevenue=${productSegments.totalRevenue}`, `productGrossProfit=${productSegments.totalGrossProfit}`],
+    );
+    for (const entry of productSegments.highMargin) {
+      push(
+        opportunities,
+        `Product "${entry.name}" earns a gross margin of ${(entry.grossMargin as number * 100).toFixed(2)}%, above the company product average of ${overallPct}%; it contributes ${(entry.grossProfitShare === null ? 0 : entry.grossProfitShare * 100).toFixed(2)}% of product gross profit.`,
+        "DERIVED_METRIC",
+        [`segment=${entry.name}`, `revenue=${entry.revenue}`, `grossProfit=${entry.grossProfit}`],
+      );
+    }
+    for (const entry of productSegments.negativeMargin) {
+      const message = `Product "${entry.name}" has a negative gross margin of ${((entry.grossMargin as number) * 100).toFixed(2)}% on revenue ${entry.revenue} (gross profit ${entry.grossProfit}).`;
+      push(weaknesses, message, "DERIVED_METRIC", [`segment=${entry.name}`, `revenue=${entry.revenue}`, `grossProfit=${entry.grossProfit}`]);
+      push(managementActions, `Review the pricing and cost structure of "${entry.name}", which is sold below its product cost.`, "MANAGEMENT_RECOMMENDATION", [`segment=${entry.name}`, `grossProfit=${entry.grossProfit}`]);
+    }
+    if (productSegments.topRevenueContribution) {
+      const top = productSegments.topRevenueContribution;
+      push(
+        risks,
+        `Revenue is concentrated in "${top.name}", which is ${(top.revenueShare * 100).toFixed(2)}% of product revenue (revenue concentration index ${productSegments.revenueHhi === null ? "n/a" : productSegments.revenueHhi.toFixed(2)}); a demand or price shock in this product would materially affect the company.`,
+        "INTERPRETATION",
+        [`segment=${top.name}`, `revenueShare=${top.revenueShare}`],
+      );
+    }
+    if (productSegments.mixEffect) {
+      const mix = productSegments.mixEffect;
+      push(
+        interpretation,
+        `Product gross margin moved from ${(mix.priorOverallGrossMargin * 100).toFixed(2)}% to ${(mix.currentOverallGrossMargin * 100).toFixed(2)}%; the shift in sales mix contributed ${(mix.mixEffect * 100).toFixed(2)} points and per-product price/cost movements contributed ${(mix.rateCostEffect * 100).toFixed(2)} points.`,
+        "DERIVED_METRIC",
+        [`mixEffect=${mix.mixEffect}`, `rateCostEffect=${mix.rateCostEffect}`],
+      );
+    }
+    for (const line of productSegments.limitations) limitations.push(line);
+  } else {
+    limitations.push("Product/segment profitability is not modeled for this document: it has no per-product revenue table, and no figure is inferred from company totals.");
+  }
+
   // Growth grounding: statement evidence bounds what can be concluded.
   limitations.push("This statement cannot establish market demand, competitive position or future sales; growth-readiness conclusions are limited to financial capacity (profitability, liquidity, leverage, cash generation and trend).");
 
@@ -918,6 +977,7 @@ export function composeFinancialStatementInsight(
     efficiency: efficiencyView,
     coverage: coverageView,
     duPont: duPontView,
+    productSegments,
     derivedResidual,
     limitations,
     interpretation,

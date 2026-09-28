@@ -805,6 +805,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
             longTermDebt: "تسهیلات مالی بلندمدت",
             interest: "هزینه مالی",
             preTaxIncome: "سود قبل از مالیات",
+            taxes: "مالیات",
             operatingCashFlow: "جریان نقد عملیاتی",
             investingCashFlow: "جریان نقد سرمایه‌گذاری",
             financingCashFlow: "جریان نقد تأمین مالی",
@@ -961,6 +962,30 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                         `ضریب حقوق مالکانه: ${dp.equityMultiplier !== null ? `${formatNumber(dp.equityMultiplier)} برابر` : "نامشخص"}`,
                     ],
                 });
+            }
+
+            const ps = insight.productSegments;
+            if (ps && ps.contributions.some((entry) => entry.revenue !== 0)) {
+                const productLines: string[] = [
+                    `درآمد محصولات: ${formatAmount(ps.totalRevenue, currency)}`,
+                    `سود ناخالص محصولات: ${formatAmount(ps.totalGrossProfit, currency)}`,
+                    `حاشیه سود ناخالص محصولات: ${ps.overallGrossMargin === null ? "نامشخص" : formatPercent(ps.overallGrossMargin)}`,
+                ];
+                const ranked = [...ps.contributions]
+                    .filter((entry) => entry.revenue !== 0)
+                    .sort((a, b) => b.revenueShare - a.revenueShare);
+                for (const entry of ranked) {
+                    const gp = entry.grossProfit === null ? "نامشخص" : formatAmount(entry.grossProfit, currency);
+                    const margin = entry.grossMargin === null ? "نامشخص" : formatPercent(entry.grossMargin);
+                    productLines.push(`${entry.name}: درآمد ${formatAmount(entry.revenue, currency)}؛ سود ناخالص ${gp}؛ حاشیه ${margin}؛ سهم درآمد ${formatPercent(entry.revenueShare)}`);
+                }
+                if (ps.mixEffect) {
+                    productLines.push(`اثر ترکیب فروش: ${formatPercent(ps.mixEffect.mixEffect)}؛ اثر نرخ/بهای تمام شده: ${formatPercent(ps.mixEffect.rateCostEffect)}؛ تغییر حاشیه محصولات: ${formatPercent(ps.mixEffect.marginChange)}`);
+                }
+                sections.push({ heading: "سودآوری محصول/بخش", lines: productLines });
+                if (ps.limitations.length > 0) {
+                    sections.push({ heading: "محدودیت‌های تحلیل محصول/بخش", lines: [...ps.limitations] });
+                }
             }
 
             if (insight.comparative.length) {

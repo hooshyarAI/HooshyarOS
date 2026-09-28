@@ -69,6 +69,7 @@ export type StatementMeasure =
   | "OPERATING_PROFIT"
   | "INTEREST"
   | "PRE_TAX_INCOME"
+  | "TAX"
   | "EXPENSES"
   | "NET_PROFIT"
   | "OPERATING_CASH_FLOW"
@@ -98,6 +99,7 @@ export const STATEMENT_MEASURES: ReadonlyArray<StatementMeasure> = [
   "OPERATING_PROFIT",
   "INTEREST",
   "PRE_TAX_INCOME",
+  "TAX",
   "EXPENSES",
   "NET_PROFIT",
   "OPERATING_CASH_FLOW",
@@ -171,6 +173,39 @@ export interface FinancialDocumentUnderstanding {
   readonly unitMultiplier: number;
   readonly sections: ReadonlyArray<FinancialDocumentSection>;
   readonly facts: ReadonlyArray<FinancialStatementFact>;
+  /**
+   * Product/segment-level revenue, cost-of-goods-sold, gross profit, quantity
+   * and unit price extracted from a document's per-product revenue table (for
+   * example the "درآمدهای عملیاتی و بهای تمام شده" table). This is an additive,
+   * optional canonical projection: a document without such a table simply
+   * carries no segments and every downstream capability discloses the gap
+   * honestly. Values are scaled by the declared unit multiplier except the unit
+   * price, which is expressed in currency-per-unit as printed.
+   */
+  readonly segments?: ReadonlyArray<ProductSegment>;
+}
+
+export interface ProductSegmentPeriodValue {
+  readonly quantityProduced: number | null;
+  readonly quantitySold: number | null;
+  /** Price per unit as printed (currency per unit, not scaled by the unit multiplier). */
+  readonly unitPrice: number | null;
+  /** Sales amount, scaled by the declared unit multiplier. */
+  readonly revenue: number;
+  /** Cost of goods sold shown for the product, scaled and sign-normalized. */
+  readonly cost: number | null;
+  /** Gross profit shown for the product, scaled and signed (may be negative). */
+  readonly grossProfit: number | null;
+}
+
+export interface ProductSegment {
+  readonly name: string;
+  readonly unit: string;
+  readonly current: ProductSegmentPeriodValue;
+  readonly prior: ProductSegmentPeriodValue | null;
+  /** 1 when the product row mapped exactly from the revenue table. */
+  readonly confidence: number;
+  readonly evidence: FinancialFactEvidence;
 }
 
 export const FINANCIAL_DOCUMENT_ERROR_CODES = {
@@ -260,8 +295,22 @@ const MEASURE_ALIASES = buildAliasMap([
   ["SHORT_TERM_DEBT", ["تسهیلات مالی", "تسهیلات مالی کوتاه مدت", "تسهیلات کوتاه مدت", "بدهی‌های کوتاه مدت", "short-term debt", "short term debt", "short-term borrowings"]],
   ["LONG_TERM_DEBT", ["تسهیلات مالی بلندمدت", "تسهیلات مالی بلند مدت", "بدهی‌های بلندمدت", "long-term debt", "long term debt", "long-term borrowings"]],
   ["INTEREST", ["هزینه‌های مالی", "هزینه مالی", "هزینه‌های تامین مالی", "finance costs", "finance cost", "interest expense", "interest expenses"]],
-  ["PRE_TAX_INCOME", ["سود(زیان) عملیاتی در حال تداوم قبل از مالیات", "سود زیان عملیاتی در حال تداوم قبل از مالیات", "سود(زیان) قبل از مالیات", "سود قبل از مالیات", "سود و زیان قبل از مالیات", "profit before tax", "income before tax", "pre-tax profit", "profit before income tax"]],
+  // Real Persian statements print the pre-tax line as "عملیات در حال تداوم"
+  // (operations) as often as "عملیاتی" (operating); both spellings must match or
+  // the pre-tax line is silently discarded on a real report.
+  ["PRE_TAX_INCOME", ["سود(زیان) عملیاتی در حال تداوم قبل از مالیات", "سود زیان عملیاتی در حال تداوم قبل از مالیات", "سود(زیان) عملیات در حال تداوم قبل از مالیات", "سود زیان عملیات در حال تداوم قبل از مالیات", "سود(زیان) قبل از مالیات", "سود قبل از مالیات", "سود و زیان قبل از مالیات", "profit before tax", "income before tax", "pre-tax profit", "profit before income tax"]],
+  // Income-tax expense header. The tax amount may be printed on the header row
+  // itself or split across detail rows ("سال جاری" / "سال‌های قبل"), which are
+  // aggregated while this header context is open (see extractSectionFacts).
+  ["TAX", ["هزینه مالیات بر درآمد", "هزینه مالیات بر درآمد عملیات", "هزینه مالیات", "مالیات بر درآمد", "income tax expense", "tax expense"]],
 ]);
+
+/** Detail rows that split a single income-tax-expense header (exact matches only). */
+const TAX_DETAIL_ALIASES: ReadonlySet<string> = new Set(
+  ["سال جاری", "سال مالی جاری", "سال‌های قبل", "سالهای قبل", "سال گذشته", "سال‌های گذشته", "current year", "prior years", "previous years"]
+    .map((alias) => matchKey(alias))
+    .filter(Boolean),
+);
 
 /** Map a statement label to a canonical measure, or null when unrecognized. */
 export function matchStatementMeasure(label: string): StatementMeasure | null {
@@ -508,6 +557,48 @@ function extractSectionFacts(
 
   let pendingLabel = "";
   let inferredColumns = false;
+  // A single income-tax-expense header may be followed by detail rows
+  // ("سال جاری" / "سال‌های قبل"). Their amounts are aggregated into one TAX fact
+  // per period while the header context is open. Only exact detail labels are
+  // accepted, so an unrelated unrecognized row can never be folded into tax.
+  let taxContextOpen = false;
+  const taxAccumulator = new Map<number, { label: string; value: number; confidence: number; rowIndex: number }>();
+
+  const emitFact = (
+    measure: StatementMeasure,
+    label: string,
+    entry: { index: number; label: string; value: number; confidence: number },
+    rowIndex: number,
+  ): void => {
+    const page = pageNumbers?.[rowIndex];
+    facts.push({
+      measure,
+      section: sectionType,
+      label,
+      periodLabel: entry.label,
+      periodIndex: entry.index,
+      rawValue: entry.value,
+      value: entry.value * unit.multiplier,
+      unitMultiplier: unit.multiplier,
+      currency: unit.currency ?? "",
+      confidence: entry.confidence,
+      evidence: { line: lineOffset + rowIndex + 1, text: joinRowText(rows[rowIndex] ?? []), ...(typeof page === "number" ? { page } : {}) },
+    });
+  };
+
+  const flushTax = (): void => {
+    if (taxAccumulator.size === 0) return;
+    const ordered = [...taxAccumulator.entries()].sort((a, b) => a[0] - b[0]);
+    for (const [index, entry] of ordered) {
+      emitFact(
+        "TAX",
+        entry.label,
+        { index, label: grid.periodLabels[index] ?? DEFAULT_PERIOD_LABELS[index] ?? `period-${index}`, value: entry.value, confidence: entry.confidence },
+        entry.rowIndex,
+      );
+    }
+    taxAccumulator.clear();
+  };
 
   for (let r = 0; r < rows.length; r += 1) {
     const row = rows[r];
@@ -569,7 +660,34 @@ function extractSectionFacts(
     }
 
     const effectiveLabel = label || pendingLabel;
+
+    // While a tax-expense header context is open, exact tax detail rows are
+    // accumulated; any other row closes the context and is processed normally.
+    if (taxContextOpen) {
+      if (TAX_DETAIL_ALIASES.has(matchKey(effectiveLabel)) && periodValues.length > 0) {
+        for (const entry of periodValues) {
+          const previous = taxAccumulator.get(entry.index);
+          taxAccumulator.set(entry.index, {
+            label: previous?.label ?? effectiveLabel,
+            value: (previous?.value ?? 0) + entry.value,
+            confidence: Math.min(previous?.confidence ?? 1, entry.confidence),
+            rowIndex: previous?.rowIndex ?? r,
+          });
+        }
+        pendingLabel = "";
+        continue;
+      }
+      flushTax();
+      taxContextOpen = false;
+    }
+
     if (periodValues.length === 0) {
+      // A tax-expense header without its own value opens the detail context.
+      if (matchStatementMeasure(effectiveLabel) === "TAX" && isMeasureForSection("TAX", sectionType)) {
+        taxContextOpen = true;
+        pendingLabel = "";
+        continue;
+      }
       if (effectiveLabel) pendingLabel = effectiveLabel;
       continue;
     }
@@ -580,22 +698,10 @@ function extractSectionFacts(
     if (!isMeasureForSection(measure, sectionType)) continue;
 
     for (const entry of periodValues) {
-      const page = pageNumbers?.[r];
-      facts.push({
-        measure,
-        section: sectionType,
-        label: effectiveLabel,
-        periodLabel: entry.label,
-        periodIndex: entry.index,
-        rawValue: entry.value,
-        value: entry.value * unit.multiplier,
-        unitMultiplier: unit.multiplier,
-        currency: unit.currency ?? "",
-        confidence: entry.confidence,
-        evidence: { line: lineOffset + r + 1, text: joinRowText(row), ...(typeof page === "number" ? { page } : {}) },
-      });
+      emitFact(measure, effectiveLabel, entry, r);
     }
   }
+  flushTax();
 
   if (inferredColumns) notes.push("period-columns-inferred-from-trailing-values");
   return { facts, notes };
@@ -606,7 +712,7 @@ function isMeasureForSection(measure: StatementMeasure, sectionType: FinancialSe
     return ["ASSETS", "CURRENT_ASSETS", "NON_CURRENT_ASSETS", "CASH", "RECEIVABLES", "INVENTORY", "PPE", "LIABILITIES", "CURRENT_LIABILITIES", "NON_CURRENT_LIABILITIES", "PAYABLES", "SHORT_TERM_DEBT", "LONG_TERM_DEBT", "EQUITY"].includes(measure);
   }
   if (sectionType === "INCOME_STATEMENT") {
-    return ["REVENUE", "COGS", "GROSS_PROFIT", "OPERATING_EXPENSES", "OPERATING_PROFIT", "INTEREST", "PRE_TAX_INCOME", "EXPENSES", "NET_PROFIT"].includes(measure);
+    return ["REVENUE", "COGS", "GROSS_PROFIT", "OPERATING_EXPENSES", "OPERATING_PROFIT", "INTEREST", "PRE_TAX_INCOME", "TAX", "EXPENSES", "NET_PROFIT"].includes(measure);
   }
   if (sectionType === "CASH_FLOW_STATEMENT") {
     return ["OPERATING_CASH_FLOW", "INVESTING_CASH_FLOW", "FINANCING_CASH_FLOW", "NET_CASH_FLOW"].includes(measure);
@@ -799,6 +905,191 @@ function segmentByHeadings(lines: ReadonlyArray<DocumentLine>, nameHint?: string
   return segments.filter((segment) => segment.type !== "UNKNOWN" || segment.lines.length > 0);
 }
 
+/* ------------------------------------------------------------------------- *
+ * Product / segment revenue table extraction
+ * ------------------------------------------------------------------------- */
+
+/** Metric columns of a per-product revenue-and-cost table, in canonical order. */
+const PRODUCT_METRIC_MATCHERS: ReadonlyArray<readonly [RegExp, keyof ProductSegmentPeriodValue]> = [
+  [/تعدادتولید/, "quantityProduced"],
+  [/تعدادفروش/, "quantitySold"],
+  [/نرخفروش/, "unitPrice"],
+  [/مبلغفروش/, "revenue"],
+  [/مبلغبهایتمامشده/, "cost"],
+  [/سودناخالص/, "grossProfit"],
+];
+
+function productMetricFor(cell: string): keyof ProductSegmentPeriodValue | null {
+  const key = matchKey(cell);
+  if (!key) return null;
+  for (const [pattern, metric] of PRODUCT_METRIC_MATCHERS) {
+    if (pattern.test(key)) return metric;
+  }
+  return null;
+}
+
+/** A year printed in a period header cell (e.g. "سال مالی منتهی به ۱۴۰۴/۰۴/۳۱"). */
+function yearInCell(cell: string): number | null {
+  const ascii = toAsciiDigits(String(cell ?? ""));
+  const match = ascii.match(/\b(1[34]\d{2})\b/);
+  return match ? Number(match[1]) : null;
+}
+
+type ProductPeriodKind = "current" | "prior" | "other";
+
+function relativePeriodKind(cell: string): ProductPeriodKind | null {
+  const key = matchKey(cell);
+  if (!key) return null;
+  if (/دورهجاری|سالجاری|جاری|current|currentyear/.test(key)) return "current";
+  if (/دورهقبل|سالقبل|قبل|prior|previous|comparative/.test(key)) return "prior";
+  return null;
+}
+
+const PRODUCT_SECTION_MARKERS = [/^فروشداخلی/, /^فروشصادراتی/, /^درآمدارائهخدمات/, /^سایر/, /^نوعکالا/, /^شرحکالا/, /^شرح$/];
+
+/**
+ * Extract per-product/segment revenue, COGS, gross profit, quantity and unit
+ * price from a document's operating-revenue-and-cost table. Only a table whose
+ * header row declares a product column together with `مبلغ فروش` and
+ * `سود ناخالص` is accepted; the two most recent period years (or explicit
+ * current/prior labels) are mapped to the current and prior slots. Nothing is
+ * inferred from company totals: a row is kept only when it carries its own
+ * revenue evidence for the current period.
+ */
+function extractProductSegments(
+  blocks: ReadonlyArray<DocumentSectionInput>,
+  unit: StatementUnitDeclaration,
+): ProductSegment[] {
+  const segments: ProductSegment[] = [];
+  const seenNames = new Set<string>();
+  const multiplier = unit.multiplier > 0 ? unit.multiplier : 1;
+
+  for (const block of blocks) {
+    const rows = block.rows;
+    let headerIndex = -1;
+    for (let r = 0; r < rows.length; r += 1) {
+      const keys = rows[r].map((cell) => matchKey(cell));
+      const hasProduct = keys.some((key) => key.includes("نوعکالا") || key.includes("شرحکالا") || key.includes("شرح محصول".replace(/\s/g, "")));
+      const hasRevenue = keys.some((key) => key.includes("مبلغفروش"));
+      const hasGrossProfit = keys.some((key) => key.includes("سودناخالص"));
+      if (hasProduct && hasRevenue && hasGrossProfit) {
+        headerIndex = r;
+        break;
+      }
+    }
+    if (headerIndex < 0) continue;
+
+    const headerCells = rows[headerIndex];
+    const metricColumns: Array<{ column: number; metric: keyof ProductSegmentPeriodValue; year: number | null; relative: ProductPeriodKind | null }> = [];
+    const years: number[] = [];
+    for (let c = 1; c < headerCells.length; c += 1) {
+      const metric = productMetricFor(headerCells[c]);
+      if (!metric) continue;
+      let year: number | null = null;
+      let relative: ProductPeriodKind | null = null;
+      for (let rr = headerIndex - 1; rr >= Math.max(0, headerIndex - 4); rr -= 1) {
+        const cell = rows[rr]?.[c] ?? "";
+        // An estimate/forecast period ("برآورد ... ۱۴۰۶") is never a historical
+        // current/prior period: it must not become the current-period mapping.
+        // (Note: label normalization folds the alef-madda so "برآورد" -> "براورد".)
+        if (/برآورد|براورد|پیشبینی|پیشبینی|estimate|forecast/.test(matchKey(cell))) {
+          relative = "other";
+          break;
+        }
+        const found = yearInCell(cell);
+        if (found !== null) {
+          year = found;
+          if (!years.includes(found)) years.push(found);
+          break;
+        }
+        const rel = relativePeriodKind(cell);
+        if (rel) {
+          relative = rel;
+          break;
+        }
+      }
+      metricColumns.push({ column: c, metric, year, relative });
+    }
+
+    const sortedYears = [...years].sort((a, b) => b - a);
+    const currentYear = sortedYears[0] ?? null;
+    const priorYear = sortedYears[1] ?? null;
+    const kindOf = (entry: { year: number | null; relative: ProductPeriodKind | null }): ProductPeriodKind => {
+      if (entry.relative) return entry.relative;
+      if (entry.year !== null && currentYear !== null && entry.year === currentYear) return "current";
+      if (entry.year !== null && priorYear !== null && entry.year === priorYear) return "prior";
+      return "other";
+    };
+
+    const collectPeriod = (period: ProductPeriodKind, row: ReadonlyArray<string>): ProductSegmentPeriodValue | null => {
+      const raw: Partial<Record<keyof ProductSegmentPeriodValue, number | null>> = {};
+      for (const entry of metricColumns) {
+        if (kindOf(entry) !== period) continue;
+        raw[entry.metric] = valueFromCell(row[entry.column]);
+      }
+      const revenueRaw = raw.revenue;
+      if (revenueRaw === null || revenueRaw === undefined) return null;
+      const scale = (value: number | null | undefined, signed = true): number | null => {
+        if (value === null || value === undefined) return null;
+        return (signed ? value : Math.abs(value)) * multiplier;
+      };
+      return {
+        quantityProduced: raw.quantityProduced ?? null,
+        quantitySold: raw.quantitySold ?? null,
+        unitPrice: raw.unitPrice ?? null,
+        revenue: revenueRaw * multiplier,
+        cost: scale(raw.cost, false),
+        grossProfit: scale(raw.grossProfit, true),
+      };
+    };
+
+    for (let r = headerIndex + 1; r < rows.length; r += 1) {
+      const row = rows[r];
+      if (!row || row.length === 0) continue;
+      const firstKey = matchKey(row[0] ?? "");
+      if (!firstKey) continue;
+      if (firstKey.startsWith("جمع")) break;
+      if (PRODUCT_SECTION_MARKERS.some((pattern) => pattern.test(firstKey))) continue;
+      const unitCell = String(row[1] ?? "").trim();
+      if (!unitCell) continue;
+      const name = String(row[0] ?? "").trim();
+      if (!name || seenNames.has(name)) continue;
+
+      const current = collectPeriod("current", row);
+      if (!current) continue;
+      const prior = collectPeriod("prior", row);
+      const hasActivity = current.revenue !== 0 || (prior?.revenue ?? 0) !== 0 || current.quantitySold !== null || (current.cost ?? 0) !== 0;
+      if (!hasActivity) continue;
+
+      seenNames.add(name);
+      segments.push({
+        name,
+        unit: unitCell,
+        current,
+        prior,
+        confidence: 1,
+        evidence: {
+          line: (block.lineOffset ?? 1) + r + 1,
+          text: joinRowText(row),
+          ...(typeof block.pageNumbers?.[r] === "number" ? { page: block.pageNumbers[r] as number } : {}),
+        },
+      });
+    }
+    // One product revenue table per document; later duplicate tables (estimates
+    // or recaps) are intentionally not merged to avoid double counting.
+    if (segments.length > 0) break;
+  }
+
+  return segments;
+}
+
+/** Exposed for tests and for callers that build a document by hand. */
+export function extractProductSegmentsFromBlocks(blocks: ReadonlyArray<DocumentSectionInput>): ProductSegment[] {
+  const documentText = blocks.flatMap((block) => block.rows.map((row) => row.join(" "))).join("\n");
+  return extractProductSegments(blocks, detectStatementUnit(documentText));
+}
+
+
 /**
  * Build the unified document understanding from one or more blocks (PDF pages
  * or worksheets). The same boundary is used for every source so PDF, XLSX and
@@ -869,6 +1160,7 @@ export function buildFinancialDocumentUnderstanding(blocks: ReadonlyArray<Docume
     unitMultiplier: documentUnit.multiplier,
     sections,
     facts: allFacts,
+    segments: extractProductSegments(blocks, documentUnit),
   };
 }
 
@@ -958,6 +1250,7 @@ function statementForPeriod(
   set("operatingIncome", "OPERATING_PROFIT");
   set("interest", "INTEREST", true);
   set("preTaxIncome", "PRE_TAX_INCOME");
+  set("taxes", "TAX", true);
   set("netIncome", "NET_PROFIT");
   set("cash", "CASH");
   set("receivables", "RECEIVABLES");
