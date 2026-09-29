@@ -244,7 +244,7 @@ async function runCustomerJourney() {
   checks.push('ready');
 
   const rootPage = await fetch(`http://127.0.0.1:${port}/`);
-  if (!rootPage.ok || !(await rootPage.text()).includes('هوشیار.ai')) fail('installed root page failed');
+  if (!rootPage.ok || !(await rootPage.text()).includes('هوشیارOS')) fail('installed root page failed');
   checks.push('web-shell');
 
   const username = `installed-qa-${Date.now()}`;
