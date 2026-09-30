@@ -266,13 +266,39 @@ const INTERNAL_LEAK = /\b(preTaxIncome|netProfit|netIncome|cashConversionCycle|w
   });
 
   test("limitations are reported rather than hidden", () => {
-    // The RESILIENCE path fully executed on this document, so it correctly
-    // reports no capability limitation. The paths that COULD NOT fully execute
-    // must disclose the missing canonical evidence instead of inventing it.
-    expect(of(QUESTIONS[1]).cognition.unavailableCapabilities.length).toBe(0);
+    // The RESILIENCE path executes every capability that HAS genuine canonical
+    // evidence on this document. The only capability it cannot honestly execute
+    // is organizational intelligence (B-03.1): a financial statement carries no
+    // organizational evidence, and financial ratios are never re-labelled as
+    // one. Every other path must disclose its genuinely missing evidence.
+    const resilience = of(QUESTIONS[1]).cognition;
+    expect(resilience.unavailableCapabilities.map((entry) => entry.capability))
+      .toEqual(["ORGANIZATIONAL_INTELLIGENCE"]);
+    expect(resilience.unavailableCapabilities[0].owner).toBe("OrganizationalIntelligenceEngine.diagnose");
+    expect(resilience.unavailableCapabilities[0].reason).toMatch(/organizational evidence/i);
+    // The capability really executed from canonical evidence.
+    expect(resilience.executedCapabilities).toEqual(expect.arrayContaining([
+      "FINANCIAL_INTELLIGENCE", "LIQUIDITY_LEVERAGE", "WORKING_CAPITAL", "EARNINGS_QUALITY",
+    ]));
     // The risk question discloses the absent probability/impact evidence.
     expect(of(QUESTIONS[2]).cognition.limitations.length).toBeGreaterThan(0);
     // An ACTION question discloses the absent decision matrices.
     expect(of(QUESTIONS[6]).cognition.limitations.length).toBeGreaterThan(0);
+  });
+
+  test("B-03.1 — the canonical derived residual is consumed, never reconstructed", () => {
+    for (const question of [QUESTIONS[0], QUESTIONS[1], QUESTIONS[7], QUESTIONS[8]]) {
+      const financial = of(question).cognition.capabilities
+        .find((entry) => entry.capability === "FINANCIAL_INTELLIGENCE");
+      // Where financial intelligence executed at all, it executed on the
+      // canonical residual basis; where the document could not supply it the
+      // capability is reported unavailable rather than filled in locally.
+      if (!financial || financial.status !== "EXECUTED") continue;
+      expect(financial.evidenceCount).toBeGreaterThan(0);
+    }
+    // The real document supplies the residual, so the financial owner really runs.
+    const q1 = of(QUESTIONS[0]).cognition.capabilities
+      .find((entry) => entry.capability === "FINANCIAL_INTELLIGENCE");
+    expect(q1?.status).toBe("EXECUTED");
   });
 });

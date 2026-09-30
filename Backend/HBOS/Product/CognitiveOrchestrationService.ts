@@ -6,14 +6,20 @@
  *
  *   - `FinancialIntelligenceEngine` remains the owner of canonical financial
  *     mathematics. This module only *calls* it and *verifies* its output against
- *     the canonical statement insight. It never re-computes a ratio.
+ *     the canonical statement insight. It never re-computes a ratio and never
+ *     reconstructs a financial value: the total-expense basis is CONSUMED from
+ *     the insight's canonical `derivedResidual`, and when that residual is absent
+ *     the capability is reported `UNAVAILABLE` (B-03.1).
  *   - `RiskIntelligenceEngine` and `ExecutiveIntelligenceEngine` remain the
  *     owners of risk scoring and executive synthesis. When the canonical record
  *     carries no input they could honestly accept, this module reports them
  *     `UNAVAILABLE` — it does not hold an instance in order to look wired, and
  *     it never fabricates the missing input to force execution.
  *   - `OrganizationalIntelligenceEngine` remains the owner of organizational
- *     intelligence.
+ *     intelligence, and is only invoked with GENUINE organizational evidence.
+ *     A financial statement carries none: financial ratios, cash flow and
+ *     accounting integrity are financial evidence and are never re-labelled as
+ *     organizational evidence (B-03.1).
  *   - `GovernanceEngine` remains the owner of policy / authorization.
  *   - `IntelligenceEngine` remains the sanctioned reasoning-pipeline composer.
  *
@@ -380,11 +386,25 @@ export class CognitiveOrchestrationService {
                         [insightRef], "ارقام پایه کاننیکال برای اجرای قابلیت مالی کامل نیست",
                     );
                 }
-                // The platform's canonical total-expense basis is the residual
-                // (revenue − verified net profit). It is passed to the canonical
-                // owner, which performs the mathematics; this module never
-                // derives profit itself.
-                const expenses = revenue - netProfit;
+                // B-03.1 — the total-expense basis is CONSUMED from the canonical
+                // insight (`derivedResidual`), never reconstructed here. This
+                // module performs no financial arithmetic: if the canonical
+                // residual is absent it is absent, and the capability is honestly
+                // reported UNAVAILABLE rather than filled with a local
+                // `revenue - netProfit` computation. `FinancialIntelligenceEngine`
+                // remains the only owner of financial mathematics.
+                const canonicalResidual = insight?.derivedResidual ?? null;
+                const expenses =
+                    canonicalResidual && Number.isFinite(canonicalResidual.value)
+                        ? canonicalResidual.value
+                        : null;
+                if (expenses === null) {
+                    return this.unavailable(
+                        capability, "FinancialIntelligenceEngine",
+                        "the canonical insight carries no derived residual expense basis; it is consumed, never reconstructed as revenue minus net profit",
+                        [insightRef], "مبنای هزینه باقیمانده کاننیکال در سند موجود نیست و در این لایه محاسبه نمی‌شود",
+                    );
+                }
                 const analysis = this.financial.analyze({ revenue, expenses, assets, liabilities });
                 if (analysis.status !== "READY") {
                     return this.unavailable(capability, "FinancialIntelligenceEngine", "the canonical financial analysis returned BLOCKED", [insightRef], "تحلیل مالی کاننیکال آماده نشد");
@@ -420,6 +440,7 @@ export class CognitiveOrchestrationService {
                     evidence: [
                         `revenue=${revenue}`, `netProfit=${netProfit}`,
                         `assets=${assets}`, `liabilities=${liabilities}`,
+                        `expensesBasis=derivedResidual`, `expenses=${expenses}`,
                     ],
                     result: {
                         revenue: analysis.revenue, expenses: analysis.expenses, profit: analysis.profit,
@@ -525,7 +546,11 @@ export class CognitiveOrchestrationService {
                 }
                 const evidence = this.organizationalEvidence(insight);
                 if (Object.keys(evidence).length === 0) {
-                    return this.unavailable(capability, "OrganizationalIntelligenceEngine.diagnose", "no organizational evidence in the canonical insight", [], "شواهد سازمانی در سند موجود نیست");
+                    return this.unavailable(
+                        capability, "OrganizationalIntelligenceEngine.diagnose",
+                        "the canonical record carries no genuine organizational evidence; financial ratios, cash flow and accounting integrity are financial evidence, not organizational evidence, and are never re-labelled as such",
+                        [], "شواهد سازمانی (ساختار، فرایند، ظرفیت یا جریان تصمیم) در سند کاننیکال وجود ندارد؛ نسبت‌های مالی شواهد سازمانی محسوب نمی‌شوند",
+                    );
                 }
                 const diagnosis = this.organizational.diagnose("financial-resilience", evidence);
                 return {
@@ -622,18 +647,25 @@ export class CognitiveOrchestrationService {
         return { capability, owner, status: "UNAVAILABLE", unavailableReason, evidence, result: {} };
     }
 
-    private organizationalEvidence(insight: FinancialStatementInsight): Record<string, unknown> {
-        const evidence: Record<string, unknown> = {};
-        const currentRatio = insight.ratios.currentRatio;
-        const debtToAssets = insight.ratios.debtToAssets;
-        if (currentRatio !== null) evidence.liquidityRatio = currentRatio;
-        if (debtToAssets !== null) evidence.leverage = debtToAssets;
-        if (insight.cashFlow.operating !== null) evidence.cashGeneration = insight.cashFlow.operating;
-        const integrityMismatch = insight.integrity.some((check) => check.status === "MISMATCH");
-        if (integrityMismatch) evidence.quality = "integrity-mismatch";
-        const notTestable = insight.integrity.filter((check) => check.status === "NOT_TESTABLE").length;
-        if (notTestable > 0) evidence.quality = `not-testable-checks=${notTestable}`;
-        return evidence;
+    /**
+     * Genuine organizational evidence: facts about HOW the company operates —
+     * organizational structure, process behaviour, capacity, staffing,
+     * decision/approval flow or recorded organizational events.
+     *
+     * A financial statement is NOT organizational evidence. `currentRatio`,
+     * `debtToAssets`, `operatingCashFlow` and accounting-integrity outcomes are
+     * FINANCIAL evidence: they describe the numbers, never the organization.
+     * Re-labelling them as organizational evidence would make
+     * `OrganizationalIntelligenceEngine` reason causally about a process from a
+     * balance-sheet ratio, so they are never admitted here. No financial metric
+     * is ever converted into organizational evidence.
+     *
+     * The canonical record consumed by this composition is a financial statement
+     * insight, which carries no organizational signal, so this extractor admits
+     * nothing and the capability is reported `UNAVAILABLE` rather than faked.
+     */
+    private organizationalEvidence(_insight: FinancialStatementInsight): Record<string, unknown> {
+        return {};
     }
 
     /**

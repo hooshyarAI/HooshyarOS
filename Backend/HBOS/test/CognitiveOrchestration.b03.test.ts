@@ -89,10 +89,17 @@ describe("B-03 cognitive orchestration", () => {
     );
     // DATA_GAPS must NOT pull in the financial specialist engines.
     expect(ask("چه اطلاعاتی برای نتیجه‌گیری بهتر کم است؟")).toEqual(["INTEGRITY_EVIDENCE"]);
-    // RESILIENCE runs liquidity, working capital and earnings quality.
-    expect(ask("تاب‌آوری شرکت را بررسی کن")).toEqual(
-      expect.arrayContaining(["LIQUIDITY_LEVERAGE", "WORKING_CAPITAL", "EARNINGS_QUALITY", "ORGANIZATIONAL_INTELLIGENCE"]),
+    // RESILIENCE runs liquidity, working capital and earnings quality, and it
+    // SELECTS organizational intelligence — but a financial statement carries no
+    // genuine organizational evidence, so B-03.1 reports that capability
+    // UNAVAILABLE instead of dressing financial ratios up as organizational
+    // evidence. Selection is asserted, honest absence is asserted.
+    const resilience = service.orchestrate({ tenantId: "tenant-a", question: "تاب‌آوری شرکت را بررسی کن", insight, securityContext });
+    expect(resilience.executedCapabilities).toEqual(
+      expect.arrayContaining(["LIQUIDITY_LEVERAGE", "WORKING_CAPITAL", "EARNINGS_QUALITY"]),
     );
+    expect(resilience.executionOrder).toContain("ORGANIZATIONAL_INTELLIGENCE");
+    expect(resilience.unavailableCapabilities.map((entry) => entry.capability)).toContain("ORGANIZATIONAL_INTELLIGENCE");
     // GROWTH runs the existing scenario capability.
     expect(ask("برای رشد و توسعه چه پیشنهادهایی داری؟")).toContain("SCENARIO");
     // PROFIT_CHANGE runs comparative evidence.
