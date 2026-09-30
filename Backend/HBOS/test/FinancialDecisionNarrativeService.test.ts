@@ -16,6 +16,7 @@ import {
 import { FinancialAnalyticsService } from "../Product/FinancialAnalyticsService";
 import { composeFinancialStatementInsight } from "../Product/FinancialStatementInsight";
 import {
+  analyzeQuestion,
   classifyQuestion,
   composeAnswer,
   composeFindingGroups,
@@ -185,5 +186,229 @@ describe("FinancialDecisionNarrativeService", () => {
     expect(composed.answer).toContain("سود خالص: در سند استخراج نشده است");
     expect(composed.answer).toContain("محدودیت");
     expect(INTERNAL_IDENTIFIER.test(composed.answer)).toBe(false);
+  });
+});
+
+/**
+ * B-02 — the user question is the control variable of the answer.
+ *
+ * These tests fix the previously-observed failure: a single document answered
+ * every question with one shared template, and meaningful questions about growth,
+ * resilience or next action silently fell through to GENERAL.
+ */
+describe("B-02 question-driven cognitive control", () => {
+  describe("mandatory intent regression cases", () => {
+    test.each([
+      ["این صورت مالی را تحلیل کن", "ANALYZE"],
+      ["تاب‌آوری شرکت را بررسی کن", "RESILIENCE"],
+      ["مهم‌ترین ریسک مالی چیست؟", "RISK"],
+      ["چرا سود تغییر کرده است؟", "PROFIT_CHANGE"],
+      ["چه اطلاعاتی برای نتیجه‌گیری بهتر کم است؟", "DATA_GAPS"],
+      ["برای رشد و توسعه چه پیشنهادهایی داری؟", "GROWTH"],
+      ["الان برای بهبود وضعیت مالی شرکت چه کار کنم؟", "ACTION"],
+      ["هوا امروز چطور است؟", "GENERAL"],
+    ])("%s routes to %s", (question, expected) => {
+      expect(classifyQuestion(question)).toBe(expected);
+    });
+
+    test("Q7 keeps both growth and resilience and composes the answer", () => {
+      const contract = analyzeQuestion("برای رشد و توسعه و افزایش تاب‌آوری شرکت چه پیشنهادی داری؟");
+      expect(contract.primaryIntent).toBe("GROWTH");
+      expect(contract.secondaryIntents).toContain("RESILIENCE");
+      expect(contract.answerMode).toBe("COMPOSITE");
+    });
+
+    test("Q8 keeps both risk and action and composes the answer", () => {
+      const contract = analyzeQuestion("مهم‌ترین ریسک مالی چیست و الان چه اقدامی انجام بدهم؟");
+      expect(contract.primaryIntent).toBe("RISK");
+      expect(contract.secondaryIntents).toContain("ACTION");
+      expect(contract.answerMode).toBe("COMPOSITE");
+    });
+
+    test("a genuinely unrelated question is GENERAL", () => {
+      const contract = analyzeQuestion("هوا امروز چطور است؟");
+      expect(contract.primaryIntent).toBe("GENERAL");
+      expect(contract.secondaryIntents).toEqual([]);
+      expect(contract.answerMode).toBe("FOCUSED");
+    });
+  });
+
+  describe("structured control contract", () => {
+    test("every intent yields a complete, non-empty control contract", () => {
+      for (const question of [
+        "این صورت مالی را تحلیل کن",
+        "مهم‌ترین ریسک مالی چیست؟",
+        "چرا سود تغییر کرده است؟",
+        "کدام محصولات سودآورترند؟",
+        "چه اطلاعاتی کم است؟",
+        "سه سناریو برای آینده چیست؟",
+        "برای رشد و توسعه چه پیشنهادهایی داری؟",
+        "تاب‌آوری شرکت را بررسی کن",
+        "الان چه کار کنم؟",
+        "هوا امروز چطور است؟",
+      ]) {
+        const contract = analyzeQuestion(question);
+        expect(contract.userGoal.length).toBeGreaterThan(0);
+        expect(contract.requestedAnalysis.length).toBeGreaterThan(0);
+        expect(contract.requestedOutcome.length).toBeGreaterThan(0);
+        expect(contract.requiredEvidenceDomains.length).toBeGreaterThan(0);
+        expect(["FOCUSED", "COMPOSITE"]).toContain(contract.answerMode);
+        // The public label API and the contract can never disagree.
+        expect(classifyQuestion(question)).toBe(contract.primaryIntent);
+      }
+    });
+
+    test("Persian typing variants normalize to the same intent", () => {
+      const withZwnj = "تاب‌آوری شرکت را بررسی کن";
+      const spaced = "تاب آوری شرکت را بررسی کن";
+      const arabicYeh = "تاباوری شركت را برسي كن";
+      const withQuestionMark = "تاب‌آوری شرکت؟";
+      for (const variant of [spaced, arabicYeh, withQuestionMark]) {
+        expect(classifyQuestion(variant)).toBe(classifyQuestion(withZwnj));
+      }
+      expect(classifyQuestion(withZwnj)).toBe("RESILIENCE");
+    });
+
+    test("secondary intents are never silently dropped for a multi-part question", () => {
+      const contract = analyzeQuestion("ریسکها را بگو و بگو چه کار کنم و تاب‌آوری چقدر است");
+      expect(contract.primaryIntent).toBe("RISK");
+      expect(contract.secondaryIntents).toContain("ACTION");
+      expect(contract.secondaryIntents).toContain("RESILIENCE");
+      expect(contract.answerMode).toBe("COMPOSITE");
+    });
+  });
+
+  describe("growth, resilience and action answer paths", () => {
+    test("a growth question reaches the existing three-scenario capability", () => {
+      const insight = insightFor();
+      const composed = composeAnswer(insight, "برای رشد و توسعه چه پیشنهادهایی داری؟");
+      expect(composed.intent).toBe("GROWTH");
+      // GROWTH is answered by the existing composeScenarios capability.
+      expect(composed.scenarios).toHaveLength(3);
+      const normalizedAnswer = normalize(composed.answer);
+      for (const label of ["محافظه‌کارانه", "متوازن", "تهاجمی"]) {
+        expect(normalizedAnswer).toContain(normalize(label));
+      }
+      expect(composed.sections.some((section) => section.heading.includes("مبانی رشد"))).toBe(true);
+    });
+
+    test("a resilience question answers only from canonical evidence, never from market claims", () => {
+      const insight = insightFor();
+      const composed = composeAnswer(insight, "تاب‌آوری شرکت را بررسی کن");
+      expect(composed.intent).toBe("RESILIENCE");
+      expect(composed.sections.some((section) => section.heading.includes("تابآوری"))).toBe(true);
+      // Grounded in the document's own evidence.
+      expect(composed.answer).toContain("اهرم");
+      // Explicitly refuses to claim non-financial resilience.
+      expect(composed.answer).toContain("عوامل غیرمالی");
+      expect(INTERNAL_IDENTIFIER.test(composed.answer)).toBe(false);
+    });
+
+    test("a resilience question with no evidence says so instead of fabricating a verdict", () => {
+      const empty = insightFor([fact("REVENUE", 1000)]);
+      const composed = composeAnswer(empty, "تاب‌آوری شرکت را بررسی کن");
+      expect(composed.intent).toBe("RESILIENCE");
+      expect(composed.answer).toContain("شواهد کافی");
+      // Absence of evidence is not reported as a resilience verdict.
+      expect(composed.answer).toContain("به معنای ضعف تابآوری نیست");
+    });
+
+    test("an action question answers from the canonical finding groups", () => {
+      const insight = insightFor();
+      const composed = composeAnswer(insight, "الان چه کار کنم؟");
+      expect(composed.intent).toBe("ACTION");
+      expect(composed.sections.some((section) => section.heading.includes("اقدام اولویت دار"))).toBe(true);
+      expect(composed.sections.some((section) => section.heading.includes("مبنای شواهد"))).toBe(true);
+      // Recommendations are labelled as such, never as verified fact.
+      expect(composed.answer).toContain("توصیه مدیریتی");
+      expect(INTERNAL_IDENTIFIER.test(composed.answer)).toBe(false);
+    });
+  });
+
+  describe("one document, different questions, materially different answers", () => {
+    test("seven questions produce materially different answer structures", () => {
+      const insight = insightFor();
+      const questions: readonly string[] = [
+        "این صورت مالی را تحلیل کن",
+        "مهم‌ترین ریسک مالی چیست؟",
+        "چرا سود تغییر کرده است؟",
+        "چه اطلاعاتی برای نتیجه‌گیری بهتر کم است؟",
+        "برای رشد و توسعه چه پیشنهادهایی داری؟",
+        "تاب‌آوری شرکت را بررسی کن",
+        "الان چه کار کنم؟",
+      ];
+      const answers = questions.map((question) => composeAnswer(insight, question));
+
+      // Intent, headings, evidence selection and structure must all differ.
+      expect(new Set(answers.map((answer) => answer.intent)).size).toBe(questions.length);
+
+      const headingSets = answers.map((answer) => answer.sections.map((section) => normalize(section.heading)).join("|"));
+      expect(new Set(headingSets).size).toBe(questions.length);
+
+      const bodies = answers.map((answer) => answer.answer);
+      expect(new Set(bodies).size).toBe(questions.length);
+      for (const body of bodies) {
+        for (const other of bodies) {
+          if (body === other) continue;
+          expect(body).not.toBe(other);
+        }
+      }
+    });
+
+    test("Q1 and Q5 no longer collapse onto one shared body", () => {
+      const insight = insightFor();
+      const analyze = composeAnswer(insight, "این صورت مالی را تحلیل کن");
+      const gaps = composeAnswer(insight, "چه اطلاعاتی برای نتیجه‌گیری بهتر کم است؟");
+      expect(analyze.intent).not.toBe(gaps.intent);
+      expect(analyze.answer).not.toBe(gaps.answer);
+      expect(analyze.sections.map((section) => section.heading)).not.toEqual(gaps.sections.map((section) => section.heading));
+    });
+
+    test("Q2 resilience and Q6 growth no longer collapse to the general template", () => {
+      const insight = insightFor();
+      const resilience = composeAnswer(insight, "تاب‌آوری شرکت را بررسی کن");
+      const growth = composeAnswer(insight, "برای رشد و توسعه چه پیشنهادهایی داری؟");
+      const general = composeAnswer(insight, "هوا امروز چطور است؟");
+      expect(resilience.intent).toBe("RESILIENCE");
+      expect(growth.intent).toBe("GROWTH");
+      expect(resilience.answer).not.toBe(general.answer);
+      expect(growth.answer).not.toBe(general.answer);
+      expect(resilience.sections.map((section) => section.heading)).not.toEqual(general.sections.map((section) => section.heading));
+    });
+
+    test("a composite question answers both of its parts", () => {
+      const insight = insightFor();
+      const composed = composeAnswer(insight, "مهم‌ترین ریسک مالی چیست و الان چه اقدامی انجام بدهم؟");
+      expect(composed.intent).toBe("RISK");
+      const headings = composed.sections.map((section) => section.heading);
+      // Risk part
+      expect(headings.some((heading) => heading.includes("ریسکهای اصلی"))).toBe(true);
+      // Action part
+      expect(headings.some((heading) => heading.includes("اقدام اولویت دار"))).toBe(true);
+      expect(INTERNAL_IDENTIFIER.test(composed.answer)).toBe(false);
+    });
+
+    test("no internal identifier leaks into any of the answer paths", () => {
+      const insight = insightFor();
+      for (const question of [
+        "این صورت مالی را تحلیل کن",
+        "مهم‌ترین ریسک مالی چیست؟",
+        "چرا سود تغییر کرده است؟",
+        "چه اطلاعاتی برای نتیجه‌گیری بهتر کم است؟",
+        "برای رشد و توسعه چه پیشنهادهایی داری؟",
+        "تاب‌آوری شرکت را بررسی کن",
+        "الان چه کار کنم؟",
+        "هوا امروز چطور است؟",
+        "برای رشد و توسعه و افزایش تاب‌آوری شرکت چه پیشنهادی داری؟",
+        "مهم‌ترین ریسک مالی چیست و الان چه اقدامی انجام بدهم؟",
+      ]) {
+        const composed = composeAnswer(insight, question);
+        expect(INTERNAL_IDENTIFIER.test(composed.answer)).toBe(false);
+        // Internal intent identifiers must never reach the user surface.
+        for (const intent of ["ANALYZE", "RISK", "PROFIT_CHANGE", "DATA_GAPS", "GROWTH", "RESILIENCE", "ACTION", "SCENARIOS", "GENERAL", "COMPOSITE", "FOCUSED"]) {
+          expect(composed.answer).not.toContain(intent);
+        }
+      }
+    });
   });
 });

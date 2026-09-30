@@ -30,8 +30,52 @@ export type AssistantIntent =
   | "PROFIT_CHANGE"
   | "PRODUCT"
   | "DATA_GAPS"
+  | "GROWTH"
+  | "RESILIENCE"
+  | "ACTION"
   | "ANALYZE"
   | "GENERAL";
+
+/**
+ * Structured, deterministic question contract.
+ *
+ * The intent is not a mere answer label: it is the control variable that
+ * selects the analysis path, the evidence domains and the answer structure.
+ * A multi-part question keeps every detected intent so that nothing is
+ * collapsed to a single keyword match.
+ */
+export interface QuestionIntent {
+  readonly primaryIntent: AssistantIntent;
+  readonly secondaryIntents: readonly AssistantIntent[];
+  /** Persian, user-facing description of what the user is actually asking. */
+  readonly userGoal: string;
+  /** The analysis paths this question requires. */
+  readonly requestedAnalysis: readonly string[];
+  /** The end state the user wants out of the answer. */
+  readonly requestedOutcome: string;
+  readonly requiredEvidenceDomains: readonly EvidenceDomain[];
+  readonly answerMode: AnswerMode;
+}
+
+export type AnswerMode = "FOCUSED" | "COMPOSITE";
+
+/**
+ * Evidence domains a question requires. These select evidence in the answer;
+ * they never introduce a value that is absent from the canonical insight.
+ */
+export type EvidenceDomain =
+  | "OVERVIEW"
+  | "LIQUIDITY"
+  | "LEVERAGE"
+  | "OPERATING_CASH_FLOW"
+  | "CASH_CONVERSION"
+  | "EARNINGS_QUALITY"
+  | "COMPARATIVE"
+  | "INTEGRITY"
+  | "DATA_COMPLETENESS"
+  | "PRODUCT_MIX"
+  | "SCENARIOS"
+  | "ACTIONS";
 
 export type NarrativeEvidenceLevel =
   | "EXTRACTED_FACT"
@@ -279,21 +323,293 @@ export function localizeStatementLimitations(insight: FinancialStatementInsight)
 }
 
 /* ------------------------------------------------------------------------- *
- * Intent classification.
+ * Question-driven cognitive control.
+ *
+ * Persian-first normalization: Arabic yeh/kaf, ZWNJ, Arabic diacritics and
+ * punctuation are folded so that natural typing variants (نیم‌فاصله، علامت
+ * سؤال، فاصله اضافه) match identically. Detection is a SCORING SCAN, not an
+ * ordered cascade: every intent that the question expresses is collected and
+ * then ranked, so a multi-part question keeps all of its intents instead of
+ * collapsing onto the first keyword hit.
+ *
+ * GENERAL is only produced when no capability is expressed at all.
  * ------------------------------------------------------------------------- */
 
+/**
+ * Normalize a Persian question for matching.
+ * Internal intent identifiers never appear here; this is matching-only.
+ */
+export const normalizeQuestion = (question: string): string => String(question ?? "")
+  .replace(/[يى]/g, "ی")                    // Arabic yeh -> Persian yeh
+  .replace(/ك/g, "ک")                              // Arabic kaf -> Persian keheh
+  .replace(/[ً-ْٰ]/g, "")                 // Arabic diacritics
+  .replace(/[\u200B-\u200F\u2028\u2029\uFEFF]/g, "") // ZWNJ / bidi marks / BOM
+  .replace(/[؟?!.,:;«»"'()[\]{}\-–—_/\\]/g, " ")    // punctuation -> space
+  .replace(/\s+/g, " ")
+  .trim()
+  .toLowerCase();
+
+interface IntentRule {
+  readonly intent: AssistantIntent;
+  /** Higher wins when several intents match the same question. */
+  readonly weight: number;
+  readonly patterns: readonly RegExp[];
+}
+
+/**
+ * Intent rules. Weights encode how specific a signal is:
+ *   100 = unambiguous capability ask, 60 = clear, 30 = supporting.
+ * Ties are broken by array order, which is the documented priority.
+ */
+const INTENT_RULES: readonly IntentRule[] = [
+  // Explicit scenario request wins over a generic growth question.
+  {
+    intent: "SCENARIOS",
+    weight: 100,
+    patterns: [/سناریو/, /سه حالت/, /حالت بدبینانه/, /بدبینانه/, /خوشبینانه/, /scenario/, /بدترین حالت/, /بهترین حالت/],
+  },
+  {
+    intent: "PROFIT_CHANGE",
+    weight: 100,
+    patterns: [
+      /(چرا|علت|دلیل|چگونه).*(سود|سودآوری|درآمد|سوددهی)/,
+      /(سود|سودآوری).*(تغییر|عوض|کاهش|افزایش|ریزش|رشد کرده|بالا رفته|پایین آمده)/,
+      /why.*profit/,
+      /profit.*(chang|drop|rise|fall|declin)/,
+    ],
+  },
+  {
+    intent: "RISK",
+    weight: 100,
+    patterns: [/ریسک/, /خطر/, /مخاطره/, /تهدید/, /آسیب پذیری/, /\brisk/, /danger/, /تهدید آمیز/],
+  },
+  {
+    intent: "DATA_GAPS",
+    weight: 100,
+    patterns: [
+      /(چه چیزی|چه اطلاعاتی|چه داده|چه بخشی|کدام بخش|کدام اطلاعاتی).*(کم|ناقص|نیاز|نبود|موجود نیست)/,
+      /(کم|ناقص|نبوده|موجود نیست|نیست).*(اطلاعات|داده|شواهد|بخش|سند|مدارک)/,
+      /چه چیزی کم است/,
+      /کم است/,
+      /ناقص/,
+      /missing/,
+      /data gap/,
+      /incomplete/,
+      /چه چیزی برای نتیجه گیری/,
+    ],
+  },
+  {
+    intent: "PRODUCT",
+    weight: 100,
+    patterns: [/محصول/, /بخش/, /ترکیب فروش/, /سودآوری محصول/, /\bsegment/, /product/, /sales mix/, /\bmix/],
+  },
+  {
+    // GROWTH is ranked before RESILIENCE: a question asking for growth AND
+    // resilience ("رشد و توسعه و افزایش تابآوری") is led by the growth ask.
+    intent: "GROWTH",
+    weight: 100,
+    patterns: [
+      /رشد/,
+      /توسعه/,
+      /گسترش/,
+      /توسعه کسب و کار/,
+      /توسعه کسب ?و ?کار/,
+      /افزایش فروش/,
+      /رشد فروش/,
+      /رشد درآمد/,
+      /ظرفیت توسعه/,
+      /برنامه رشد/,
+      /استراتژی رشد/,
+      /بهره برداری از ظرفیت/,
+      /سرمایه گذاری برای رشد/,
+      /راهبرد رشد/,
+      /\bgrowth/,
+      /expand/,
+      /expansion/,
+      /scale up/,
+    ],
+  },
+  {
+    intent: "RESILIENCE",
+    weight: 100,
+    patterns: [
+      /تاب ?آوری/,
+      /تاباوری/,
+      /تاب آوری/,
+      /مقاومت/,
+      /پایداری/,
+      /توان عبور از شوک/,
+      /تحمل فشار/,
+      /تحمل شوک/,
+      /شکنندگی/,
+      /بازسازی پس از/,
+      /استواری/,
+      /تحمل بالا/,
+      /توان تحمل/,
+      /سرمایه در گردش.*(تحمل|فشار)/,
+      /resilien/,
+      /stability/,
+      / withstand/,
+      /survive/,
+      /tolerate/,
+    ],
+  },
+  {
+    intent: "ACTION",
+    weight: 100,
+    patterns: [
+      /چه کار کنم/,
+      /چه کار باید/,
+      /چه باید کرد/,
+      /چه باید بکنم/,
+      /اولویت اقدام/,
+      /اولویت کار/,
+      /اقدام کنم/,
+      /اقدامی پیشنهاد/,
+      /اقدامات پیشنهادی/,
+      /پیشنهاد اقدام/,
+      /برای بهبود.*(چه کنم|چه کار)/,
+      /بهبود وضعیت/,
+      /چه باید انجام/,
+      /انجام دهم/,
+      /انجام بدهم/,
+      /بکنم/,
+      /کنم \??/,
+      /recommend/,
+      /what should i do/,
+      /next step/,
+      /action plan/,
+    ],
+  },
+  {
+    intent: "ANALYZE",
+    weight: 60,
+    patterns: [/تحلیل کن/, /تحلیل.*(صورت|مالی|وضعیت|شرکت)/, /این صورت مالی/, /بررسی کن/, /بررسی وضعیت/, /analy[sz]e/, /review/, /چه وضعیتی/],
+  },
+];
+
+/** Per-intent contract metadata: goal, analysis paths, outcome, evidence domains. */
+const INTENT_CONTRACT: Readonly<Record<AssistantIntent, Omit<QuestionIntent, "primaryIntent" | "secondaryIntents" | "answerMode">>> = {
+  ANALYZE: {
+    userGoal: "دریافت تصویر کلی معتبر از وضعیت مالی شرکت",
+    requestedAnalysis: ["خلاصه مدیریتی", "نقاط قوت و ضعف", "ریسکها", "فرصتها", "اقدامات"],
+    requestedOutcome: "تصویر کلی سند مالی",
+    requiredEvidenceDomains: ["OVERVIEW", "INTEGRITY"],
+  },
+  RISK: {
+    userGoal: "شناسایی ریسکهای مالی واقعی و شواهد پشت آنها",
+    requestedAnalysis: ["ریسکهای اصلی", "محرکهای ریسک", "شاخصهای پایش"],
+    requestedOutcome: "فهرست ریسکهای قابل اتکا با شاهد",
+    requiredEvidenceDomains: ["LEVERAGE", "LIQUIDITY", "OPERATING_CASH_FLOW", "INTEGRITY"],
+  },
+  PROFIT_CHANGE: {
+    userGoal: "درک علت تغییر سود",
+    requestedAnalysis: ["تغییر سود", "زنجیره عوامل", "تفکیک واقعیت از استنباط"],
+    requestedOutcome: "تبیین مستند تغییر سود",
+    requiredEvidenceDomains: ["COMPARATIVE"],
+  },
+  PRODUCT: {
+    userGoal: "بررسی سودآوری در سطح محصول یا بخش",
+    requestedAnalysis: ["سودآوری محصول/بخش", "ترکیب فروش", "اقدامات مرتبط"],
+    requestedOutcome: "سهم محصولات و اثر ترکیب فروش",
+    requiredEvidenceDomains: ["PRODUCT_MIX"],
+  },
+  DATA_GAPS: {
+    userGoal: "دانستن اینکه چه شواهدی برای نتیجهگیری کم است",
+    requestedAnalysis: ["شکاف داده", "شکاف اعتبارسنجی", "شکاف عملیاتی", "اقدام تکمیل"],
+    requestedOutcome: "فهرست شواهد ناقص و نحوه تکمیل",
+    requiredEvidenceDomains: ["DATA_COMPLETENESS", "INTEGRITY"],
+  },
+  SCENARIOS: {
+    userGoal: "دیدن مسیرهای ممکن آینده بر پایه شواهد سند",
+    requestedAnalysis: ["سناریوی محافظهکارانه", "سناریوی متوازن", "سناریوی تهاجمی"],
+    requestedOutcome: "مقایسه سه سناریوی مستند",
+    requiredEvidenceDomains: ["SCENARIOS", "COMPARATIVE", "LIQUIDITY", "LEVERAGE"],
+  },
+  GROWTH: {
+    userGoal: "بررسی ظرفیت رشد و توسعه شرکت",
+    requestedAnalysis: ["مبانی رشد", "مسیرهای رشد در سه سناریو", "پیش نیازهای مالی رشد", "هشدارها"],
+    requestedOutcome: "مسیرهای مستند رشد",
+    requiredEvidenceDomains: ["SCENARIOS", "COMPARATIVE", "OPERATING_CASH_FLOW"],
+  },
+  RESILIENCE: {
+    userGoal: "سنجش تابآوری مالی شرکت بر پایه شواهد سند",
+    requestedAnalysis: ["نقدینگی", "اهرم", "جریان نقد عملیاتی", "کیفیت سود", "چرخه تبدیل نقد"],
+    requestedOutcome: "ارزیابی مستند تابآوری یا اعلام کمبود شواهد",
+    requiredEvidenceDomains: ["LIQUIDITY", "LEVERAGE", "OPERATING_CASH_FLOW", "CASH_CONVERSION", "EARNINGS_QUALITY", "COMPARATIVE", "INTEGRITY"],
+  },
+  ACTION: {
+    userGoal: "دانستن اقدام عملی بعدی",
+    requestedAnalysis: ["اقدامهای اولویت دار", "مبنای شواهد هر اقدام"],
+    requestedOutcome: "اقدام اولویت دار مستند",
+    requiredEvidenceDomains: ["ACTIONS", "LIQUIDITY", "LEVERAGE", "OPERATING_CASH_FLOW"],
+  },
+  GENERAL: {
+    userGoal: "دریافت پاسخ عمومی به پرسش خارج از مسیرهای تخصصی",
+    requestedAnalysis: ["خلاصه", "نقاط قوت", "ریسکها", "اقدامات"],
+    requestedOutcome: "پاسخ عمومی مبتنی بر سند",
+    requiredEvidenceDomains: ["OVERVIEW"],
+  },
+};
+
+/**
+ * Detect every intent the question expresses, ranked.
+ * Returns the structured control contract for one question.
+ */
+export function analyzeQuestion(question: string): QuestionIntent {
+  const q = normalizeQuestion(question);
+
+  if (!q) {
+    return { primaryIntent: "GENERAL", secondaryIntents: [], ...INTENT_CONTRACT.GENERAL, answerMode: "FOCUSED" };
+  }
+
+  // Scoring scan: collect EVERY matching intent, then rank. Nothing collapses
+  // onto the first keyword hit, so a multi-part question keeps all its parts.
+  const scored = INTENT_RULES
+    .map((rule, index) => ({ intent: rule.intent, weight: rule.weight, index, matched: rule.patterns.some((pattern) => pattern.test(q)) }))
+    .filter((entry) => entry.matched)
+    .sort((a, b) => (b.weight - a.weight) || (a.index - b.index));
+
+  if (scored.length === 0) {
+    return { primaryIntent: "GENERAL", secondaryIntents: [], ...INTENT_CONTRACT.GENERAL, answerMode: "FOCUSED" };
+  }
+
+  const [primary, ...rest] = scored;
+  const secondaryIntents = rest.map((entry) => entry.intent);
+
+  // Evidence domains and analysis paths are the union over every detected
+  // intent, so a composite question is answered from all required evidence.
+  const requiredEvidenceDomains = Array.from(new Set<EvidenceDomain>(
+    [primary.intent, ...secondaryIntents].flatMap((intent) => INTENT_CONTRACT[intent].requiredEvidenceDomains),
+  ));
+  const requestedAnalysis = Array.from(new Set<string>(
+    [primary.intent, ...secondaryIntents].flatMap((intent) => INTENT_CONTRACT[intent].requestedAnalysis),
+  ));
+  const requestedOutcome = secondaryIntents.length > 0
+    ? `${INTENT_CONTRACT[primary.intent].requestedOutcome} همراه با ${secondaryIntents.map((intent) => INTENT_CONTRACT[intent].userGoal).join(" و ")}`
+    : INTENT_CONTRACT[primary.intent].requestedOutcome;
+
+  return {
+    primaryIntent: primary.intent,
+    secondaryIntents,
+    userGoal: secondaryIntents.length > 0
+      ? `${INTENT_CONTRACT[primary.intent].userGoal} همراه با ${secondaryIntents.map((intent) => INTENT_CONTRACT[intent].userGoal).join(" و ")}`
+      : INTENT_CONTRACT[primary.intent].userGoal,
+    requestedAnalysis,
+    requestedOutcome,
+    requiredEvidenceDomains,
+    // A question expressing more than one intent must be answered compositely;
+    // one expressing a single intent gets a focused answer.
+    answerMode: secondaryIntents.length > 0 ? "COMPOSITE" : "FOCUSED",
+  };
+}
+
+/**
+ * Backward-compatible public API: the primary intent label only.
+ * Prefer `analyzeQuestion` when the full control contract is needed.
+ */
 export function classifyQuestion(question: string): AssistantIntent {
-  const q = String(question ?? "").replace(/\s+/g, " ").trim();
-  if (!q) return "GENERAL";
-  if (/سناریو|scenario/i.test(q)) return "SCENARIOS";
-  if (/ریسک|خطر|risk/i.test(q)) return "RISK";
-  if (/(چرا|why).*(سود|profit)|سود.*(تغییر|عوض|چرا)|profit.*(chang|why)/i.test(q)) return "PROFIT_CHANGE";
-  // Product / segment / sales-mix questions are answered from the document's own
-  // per-product revenue table when it exists (never from company totals).
-  if (/محصول|بخش|ترکیب فروش|segment|product|sales mix|mix/i.test(q)) return "PRODUCT";
-  if (/(چه چیزی|چه اطلاعاتی|چه داده|what).*(کم|ناقص|نیاز|missing|gap)|کم است|کم است؟|ناقص|missing|data gap/i.test(q)) return "DATA_GAPS";
-  if (/تحلیل کن|تحلیل.*(صورت|مالی)|این صورت مالی|analy[sz]e/i.test(q)) return "ANALYZE";
-  return "GENERAL";
+  return analyzeQuestion(question).primaryIntent;
 }
 
 /* ------------------------------------------------------------------------- *
@@ -860,8 +1176,150 @@ const productSegmentSections = (insight: FinancialStatementInsight): NarrativeSe
   return sections;
 };
 
+/**
+ * Resilience evidence, built ONLY from what the canonical insight actually
+ * contains: liquidity, leverage, operating cash flow, cash conversion, earnings
+ * quality, comparative movement, integrity findings and unavailable evidence.
+ *
+ * No claim is made about market conditions, the future, or real-world shock
+ * absorption. When the document carries no such evidence the caller receives an
+ * explicit INSUFFICIENT_EVIDENCE limitation rather than a fabricated judgement.
+ */
+const resilienceLines = (insight: FinancialStatementInsight): readonly string[] => {
+  const currency = insight.currency || "IRR";
+  const lines: string[] = [];
+  const currentAssets = metric(insight, "currentAssets");
+  const currentLiabilities = metric(insight, "currentLiabilities");
+  const totalLiabilities = metric(insight, "totalLiabilities");
+  const equity = metric(insight, "equity");
+  const operating = insight.cashFlow?.operating ?? null;
+
+  if (insight.ratios.currentRatio !== null) {
+    lines.push(`نقدینگی: نسبت جاری ${formatFaRatio(insight.ratios.currentRatio)} (${insight.ratios.currentRatio >= 1 ? "پوشش کامل بدهیهای جاری توسط داراییهای جاری" : "پوشش ناقص بدهیهای جاری"}) و نسبت آنی ${formatFaRatio(insight.ratios.quickRatio)}.`);
+  }
+  if (currentAssets !== null && currentLiabilities !== null) {
+    lines.push(currentLiabilities > currentAssets
+      ? `نقدینگی: بدهیهای جاری ${formatFaAmount(currentLiabilities, currency)} از داراییهای جاری ${formatFaAmount(currentAssets, currency)} بیشتر است؛ کسری پوشش تعهدات کوتاهمدت ${formatFaAmount(currentLiabilities - currentAssets, currency)}.`
+      : `نقدینگی: داراییهای جاری ${formatFaAmount(currentAssets, currency)} بدهیهای جاری ${formatFaAmount(currentLiabilities, currency)} را پوشش میدهند.`);
+  }
+  if (insight.ratios.debtToAssets !== null || insight.ratios.debtToEquity !== null) {
+    lines.push(`اهرم: نسبت بدهی به دارایی ${formatFaPercent(insight.ratios.debtToAssets)} و نسبت بدهی به حقوق مالکانه ${formatFaRatio(insight.ratios.debtToEquity)}.`);
+  }
+  if (totalLiabilities !== null && equity !== null) {
+    lines.push(equity < 0
+      ? `اهرم: حقوق مالکانه منفی (${formatFaAmount(equity, currency)}) است؛ تابآوری مالی به حمایت طلبکاران وابسته است.`
+      : `اهرم: بدهیهای ${formatFaAmount(totalLiabilities, currency)} در برابر حقوق مالکانه ${formatFaAmount(equity, currency)}؛ ${totalLiabilities > equity ? "اهرم بالاتر از حقوق مالکانه است و ظرفیت تحمل فشار کاهش می یابد." : "اهرم در محدوده حقوق مالکانه است."}`);
+  }
+  if (insight.coverage?.interestCoverage !== null && insight.coverage?.interestCoverage !== undefined) {
+    const coverage = insight.coverage.interestCoverage;
+    lines.push(`تحم��ل فشار مالی: پوشش هزینه مالی ${formatFaRatio(coverage)}؛ ${coverage < 1 ? "سود عملیاتی به تنهایی هزینه مالی را پوشش نمی دهد." : "سود عملیاتی هزینه مالی را پوشش می دهد."}`);
+  }
+  if (operating !== null) {
+    lines.push(`جریان نقد عملیاتی: ${formatFaAmount(operating, currency)}؛ ${operating < 0 ? "عملیات جاری از نقد استفاده کرده و تابآوری تحت فشار کاهش می یابد." : "عملیات جاری نقد تولید کرده است."}`);
+  }
+  const quality = insight.cashFlow?.qualityOfEarnings ?? "UNAVAILABLE";
+  if (quality === "CASH_BACKED") {
+    lines.push("کیفیت سود: سود گزارششده با جریان نقد عملیاتی پشتیبانی می شود.");
+  } else if (quality === "PROFIT_NOT_CASH_BACKED") {
+    lines.push("کیفیت سود: سود گزارششده هنوز به جریان نقد تبدیل نشده است؛ پایداری نقدی سود اثبات نشده است.");
+  } else {
+    lines.push("کیفیت سود: شواهد جریان نقد عملیاتی برای سنجش کیفیت سود در دسترس نیست.");
+  }
+  if (insight.workingCapital) {
+    const ccc = insight.workingCapital.cashConversionCycle;
+    lines.push(`چرخه تبدیل نقد: ${formatFaDecimal(ccc, 0)} روز (دوره وصول ${formatFaDecimal(insight.workingCapital.dso, 0)} روز، دوره نگهداری موجودی ${formatFaDecimal(insight.workingCapital.dio, 0)} روز، دوره پرداخت ${formatFaDecimal(insight.workingCapital.dpo, 0)} روز).`);
+  }
+  const revenueChange = change(insight, "revenue");
+  const netProfitChange = change(insight, "netIncome");
+  if (revenueChange) lines.push(`روند درآمد: ${changeText(revenueChange)} نسبت به دوره قبل.`);
+  if (netProfitChange) lines.push(`روند سود خالص: ${changeText(netProfitChange)} نسبت به دوره قبل.`);
+  if (!revenueChange && !netProfitChange) {
+    lines.push("روند: شواهد دوره مقایسهای برای ارزیابی تغییر در دسترس نیست.");
+  }
+  const mismatch = (insight.integrity ?? []).find((check) => check.status === "MISMATCH");
+  if (mismatch) {
+    lines.push(`کنترل حسابداری: «${faIntegrity(mismatch.id)}» با اقلام استخراجشده منطبق نیست (اختلاف ${formatFaAmount(Math.abs(mismatch.difference ?? 0), currency)})؛ تا رفع آن، پایداری ارقام قابل اتکا نیست.`);
+  }
+  const untestable = (insight.integrity ?? []).filter((check) => check.status === "NOT_TESTABLE");
+  if (untestable.length > 0) {
+    lines.push(`کنترلهای آزموننشده: ${untestable.map((check) => faIntegrity(check.id)).join("، ")}.`);
+  }
+  if (insight.documentStatus !== "COMPLETED") {
+    lines.push("وضعیت سند: ناقص؛ بخشی از نتیجهگیری تابآوری بر پایه شواهد ناقص است.");
+  }
+  const gaps = missingEvidence(insight);
+  if (gaps.length > 0) {
+    lines.push(`شواهد ناقص: ${gaps.map(faMeasure).join("، ")}.`);
+  }
+  return lines;
+};
+
+/** True when the document carries at least one resilience-relevant observation. */
+const hasResilienceEvidence = (insight: FinancialStatementInsight): boolean => {
+  const currentAssets = metric(insight, "currentAssets");
+  const currentLiabilities = metric(insight, "currentLiabilities");
+  const totalLiabilities = metric(insight, "totalLiabilities");
+  const equity = metric(insight, "equity");
+  return insight.ratios.currentRatio !== null
+    || insight.ratios.debtToAssets !== null
+    || insight.ratios.debtToEquity !== null
+    || insight.cashFlow?.operating !== null && insight.cashFlow?.operating !== undefined
+    || qualityOfEarningsKnown(insight)
+    || insight.workingCapital !== null && insight.workingCapital !== undefined
+    || change(insight, "revenue") !== undefined
+    || change(insight, "netIncome") !== undefined
+    || (currentAssets !== null && currentLiabilities !== null)
+    || (totalLiabilities !== null && equity !== null);
+};
+
+const qualityOfEarningsKnown = (insight: FinancialStatementInsight): boolean => {
+  const quality = insight.cashFlow?.qualityOfEarnings;
+  return quality === "CASH_BACKED" || quality === "PROFIT_NOT_CASH_BACKED";
+};
+
+/** Scenario sections, reused by both the SCENARIOS and GROWTH answer paths. */
+const scenarioSections = (
+  insight: FinancialStatementInsight,
+  scenarios: readonly ScenarioView[],
+  basisHeading: string,
+): readonly NarrativeSection[] => {
+  const sections: NarrativeSection[] = [{
+    heading: basisHeading,
+    lines: [
+      `مبنای سناریوها: شواهد مالی همین سند (${insight.periods.map((period) => period.label).join("، ") || "دوره نامشخص"}). فرضهای هر سناریو بهصورت صریح ذکر شده و هیچ عدد آیندهنگرانهای ساخته نشده است.`,
+    ],
+  }];
+  for (const scenario of scenarios) {
+    sections.push({
+      heading: `سناریوی ${scenario.label}`,
+      lines: [
+        `هدف: ${scenario.objective}`,
+        "فرضها:",
+        ...scenario.assumptions.map((line) => `• ${line}`),
+        "اقدامهای کلیدی:",
+        ...scenario.actions.map((line) => `• ${line}`),
+        "جهتگیری مورد انتظار:",
+        ...scenario.expectedDirection.map((line) => `• ${line}`),
+        "ریسکهای اصلی:",
+        ...scenario.principalRisks.map((line) => `• ${line}`),
+        "شاخصهای هشدار زودهنگام:",
+        ...scenario.earlyWarnings.map((line) => `• ${line}`),
+        "معیارهای تصمیم:",
+        ...scenario.decisionCriteria.map((line) => `• ${line}`),
+        "شواهد مورد نیاز:",
+        ...scenario.requiredEvidence.map((line) => `• ${line}`),
+      ],
+    });
+  }
+  return sections;
+};
+
 export function composeAnswer(insight: FinancialStatementInsight, question: string): ComposedAnswer {
-  const intent = classifyQuestion(question);
+  // Classification and answer composition share ONE contract: the intent
+  // contract that classifyQuestion() reduces to, so the answer structure can
+  // never disagree with the detected question.
+  const intentContract = analyzeQuestion(question);
+  const intent = intentContract.primaryIntent;
   const groups = composeFindingGroups(insight);
   const scenarios = composeScenarios(insight);
   // Honest capability disclosure: only when the document actually lacks a
@@ -876,44 +1334,24 @@ export function composeAnswer(insight: FinancialStatementInsight, question: stri
   ];
   const currency = insight.currency || "IRR";
   const sections: NarrativeSection[] = [];
+  // Composite questions answer EVERY detected intent, not only the first.
+  const targetIntents: readonly AssistantIntent[] = intentContract.answerMode === "COMPOSITE"
+    ? [intentContract.primaryIntent, ...intentContract.secondaryIntents]
+    : [intentContract.primaryIntent];
+  // Limitations are appended once, by the outermost composition, not per part.
+  // `answeredIntents` is the full target set, computed up front so a part can
+  // tell whether a sibling part already covers a shared section.
+  const answeredIntents = new Set<AssistantIntent>(targetIntents);
 
-  if (intent === "SCENARIOS") {
-    sections.push({
-      heading: "پیشنهاد رشد، توسعه و افزایش تابآوری در سه سناریو",
-      lines: [
-        `مبنای سناریوها: شواهد مالی همین سند (${insight.periods.map((period) => period.label).join("، ") || "دوره نامشخص"}). فرضهای هر سناریو بهصورت صریح ذکر شده و هیچ عدد آیندهنگرانهای ساخته نشده است.`,
-      ],
-    });
-    for (const scenario of scenarios) {
-      sections.push({
-        heading: `سناریوی ${scenario.label}`,
-        lines: [
-          `هدف: ${scenario.objective}`,
-          "فرضها:",
-          ...scenario.assumptions.map((line) => `• ${line}`),
-          "اقدامهای کلیدی:",
-          ...scenario.actions.map((line) => `• ${line}`),
-          "جهتگیری مورد انتظار:",
-          ...scenario.expectedDirection.map((line) => `• ${line}`),
-          "ریسکهای اصلی:",
-          ...scenario.principalRisks.map((line) => `• ${line}`),
-          "شاخصهای هشدار زودهنگام:",
-          ...scenario.earlyWarnings.map((line) => `• ${line}`),
-          "معیارهای تصمیم:",
-          ...scenario.decisionCriteria.map((line) => `• ${line}`),
-          "شواهد مورد نیاز:",
-          ...scenario.requiredEvidence.map((line) => `• ${line}`),
-        ],
-      });
-    }
-    sections.push({ heading: "محدودیتها", lines: limitations.length ? limitations : ["محدودیت ثبتشدهای برای این تحلیل وجود ندارد."] });
-  } else if (intent === "RISK") {
-    sections.push({ heading: "ریسکهای اصلی", lines: linesOf(groups.risks) });
-    sections.push({ heading: "چرا این ریسکها مهماند (محرکها و شواهد)", lines: riskDrivers(insight) });
-    sections.push({ heading: "آنچه باید پایش شود", lines: monitorLine(insight) });
-    sections.push({ heading: "اقدام پیشنهادی", lines: linesOf(groups.actions) });
-    sections.push({ heading: "اطمینان و محدودیت", lines: limitations.length ? limitations : [`این تفسیر فقط بر شواهد همین سند (${currency}) استوار است.`] });
-  } else if (intent === "PROFIT_CHANGE") {
+  for (const target of targetIntents) {
+    if (target === "SCENARIOS") {
+      for (const section of scenarioSections(insight, scenarios, "پیشنهاد رشد، توسعه و افزایش تابآوری در سه سناریو")) sections.push(section);
+    } else if (target === "RISK") {
+      sections.push({ heading: "ریسکهای اصلی", lines: linesOf(groups.risks) });
+      sections.push({ heading: "چرا این ریسکها مهماند (محرکها و شواهد)", lines: riskDrivers(insight) });
+      sections.push({ heading: "آنچه باید پایش شود", lines: monitorLine(insight) });
+      if (!answeredIntents.has("ACTION")) sections.push({ heading: "اقدام پیشنهادی", lines: linesOf(groups.actions) });
+    } else if (target === "PROFIT_CHANGE") {
     const netProfit = metric(insight, "netProfit");
     const netProfitChange = change(insight, "netIncome");
     const revenueChange = change(insight, "revenue");
@@ -945,17 +1383,15 @@ export function composeAnswer(insight: FinancialStatementInsight, question: stri
         "استنباط: ربطدادن تغییر سود به یک علت واحد، بدون شواهد تکمیلی درباره بازار، قیمت یا ترکیب فروش، قطعی نیست.",
       ],
     });
-    sections.push({ heading: "محدودیتها", lines: limitations.length ? limitations : ["محدودیت ثبتشدهای برای این تحلیل وجود ندارد."] });
-  } else if (intent === "PRODUCT") {
+    } else if (target === "PRODUCT") {
     const productSections = productSegmentSections(insight);
     if (productSections.length > 0) {
       for (const section of productSections) sections.push(section);
     } else {
-      sections.push({ heading: "Product/segment profitability", lines: ["داده سودآوری محصول/بخش در منبع موجود نیست؛ از جمع‌های کل شرکت استنتاج نمی‌شود و برای تحلیل بخش به جدول درآمد و بهای تمام شده محصول نیاز است."] });
+      sections.push({ heading: "داده سودآوری محصول/بخش", lines: ["داده سودآوری محصول/بخش در منبع موجود نیست؛ از جمع‌های کل شرکت استنتاج نمی‌شود و برای تحلیل بخش به جدول درآمد و بهای تمام شده محصول نیاز است."] });
     }
     if (groups.actions.length > 0) sections.push({ heading: "اقدامات پیشنهادی مرتبط", lines: linesOf(groups.actions) });
-    sections.push({ heading: "محدودیت‌ها", lines: limitations.length ? limitations : ["محدودیت ثبت‌شده‌ای برای این تحلیل وجود ندارد."] });
-  } else if (intent === "DATA_GAPS") {
+  } else if (target === "DATA_GAPS") {
     const integrityGaps = (insight.integrity ?? [])
       .filter((check) => check.status === "NOT_TESTABLE")
       .map((check) => `${faIntegrity(check.id)} (اقلام ناموجود: ${check.missing.map(faMeasure).join("، ") || "نامشخص"})`);
@@ -969,9 +1405,60 @@ export function composeAnswer(insight: FinancialStatementInsight, question: stri
     sections.push({ heading: "شکافهای اعتبارسنجی", lines: (insight.integrity ?? []).some((check) => check.status === "NOT_TESTABLE") ? (insight.integrity ?? []).filter((check) => check.status === "NOT_TESTABLE").map((check) => `${faIntegrity(check.id)}: کنترل کامل ممکن نیست.`) : ["همه کنترلهای سازگاری موجود قابل آزمون بودند."] });
     sections.push({ heading: "شکافهای عملیاتی", lines: operationalGaps.length ? operationalGaps : ["شکاف عملیاتی مشخصی در شواهد فعلی ثبت نشده است."] });
     sections.push({ heading: "اقدام برای تکمیل", lines: linesOf(groups.actions) });
-  } else if (intent === "ANALYZE") {
-    const keyFigures = [
-      metric(insight, "revenue") !== null ? `درآمد: ${formatFaAmount(metric(insight, "revenue"), currency)}` : "درآمد: در سند استخراج نشده است",
+    } else if (target === "GROWTH") {
+      // Growth is answered from the EXISTING three-scenario capability; no new
+      // scenario engine and no forward-looking figure is created here.
+      sections.push({ heading: "مبانی رشد بر پایه شواهد سند", lines: [
+        `رشد در این تحلیل فقط از شواهد همین سند (${insight.periods.map((period) => period.label).join("، ") || "دوره نامشخص"}) استخراج می‌شود. این صورت مالی به‌تنهایی تقاضای بازار، جایگاه رقابتی یا فروش آینده را اثبات نمی‌کند.`,
+        ...linesOf(groups.opportunities).slice(0, 4),
+        ...(insight.cashFlow?.operating !== null && insight.cashFlow?.operating !== undefined
+          ? [`ظرفیت خودتأمینی رشد: جریان نقد عملیاتی ${formatFaAmount(insight.cashFlow.operating, currency)}${insight.cashFlow.operating > 0 ? " مثبت است." : " منفی است؛ رشد از محل منابع داخلی تأمین نمی‌شود."}`]
+          : ["ظرفیت خودتأمینی رشد: شواهد جریان نقد عملیاتی در دسترس نیست."]),
+      ] });
+      for (const section of scenarioSections(insight, scenarios, "مسیرهای رشد در سه سناریو")) sections.push(section);
+      if (!answeredIntents.has("RESILIENCE")) {
+        sections.push({ heading: "پیشنیازهای مالی رشد", lines: [
+          "رشد فقط تا سقف جریان نقد آزاد و کنترل اهرم ادامه مییابد.",
+          `اهرم فعلی: بدهی به دارایی ${formatFaPercent(insight.ratios.debtToAssets)}؛ پوشش تعهدات کوتاهمدت: نسبت جاری ${formatFaRatio(insight.ratios.currentRatio)}.`,
+        ] });
+      }
+    } else if (target === "RESILIENCE") {
+      // Resilience is reported ONLY from canonical evidence; with no such
+      // evidence the answer says so explicitly instead of inventing a verdict.
+      const evidenceAvailable = hasResilienceEvidence(insight);
+      sections.push({ heading: "ارزیابی تابآوری مالی بر پایه شواهد سند", lines: evidenceAvailable
+        ? [...resilienceLines(insight)]
+        : [
+          "شواهد کافی برای ارزیابی تابآوری مالی در این سند وجود ندارد؛ نسبتهای نقدینگی و اهرم، جریان نقد عملیاتی و چرخه تبدیل نقد قابل استخراج نیستند.",
+        ] });
+      sections.push({ heading: "حدود این ارزیابی", lines: [
+        "این ارزیابی تنها بر شواهد مالی همین سند استوار است.",
+        "تابآوری در برابر شوک بازار، شوک عرضه، رقابت یا سایر عوامل غیرمالی از این سند قابل سنجش نیست و هیچ ادعایی درباره آن نمی‌شود.",
+        ...(evidenceAvailable
+          ? ["هیچ عدد آیندهنگرانهای برای تحمل شوک برآورد نشده است."]
+          : ["کمبود شواهد به معنای ضعف تابآوری نیست؛ صرفاً یعنی از این سند قابل ارزیابی نیست."]),
+      ] });
+      if (!answeredIntents.has("ACTION") && groups.actions.length > 0) {
+        sections.push({ heading: "اقدامهای مرتبط با تابآوری", lines: linesOf(groups.actions) });
+      }
+    } else if (target === "ACTION") {
+      sections.push({ heading: "اقدام اولویت دار", lines: groups.actions.filter((finding) => finding.evidenceLevel === "MANAGEMENT_RECOMMENDATION").length > 0
+        ? linesOf(groups.actions.filter((finding) => finding.evidenceLevel === "MANAGEMENT_RECOMMENDATION"))
+        : linesOf(groups.actions) });
+      sections.push({ heading: "مبنای شواهد هر اقدام", lines: groups.actions.flatMap((finding) => [
+        `• ${finding.message}`,
+        ...(finding.evidence.length > 0 ? [`  شاهد: ${finding.evidence.map((item) => faMeasure(item.split("=")[0])).join("، ")}`] : []),
+      ]) });
+      sections.push({ heading: "اولویت بندی بر پایه شدت", lines: [
+        ...linesOf(groups.risks).slice(0, 3).map((line) => `ریسک مرتبط: ${line}`),
+        ...linesOf(groups.weaknesses).slice(0, 3).map((line) => `ضعف مرتبط: ${line}`),
+      ] });
+      sections.push({ heading: "محدودیت اقدامها", lines: [
+        "اقدامهای فوق توصیه مدیریتی بر پایه شواهد همین سند هستند و به‌عنوان تصمیم قطعی یا تضمین نتیجه ارائه نمی‌شوند.",
+        ...(limitations.length ? [] : [`این پیشنهاد فقط بر شواهد همین سند (${currency}) استوار است.`]),
+      ] });
+    } else if (target === "ANALYZE") {
+    const keyFigures = [      metric(insight, "revenue") !== null ? `درآمد: ${formatFaAmount(metric(insight, "revenue"), currency)}` : "درآمد: در سند استخراج نشده است",
       metric(insight, "netProfit") !== null ? `سود خالص: ${formatFaAmount(metric(insight, "netProfit"), currency)}` : "سود خالص: در سند استخراج نشده است",
       metric(insight, "grossProfit") !== null ? `سود ناخالص: ${formatFaAmount(metric(insight, "grossProfit"), currency)}` : null,
       metric(insight, "totalAssets") !== null ? `کل دارایی‌ها: ${formatFaAmount(metric(insight, "totalAssets"), currency)}` : null,
@@ -986,9 +1473,8 @@ export function composeAnswer(insight: FinancialStatementInsight, question: stri
     sections.push({ heading: "ریسکها", lines: linesOf(groups.risks) });
     sections.push({ heading: "فرصتها و رشد", lines: linesOf(groups.opportunities) });
     for (const section of productSegmentSections(insight)) sections.push(section);
-    sections.push({ heading: "اقدامات پیشنهادی", lines: linesOf(groups.actions) });
-    sections.push({ heading: "محدودیتها", lines: limitations.length ? limitations : ["محدودیت ثبتشدهای برای این تحلیل وجود ندارد."] });
-  } else {
+    if (!answeredIntents.has("ACTION")) sections.push({ heading: "اقدامات پیشنهادی", lines: linesOf(groups.actions) });
+    } else {
     sections.push({ heading: "خلاصه", lines: [
       `سند با وضعیت ${faDocumentStatus(insight.documentStatus)} بررسی شد؛ ارقام از همین سند استخراج شدهاند.`,
       metric(insight, "revenue") !== null ? `درآمد: ${formatFaAmount(metric(insight, "revenue"), currency)}.` : "درآمد: در سند استخراج نشده است.",
@@ -997,13 +1483,30 @@ export function composeAnswer(insight: FinancialStatementInsight, question: stri
     sections.push({ heading: "نقاط قوت", lines: linesOf(groups.strengths) });
     sections.push({ heading: "ریسک‌ها", lines: linesOf(groups.risks) });
     for (const section of productSegmentSections(insight)) sections.push(section);
-    sections.push({ heading: "اقدامات پیشنهادی", lines: linesOf(groups.actions) });
+    if (!answeredIntents.has("ACTION")) sections.push({ heading: "اقدامات پیشنهادی", lines: linesOf(groups.actions) });
+    }
+  }
+
+  // Limitations are appended once for the whole answer, by the outermost
+  // composition, so a composite question does not repeat them per part.
+  if (!answeredIntents.has("RESILIENCE") && !answeredIntents.has("ACTION")) {
     sections.push({ heading: "محدودیتها", lines: limitations.length ? limitations : ["محدودیت ثبتشدهای برای این تحلیل وجود ندارد."] });
+  } else {
+    sections.push({ heading: "محدودیتها", lines: limitations.length ? limitations : [`این تحلیل فقط بر شواهد همین سند (${currency}) استوار است.`] });
   }
 
   const answer = sections
     .flatMap((section) => [section.heading, ...section.lines])
     .join("\n");
 
-  return { intent, answer, sections, scenarios: intent === "SCENARIOS" ? scenarios : [], limitations };
+  // Scenarios are surfaced to the caller for both the explicit scenario path and
+  // the growth path, since GROWTH is answered by the same existing capability.
+  const scenarioIntents: readonly AssistantIntent[] = ["SCENARIOS", "GROWTH"];
+  return {
+    intent,
+    answer,
+    sections,
+    scenarios: targetIntents.some((target) => scenarioIntents.includes(target)) ? scenarios : [],
+    limitations,
+  };
 }
