@@ -22,6 +22,7 @@ import {
     composeFindingGroups,
     composeScenarios,
 } from "../../Product/FinancialDecisionNarrativeService";
+import { CognitiveOrchestrationService } from "../../Product/CognitiveOrchestrationService";
 import { FinancialIngestionService, IngestionFormat, SUPPORTED_INGESTION_FORMATS } from "../../Product/FinancialIngestionService";
 import { IngestionJobService } from "../../Product/IngestionJobService";
 import { isTerminalIngestionStage } from "../../Product/IngestionProgress";
@@ -447,6 +448,9 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     const executiveWorkbench = new ExecutiveIntelligenceWorkbench(new ExecutiveIntelligenceEngine());
     const decisionWorkbench = new DecisionWorkbench();
     const financialAnalytics = new FinancialAnalyticsService();
+    // B-03: question-driven cognitive orchestration composition over the
+    // existing canonical Engines (no new Engine, no new domain logic).
+    const cognitiveOrchestration = new CognitiveOrchestrationService();
     const organizationalExecution = new OrganizationalExecutionCoordinator(persistence);
     if (options.securityEventLogger) organizationalExecution.setSecurityLogger(options.securityEventLogger);
     const reports = new ReportsEngine();
@@ -2229,6 +2233,29 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                     ?? await loadStatementInsight(session.tenantId, result.source.sha256, analytics);
 
                 /**
+                 * Question-driven cognitive orchestration (B-03).
+                 *
+                 * The user question is the control variable. `analyzeQuestion`
+                 * produces the `QuestionIntent`, the intent selects the required
+                 * capabilities, the existing canonical Engines execute in
+                 * dependency order, the results are checked against the canonical
+                 * financial truth, and only then does reasoning run. The narrative
+                 * composer is the FINAL presentation layer over that executed
+                 * result — it is no longer the owner of cognitive orchestration.
+                 */
+                const orchestration = cognitiveOrchestration.orchestrate({
+                    tenantId: session.tenantId,
+                    question,
+                    insight: insight ?? null,
+                    executiveWorkbench: workbench
+                        ? { recommendations: workbench.recommendations.map((item) => ({ action: item.action })) }
+                        : null,
+                    // The governance gate uses the caller's real session
+                    // authority; it is never bypassed for the ACTION path.
+                    securityContext: executionContext(session),                    ...(result.source?.sha256 ? { evidenceRefs: [`financial-ingestion:${result.source.sha256}`] } : {}),
+                });
+
+                /**
                  * Question-specific decision-support answer. When governed
                  * statement evidence exists, the question is routed to the
                  * appropriate answer structure and composed deterministically
@@ -2292,6 +2319,40 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                     question,
                     answer: resolvedAnswer,
                     ...(response ? { response } : {}),
+                    /**
+                     * Cognitive orchestration provenance: what the question
+                     * selected, what actually executed, in which order, with
+                     * which evidence, and which contradictions were detected.
+                     */
+                    cognition: {
+                        traceId: orchestration.traceId,
+                        status: orchestration.status,
+                        intent: {
+                            primary: orchestration.intent.primaryIntent,
+                            secondary: orchestration.intent.secondaryIntents,
+                            answerMode: orchestration.intent.answerMode,
+                            userGoal: orchestration.intent.userGoal,
+                            requiredEvidenceDomains: orchestration.intent.requiredEvidenceDomains,
+                        },
+                        selectedCapabilities: orchestration.selectedCapabilities,
+                        executionOrder: orchestration.executionOrder,
+                        capabilities: orchestration.executed.map((entry) => ({
+                            capability: entry.capability,
+                            owner: entry.owner,
+                            status: entry.status,
+                            ...(entry.unavailableReason ? { unavailableReason: entry.unavailableReason } : {}),
+                            evidenceCount: entry.evidence.length,
+                        })),
+                        executedCapabilities: orchestration.executedCapabilities,
+                        unavailableCapabilities: orchestration.unavailableCapabilities,
+                        reasoning: {
+                            status: orchestration.reasoning.status,
+                            confidenceSource: orchestration.reasoning.confidenceSource,
+                            stepCount: orchestration.reasoning.steps.length,
+                        },
+                        contradictions: orchestration.contradictions,
+                        limitations: orchestration.limitations,
+                    },
                     ...(conversationId ? { conversationId } : {}),
                     evidence: {
                         analysisSource: result.source,

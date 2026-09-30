@@ -433,9 +433,10 @@ const INTENT_RULES: readonly IntentRule[] = [
     intent: "RESILIENCE",
     weight: 100,
     patterns: [
-      /تاب ?آوری/,
+      // "تاب‌آور" (adjectival), "تاب‌آوری" (noun), "تاب آوری" and the
+      // plain-alif spelling "تاباوری" all resolve to RESILIENCE.
+      /تاب ?آور/,
       /تاباوری/,
-      /تاب آوری/,
       /مقاومت/,
       /پایداری/,
       /توان عبور از شوک/,
