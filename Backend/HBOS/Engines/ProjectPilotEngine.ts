@@ -6,7 +6,7 @@ import { ProjectInsight } from "../Entities/ProjectInsight";
 import { MemoryEvent } from "../Entities/MemoryEvent";
 
 import { DecisionEngine } from "./DecisionEngine";
-import { MemoryEngine } from "./MemoryEngine";
+import { MemoryEngine, MEMORY_INTERNAL_SCOPE } from "./MemoryEngine";
 import { ReactionEngine } from "./ReactionEngine";
 
 
@@ -68,7 +68,9 @@ export class ProjectPilotEngine {
 
                 "ProjectPilotEngine"
 
-            )
+            ),
+
+            MEMORY_INTERNAL_SCOPE
 
         );
 

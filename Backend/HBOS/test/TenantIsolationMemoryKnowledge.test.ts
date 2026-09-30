@@ -1,4 +1,4 @@
-import { MemoryEngine } from '../Engines/MemoryEngine';
+import { MemoryEngine, MEMORY_SYSTEM_SCOPE } from '../Engines/MemoryEngine';
 import { KnowledgeEngine } from '../Engines/KnowledgeEngine';
 import { MemoryEvent } from '../Entities/MemoryEvent';
 
@@ -38,21 +38,25 @@ describe('MemoryEngine and KnowledgeEngine tenant isolation', () => {
             expect(bResults).toHaveLength(0);
         });
 
-        test('global/system entries remain accessible without tenant filter', () => {
+        test('retrieval without a tenant scope fails closed', () => {
             const memory = new MemoryEngine();
 
             const systemEvent = new MemoryEvent('SYSTEM_READY', 'All systems go', 'HBOS');
             const tenantEvent = new MemoryEvent('PROJECT_CREATED', 'ProjectA', 'Test', TENANT_A);
 
-            memory.store(systemEvent);
+            memory.store(systemEvent, MEMORY_SYSTEM_SCOPE);
             memory.store(tenantEvent);
 
-            const allResults = memory.retrieve();
-            expect(allResults).toHaveLength(2);
+            // A tenant-scoped read never returns system or other-tenant records.
+            expect(memory.retrieve(TENANT_A)).toHaveLength(1);
 
-            const systemOnly = allResults.find(e => e.type === 'SYSTEM_READY');
-            expect(systemOnly).toBeDefined();
-            expect(systemOnly!.tenantId).toBeUndefined();
+            // Omitting the tenant fails closed rather than returning global memory.
+            expect(() => memory.retrieve()).toThrow(/tenant/i);
+
+            // System memory is reachable only by explicitly asking for its scope.
+            const system = memory.retrieve(MEMORY_SYSTEM_SCOPE);
+            expect(system).toHaveLength(1);
+            expect(system[0].tenantId).toBe(MEMORY_SYSTEM_SCOPE);
         });
 
         test('tenant-scoped store sets tenantId on event', () => {

@@ -1,4 +1,5 @@
 import { ExecutiveIntelligenceEngine, StrategicGoal, ActualMetrics, ExpectedMetrics, GrowthDimension, ImpactComparison, StrategicAlignment, DashboardPrimitives, KPIHistory, BalancedGrowthReport } from "../Engines/ExecutiveIntelligenceEngine";
+import { MEMORY_INTERNAL_SCOPE } from "../Engines/MemoryEngine";
 import { MemoryEvent } from "../Entities/MemoryEvent";
 
 describe("ExecutiveIntelligenceEngine Phase 11-1.4 — Strategic Evaluation & Dashboard Primitives", () => {
@@ -161,9 +162,9 @@ describe("ExecutiveIntelligenceEngine Phase 11-1.4 — Strategic Evaluation & Dash
         it("returns KPI history with data points from memory", () => {
             const MemoryEvent = require("../Entities/MemoryEvent").MemoryEvent;
             const memory = (engine as any).memory;
-            memory.store(new MemoryEvent("Revenue", "100", "finance"));
-            memory.store(new MemoryEvent("Revenue", "110", "finance"));
-            memory.store(new MemoryEvent("Revenue", "120", "finance"));
+            memory.store(new MemoryEvent("Revenue", "100", "finance"), MEMORY_INTERNAL_SCOPE);
+            memory.store(new MemoryEvent("Revenue", "110", "finance"), MEMORY_INTERNAL_SCOPE);
+            memory.store(new MemoryEvent("Revenue", "120", "finance"), MEMORY_INTERNAL_SCOPE);
 
             const result = engine.trackKPIHistory("Revenue");
 
@@ -178,8 +179,8 @@ describe("ExecutiveIntelligenceEngine Phase 11-1.4 — Strategic Evaluation & Dash
         it("returns DOWN trend for decreasing values", () => {
             const MemoryEvent = require("../Entities/MemoryEvent").MemoryEvent;
             const memory = (engine as any).memory;
-            memory.store(new MemoryEvent("Efficiency", "100", "ops"));
-            memory.store(new MemoryEvent("Efficiency", "90", "ops"));
+            memory.store(new MemoryEvent("Efficiency", "100", "ops"), MEMORY_INTERNAL_SCOPE);
+            memory.store(new MemoryEvent("Efficiency", "90", "ops"), MEMORY_INTERNAL_SCOPE);
 
             const result = engine.trackKPIHistory("Efficiency");
 
@@ -189,8 +190,8 @@ describe("ExecutiveIntelligenceEngine Phase 11-1.4 — Strategic Evaluation & Dash
         it("returns STABLE trend for unchanged values", () => {
             const MemoryEvent = require("../Entities/MemoryEvent").MemoryEvent;
             const memory = (engine as any).memory;
-            memory.store(new MemoryEvent("Quality", "50", "qa"));
-            memory.store(new MemoryEvent("Quality", "50", "qa"));
+            memory.store(new MemoryEvent("Quality", "50", "qa"), MEMORY_INTERNAL_SCOPE);
+            memory.store(new MemoryEvent("Quality", "50", "qa"), MEMORY_INTERNAL_SCOPE);
 
             const result = engine.trackKPIHistory("Quality");
 
@@ -209,7 +210,7 @@ describe("ExecutiveIntelligenceEngine Phase 11-1.4 — Strategic Evaluation & Dash
             const MemoryEvent = require("../Entities/MemoryEvent").MemoryEvent;
             const memory = (engine as any).memory;
             for (let i = 0; i < 10; i++) {
-                memory.store(new MemoryEvent("Metric", String(i), "src"));
+                memory.store(new MemoryEvent("Metric", String(i), "src"), MEMORY_INTERNAL_SCOPE);
             }
 
             const result = engine.trackKPIHistory("Metric", 3);
@@ -308,7 +309,7 @@ describe("ExecutiveIntelligenceEngine Phase 11-1.4 — Strategic Evaluation & Dash
         it("scores HEALTHY for dimensions above 75", () => {
             const MemoryEvent = require("../Entities/MemoryEvent").MemoryEvent;
             const memory = (engine as any).memory;
-            memory.store(new MemoryEvent("profit", "90", "finance"));
+            memory.store(new MemoryEvent("profit", "90", "finance"), MEMORY_INTERNAL_SCOPE);
 
             const dimensions: GrowthDimension[] = ["profit"];
             const result = engine.generateBalancedGrowthIndicators(dimensions);
@@ -320,7 +321,7 @@ describe("ExecutiveIntelligenceEngine Phase 11-1.4 — Strategic Evaluation & Dash
         it("identifies AT_RISK dimensions between 40 and 75", () => {
             const MemoryEvent = require("../Entities/MemoryEvent").MemoryEvent;
             const memory = (engine as any).memory;
-            memory.store(new MemoryEvent("liquidity", "60", "finance"));
+            memory.store(new MemoryEvent("liquidity", "60", "finance"), MEMORY_INTERNAL_SCOPE);
 
             const dimensions: GrowthDimension[] = ["liquidity"];
             const result = engine.generateBalancedGrowthIndicators(dimensions);
@@ -333,7 +334,7 @@ describe("ExecutiveIntelligenceEngine Phase 11-1.4 — Strategic Evaluation & Dash
         it("identifies CRITICAL dimensions below 40", () => {
             const MemoryEvent = require("../Entities/MemoryEvent").MemoryEvent;
             const memory = (engine as any).memory;
-            memory.store(new MemoryEvent("investment", "20", "finance"));
+            memory.store(new MemoryEvent("investment", "20", "finance"), MEMORY_INTERNAL_SCOPE);
 
             const dimensions: GrowthDimension[] = ["investment"];
             const result = engine.generateBalancedGrowthIndicators(dimensions);
@@ -354,8 +355,8 @@ describe("ExecutiveIntelligenceEngine Phase 11-1.4 — Strategic Evaluation & Dash
         it("generates recommendations for imbalanced dimensions", () => {
             const MemoryEvent = require("../Entities/MemoryEvent").MemoryEvent;
             const memory = (engine as any).memory;
-            memory.store(new MemoryEvent("workforce", "30", "hr"));
-            memory.store(new MemoryEvent("quality", "20", "qa"));
+            memory.store(new MemoryEvent("workforce", "30", "hr"), MEMORY_INTERNAL_SCOPE);
+            memory.store(new MemoryEvent("quality", "20", "qa"), MEMORY_INTERNAL_SCOPE);
 
             const dimensions: GrowthDimension[] = ["workforce", "quality"];
             const result = engine.generateBalancedGrowthIndicators(dimensions);

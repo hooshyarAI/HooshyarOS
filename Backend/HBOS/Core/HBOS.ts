@@ -1,6 +1,6 @@
 import { EngineRegistry } from "./EngineRegistry";
 
-import { MemoryEngine } from "../Engines/MemoryEngine";
+import { MemoryEngine, MEMORY_SYSTEM_SCOPE } from "../Engines/MemoryEngine";
 import { DecisionEngine } from "../Engines/DecisionEngine";
 import { ProjectPilotEngine } from "../Engines/ProjectPilotEngine";
 import { AssistantEngine } from "../Engines/AssistantEngine";
@@ -320,13 +320,17 @@ export class HBOS {
 
 
 
+        // The boot event is platform/system memory, not tenant data. It is
+        // stored under the reserved system scope so it can never leak into a
+        // tenant-scoped retrieval.
         const bootEvent = new MemoryEvent(
             "HBOS_BOOT",
             "HBOS platform initialized",
-            "HBOS"
+            "HBOS",
+            MEMORY_SYSTEM_SCOPE
         );
 
-        this.memoryEngine.store(bootEvent);
+        this.memoryEngine.store(bootEvent, MEMORY_SYSTEM_SCOPE);
 
         return true;
 

@@ -1,4 +1,4 @@
-import { MemoryEngine } from "./MemoryEngine";
+import { MemoryEngine, MEMORY_INTERNAL_SCOPE } from "./MemoryEngine";
 import { MemoryEvent } from "./MemoryEvent";
 
 
@@ -16,7 +16,7 @@ export class AssistantMemory {
 
     getRecentEvents(): MemoryEvent[] {
 
-        return this.memoryEngine.retrieve();
+        return this.memoryEngine.retrieve(MEMORY_INTERNAL_SCOPE);
 
     }
 

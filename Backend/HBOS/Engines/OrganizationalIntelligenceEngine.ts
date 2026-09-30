@@ -1,5 +1,5 @@
 ﻿import { Engine } from "../Core/Engine";
-import { MemoryEngine } from "./MemoryEngine";
+import { MemoryEngine, MEMORY_INTERNAL_SCOPE } from "./MemoryEngine";
 import { KnowledgeEngine } from "./KnowledgeEngine";
 import { ProjectPilotEngine } from "./ProjectPilotEngine";
 import { ReasoningEngine } from "./ReasoningEngine";
@@ -136,6 +136,16 @@ export class OrganizationalIntelligenceEngine implements Engine {
         return true;
     }
 
+    /**
+     * Tenant/scope for this engine's own working memory. A non-empty
+     * organizational scope isolates the events it reads; an empty scope falls
+     * back to the engine-local internal scope, never to a global read.
+     */
+    private memoryScope(scope: string): string {
+        const trimmed = typeof scope === "string" ? scope.trim() : "";
+        return trimmed.length > 0 ? trimmed : MEMORY_INTERNAL_SCOPE;
+    }
+
     assess(scope = "organization"): OrganizationalInsight {
         return {
             scope,
@@ -265,7 +275,7 @@ export class OrganizationalIntelligenceEngine implements Engine {
         const traceId = ProvenanceTrace.createTraceId();
         const inputHash = ProvenanceTrace.hashInput(scope);
         const reasoningSteps: string[] = [];
-        const events = this.memory.retrieve();
+        const events = this.memory.retrieve(this.memoryScope(scope));
         const processes: string[] = [];
         const cycleTimes: Record<string, number> = {};
         const throughput: Record<string, number> = {};
@@ -310,7 +320,7 @@ export class OrganizationalIntelligenceEngine implements Engine {
         const traceId = ProvenanceTrace.createTraceId();
         const inputHash = ProvenanceTrace.hashInput(scope);
         const reasoningSteps: string[] = [];
-        const events = this.memory.retrieve();
+        const events = this.memory.retrieve(this.memoryScope(scope));
         const results: Bottleneck[] = [];
         const seenKeys = new Set<string>();
 
@@ -408,7 +418,7 @@ export class OrganizationalIntelligenceEngine implements Engine {
         }
 
         const bottlenecks = this.detectBottlenecks(scope);
-        const events = this.memory.retrieve();
+        const events = this.memory.retrieve(this.memoryScope(scope));
 
         reasoningSteps.push("Found " + bottlenecks.length + " bottlenecks for improvement targeting");
 

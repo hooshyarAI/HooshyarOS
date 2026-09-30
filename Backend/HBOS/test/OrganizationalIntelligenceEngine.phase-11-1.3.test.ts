@@ -115,8 +115,8 @@ describe("OrganizationalIntelligenceEngine Phase 11-1.3", () => {
         it("returns process analysis with provenance from MemoryEngine events", () => {
             const MemoryEvent = require("../Entities/MemoryEvent").MemoryEvent;
             const memory = (engine as any).memory;
-            memory.store(new MemoryEvent("PROJECT_CREATED", "data", "sales-process"));
-            memory.store(new MemoryEvent("PROJECT_UPDATED", "data", "sales-process"));
+            memory.store(new MemoryEvent("PROJECT_CREATED", "data", "sales-process"), "sales");
+            memory.store(new MemoryEvent("PROJECT_UPDATED", "data", "sales-process"), "sales");
 
             const result = engine.analyzeProcesses("sales");
 
@@ -143,7 +143,7 @@ describe("OrganizationalIntelligenceEngine Phase 11-1.3", () => {
             const MemoryEvent = require("../Entities/MemoryEvent").MemoryEvent;
             const memory = (engine as any).memory;
             for (let i = 0; i < 25; i++) {
-                memory.store(new MemoryEvent("EVENT", "data", "slow-process"));
+                memory.store(new MemoryEvent("EVENT", "data", "slow-process"), "slow");
             }
 
             const result = engine.detectBottlenecks("slow");
@@ -162,7 +162,7 @@ describe("OrganizationalIntelligenceEngine Phase 11-1.3", () => {
             const MemoryEvent = require("../Entities/MemoryEvent").MemoryEvent;
             const memory = (engine as any).memory;
             for (let i = 0; i < 8; i++) {
-                memory.store(new MemoryEvent("EVENT", "data", "dup-source"));
+                memory.store(new MemoryEvent("EVENT", "data", "dup-source"), "dup");
             }
 
             const result = engine.detectBottlenecks("dup");
@@ -195,7 +195,7 @@ describe("OrganizationalIntelligenceEngine Phase 11-1.3", () => {
             const MemoryEvent = require("../Entities/MemoryEvent").MemoryEvent;
             const memory = (engine as any).memory;
             for (let i = 0; i < 25; i++) {
-                memory.store(new MemoryEvent("EVENT", "data", "critical-process"));
+                memory.store(new MemoryEvent("EVENT", "data", "critical-process"), "critical");
             }
 
             const result = engine.recommendImprovements("critical");
@@ -225,7 +225,7 @@ describe("OrganizationalIntelligenceEngine Phase 11-1.3", () => {
             const MemoryEvent = require("../Entities/MemoryEvent").MemoryEvent;
             const memory = (engine as any).memory;
             for (let i = 0; i < 8; i++) {
-                memory.store(new MemoryEvent("EVENT", "data", "dup-proc"));
+                memory.store(new MemoryEvent("EVENT", "data", "dup-proc"), "dup-proc");
             }
 
             const result = engine.recommendImprovements("dup-proc");
@@ -326,7 +326,7 @@ describe("OrganizationalIntelligenceEngine Phase 11-1.3", () => {
             const MemoryEvent = require("../Entities/MemoryEvent").MemoryEvent;
             const memory = (engine as any).memory;
             for (let i = 0; i < 25; i++) {
-                memory.store(new MemoryEvent("EVENT", "data", "proc"));
+                memory.store(new MemoryEvent("EVENT", "data", "proc"), "proc");
             }
 
             const recs = engine.recommendImprovements("proc");
@@ -378,7 +378,7 @@ describe("OrganizationalIntelligenceEngine Phase 11-1.3", () => {
         it("analyzeProcesses reads from MemoryEngine.retrieve", () => {
             const MemoryEvent = require("../Entities/MemoryEvent").MemoryEvent;
             const memory = (engine as any).memory;
-            memory.store(new MemoryEvent("TYPE", "data", "proc-A"));
+            memory.store(new MemoryEvent("TYPE", "data", "proc-A"), "proc-A");
 
             const result = engine.analyzeProcesses("proc-A");
 

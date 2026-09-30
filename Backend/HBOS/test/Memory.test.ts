@@ -12,9 +12,9 @@ test("MemoryEngine can store and retrieve event", () => {
         "Test"
     );
 
-    memory.store(event);
+    memory.store(event, "tenant-memory-test");
 
-    const result = memory.retrieve();
+    const result = memory.retrieve("tenant-memory-test");
 
     expect(result[0].type).toBe("PROJECT_CREATED");
 
@@ -36,7 +36,7 @@ test("canonical MemoryEngine owns the Memory capability and is a superset with l
     memory.addListener(listener);
 
     const event = new MemoryEvent("PROJECT_CREATED", "HooshyarOS", "test");
-    memory.store(event);
+    memory.store(event, "tenant-memory-listener");
 
     expect(received).toHaveLength(1);
     expect(received[0].type).toBe("PROJECT_CREATED");

@@ -17,7 +17,7 @@
  */
 
 import { HBOS } from "../Core/HBOS";
-import { MemoryEngine } from "../Core/MemoryEngine";
+import { MemoryEngine, MEMORY_SYSTEM_SCOPE } from "../Core/MemoryEngine";
 import { KnowledgeEngine } from "../Engines/KnowledgeEngine";
 import { MemoryEvent } from "../Entities/MemoryEvent";
 
@@ -29,14 +29,14 @@ describe("Phase 06-I: HBOS Runtime Boot with MemoryEvents", () => {
             const hbos = new HBOS();
 
             const memoryEngine = hbos.getMemoryEngine();
-            const initialCount = memoryEngine.retrieve().length;
+            const initialCount = memoryEngine.retrieve(MEMORY_SYSTEM_SCOPE).length;
 
             const result = hbos.boot();
 
             expect(result).toBe(true);
-            expect(memoryEngine.retrieve().length).toBeGreaterThan(initialCount);
+            expect(memoryEngine.retrieve(MEMORY_SYSTEM_SCOPE).length).toBeGreaterThan(initialCount);
 
-            const bootEvents = memoryEngine.retrieve().filter(
+            const bootEvents = memoryEngine.retrieve(MEMORY_SYSTEM_SCOPE).filter(
                 e => e.type === "HBOS_BOOT"
             );
             expect(bootEvents.length).toBe(1);
@@ -49,7 +49,7 @@ describe("Phase 06-I: HBOS Runtime Boot with MemoryEvents", () => {
             hbos.boot();
 
             const memoryEngine = hbos.getMemoryEngine();
-            const bootEvent = memoryEngine.retrieve().find(e => e.type === "HBOS_BOOT");
+            const bootEvent = memoryEngine.retrieve(MEMORY_SYSTEM_SCOPE).find(e => e.type === "HBOS_BOOT");
 
             expect(bootEvent).toBeDefined();
             expect(bootEvent!.id).toBeDefined();
@@ -153,7 +153,7 @@ describe("Phase 06-I: HBOS Runtime Boot with MemoryEvents", () => {
 
             // Don't boot - boot is already validated in this minimal HBOS
             // But we can verify the memory engine starts empty before any boot
-            const initialEvents = memoryEngine.retrieve();
+            const initialEvents = memoryEngine.retrieve(MEMORY_SYSTEM_SCOPE);
 
             // Creating HBOS without booting should not emit boot event
             expect(initialEvents.filter(e => e.type === "HBOS_BOOT").length).toBe(0);
@@ -189,7 +189,7 @@ describe("Phase 06-I: HBOS Runtime Boot with MemoryEvents", () => {
                 "TestSource"
             );
 
-            memoryEngine.store(event);
+            memoryEngine.store(event, "tenant-phase06i");
 
             expect(knowledgeEngine.count()).toBe(1);
             expect(knowledgeEngine.getKnowledge()[0].title).toBe("TEST_EVENT");
@@ -201,9 +201,9 @@ describe("Phase 06-I: HBOS Runtime Boot with MemoryEvents", () => {
 
             memoryEngine.addListener(knowledgeEngine);
 
-            memoryEngine.store(new MemoryEvent("EVENT_1", "Data 1", "Source1"));
-            memoryEngine.store(new MemoryEvent("EVENT_2", "Data 2", "Source2"));
-            memoryEngine.store(new MemoryEvent("EVENT_3", "Data 3", "Source3"));
+            memoryEngine.store(new MemoryEvent("EVENT_1", "Data 1", "Source1"), "tenant-phase06i");
+            memoryEngine.store(new MemoryEvent("EVENT_2", "Data 2", "Source2"), "tenant-phase06i");
+            memoryEngine.store(new MemoryEvent("EVENT_3", "Data 3", "Source3"), "tenant-phase06i");
 
             expect(knowledgeEngine.count()).toBe(3);
         });

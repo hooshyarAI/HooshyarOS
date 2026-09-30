@@ -1,5 +1,5 @@
 import { Engine } from "../Core/Engine";
-import { MemoryEngine } from "./MemoryEngine";
+import { MemoryEngine, MEMORY_INTERNAL_SCOPE } from "./MemoryEngine";
 import { OrganizationalIntelligenceEngine } from "./OrganizationalIntelligenceEngine";
 import { GovernanceEngine } from "./GovernanceEngine";
 import { ProvenanceTrace } from "../Core/ProvenanceTrace";
@@ -341,7 +341,7 @@ export class ExecutiveIntelligenceEngine implements Engine {
 
         reasoningSteps.push("Tracking KPI history for: " + kpiId + " with limit " + limit);
 
-        const memoryEvents = this.memory.retrieve();
+        const memoryEvents = this.memory.retrieve(MEMORY_INTERNAL_SCOPE);
         const relevantEvents = memoryEvents.filter(event => event.type === kpiId || event.source === kpiId);
         reasoningSteps.push("Found " + relevantEvents.length + " relevant events for KPI " + kpiId);
 
@@ -577,7 +577,7 @@ export class ExecutiveIntelligenceEngine implements Engine {
     }
 
     private scoreGrowthDimension(dimension: GrowthDimension): number {
-        const memoryEvents = this.memory.retrieve();
+        const memoryEvents = this.memory.retrieve(MEMORY_INTERNAL_SCOPE);
         const relevantEvents = memoryEvents.filter(event => event.source.toLowerCase().includes(dimension) || event.type.toLowerCase().includes(dimension));
         if (relevantEvents.length === 0) {
             const baseScores: Record<string, number> = {

@@ -29,7 +29,7 @@ describe("Phase 06-H: Knowledge-Influenced Production Decisions", () => {
                 data: "Important lesson about HBOS Core",
                 source: "KnowledgeEngine",
                 createdAt: new Date()
-            } as any);
+            } as any, "tenant-phase06h");
 
             expect(knowledgeEngine.count()).toBe(1);
             expect(knowledgeEngine.getKnowledge()[0].title).toBe("PROJECT_LEARNED");
@@ -46,7 +46,7 @@ describe("Phase 06-H: Knowledge-Influenced Production Decisions", () => {
                 data: "HBOS Core milestone completed",
                 source: "System",
                 createdAt: new Date()
-            } as any);
+            } as any, "tenant-phase06h");
 
             expect(knowledgeEngine.count()).toBe(1);
 
@@ -56,7 +56,7 @@ describe("Phase 06-H: Knowledge-Influenced Production Decisions", () => {
                 data: "HBOS Core status changed",
                 source: "System",
                 createdAt: new Date()
-            } as any);
+            } as any, "tenant-phase06h");
 
             expect(knowledgeEngine.count()).toBe(2);
         });

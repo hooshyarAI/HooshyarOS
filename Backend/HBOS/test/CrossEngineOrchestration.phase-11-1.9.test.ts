@@ -248,7 +248,7 @@ describe("Cross-Engine Orchestration Phase 11-1.9", () => {
 
         memory.store(new MemoryEvent("KPI_TenantTest", JSON.stringify({ actual: 50, target: 100 }), "tenant-isolation-test", tenantId));
 
-        const allEvents = memory.retrieve();
+        const allEvents = memory.retrieve(tenantId);
         expect(allEvents.length).toBe(1);
         expect(allEvents[0].tenantId).toBe(tenantId);
 
