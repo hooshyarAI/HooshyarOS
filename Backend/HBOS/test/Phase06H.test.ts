@@ -211,7 +211,8 @@ describe("Phase 06-H: Knowledge-Influenced Production Decisions", () => {
 
             const input = {
                 problem: "Financial analysis",
-                data: { revenue: 100000, expenses: 50000, assets: 200000, liabilities: 80000 }
+                // B-01: canonical derived values supplied by the canonical financial owner
+                data: { revenue: 100000, expenses: 50000, assets: 200000, liabilities: 80000, profit: 50000, profitMargin: 0.5, debtRatio: 0.4 }
             };
 
             const context = { knowledgeItems: [], evidenceItems: [] };
@@ -314,7 +315,8 @@ describe("Phase 06-H: Knowledge-Influenced Production Decisions", () => {
 
             const input = {
                 problem: "Financial analysis",
-                data: { revenue: 100000, expenses: 50000, assets: 200000, liabilities: 80000 }
+                // B-01: canonical derived values supplied by the canonical financial owner
+                data: { revenue: 100000, expenses: 50000, assets: 200000, liabilities: 80000, profit: 50000, profitMargin: 0.5, debtRatio: 0.4 }
             };
 
             const contextWithoutKnowledge = { knowledgeItems: [], evidenceItems: [] };

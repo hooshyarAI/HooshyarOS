@@ -77,7 +77,11 @@ describe("Phase 06-E - Truthful Confidence", () => {
                     revenue: 100000,
                     expenses: 50000,
                     assets: 200000,
-                    liabilities: 80000
+                    liabilities: 80000,
+                    // B-01: canonical derived values from the canonical financial owner
+                    profit: 50000,
+                    profitMargin: 0.5,
+                    debtRatio: 0.4
                     // profitMargin = 0.5, debtRatio = 0.4 → GOOD
                 }
             };
@@ -110,7 +114,11 @@ describe("Phase 06-E - Truthful Confidence", () => {
                     revenue: 100000,
                     expenses: 80000,
                     assets: 200000,
-                    liabilities: 100000
+                    liabilities: 100000,
+                    // B-01: canonical derived values from the canonical financial owner
+                    profit: 20000,
+                    profitMargin: 0.2,
+                    debtRatio: 0.5
                     // profitMargin = 0.2, debtRatio = 0.5 → MARGINAL
                 }
             };
@@ -407,9 +415,13 @@ describe("Phase 06-E - Truthful Confidence", () => {
                 problem: "Analyze financial health",
                 data: {
                     revenue: 100000,
-                    expenses: 50000,  // profitMargin = 0.5
+                    expenses: 50000,  // raw owner input
                     assets: 200000,
-                    liabilities: 80000  // debtRatio = 0.4
+                    liabilities: 80000,
+                    // B-01: canonical derived values
+                    profit: 50000,
+                    profitMargin: 0.5,
+                    debtRatio: 0.4
                 }
             };
 
@@ -418,9 +430,13 @@ describe("Phase 06-E - Truthful Confidence", () => {
                 problem: "Analyze financial health",
                 data: {
                     revenue: 100000,
-                    expenses: 95000,  // profitMargin = 0.05 (< 0.1 but >= 0)
+                    expenses: 95000,  // raw owner input
                     assets: 200000,
-                    liabilities: 80000  // debtRatio = 0.4
+                    liabilities: 80000,
+                    // B-01: canonical derived values (profitMargin = 0.05 < 0.1 but >= 0)
+                    profit: 5000,
+                    profitMargin: 0.05,
+                    debtRatio: 0.4
                 }
             };
 
@@ -429,9 +445,13 @@ describe("Phase 06-E - Truthful Confidence", () => {
                 problem: "Analyze financial health",
                 data: {
                     revenue: 100000,
-                    expenses: 120000,  // profitMargin = -0.2 (< 0)
+                    expenses: 120000,  // raw owner input
                     assets: 200000,
-                    liabilities: 160000  // debtRatio = 0.8 (>= 0.7)
+                    liabilities: 160000,
+                    // B-01: canonical derived values (profitMargin = -0.2, debtRatio = 0.8)
+                    profit: -20000,
+                    profitMargin: -0.2,
+                    debtRatio: 0.8
                 }
             };
 
@@ -668,9 +688,13 @@ describe("Phase 06-E - Truthful Confidence", () => {
                 problem: "Analyze financial health",
                 data: {
                     revenue: 100000,
-                    expenses: 50000,  // profitMargin = 0.5
+                    expenses: 50000,  // raw owner input
                     assets: 200000,
-                    liabilities: 80000  // debtRatio = 0.4
+                    liabilities: 80000,
+                    // B-01: canonical derived values
+                    profit: 50000,
+                    profitMargin: 0.5,
+                    debtRatio: 0.4
                 }
             };
 
@@ -679,9 +703,13 @@ describe("Phase 06-E - Truthful Confidence", () => {
                 problem: "Analyze financial health",
                 data: {
                     revenue: 100000,
-                    expenses: 95000,  // profitMargin = 0.05 (< 0.1)
+                    expenses: 95000,  // raw owner input
                     assets: 200000,
-                    liabilities: 80000  // debtRatio = 0.4
+                    liabilities: 80000,
+                    // B-01: canonical derived values (profitMargin = 0.05 < 0.1)
+                    profit: 5000,
+                    profitMargin: 0.05,
+                    debtRatio: 0.4
                 }
             };
 
@@ -802,6 +830,163 @@ describe("Phase 06-E - Truthful Confidence", () => {
             const result = engine.reason(input, context);
 
             expect(result.confidence.source).toBe("unavailable");
+        });
+    });
+
+    describe("14. B-01 - Canonical Financial Truth Is Consumed, Never Recomputed", () => {
+
+        let engine: IntelligenceEngine;
+
+        const emptyContext: IntelligenceContext = { knowledgeItems: [], evidenceItems: [] };
+
+        beforeEach(() => {
+            engine = new IntelligenceEngine();
+        });
+
+        test("consumes canonical derived values instead of recomputing revenue - expenses", () => {
+            // Canonical profit deliberately DISAGREES with revenue - expenses.
+            // If IntelligenceEngine re-derives profit it reports 80000; the only
+            // value consistent with the canonical owner is 10000.
+            const input: IntelligenceInput = {
+                problem: "Analyze financial health",
+                data: {
+                    revenue: 100000,
+                    expenses: 20000,
+                    assets: 500000,
+                    liabilities: 100000,
+                    profit: 10000,
+                    profitMargin: 0.1,
+                    // canonical debtRatio 0.25 deliberately differs from
+                    // liabilities/assets (100000/500000 = 0.2)
+                    debtRatio: 0.25
+                }
+            };
+
+            const result = engine.reason(input, emptyContext);
+
+            expect(result.success).toBe(true);
+            expect(result.status).toBe("reasoned_domain");
+
+            // Canonical profit 10000 is reported, not 80000 (revenue - expenses).
+            const reported = result.reasoningSteps.join(" ");
+            expect(reported).toContain("profit=10000");
+            expect(reported).not.toContain("80000");
+
+            // profitMargin 0.1 must come from the canonical owner, not 0.8.
+            expect(reported).toContain("profitMargin=0.1");
+            expect(reported).not.toContain("profitMargin=0.8");
+
+            // debtRatio 0.25 must come from the canonical owner, not the
+            // recomputed liabilities/assets ratio of 0.2. Exact-line assertion
+            // avoids prefix collisions between 0.2 and 0.25.
+            expect(reported).toBe(
+                "Consumed canonical financial insight: profit=10000, profitMargin=0.1, debtRatio=0.25"
+            );
+
+            // Classification follows the canonical values: margin 0.1 >= 0.1, debt 0.25 < 0.5 → GOOD
+            expect(result.conclusion).toContain("GOOD");
+        });
+
+        test("canonical profit diverging from revenue - expenses still drives the canonical conclusion", () => {
+            // Same raw inputs, but canonical owner reports a loss. The conclusion
+            // must follow the canonical loss, not the raw positive margin.
+            const input: IntelligenceInput = {
+                problem: "Analyze financial health",
+                data: {
+                    revenue: 100000,
+                    expenses: 20000,
+                    assets: 500000,
+                    liabilities: 400000,
+                    profit: -50000,
+                    profitMargin: -0.5,
+                    debtRatio: 0.8
+                }
+            };
+
+            const result = engine.reason(input, emptyContext);
+
+            expect(result.status).toBe("reasoned_domain");
+            // revenue - expenses would be +80000 → GOOD. Canonical says AT RISK.
+            expect(result.conclusion).toContain("AT RISK");
+            expect(result.conclusion).not.toContain("GOOD");
+        });
+
+        test("hasFinancialMetrics via profit + profitMargin alone does not synthesize profit=0 or substitute values", () => {
+            // profit + profitMargin activate the financial layer, but revenue and
+            // expenses are absent entirely. The layer must not fall back to 0.
+            const input: IntelligenceInput = {
+                problem: "Analyze financial health",
+                data: {
+                    profit: 42000,
+                    profitMargin: 0.42
+                }
+            };
+
+            const result = engine.reason(input, emptyContext);
+
+            expect(result.success).toBe(true);
+            expect(result.status).toBe("reasoned_domain");
+
+            const reported = result.reasoningSteps.join(" ");
+            expect(reported).toContain("profit=42000");
+            expect(reported).not.toContain("profit=0");
+            // No debt ratio was supplied canonically, so it must be reported unavailable.
+            expect(reported).toContain("debtRatio=unavailable");
+
+            // No substitute debt ratio invented from missing assets/liabilities.
+            expect(reported).not.toContain("debtRatio=0.000");
+
+            // Classified on the canonical margin alone.
+            expect(result.conclusion).toContain("GOOD");
+            expect(result.conclusion).toContain("debt ratio was not provided");
+        });
+
+        test("raw-only financial inputs do not activate financial reasoning and yield no canonical values", () => {
+            // Raw inputs without canonical derived values must not be re-derived.
+            const input: IntelligenceInput = {
+                problem: "Analyze financial health",
+                data: {
+                    revenue: 100000,
+                    expenses: 20000,
+                    assets: 500000,
+                    liabilities: 100000
+                }
+            };
+
+            const result = engine.reason(input, emptyContext);
+
+            // No financial layer, no invented profit/margin/debt ratio.
+            expect(result.status).not.toBe("reasoned_domain");
+            expect(result.conclusion).not.toContain("Financial health");
+        });
+
+        test("profit without profitMargin yields no financial reasoning and no substituted value", () => {
+            const input: IntelligenceInput = {
+                problem: "Analyze financial health",
+                data: { profit: 10000 }
+            };
+
+            const result = engine.reason(input, emptyContext);
+
+            // profit alone is not enough canonical insight to classify health.
+            expect(result.status).not.toBe("reasoned_domain");
+            expect(result.conclusion).not.toContain("Financial health");
+        });
+
+        test("budget and risk paths are unaffected by canonical financial consumption", () => {
+            const budget = engine.reason(
+                { problem: "Analyze budget", data: { planned: 100000, actual: 105000 } },
+                emptyContext
+            );
+            expect(budget.status).toBe("reasoned_domain");
+            expect(budget.conclusion).toContain("ON TRACK");
+
+            const risk = engine.reason(
+                { problem: "Assess risk", data: { probability: 0.8, impact: 0.9 } },
+                emptyContext
+            );
+            expect(risk.status).toBe("reasoned_domain");
+            expect(risk.conclusion).toContain("HIGH");
         });
     });
 

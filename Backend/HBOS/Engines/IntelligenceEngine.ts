@@ -148,65 +148,62 @@ export class IntelligenceEngine {
     }
 
     /**
-     * Financial domain reasoning
+     * Financial domain reasoning (B-01: canonical-value consumer only)
+     *
+     * Canonical financial truth (profit, profitMargin, debtRatio) is owned by
+     * `FinancialIntelligenceEngine` / canonical financial insight. This layer is
+     * reasoning composition over those values and MUST NOT re-derive them from
+     * raw inputs such as revenue/expenses/assets/liabilities.
+     *
+     * Classification thresholds below are domain classification boundaries only.
+     * They do not produce financial values and they are not confidence.
      */
     private reasonFinancial(input: IntelligenceInput, context: IntelligenceContext): DomainAlgorithmResult {
         const data = input.data!;
         const steps: string[] = [];
 
-        const revenue = this.getNumber(data, "revenue");
-        const expenses = this.getNumber(data, "expenses");
-        const assets = this.getNumber(data, "assets");
-        const liabilities = this.getNumber(data, "liabilities");
+        // Canonical derived values are consumed as provided. Nothing here
+        // reconstructs them from raw financial inputs.
+        const profit = this.getNumber(data, "profit");
+        const profitMargin = this.getNumber(data, "profitMargin");
+        const hasCanonicalDebtRatio = this.hasAll(data, ["debtRatio"]);
+        const debtRatio = hasCanonicalDebtRatio ? this.getNumber(data, "debtRatio") : undefined;
 
-        steps.push(`Analyzed revenue: ${revenue}, expenses: ${expenses}, assets: ${assets}, liabilities: ${liabilities}`);
+        steps.push(
+            `Consumed canonical financial insight: profit=${profit}, profitMargin=${profitMargin}, ` +
+            `debtRatio=${debtRatio === undefined ? "unavailable" : debtRatio}`
+        );
 
-        const profit = revenue - expenses;
-        steps.push(`Calculated profit: ${profit}`);
+        const canonicalKeys = debtRatio === undefined
+            ? ["profit", "profitMargin"]
+            : ["profit", "profitMargin", "debtRatio"];
+        const dataQuality = this.calculateDataQuality(data, canonicalKeys);
+        const qualityBasedConfidence = IntelligencePipeline.fromCalculatedConfidence(
+            dataQuality / 100,
+            "data_completeness",
+            `Data quality: ${dataQuality}%. Canonical metrics consumed: profitMargin=${profitMargin.toFixed(3)}` +
+            (debtRatio === undefined ? ", debtRatio=unavailable" : `, debtRatio=${debtRatio.toFixed(3)}`) +
+            ". Note: domain severity does not affect confidence."
+        );
 
-        const profitMargin = revenue > 0 ? profit / revenue : 0;
-        steps.push(`Calculated profit margin: ${(profitMargin * 100).toFixed(2)}%`);
-
-        const debtRatio = assets > 0 ? liabilities / assets : 0;
-        steps.push(`Calculated debt ratio: ${(debtRatio * 100).toFixed(2)}%`);
-
-        // Generate conclusion based on financial health
-        // Phase 06-E: Domain thresholds retained for classification, but
-        // confidence is now based on DATA QUALITY, not domain values
         let conclusion: string;
-        let confidence: TruthfulConfidence;
 
-        // Calculate data quality for confidence basis
-        const dataQuality = this.calculateDataQuality(data, ["revenue", "expenses", "assets", "liabilities"]);
-        const qualityBasedConfidence = dataQuality / 100;
-
-        if (profitMargin >= 0.1 && debtRatio < 0.5) {
+        if (debtRatio === undefined) {
+            // Without canonical debt ratio, classify only on canonical margin.
+            // A missing canonical value is reported, never estimated.
+            if (profitMargin >= 0.1) {
+                conclusion = "Financial health: GOOD. Canonical profit margin is healthy; canonical debt ratio was not provided.";
+            } else if (profitMargin >= 0) {
+                conclusion = "Financial health: MARGINAL. Consider improving profit margin; canonical debt ratio was not provided.";
+            } else {
+                conclusion = "Financial health: AT RISK. Canonical profit margin is negative; immediate attention required.";
+            }
+        } else if (profitMargin >= 0.1 && debtRatio < 0.5) {
             conclusion = "Financial health: GOOD. Profit margin is healthy and debt ratio is acceptable.";
-            // Phase 06-E: Confidence based on data quality only
-            // Domain severity does NOT attenuate confidence
-            confidence = IntelligencePipeline.fromCalculatedConfidence(
-                qualityBasedConfidence,
-                "data_completeness",
-                `Data quality: ${dataQuality}%. Metrics: profitMargin=${profitMargin.toFixed(3)}, debtRatio=${debtRatio.toFixed(3)}. Note: profitMargin is domain value, not confidence.`
-            );
         } else if (profitMargin >= 0 && debtRatio < 0.7) {
             conclusion = "Financial health: MARGINAL. Consider improving profit margin or reducing debt.";
-            // Phase 06-E FIX: Removed undocumented multiplier (* 0.6)
-            // Domain severity must NOT attenuate confidence
-            confidence = IntelligencePipeline.fromCalculatedConfidence(
-                qualityBasedConfidence,
-                "data_completeness",
-                `Data quality: ${dataQuality}%. Metrics: profitMargin=${profitMargin.toFixed(3)}, debtRatio=${debtRatio.toFixed(3)}. Note: domain severity does not affect confidence.`
-            );
         } else {
             conclusion = "Financial health: AT RISK. Immediate attention required to improve profitability or reduce debt.";
-            // Phase 06-E FIX: Removed undocumented multiplier (* 0.75)
-            // Domain severity must NOT attenuate confidence
-            confidence = IntelligencePipeline.fromCalculatedConfidence(
-                qualityBasedConfidence,
-                "data_completeness",
-                `Data quality: ${dataQuality}%. Metrics: profitMargin=${profitMargin.toFixed(3)}, debtRatio=${debtRatio.toFixed(3)}. Note: domain severity does not affect confidence.`
-            );
         }
 
         // Add knowledge context if available
@@ -218,10 +215,11 @@ export class IntelligenceEngine {
         return {
             applicable: true,
             conclusion,
-            confidence,
+            confidence: qualityBasedConfidence,
             reasoningSteps: steps,
             limitations: [
-                "Analysis based on provided metrics only",
+                "Analysis based on canonical financial values provided by the canonical financial owner only",
+                debtRatio === undefined ? "Canonical debt ratio unavailable; not estimated" : "Canonical debt ratio provided",
                 "Historical trends not considered",
                 "Industry benchmarks not applied"
             ]
@@ -479,9 +477,12 @@ export class IntelligenceEngine {
     }
 
     private hasFinancialMetrics(data: Record<string, unknown>): boolean {
-        return this.hasAll(data, ["revenue", "expenses"]) ||
-               this.hasAll(data, ["profit", "profitMargin"]) ||
-               this.hasAll(data, ["assets", "liabilities"]);
+        // B-01: The financial layer is applicable only when the canonical
+        // financial insight already carries derived values. Raw inputs alone
+        // (revenue/expenses/assets/liabilities) are the canonical owner's
+        // inputs, not a reason to re-derive canonical financial truth here.
+        return this.hasAll(data, ["profit", "profitMargin"]) ||
+               this.hasAll(data, ["profitMargin", "debtRatio"]);
     }
 
     private hasBudgetMetrics(data: Record<string, unknown>): boolean {
