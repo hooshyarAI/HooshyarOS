@@ -87,8 +87,12 @@ describe("Engine Dependency Verification (Phase 03E)", () => {
         expect(assistant!.dependencyDirection).toBe("OUTBOUND");
 
         const memory = byName.get("MemoryEngine");
-        expect(memory!.importedEngines).toContain("ReactionEngine");
-        expect(memory!.dependencyDirection).toBe("NEUTRAL");
+        // B-04: the canonical memory owner lives in Core and is decoupled from a
+        // concrete ReactionEngine via a structural reaction sink; the Engines
+        // module is now a thin re-export, so it has no outbound engine
+        // dependency while every other engine still depends on it.
+        expect(memory!.importedEngines).toEqual([]);
+        expect(memory!.dependencyDirection).toBe("INBOUND");
     });
 
     it("reports only genuinely bidirectional engines as conflicting directions", () => {

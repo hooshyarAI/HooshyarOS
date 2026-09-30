@@ -22,7 +22,9 @@ import {
     composeFindingGroups,
     composeScenarios,
 } from "../../Product/FinancialDecisionNarrativeService";
-import { CognitiveOrchestrationService } from "../../Product/CognitiveOrchestrationService";
+import { CognitiveOrchestrationService, COGNITIVE_MEMORY_ASSERTION_TYPE } from "../../Product/CognitiveOrchestrationService";
+import { MemoryEngine } from "../../Core/MemoryEngine";
+import { MemoryEvent } from "../../Core/MemoryEvent";
 import { FinancialIngestionService, IngestionFormat, SUPPORTED_INGESTION_FORMATS } from "../../Product/FinancialIngestionService";
 import { IngestionJobService } from "../../Product/IngestionJobService";
 import { isTerminalIngestionStage } from "../../Product/IngestionProgress";
@@ -450,7 +452,10 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     const financialAnalytics = new FinancialAnalyticsService();
     // B-03: question-driven cognitive orchestration composition over the
     // existing canonical Engines (no new Engine, no new domain logic).
-    const cognitiveOrchestration = new CognitiveOrchestrationService();
+    // B-04: the canonical tenant-safe MemoryEngine is injected as the single
+    // cognitive memory owner. The service consumes it; it does not wrap it.
+    const cognitiveMemory = new MemoryEngine();
+    const cognitiveOrchestration = new CognitiveOrchestrationService(undefined, undefined, undefined, undefined, cognitiveMemory);
     const organizationalExecution = new OrganizationalExecutionCoordinator(persistence);
     if (options.securityEventLogger) organizationalExecution.setSecurityLogger(options.securityEventLogger);
     const reports = new ReportsEngine();
@@ -2256,6 +2261,41 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 });
 
                 /**
+                 * B-04: persist a tenant-scoped cognitive memory snapshot of the
+                 * currently verified canonical values. The next question for this
+                 * tenant retrieves it; any later disagreement with fresh canonical
+                 * evidence is surfaced as CANONICAL_WINS and never overwrites it.
+                 * A memory-write failure must never replace a verified answer.
+                 */
+                const memoryAssertion: Record<string, number> = {};
+                if (insight) {
+                    for (const subject of ["netProfit", "revenue", "totalAssets", "totalLiabilities"] as const) {
+                        const value = insight.metrics?.[subject];
+                        if (typeof value === "number" && Number.isFinite(value)) memoryAssertion[subject] = value;
+                    }
+                }
+                if (Object.keys(memoryAssertion).length > 0) {
+                    try {
+                        cognitiveMemory.store(
+                            new MemoryEvent(
+                                COGNITIVE_MEMORY_ASSERTION_TYPE,
+                                JSON.stringify(memoryAssertion),
+                                "cognitive-orchestration",
+                                session.tenantId,
+                                {
+                                    observedAt: new Date(now()),
+                                    traceId: orchestration.traceId,
+                                    ...(result.source?.sha256 ? { evidenceRef: `financial-ingestion:${result.source.sha256}` } : {}),
+                                },
+                            ),
+                            session.tenantId,
+                        );
+                    } catch {
+                        // Memory is contextual only; never fail the answer on it.
+                    }
+                }
+
+                /**
                  * Question-specific decision-support answer. When governed
                  * statement evidence exists, the question is routed to the
                  * appropriate answer structure and composed deterministically
@@ -2352,6 +2392,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                         },
                         contradictions: orchestration.contradictions,
                         limitations: orchestration.limitations,
+                        memory: orchestration.memory,
                     },
                     ...(conversationId ? { conversationId } : {}),
                     evidence: {

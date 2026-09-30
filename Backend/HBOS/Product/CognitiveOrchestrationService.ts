@@ -38,6 +38,8 @@ import { GovernanceEngine, type GovernanceResult } from "../Engines/GovernanceEn
 import { IntelligenceEngine } from "../Engines/IntelligenceEngine";
 import type { IntelligenceContext, IntelligenceInput } from "../Core/IntelligenceContract";
 import { ProvenanceTrace } from "../Core/ProvenanceTrace";
+import { MemoryEngine } from "../Core/MemoryEngine";
+import type { MemoryEvent } from "../Core/MemoryEvent";
 import type { SecurityContext } from "../Security/SecurityContext";
 import { composeScenarios, analyzeQuestion, type QuestionIntent } from "./FinancialDecisionNarrativeService";
 import type { FinancialStatementInsight } from "./FinancialStatementInsight";
@@ -87,6 +89,74 @@ export interface CognitiveContradiction {
   readonly note: string;
 }
 
+/** A disagreement between a historical memory assertion and current canonical evidence. */
+export interface CognitiveMemoryConflict {
+  readonly subject: string;
+  readonly memoryValue: number;
+  readonly canonicalValue: number;
+  readonly difference: number;
+  /** Current canonical evidence is authoritative; memory is preserved as context. */
+  readonly resolution: "CANONICAL_WINS";
+  readonly memoryRef: string;
+  readonly note: string;
+}
+
+/**
+ * Runtime provenance proving that tenant-scoped cognitive memory retrieval
+ * occurred. It exposes the tenant used, how many records were retrieved, the
+ * opaque references considered, the preserved trace id, and the fact that
+ * current verified evidence stayed authoritative. Internal references are never
+ * surfaced into the user-facing Persian answer.
+ */
+export interface CognitiveMemoryProvenance {
+  readonly retrievalOccurred: boolean;
+  readonly tenantId: string | null;
+  readonly retrievedCount: number;
+  readonly references: readonly string[];
+  readonly traceId: string;
+  readonly authoritativeSource: "CURRENT_CANONICAL_EVIDENCE";
+  readonly conflicts: readonly CognitiveMemoryConflict[];
+}
+
+/**
+ * Memory records that assert a canonical financial fact use this event type.
+ * Their `data` is a JSON object mapping canonical subject → numeric value.
+ */
+export const COGNITIVE_MEMORY_ASSERTION_TYPE = "COGNITIVE_FINANCIAL_ASSERTION";
+
+interface MemoryAssertion {
+  readonly subject: string;
+  readonly value: number;
+}
+
+const memoryAssertions = (event: MemoryEvent): readonly MemoryAssertion[] => {
+  if (!event || event.type !== COGNITIVE_MEMORY_ASSERTION_TYPE) return [];
+  try {
+    const parsed: unknown = JSON.parse(event.data);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return [];
+    const assertions: MemoryAssertion[] = [];
+    for (const [subject, value] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof value === "number" && Number.isFinite(value)) assertions.push({ subject, value });
+    }
+    return assertions;
+  } catch {
+    return [];
+  }
+};
+
+const canonicalMemorySubject = (
+  canonical: { netProfit: number | null; revenue: number | null; totalAssets: number | null; totalLiabilities: number | null },
+  subject: string,
+): number | null => {
+  switch (subject) {
+    case "netProfit": return canonical.netProfit;
+    case "revenue": return canonical.revenue;
+    case "totalAssets": return canonical.totalAssets;
+    case "totalLiabilities": return canonical.totalLiabilities;
+    default: return null;
+  }
+};
+
 export interface CognitiveOrchestrationInput {
   readonly tenantId: string;
   readonly question: string;
@@ -111,6 +181,8 @@ export interface CognitiveOrchestrationResult {
     /** Capabilities that could not honestly run, with their reason. */
     readonly unavailableCapabilities: readonly { readonly capability: CognitiveCapability; readonly owner: string; readonly reason: string }[];
   readonly contradictions: readonly CognitiveContradiction[];
+  /** Tenant-scoped cognitive memory retrieval provenance. */
+  readonly memory: CognitiveMemoryProvenance;
   readonly reasoning: {
     readonly status: "EXECUTED" | "UNAVAILABLE";
     readonly conclusion: string | null;
@@ -192,21 +264,26 @@ export class CognitiveOrchestrationService {
     private readonly organizational: OrganizationalIntelligenceEngine;
     private readonly governance: GovernanceEngine;
     private readonly intelligence: IntelligenceEngine;
+    /** Canonical tenant-safe cognitive memory owner (never wrapped or copied). */
+    private readonly memory: MemoryEngine;
 
     constructor(
         financial?: FinancialIntelligenceEngine,
         organizational?: OrganizationalIntelligenceEngine,
         governance?: GovernanceEngine,
         intelligence?: IntelligenceEngine,
+        memory?: MemoryEngine,
     ) {
         this.financial = financial ?? new FinancialIntelligenceEngine();
         this.organizational = organizational ?? new OrganizationalIntelligenceEngine();
         this.governance = governance ?? new GovernanceEngine();
         this.intelligence = intelligence ?? new IntelligenceEngine();
+        this.memory = memory ?? new MemoryEngine();
     }
 
     orchestrate(input: CognitiveOrchestrationInput): CognitiveOrchestrationResult {
         this.collectedLimitations = [];
+        this.retrievedMemory = [];
         const question = String(input?.question ?? "");
         const tenantId = String(input?.tenantId ?? "");
         const insight = input?.insight ?? null;
@@ -238,6 +315,14 @@ export class CognitiveOrchestrationService {
             totalLiabilities: metric(insight, "totalLiabilities"),
         };
 
+        // ---- tenant-scoped cognitive memory --------------------------------
+        // Memory is retrieved through the canonical MemoryEngine under the
+        // caller's tenant. It may inform reasoning, but current canonical
+        // evidence always outranks it: a disagreeing memory is reported as a
+        // CANONICAL_WINS contradiction and preserved as historical context,
+        // never averaged in and never written back onto the canonical value.
+        const memory = this.retrieveCognitiveMemory({ tenantId, traceId, canonical, contradictions });
+
         for (const capability of executionOrder) {
             const record = this.executeCapability(capability, {
                 insight, tenantId, input, contradictions, question, traceId,
@@ -247,7 +332,7 @@ export class CognitiveOrchestrationService {
 
         // ---- reasoning over the collected orchestration context -----------
         const limitations = this.collectedLimitations;
-        const reasoning = this.runReasoning({ question, intent, insight, input, executed, limitations });
+        const reasoning = this.runReasoning({ question, intent, insight, input, executed, limitations, memoryRecords: this.retrievedMemory });
 
         const unavailable = executed.filter((entry) => entry.status === "UNAVAILABLE");
         return {
@@ -266,6 +351,7 @@ export class CognitiveOrchestrationService {
                     reason: entry.unavailableReason ?? "unavailable",
                 })),
             contradictions,
+            memory,
             reasoning,
             limitations: Array.from(new Set(limitations)),
             traceId,
@@ -636,6 +722,78 @@ export class CognitiveOrchestrationService {
      */
     private collectedLimitations: string[] = [];
 
+    /**
+     * Tenant-scoped memory records retrieved for the current synchronous
+     * `orchestrate()` call. Scoped per call so the service holds no cross-request
+     * state of its own; the MemoryEngine remains the memory owner.
+     */
+    private retrievedMemory: MemoryEvent[] = [];
+
+    /**
+     * Retrieve the caller tenant's cognitive memory through the canonical
+     * MemoryEngine and detect disagreements with the current canonical evidence.
+     *
+     * Retrieval is fail-closed: without an explicit tenant scope it does not
+     * occur at all, and the canonical engine can only ever return that tenant's
+     * records. A disagreeing memory is surfaced as a CANONICAL_WINS
+     * contradiction; the canonical value is never overwritten.
+     */
+    private retrieveCognitiveMemory(ctx: {
+        tenantId: string;
+        traceId: string;
+        canonical: { netProfit: number | null; revenue: number | null; totalAssets: number | null; totalLiabilities: number | null };
+        contradictions: CognitiveContradiction[];
+    }): CognitiveMemoryProvenance {
+        const scope = typeof ctx.tenantId === "string" ? ctx.tenantId.trim() : "";
+        const base: CognitiveMemoryProvenance = {
+            retrievalOccurred: false,
+            tenantId: scope || null,
+            retrievedCount: 0,
+            references: [],
+            traceId: ctx.traceId,
+            authoritativeSource: "CURRENT_CANONICAL_EVIDENCE",
+            conflicts: [],
+        };
+        if (!scope) return base;
+
+        const records = this.memory.retrieve(scope);
+        this.retrievedMemory = [...records];
+
+        const conflicts: CognitiveMemoryConflict[] = [];
+        for (const record of records) {
+            for (const assertion of memoryAssertions(record)) {
+                const canonicalValue = canonicalMemorySubject(ctx.canonical, assertion.subject);
+                if (canonicalValue === null) continue;
+                if (agrees(assertion.value, canonicalValue)) continue;
+                conflicts.push({
+                    subject: assertion.subject,
+                    memoryValue: assertion.value,
+                    canonicalValue,
+                    difference: assertion.value - canonicalValue,
+                    resolution: "CANONICAL_WINS",
+                    memoryRef: record.id,
+                    note: "current canonical evidence is authoritative; the disagreeing memory is preserved as historical context",
+                });
+                ctx.contradictions.push({
+                    subject: assertion.subject,
+                    canonicalValue,
+                    specialistValue: assertion.value,
+                    difference: assertion.value - canonicalValue,
+                    resolution: "CANONICAL_WINS",
+                    note: "historical memory disagrees with current canonical evidence; canonical evidence wins and memory is preserved as context",
+                });
+            }
+        }
+
+        return {
+            ...base,
+            retrievalOccurred: true,
+            retrievedCount: records.length,
+            references: records.map((record) => record.id),
+            conflicts,
+        };
+    }
+
     private unavailable(
         capability: CognitiveCapability,
         owner: string,
@@ -679,8 +837,9 @@ export class CognitiveOrchestrationService {
         input: CognitiveOrchestrationInput;
         executed: readonly CapabilityExecution[];
         limitations: string[];
+        memoryRecords: readonly MemoryEvent[];
     }): CognitiveOrchestrationResult["reasoning"] {
-        const { question, intent, insight, input, executed, limitations } = ctx;
+        const { question, intent, insight, input, executed, limitations, memoryRecords } = ctx;
         const evidenceLines: string[] = [];
         for (const entry of executed) {
             if (entry.status === "EXECUTED") {
@@ -721,7 +880,18 @@ export class CognitiveOrchestrationService {
             data: insightData,
         };
         const intelligenceContext: IntelligenceContext = {
-            knowledgeItems: [],
+            // Historical memory informs reasoning as low-confidence context. It
+            // is never admitted as canonical evidence: the canonical values below
+            // remain the authoritative `data` the reasoning layer consumes.
+            knowledgeItems: memoryRecords.slice(0, 5).map((record) => ({
+                id: record.id,
+                title: record.type,
+                description: `historical memory (${record.source}): ${record.data}`,
+                confidence: 0.5,
+                source: `memory:${record.source}`,
+                createdAt: record.createdAt.toISOString(),
+                ...(record.tenantId ? { tenantId: record.tenantId } : {}),
+            })),
             evidenceItems: [
                 ...(input.evidenceRefs ?? []).map((ref) => ({
                     id: ref, type: "SOURCE_REF", summary: ref, sourceRef: ref, tenantId: input.tenantId,
