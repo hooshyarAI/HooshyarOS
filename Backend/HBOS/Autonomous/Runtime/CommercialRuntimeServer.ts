@@ -23,6 +23,8 @@ import {
     composeScenarios,
 } from "../../Product/FinancialDecisionNarrativeService";
 import { CognitiveOrchestrationService, COGNITIVE_MEMORY_ASSERTION_TYPE } from "../../Product/CognitiveOrchestrationService";
+import { GovernedLearningLifecycle } from "../../Product/GovernedLearningLifecycle";
+import { GovernanceEngine } from "../../Engines/GovernanceEngine";
 import { MemoryEngine } from "../../Core/MemoryEngine";
 import { MemoryEvent } from "../../Core/MemoryEvent";
 import { FinancialIngestionService, IngestionFormat, SUPPORTED_INGESTION_FORMATS } from "../../Product/FinancialIngestionService";
@@ -455,7 +457,12 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     // B-04: the canonical tenant-safe MemoryEngine is injected as the single
     // cognitive memory owner. The service consumes it; it does not wrap it.
     const cognitiveMemory = new MemoryEngine();
-    const cognitiveOrchestration = new CognitiveOrchestrationService(undefined, undefined, undefined, undefined, cognitiveMemory);
+    // B-05: the single canonical governed learning owner, built over the existing
+    // canonical persistence store and GovernanceEngine. It is a product service,
+    // not an Engine, and it is shared by the orchestration composition and the
+    // real `/api/assistant` learning path so there is exactly one authority.
+    const governedLearning = new GovernedLearningLifecycle(persistence, new GovernanceEngine(), options.now ?? (() => Date.now()));
+    const cognitiveOrchestration = new CognitiveOrchestrationService(undefined, undefined, undefined, undefined, cognitiveMemory, governedLearning);
     const organizationalExecution = new OrganizationalExecutionCoordinator(persistence);
     if (options.securityEventLogger) organizationalExecution.setSecurityLogger(options.securityEventLogger);
     const reports = new ReportsEngine();
@@ -2296,6 +2303,90 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 }
 
                 /**
+                 * B-05: real governed learning creation, driven only by what this
+                 * request actually observed.
+                 *
+                 * The observation is the genuine, freshly verified result of THIS
+                 * request on THIS real source: how many of the document's own
+                 * accounting-identity controls reconciled and with what largest
+                 * absolute difference. Nothing is fabricated: with no insight, or
+                 * with no real integrity evidence, nothing is observed and nothing
+                 * is learned.
+                 *
+                 * The lesson therefore passes the full canonical lifecycle —
+                 * observation, candidate, evidence validation against the real
+                 * document integrity references, a measured result recorded
+                 * SEPARATELY from the observation, and a governance-gated
+                 * promotion using the caller's real session authority. A VIEWER
+                 * or a governance denial leaves nothing promoted.
+                 *
+                 * Re-observing an already-active lesson is a no-op, so learning
+                 * cannot grow a new version on every identical request. Any
+                 * failure here is swallowed: learning never replaces a verified
+                 * answer.
+                 */
+                const integrityEvidence = (insight?.integrity ?? [])
+                    .filter((check) => check.id.trim().length > 0);
+                let learnedRef: string | null = null;
+                const sourceSha256 = typeof result.source?.sha256 === "string" ? result.source.sha256 : "";
+                if (insight && sourceSha256 && integrityEvidence.length > 0) {
+                    const reconciled = integrityEvidence.filter((check) => check.status === "RECONCILED").length;
+                    const largestDifference = integrityEvidence.reduce(
+                        (largest, check) => Math.max(largest, Math.abs(check.difference ?? Number.NaN)),
+                        0,
+                    );
+                    const sourceRef = `financial-ingestion:${sourceSha256}`;
+                    const lesson = `On document ${sourceSha256.slice(0, 16)} all ${integrityEvidence.length} accounting-identity controls reconciled (${reconciled}/${integrityEvidence.length}) with a largest absolute difference of ${Number.isFinite(largestDifference) ? largestDifference : "unknown"}.`;
+                    const learningSubject = "statement-integrity-reconciliation";
+                    try {
+                        const alreadyActive = (await governedLearning.retrieve({ tenantId: session.tenantId, subject: learningSubject }))
+                            .some((artifact) => artifact.statement === lesson);
+                        if (!alreadyActive) {
+                            const observation = await governedLearning.recordObservation({
+                                tenantId: session.tenantId,
+                                subject: learningSubject,
+                                sourceRef,
+                                observedAt: new Date(now()).toISOString(),
+                                traceId: orchestration.traceId,
+                            });
+                            const candidate = await governedLearning.createCandidateLesson({
+                                tenantId: session.tenantId,
+                                observationRef: observation.observationId,
+                                statement: lesson,
+                                traceId: orchestration.traceId,
+                            });
+                            await governedLearning.validateEvidence({
+                                tenantId: session.tenantId,
+                                candidateRef: candidate.candidateId,
+                                evidence: integrityEvidence.map((check) => ({
+                                    ref: `integrity:${sourceSha256}:${check.id}`,
+                                    verified: check.status === "RECONCILED",
+                                })),
+                                traceId: orchestration.traceId,
+                            });
+                            const measuredCandidate = await governedLearning.recordMeasuredResult({
+                                tenantId: session.tenantId,
+                                candidateRef: candidate.candidateId,
+                                metric: "reconciledIntegrityControls",
+                                outcome: reconciled === integrityEvidence.length ? "FULLY_RECONCILED" : "PARTIALLY_RECONCILED",
+                                value: reconciled,
+                                traceId: orchestration.traceId,
+                            });
+                            const promotedArtifact = await governedLearning.promote({
+                                tenantId: session.tenantId,
+                                candidateRef: measuredCandidate.candidateId,
+                                securityContext: executionContext(session),
+                                traceId: orchestration.traceId,
+                            });
+                            learnedRef = promotedArtifact.artifactId;
+                        }
+                    } catch {
+                        // Learning is advisory; a denied, gated or failed promotion
+                        // must never replace a verified answer.
+                    }
+                }
+
+                /**
                  * Question-specific decision-support answer. When governed
                  * statement evidence exists, the question is routed to the
                  * appropriate answer structure and composed deterministically
@@ -2393,6 +2484,21 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                         contradictions: orchestration.contradictions,
                         limitations: orchestration.limitations,
                         memory: orchestration.memory,
+                        /**
+                         * B-05 governed-learning provenance: retrieval occurred for
+                         * this tenant, which eligible artifacts were considered,
+                         * which version was active, and which contradictions were
+                         * resolved in favour of fresh canonical evidence.
+                         */
+                        learning: {
+                            retrievalOccurred: orchestration.learning.retrievalOccurred,
+                            tenantId: orchestration.learning.tenantId,
+                            retrievedCount: orchestration.learning.retrievedCount,
+                            activeVersions: orchestration.learning.activeVersions,
+                            authoritativeSource: orchestration.learning.authoritativeSource,
+                            contradictionCount: orchestration.learning.contradictions.length,
+                            ...(learnedRef ? { promotedThisRequest: learnedRef } : {}),
+                        },
                     },
                     ...(conversationId ? { conversationId } : {}),
                     evidence: {

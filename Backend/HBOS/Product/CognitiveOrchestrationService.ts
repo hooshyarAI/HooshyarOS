@@ -22,6 +22,12 @@
  *     organizational evidence (B-03.1).
  *   - `GovernanceEngine` remains the owner of policy / authorization.
  *   - `IntelligenceEngine` remains the sanctioned reasoning-pipeline composer.
+ *   - `GovernedLearningLifecycle` (B-05) remains the single governed learning
+ *     authority. It is an optional PRODUCT SERVICE dependency, not an Engine, and
+ *     it is only ever READ here. Learning reaches reasoning as low-confidence
+ *     contextual knowledge after it has passed its own evidence, measurement,
+ *     governance, versioning and tenant gates; fresh canonical evidence always
+ *     outranks it (B-05.2).
  *
  * The user question is the control variable: `analyzeQuestion()` produces the
  * `QuestionIntent`, and the intent selects WHICH capabilities execute. Two
@@ -40,6 +46,7 @@ import type { IntelligenceContext, IntelligenceInput } from "../Core/Intelligenc
 import { ProvenanceTrace } from "../Core/ProvenanceTrace";
 import { MemoryEngine } from "../Core/MemoryEngine";
 import type { MemoryEvent } from "../Core/MemoryEvent";
+import type { GovernedLearningLifecycle, LearningArtifact } from "./GovernedLearningLifecycle";
 import type { SecurityContext } from "../Security/SecurityContext";
 import { composeScenarios, analyzeQuestion, type QuestionIntent } from "./FinancialDecisionNarrativeService";
 import type { FinancialStatementInsight } from "./FinancialStatementInsight";
@@ -157,6 +164,69 @@ const canonicalMemorySubject = (
   }
 };
 
+/**
+ * A disagreement between a governed learning artifact and fresh canonical
+ * evidence. The artifact is preserved; the canonical value is never overwritten,
+ * averaged or merged.
+ */
+export interface CognitiveLearningConflict {
+  readonly subject: string;
+  readonly learnedValue: number;
+  readonly canonicalValue: number;
+  readonly difference: number;
+  /** Fresh canonical evidence is authoritative; learning stays as context. */
+  readonly resolution: "CANONICAL_WINS";
+  readonly artifactRef: string;
+  readonly artifactVersion: number;
+  readonly note: string;
+}
+
+/**
+ * B-05 provenance proving that tenant-scoped governed-learning retrieval
+ * occurred inside the live cognitive path. It exposes the tenant used, how many
+ * eligible artifacts were retrieved, their references and active versions, the
+ * preserved trace id, and the fact that current canonical evidence stayed
+ * authoritative. Internal references never reach the Persian user answer.
+ */
+export interface GovernedLearningProvenance {
+  readonly retrievalOccurred: boolean;
+  readonly tenantId: string | null;
+  readonly retrievedCount: number;
+  readonly artifactRefs: readonly string[];
+  readonly activeVersions: readonly number[];
+  readonly traceId: string;
+  readonly authoritativeSource: "CURRENT_CANONICAL_EVIDENCE";
+  readonly contradictions: readonly CognitiveLearningConflict[];
+}
+
+/** A learned canonical assertion carried by an artifact statement. */
+interface LearningAssertion {
+  readonly subject: string;
+  readonly value: number;
+}
+
+/**
+ * A governed learning artifact may assert a canonical financial fact. Such an
+ * assertion is carried as a JSON object mapping canonical subject → numeric
+ * value in the artifact statement, exactly as a memory assertion is carried in
+ * its record data. A prose statement carries no assertion and therefore can
+ * never conflict.
+ */
+const learningAssertions = (artifact: LearningArtifact): readonly LearningAssertion[] => {
+  if (!artifact || typeof artifact.statement !== "string") return [];
+  try {
+    const parsed: unknown = JSON.parse(artifact.statement);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return [];
+    const assertions: LearningAssertion[] = [];
+    for (const [subject, value] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof value === "number" && Number.isFinite(value)) assertions.push({ subject, value });
+    }
+    return assertions;
+  } catch {
+    return [];
+  }
+};
+
 export interface CognitiveOrchestrationInput {
   readonly tenantId: string;
   readonly question: string;
@@ -183,6 +253,8 @@ export interface CognitiveOrchestrationResult {
   readonly contradictions: readonly CognitiveContradiction[];
   /** Tenant-scoped cognitive memory retrieval provenance. */
   readonly memory: CognitiveMemoryProvenance;
+  /** B-05 tenant-scoped governed-learning retrieval provenance. */
+  readonly learning: GovernedLearningProvenance;
   readonly reasoning: {
     readonly status: "EXECUTED" | "UNAVAILABLE";
     readonly conclusion: string | null;
@@ -266,6 +338,12 @@ export class CognitiveOrchestrationService {
     private readonly intelligence: IntelligenceEngine;
     /** Canonical tenant-safe cognitive memory owner (never wrapped or copied). */
     private readonly memory: MemoryEngine;
+    /**
+     * B-05 canonical governed learning owner. It is a PRODUCT SERVICE, not an
+     * Engine, and it is optional: a caller that does not supply one keeps the
+     * exact previous behaviour.
+     */
+    private readonly learning?: GovernedLearningLifecycle;
 
     constructor(
         financial?: FinancialIntelligenceEngine,
@@ -273,17 +351,20 @@ export class CognitiveOrchestrationService {
         governance?: GovernanceEngine,
         intelligence?: IntelligenceEngine,
         memory?: MemoryEngine,
+        learning?: GovernedLearningLifecycle,
     ) {
         this.financial = financial ?? new FinancialIntelligenceEngine();
         this.organizational = organizational ?? new OrganizationalIntelligenceEngine();
         this.governance = governance ?? new GovernanceEngine();
         this.intelligence = intelligence ?? new IntelligenceEngine();
         this.memory = memory ?? new MemoryEngine();
+        this.learning = learning;
     }
 
     orchestrate(input: CognitiveOrchestrationInput): CognitiveOrchestrationResult {
         this.collectedLimitations = [];
         this.retrievedMemory = [];
+        this.retrievedLearning = [];
         const question = String(input?.question ?? "");
         const tenantId = String(input?.tenantId ?? "");
         const insight = input?.insight ?? null;
@@ -323,6 +404,15 @@ export class CognitiveOrchestrationService {
         // never averaged in and never written back onto the canonical value.
         const memory = this.retrieveCognitiveMemory({ tenantId, traceId, canonical, contradictions });
 
+        // ---- tenant-scoped governed learning (B-05) --------------------------
+        // Learning participates here as CONTEXT ONLY. Retrieval is delegated to
+        // the canonical `GovernedLearningLifecycle`, which already enforces the
+        // evidence gate, the governance gate, versioning, supersede/rollback and
+        // tenant isolation. This module adds no second learning authority, does
+        // not promote anything, and treats learned knowledge as strictly
+        // subordinate to fresh canonical evidence.
+        const learning = this.retrieveGovernedLearning({ tenantId, traceId, canonical, contradictions });
+
         for (const capability of executionOrder) {
             const record = this.executeCapability(capability, {
                 insight, tenantId, input, contradictions, question, traceId,
@@ -332,7 +422,7 @@ export class CognitiveOrchestrationService {
 
         // ---- reasoning over the collected orchestration context -----------
         const limitations = this.collectedLimitations;
-        const reasoning = this.runReasoning({ question, intent, insight, input, executed, limitations, memoryRecords: this.retrievedMemory });
+        const reasoning = this.runReasoning({ question, intent, insight, input, executed, limitations, memoryRecords: this.retrievedMemory, learningArtifacts: this.retrievedLearning });
 
         const unavailable = executed.filter((entry) => entry.status === "UNAVAILABLE");
         return {
@@ -352,6 +442,7 @@ export class CognitiveOrchestrationService {
                 })),
             contradictions,
             memory,
+            learning,
             reasoning,
             limitations: Array.from(new Set(limitations)),
             traceId,
@@ -730,6 +821,96 @@ export class CognitiveOrchestrationService {
     private retrievedMemory: MemoryEvent[] = [];
 
     /**
+     * Governed learning artifacts retrieved for the current synchronous
+     * `orchestrate()` call. Scoped per call so the service holds no
+     * cross-request state of its own; `GovernedLearningLifecycle` remains the
+     * single learning owner.
+     */
+    private retrievedLearning: LearningArtifact[] = [];
+
+    /**
+     * Retrieve the caller tenant's eligible governed learning artifacts through
+     * the canonical `GovernedLearningLifecycle` and detect disagreement with the
+     * current canonical evidence.
+     *
+     * Fail-closed by construction: without an explicit tenant scope retrieval
+     * does not occur at all, and without an injected lifecycle nothing is
+     * retrieved. Only `ACTIVE` + `PROMOTED` artifacts the lifecycle considers
+     * eligible reach reasoning, so a superseded version is never active context.
+     *
+     * Canonical fact safety: a disagreeing learned assertion is reported as a
+     * `CANONICAL_WINS` contradiction on both the learning provenance and the
+     * standard contradiction channel. The canonical value is never overwritten,
+     * averaged, merged or discarded, the artifact is never deleted, and the
+     * canonical insight object is never mutated.
+     */
+    private retrieveGovernedLearning(ctx: {
+        tenantId: string;
+        traceId: string;
+        canonical: { netProfit: number | null; revenue: number | null; totalAssets: number | null; totalLiabilities: number | null };
+        contradictions: CognitiveContradiction[];
+    }): GovernedLearningProvenance {
+        const scope = typeof ctx.tenantId === "string" ? ctx.tenantId.trim() : "";
+        const base: GovernedLearningProvenance = {
+            retrievalOccurred: false,
+            tenantId: scope || null,
+            retrievedCount: 0,
+            artifactRefs: [],
+            activeVersions: [],
+            traceId: ctx.traceId,
+            authoritativeSource: "CURRENT_CANONICAL_EVIDENCE",
+            contradictions: [],
+        };
+        if (!scope || !this.learning) return base;
+
+        let artifacts: readonly LearningArtifact[];
+        try {
+            artifacts = this.learning.retrieveActiveSync(scope);
+        } catch {
+            // A retrieval failure is never fatal to the answer, and it never
+            // degrades into returning another tenant's learning.
+            return base;
+        }
+        this.retrievedLearning = [...artifacts];
+
+        const contradictions: CognitiveLearningConflict[] = [];
+        for (const artifact of artifacts) {
+            for (const assertion of learningAssertions(artifact)) {
+                const canonicalValue = canonicalMemorySubject(ctx.canonical, assertion.subject);
+                if (canonicalValue === null) continue;
+                if (agrees(assertion.value, canonicalValue)) continue;
+                contradictions.push({
+                    subject: assertion.subject,
+                    learnedValue: assertion.value,
+                    canonicalValue,
+                    difference: assertion.value - canonicalValue,
+                    resolution: "CANONICAL_WINS",
+                    artifactRef: artifact.artifactId,
+                    artifactVersion: artifact.version,
+                    note: "fresh canonical evidence is authoritative; the governed learning artifact is preserved as context and is never merged into the canonical value",
+                });
+                ctx.contradictions.push({
+                    subject: assertion.subject,
+                    canonicalValue,
+                    specialistValue: assertion.value,
+                    difference: assertion.value - canonicalValue,
+                    resolution: "CANONICAL_WINS",
+                    note: `governed learning artifact ${artifact.artifactId} v${artifact.version} disagrees with current canonical evidence; canonical evidence wins and the learning artifact is preserved as context`,
+                });
+            }
+        }
+
+        return {
+            ...base,
+            retrievalOccurred: true,
+            retrievedCount: artifacts.length,
+            artifactRefs: artifacts.map((artifact) => artifact.artifactId),
+            activeVersions: artifacts.map((artifact) => artifact.version),
+            contradictions,
+        };
+    }
+
+    /**
      * Retrieve the caller tenant's cognitive memory through the canonical
      * MemoryEngine and detect disagreements with the current canonical evidence.
      *
@@ -826,32 +1007,34 @@ export class CognitiveOrchestrationService {
         return {};
     }
 
-    /**
-     * Reasoning runs LAST, over the context actually produced by the executed
-     * capabilities. It interprets; it never rewrites a canonical value.
-     */
-    private runReasoning(ctx: {
-        question: string;
-        intent: QuestionIntent;
-        insight: FinancialStatementInsight | null;
-        input: CognitiveOrchestrationInput;
-        executed: readonly CapabilityExecution[];
-        limitations: string[];
-        memoryRecords: readonly MemoryEvent[];
-    }): CognitiveOrchestrationResult["reasoning"] {
-        const { question, intent, insight, input, executed, limitations, memoryRecords } = ctx;
-        const evidenceLines: string[] = [];
-        for (const entry of executed) {
-            if (entry.status === "EXECUTED") {
-                evidenceLines.push(`${entry.capability} via ${entry.owner}: ${Object.keys(entry.result).join(",")}`);
-            } else if (entry.status === "UNAVAILABLE") {
-                evidenceLines.push(`${entry.capability} UNAVAILABLE (${entry.unavailableReason})`);
-            }
-        }
-        if (evidenceLines.length === 0) {
-            limitations.push("هیچ قابلیت کاننیکالی برای این پرسش اجرا نشد.");
-            return { status: "UNAVAILABLE", conclusion: null, confidenceSource: "unavailable", steps: [] };
-        }
+     /**
+      * Reasoning runs LAST, over the context actually produced by the executed
+      * capabilities. It interprets; it never rewrites a canonical value.
+      */
+     private runReasoning(ctx: {
+         question: string;
+         intent: QuestionIntent;
+         insight: FinancialStatementInsight | null;
+         input: CognitiveOrchestrationInput;
+         executed: readonly CapabilityExecution[];
+         limitations: string[];
+         memoryRecords: readonly MemoryEvent[];
+         learningArtifacts?: readonly LearningArtifact[];
+     }): CognitiveOrchestrationResult["reasoning"] {
+         const { question, intent, insight, input, executed, limitations, memoryRecords } = ctx;
+         const learningArtifacts = ctx.learningArtifacts ?? [];
+         const evidenceLines: string[] = [];
+         for (const entry of executed) {
+             if (entry.status === "EXECUTED") {
+                 evidenceLines.push(`${entry.capability} via ${entry.owner}: ${Object.keys(entry.result).join(",")}`);
+             } else if (entry.status === "UNAVAILABLE") {
+                 evidenceLines.push(`${entry.capability} UNAVAILABLE (${entry.unavailableReason})`);
+             }
+          }
+          if (evidenceLines.length === 0) {
+              limitations.push("هیچ قابلیت کاننیکالی برای این پرسش اجرا نشد.");
+              return { status: "UNAVAILABLE", conclusion: null, confidenceSource: "unavailable", steps: [] };
+          }
         // The reasoning input carries the CANONICAL derived values produced by
         // the executed canonical owners, so `IntelligenceEngine` reasons over
         // real verified evidence (it consumes these values; per B-01 it never
@@ -875,38 +1058,55 @@ export class CognitiveOrchestrationService {
             // canonical, evidence-backed basis.
             insightData.liquidityRatio = liquidity.result.currentRatio as number;
         }
-        const intelligenceInput: IntelligenceInput = {
-            problem: question || intent.userGoal,
-            data: insightData,
-        };
-        const intelligenceContext: IntelligenceContext = {
-            // Historical memory informs reasoning as low-confidence context. It
-            // is never admitted as canonical evidence: the canonical values below
-            // remain the authoritative `data` the reasoning layer consumes.
-            knowledgeItems: memoryRecords.slice(0, 5).map((record) => ({
-                id: record.id,
-                title: record.type,
-                description: `historical memory (${record.source}): ${record.data}`,
-                confidence: 0.5,
-                source: `memory:${record.source}`,
-                createdAt: record.createdAt.toISOString(),
-                ...(record.tenantId ? { tenantId: record.tenantId } : {}),
-            })),
-            evidenceItems: [
-                ...(input.evidenceRefs ?? []).map((ref) => ({
-                    id: ref, type: "SOURCE_REF", summary: ref, sourceRef: ref, tenantId: input.tenantId,
-                })),
-                ...executed.filter((entry) => entry.status === "EXECUTED").flatMap((entry) => entry.evidence.map((ref) => ({
-                    id: ref, type: entry.capability, summary: `${entry.capability} via ${entry.owner}`, sourceRef: ref, tenantId: input.tenantId,
-                }))),
-            ],
-        };
-        const result = this.intelligence.reason(intelligenceInput, intelligenceContext);
-        return {
-            status: "EXECUTED",
-            conclusion: result.conclusion,
-            confidenceSource: result.confidence.source,
-            steps: result.reasoningSteps,
-        };
+         const intelligenceInput: IntelligenceInput = {
+             problem: question || intent.userGoal,
+             data: insightData,
+         };
+          const intelligenceContext: IntelligenceContext = {
+              // Historical memory informs reasoning as low-confidence context. It
+              // is never admitted as canonical evidence: the canonical values below
+              // remain the authoritative `data` the reasoning layer consumes.
+              knowledgeItems: [
+                  ...memoryRecords.slice(0, 5).map((record) => ({
+                      id: record.id,
+                      title: record.type,
+                      description: `historical memory (${record.source}): ${record.data}`,
+                      confidence: 0.5,
+                      source: `memory:${record.source}`,
+                      createdAt: record.createdAt.toISOString(),
+                      ...(record.tenantId ? { tenantId: record.tenantId } : {}),
+                  })),
+                  // B-05: governed learning is contextual evidence only. It reached
+                  // this point through the full governed lifecycle — real observation,
+                  // validated evidence, a separately measured result and a governance
+                  // ALLOWED promotion — and only as an ACTIVE version. It is supplied
+                  // as low-confidence knowledge and is never admitted as canonical
+                  // financial truth: the canonical `data` above remains authoritative.
+                  ...learningArtifacts.slice(0, 5).map((artifact) => ({
+                      id: artifact.artifactId,
+                      title: `learning:${artifact.subject}@v${artifact.version}`,
+                      description: `${artifact.statement} (measured ${artifact.measuredResult.metric}=${artifact.measuredResult.value} → ${artifact.measuredResult.outcome}; evidence ${artifact.evidenceRef}; source ${artifact.sourceRef})`,
+                      confidence: 0.5,
+                      source: `learning:${artifact.evidenceRef}`,
+                      createdAt: artifact.provenance.createdAt,
+                      tenantId: artifact.tenantId,
+                  })),
+              ],
+              evidenceItems: [
+                 ...(input.evidenceRefs ?? []).map((ref) => ({
+                     id: ref, type: "SOURCE_REF", summary: ref, sourceRef: ref, tenantId: input.tenantId,
+                 })),
+                 ...executed.filter((entry) => entry.status === "EXECUTED").flatMap((entry) => entry.evidence.map((ref) => ({
+                     id: ref, type: entry.capability, summary: `${entry.capability} via ${entry.owner}`, sourceRef: ref, tenantId: input.tenantId,
+                 }))),
+             ],
+          };
+          const result = this.intelligence.reason(intelligenceInput, intelligenceContext);
+          return {
+              status: "EXECUTED",
+              conclusion: result.conclusion,
+              confidenceSource: result.confidence.source,
+              steps: result.reasoningSteps,
+          };
     }
 }
