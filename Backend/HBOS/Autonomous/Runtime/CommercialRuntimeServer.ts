@@ -2237,12 +2237,29 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const assistantError = validateAssistantBody(body);
                 if (assistantError) return corsJson(400, { error: assistantError });
                 const question = String(body.question ?? "").trim();
+                /**
+                 * Financial analysis is OPTIONAL context, never a precondition.
+                 *
+                 * A tenant that has not yet ingested a canonical statement is a
+                 * valid governed context: the question is still answered from the
+                 * verified evidence that does exist (the executive workbench and
+                 * the cognitive orchestration result). When no analysis exists the
+                 * statement insight, the evidence reference and the canonical
+                 * metrics are absent, the orchestration receives a null insight,
+                 * and the response states truthfully that no statement evidence is
+                 * present. Nothing is fabricated to fill the gap and the endpoint
+                 * no longer fails closed with a synthetic 422.
+                 */
                 const result = await loadAnalysis(session.tenantId);
-                if (!result) return corsJson(422, { error: "ASSISTANT_ANALYSIS_REQUIRED" });
                 const workbench = await loadWorkbench(session.tenantId);
-                const analytics = await correlatedAnalyticsFor(session.tenantId, result.source.sha256);
-                const insight = analytics?.statementInsight
-                    ?? await loadStatementInsight(session.tenantId, result.source.sha256, analytics);
+                const sourceSha256 = typeof result?.source?.sha256 === "string" ? result.source.sha256 : "";
+                const analytics = sourceSha256
+                    ? await correlatedAnalyticsFor(session.tenantId, sourceSha256)
+                    : undefined;
+                const insight = sourceSha256
+                    ? analytics?.statementInsight
+                        ?? await loadStatementInsight(session.tenantId, sourceSha256, analytics)
+                    : undefined;
 
                 /**
                  * Question-driven cognitive orchestration (B-03).
@@ -2264,7 +2281,8 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                         : null,
                     // The governance gate uses the caller's real session
                     // authority; it is never bypassed for the ACTION path.
-                    securityContext: executionContext(session),                    ...(result.source?.sha256 ? { evidenceRefs: [`financial-ingestion:${result.source.sha256}`] } : {}),
+                    securityContext: executionContext(session),
+                    ...(sourceSha256 ? { evidenceRefs: [`financial-ingestion:${sourceSha256}`] } : {}),
                 });
 
                 /**
@@ -2292,7 +2310,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                                 {
                                     observedAt: new Date(now()),
                                     traceId: orchestration.traceId,
-                                    ...(result.source?.sha256 ? { evidenceRef: `financial-ingestion:${result.source.sha256}` } : {}),
+                                    ...(sourceSha256 ? { evidenceRef: `financial-ingestion:${sourceSha256}` } : {}),
                                 },
                             ),
                             session.tenantId,
@@ -2328,7 +2346,6 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const integrityEvidence = (insight?.integrity ?? [])
                     .filter((check) => check.id.trim().length > 0);
                 let learnedRef: string | null = null;
-                const sourceSha256 = typeof result.source?.sha256 === "string" ? result.source.sha256 : "";
                 if (insight && sourceSha256 && integrityEvidence.length > 0) {
                     const reconciled = integrityEvidence.filter((check) => check.status === "RECONCILED").length;
                     const largestDifference = integrityEvidence.reduce(
@@ -2415,19 +2432,23 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                         "Do not infer market demand, competitive position or future sales from statement-only evidence.",
                         "If a value or period is absent from the context, say the evidence is unavailable; never invent it.",
                         `Question: ${question}`,
-                        `SourceSha256=${result.source.sha256}`,
-                        `Revenue=${result.metrics.revenue}`,
-                        `Profit=${result.metrics.profit}`,
-                        `ProfitMargin=${result.metrics.profitMargin}`,
-                        `DebtRatio=${result.metrics.debtRatio}`,
-                        `Observations=${result.observations.map((item) => item.message).join(" | ")}`,
+                        ...(result
+                            ? [
+                                `SourceSha256=${result.source.sha256}`,
+                                `Revenue=${result.metrics.revenue}`,
+                                `Profit=${result.metrics.profit}`,
+                                `ProfitMargin=${result.metrics.profitMargin}`,
+                                `DebtRatio=${result.metrics.debtRatio}`,
+                                `Observations=${result.observations.map((item) => item.message).join(" | ")}`,
+                            ]
+                            : ["No financial analysis is available for this tenant, so no canonical financial metric, ratio or observation can be reported. State that the evidence is unavailable."]),
                         workbench ? `Recommendations=${workbench.recommendations.map((item) => item.action).join(" | ")}` : "No executive workbench result is available yet.",
                     ].join(" | ");
                     const answer = reasoning.reason(context);
                     if (!answer.success) return corsJson(503, { error: "ASSISTANT_REASONING_UNAVAILABLE" });
                     resolvedAnswer = answer.answer ?? answer.status;
                 }
-                const trust = await assessSourceTrust(session.tenantId, result.source.sha256, insight?.integrity);
+                const trust = await assessSourceTrust(session.tenantId, sourceSha256 || undefined, insight?.integrity);
                 // Conversation continuity is secondary: a persistence failure
                 // must never replace a verified answer with an error.
                 let conversationId: string | undefined;
@@ -2438,7 +2459,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                         username: session.username,
                         question,
                         answer: resolvedAnswer,
-                        ...(result.source?.sha256 ? { sourceSha256: result.source.sha256 } : {}),
+                        ...(sourceSha256 ? { sourceSha256 } : {}),
                     });
                     conversationId = recorded.conversationId;
                 } catch {
@@ -2502,7 +2523,8 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                     },
                     ...(conversationId ? { conversationId } : {}),
                     evidence: {
-                        analysisSource: result.source,
+                        analysisSource: result?.source ?? null,
+                        financialAnalysisAvailable: Boolean(result),
                         executiveWorkbench: Boolean(workbench),
                         statementContext: Boolean(insight),
                         ...(trust ? { trust } : {}),

@@ -188,7 +188,7 @@ describe("CommercialRuntimeServer E2E", () => {
       expect(body.answer).toBe("test answer");
     });
 
-    test("POST /api/assistant without analysis returns 422", async () => {
+    test("POST /api/assistant without analysis answers from available context", async () => {
       const session = await request(server, "/api/session", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -200,9 +200,16 @@ describe("CommercialRuntimeServer E2E", () => {
         headers: { "content-type": "application/json", cookie },
         body: JSON.stringify({ question: "What is revenue?" }),
       });
-      expect(response.status).toBe(422);
+      expect(response.status).toBe(200);
       const body = await response.json();
-      expect(body.error).toBe("ASSISTANT_ANALYSIS_REQUIRED");
+      expect(body.status).toBe("READY");
+      expect(body.answer).toBe("test answer");
+      // Financial analysis is optional: no canonical evidence, no fabricated one.
+      expect(body.evidence.financialAnalysisAvailable).toBe(false);
+      expect(body.evidence.analysisSource).toBeNull();
+      expect(body.evidence.statementContext).toBe(false);
+      expect(body.evidence.executiveWorkbench).toBe(false);
+      expect(body.cognition.traceId).toBeDefined();
     });
 
     test("POST /api/assistant with empty question returns 400", async () => {
