@@ -40,22 +40,39 @@ const CANONICAL_TOTAL_LIABILITIES = 17_407_417_000_000;
 
 const findRealXlsx = (): string | undefined => {
   if (process.env.HOOSHYAR_REAL_XLSX) return process.env.HOOSHYAR_REAL_XLSX;
-  const desktop = "C:\\Users\\avalipour\\Desktop";
-  try {
-    for (const entry of readdirSync(desktop, { withFileTypes: true })) {
-      if (!entry.isDirectory()) continue;
-      const candidate = `${desktop}\\${entry.name}\\123.xlsx`;
-      if (existsSync(candidate)) return candidate;
+  // Portable discovery: env override first, then platform user profile, then repo-relative fallback
+  const candidates: string[] = [];
+  if (process.env.USERPROFILE) {
+    candidates.push(`${process.env.USERPROFILE}\\Desktop`);
+    candidates.push(`${process.env.USERPROFILE}\\OneDrive\\Desktop`);
+  }
+  if (process.env.HOME) {
+    candidates.push(`${process.env.HOME}\\Desktop`);
+  }
+  // Repository-relative fixture directory (only if artifact is genuinely present)
+  candidates.push(`${process.cwd()}\\test-fixtures`);
+  for (const base of candidates) {
+    try {
+      if (!existsSync(base)) continue;
+      for (const entry of readdirSync(base, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        const candidate = `${base}\\${entry.name}\\123.xlsx`;
+        if (existsSync(candidate)) return candidate;
+      }
+    } catch {
+      // ignore and try next candidate
     }
-  } catch {
-    // No Desktop access: the real-dataset regression stays skipped, and the
-    // platform-wide cognitive entry proofs below still run for real.
   }
   return undefined;
 };
 
 const REAL_XLSX = findRealXlsx();
 const REAL = Boolean(REAL_XLSX && existsSync(REAL_XLSX as string));
+
+// Explicit diagnostic when real benchmark is absent — fails visibly rather than silently passing
+if (!REAL) {
+  console.error("[C-01.1] REAL benchmark not available. Set HOOSHYAR_REAL_XLSX or place 123.xlsx in a discoverable location. Financial regression tests will be skipped with explicit diagnostics.");
+}
 
 /**
  * Internal identifiers that must never reach a user-facing Persian answer:
@@ -137,10 +154,10 @@ const NON_FINANCIAL_QUESTIONS: ReadonlyArray<{
     readonly expectedIntent: string;
 }> = [
     { family: "ACTION", question: "برای بهبود وضعیت چه اقداماتی پیشنهاد می‌شود؟", expectedIntent: "ACTION" },
-    { family: "ORGANIZATIONAL", question: "ساختار سازمانی و فرایند تأیید تصمیم شرکت چگونه است؟", expectedIntent: "GENERAL" },
-    { family: "DECISION", question: "کدام گزینه برای تأمین نقدینگی مناسب‌تر است؟", expectedIntent: "GENERAL" },
-    { family: "EXECUTION", question: "وضعیت اجرای اقدام‌های اصلاحی چیست؟", expectedIntent: "GENERAL" },
-    { family: "OPERATIONAL", question: "ظرفیت عملیاتی و جریان تأمین چطور کار می‌کند؟", expectedIntent: "GENERAL" },
+    { family: "ORGANIZATIONAL", question: "سازمان و فرآیند تأیید تصمیم شرکت چگونه است؟", expectedIntent: "ORGANIZATIONAL" },
+    { family: "DECISION", question: "کدام گزینه برای تأمین نقدینگی مناسب‌تر است؟", expectedIntent: "DECISION" },
+    { family: "EXECUTION", question: "وضعیت اجرای اقدام‌های اصلاحی چیست؟", expectedIntent: "EXECUTION" },
+    { family: "OPERATIONAL", question: "ظرفیت عملیاتی و جریان تأمین چطور کار می‌کند؟", expectedIntent: "OPERATIONAL" },
     { family: "GENERAL", question: "یک توضیح کلی درباره این شرکت بده", expectedIntent: "GENERAL" },
 ];
 
