@@ -64,8 +64,9 @@ const findRealXlsx = (): string | undefined => {
         const candidate = `${base}\\${entry.name}\\123.xlsx`;
         if (existsSync(candidate)) return candidate;
       }
-    } catch {
-      // ignore and try next candidate
+    } catch (e) {
+      // Discovery failed for this candidate — log and continue to next
+      console.error(`[C-01.2] Fixture discovery failed for ${base}:`, e instanceof Error ? e.message : String(e));
     }
   }
   return undefined;
@@ -439,13 +440,10 @@ describe("C-01.2 capability selection fidelity over the REAL runtime", () => {
         expect(opsCapA).toBeDefined();
         expect(opsCapA!.status).toBe("UNAVAILABLE");
         expect(opsCapA!.unavailableReason).toMatch(/problem case|پرونده مسئله/i);
+    });
 
-        // Tenant B has problem cases - positive leg must be unconditional
-        if (!REAL) {
-            // Explicit diagnostic: this test requires real benchmark for the positive assertion
-            console.warn("[C-01.2] ORGANIZATIONAL positive leg skipped: real benchmark not available");
-            return;
-        }
+    // Tenant B has problem cases - positive leg requires real benchmark
+    (REAL ? test : test.skip)("ORGANIZATIONAL positive leg: with problem cases, must EXECUTE with evidence", () => {
         const bodyB = answers.get("B:ORGANIZATIONAL")!;
         const opsCapB = bodyB.cognition.capabilities.find((c) => c.capability === "ORGANIZATIONAL_PROBLEM_SOLVING");
         expect(opsCapB).toBeDefined();
@@ -466,12 +464,10 @@ describe("C-01.2 capability selection fidelity over the REAL runtime", () => {
         expect(dwCapA).toBeDefined();
         expect(dwCapA!.status).toBe("UNAVAILABLE");
         expect(dwCapA!.unavailableReason).toMatch(/decision|تصمیم|ماتریس/i);
+    });
 
-        // Tenant B has decision matrix - positive leg must be unconditional
-        if (!REAL) {
-            console.warn("[C-01.2] DECISION positive leg skipped: real benchmark not available");
-            return;
-        }
+    // Tenant B has decision matrix - positive leg requires real benchmark
+    (REAL ? test : test.skip)("DECISION positive leg: with decision matrix, must EXECUTE with evidence", () => {
         const bodyB = answers.get("B:DECISION")!;
         const dwCapB = bodyB.cognition.capabilities.find((c) => c.capability === "DECISION_WORKBENCH");
         expect(dwCapB).toBeDefined();
@@ -569,13 +565,9 @@ describe("C-01.2 capability selection fidelity over the REAL runtime", () => {
         expect(cap!.unavailableReason).toBeTruthy();
     });
 
-    test("Financial-only evidence is NOT relabeled as organizational evidence", () => {
+    (REAL ? test : test.skip)("Financial-only evidence is NOT relabeled as organizational evidence", () => {
         // When only financial insight exists, organizational capabilities should report UNAVAILABLE
         // not execute with relabeled financial ratios
-        if (!REAL) {
-            console.warn("[C-01.2] Financial-only evidence test skipped: real benchmark not available");
-            return;
-        }
         const body = answers.get("B:ORGANIZATIONAL")!;
         // The financial ratios in the insight should NOT be passed as organizational evidence
         const orgIntelCap = body.cognition.capabilities.find((c) => c.capability === "ORGANIZATIONAL_INTELLIGENCE");
@@ -607,12 +599,8 @@ describe("C-01.2 capability selection fidelity over the REAL runtime", () => {
         expect(decisionCap!.status).toBe("UNAVAILABLE");
     });
 
-    test("Cross-tenant evidence cannot be consumed", () => {
+    (REAL ? test : test.skip)("Cross-tenant evidence cannot be consumed", () => {
         // Tenant C should not see tenant B's problem cases, decisions, or evidence
-        if (!REAL) {
-            console.warn("[C-01.2] Cross-tenant test skipped: real benchmark not available");
-            return;
-        }
         const bodyC = answers.get("C:GENERAL")!;
         // Should not have access to B's memory or learning
         expect(bodyC.cognition.memory.retrievedCount).toBe(0);
@@ -672,11 +660,7 @@ describe("C-01.2 capability selection fidelity over the REAL runtime", () => {
         expect(body.answer).not.toMatch(CONTEXT_LEAK);
     });
 
-    test("REAL HTTP: financial question with 123.xlsx executes canonical financial capabilities", async () => {
-        if (!REAL) {
-            console.warn("[C-01.2] Financial REAL HTTP test skipped: real benchmark not available");
-            return;
-        }
+    (REAL ? test : test.skip)("REAL HTTP: financial question with 123.xlsx executes canonical financial capabilities", async () => {
         const response = await ask(tenantB, "تحلیل کامل صورت مالی را انجام بده");
         expect(response.status).toBe(200);
         const body = response.body;

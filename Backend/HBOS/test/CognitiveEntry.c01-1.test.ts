@@ -59,8 +59,9 @@ const findRealXlsx = (): string | undefined => {
         const candidate = `${base}\\${entry.name}\\123.xlsx`;
         if (existsSync(candidate)) return candidate;
       }
-    } catch {
-      // ignore and try next candidate
+    } catch (e) {
+      // Discovery failed for this candidate — log and continue to next
+      console.error(`[C-01.1] Fixture discovery failed for ${base}:`, e instanceof Error ? e.message : String(e));
     }
   }
   return undefined;
