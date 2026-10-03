@@ -34,7 +34,11 @@ export type AssistantIntent =
   | "RESILIENCE"
   | "ACTION"
   | "ANALYZE"
-  | "GENERAL";
+  | "GENERAL"
+  | "ORGANIZATIONAL"
+  | "DECISION"
+  | "OPERATIONAL"
+  | "EXECUTION";
 
 /**
  * Structured, deterministic question contract.
@@ -75,7 +79,15 @@ export type EvidenceDomain =
   | "DATA_COMPLETENESS"
   | "PRODUCT_MIX"
   | "SCENARIOS"
-  | "ACTIONS";
+  | "ACTIONS"
+  | "PROBLEM_CASES"
+  | "ORG_EVIDENCE"
+  | "DECISION_MATRIX"
+  | "CRITERIA"
+  | "WORKFLOWS"
+  | "EXECUTION_EVIDENCE"
+  | "ACTION_ITEMS"
+  | "COMPLETION_EVIDENCE";
 
 export type NarrativeEvidenceLevel =
   | "EXTRACTED_FACT"
@@ -483,6 +495,39 @@ const INTENT_RULES: readonly IntentRule[] = [
     ],
   },
   {
+    intent: "ORGANIZATIONAL",
+    weight: 100,
+    patterns: [
+      /سازمان/, /فرایند/, /ساختار/, /وقوع.*مشکل/, /مشکل.*سازمانی/, /ریشه.*علت/,
+      /organizational/, /process/, /structure/, /root.?cause/,
+    ],
+  },
+  {
+    intent: "DECISION",
+    weight: 100,
+    patterns: [
+      /تصمیم/, /انتخاب/, /مقایسه گزینه/, /بهترین گزینه/, /تصمیم‌گیری/,
+      /گزینه/, /کدام گزینه/,
+      /decision/, /choose/, /alternative/, /trade.?off/,
+    ],
+  },
+  {
+    intent: "EXECUTION",
+    weight: 100,
+    patterns: [
+      /اجرای/, /پیاده.?سازی/, /بازبینی.*اقدام/, /پیگیری.*اقدام/,
+      /execute/, /implement/, /follow.?up/, /track/,
+    ],
+  },
+  {
+    intent: "OPERATIONAL",
+    weight: 100,
+    patterns: [
+      /عملیات/, /اجرا/, /تنفيذ/, /جریانی/, /چالش.*اجرایی/,
+      /operational/, /execution/, /workflow/, /runbook/,
+    ],
+  },
+  {
     intent: "ANALYZE",
     weight: 60,
     patterns: [/تحلیل کن/, /تحلیل.*(صورت|مالی|وضعیت|شرکت)/, /این صورت مالی/, /بررسی کن/, /بررسی وضعیت/, /analy[sz]e/, /review/, /چه وضعیتی/],
@@ -550,6 +595,30 @@ const INTENT_CONTRACT: Readonly<Record<AssistantIntent, Omit<QuestionIntent, "pr
     requestedAnalysis: ["خلاصه", "نقاط قوت", "ریسکها", "اقدامات"],
     requestedOutcome: "پاسخ عمومی مبتنی بر سند",
     requiredEvidenceDomains: ["OVERVIEW"],
+  },
+  ORGANIZATIONAL: {
+    userGoal: "شناسایی و حل مشکلات سازمانی، فرایندی و ساختاری",
+    requestedAnalysis: ["تعریف مشکل", "مجموعه شواهد", "فرضیات", "تحلیل ریشه علتی", "اقدامات پیشنهادی"],
+    requestedOutcome: "برنامه حل مسئله سازمانی با شواهد",
+    requiredEvidenceDomains: ["PROBLEM_CASES", "ORG_EVIDENCE"],
+  },
+  DECISION: {
+    userGoal: "ارزیابی و انتخاب بهترین گزینه با روش‌های تصمیم‌گیری چندمعیاره",
+    requestedAnalysis: ["مقایسه گزینه‌ها", "وزن‌دهی معیارها", "مدل AHP/TOPSIS", "استدلال و محدودیت‌ها"],
+    requestedOutcome: "پیشنهاد تصمیم با شواهد کمی",
+    requiredEvidenceDomains: ["DECISION_MATRIX", "CRITERIA"],
+  },
+  OPERATIONAL: {
+    userGoal: "مدیریت و پایش جریان‌های اجرایی و وर्क‌فلوها",
+    requestedAnalysis: ["برنامه‌ریزی ورك‌فلو", "هماهنگی عامل‌ها", "پایش اجرا", "بازیابی و تأیید"],
+    requestedOutcome: "وضعیت اجرایی و برنامه اقدام",
+    requiredEvidenceDomains: ["WORKFLOWS", "EXECUTION_EVIDENCE"],
+  },
+  EXECUTION: {
+    userGoal: "پیگیری و تأیید تکمیل اقدامات تصمیم‌گرفته شده",
+    requestedAnalysis: ["وضعیت اقدامات", "معیارهای تکمیل", "موانع", "اقدامات اصلاحی"],
+    requestedOutcome: "گزارش پیشرفت و تأیید تکمیل",
+    requiredEvidenceDomains: ["ACTION_ITEMS", "COMPLETION_EVIDENCE"],
   },
 };
 

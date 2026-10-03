@@ -50,6 +50,10 @@ import type { GovernedLearningLifecycle, LearningArtifact } from "./GovernedLear
 import type { SecurityContext } from "../Security/SecurityContext";
 import { composeScenarios, analyzeQuestion, type QuestionIntent } from "./FinancialDecisionNarrativeService";
 import type { FinancialStatementInsight } from "./FinancialStatementInsight";
+import type { OrganizationalProblemSolvingService } from "./OrganizationalProblemSolvingService";
+import type { DecisionWorkbench } from "./DecisionWorkbench";
+import type { AutonomousOperationsEngine } from "../Engines/AutonomousOperationsEngine";
+import type { ExecutiveIntelligenceWorkbench } from "./ExecutiveIntelligenceWorkbench";
 
 /** Canonical capability identifiers selected by the question intent. */
 export type CognitiveCapability =
@@ -67,7 +71,11 @@ export type CognitiveCapability =
   | "ACTION_FINDINGS"
   | "DECISION_INTELLIGENCE"
   | "GOVERNANCE"
-  | "REASONING";
+  | "REASONING"
+  | "ORGANIZATIONAL_PROBLEM_SOLVING"
+  | "DECISION_WORKBENCH"
+  | "AUTONOMOUS_OPERATIONS"
+  | "EXECUTIVE_WORKBENCH";
 
 export type CapabilityStatus = "EXECUTED" | "UNAVAILABLE" | "NOT_REQUIRED";
 
@@ -233,6 +241,10 @@ export interface CognitiveOrchestrationInput {
   readonly insight: FinancialStatementInsight | null;
   /** Existing executive workbench result, when the runtime already has one. */
   readonly executiveWorkbench?: { readonly recommendations: readonly { readonly action: string }[] } | null;
+  /** Existing organizational problem-solving cases for this tenant. */
+  readonly problemCases?: readonly { readonly problemId: string; readonly title: string; readonly stage: string; readonly category: string }[] | null;
+  /** Existing decision workbench result for this tenant. */
+  readonly decisionWorkbench?: { readonly problem: string; readonly method: string; readonly evaluations: readonly { readonly alternative: string }[] } | null;
   /** Security context used only by the governance gate. */
   readonly securityContext?: SecurityContext;
   /** Executable-engine notes, e.g. current source sha and integrity ids. */
@@ -282,6 +294,10 @@ const CAPABILITY_SELECTION: Readonly<Record<QuestionIntent["primaryIntent"], rea
   RESILIENCE: ["LIQUIDITY_LEVERAGE", "WORKING_CAPITAL", "EARNINGS_QUALITY", "COMPARATIVE_EVIDENCE", "FINANCIAL_INTELLIGENCE", "ORGANIZATIONAL_INTELLIGENCE", "REASONING"],
   ACTION: ["ACTION_FINDINGS", "DECISION_INTELLIGENCE", "GOVERNANCE", "REASONING"],
   GENERAL: ["FINANCIAL_INTELLIGENCE", "EXECUTIVE_INTELLIGENCE", "REASONING"],
+  ORGANIZATIONAL: ["ORGANIZATIONAL_PROBLEM_SOLVING", "ORGANIZATIONAL_INTELLIGENCE", "REASONING"],
+  DECISION: ["DECISION_WORKBENCH", "DECISION_INTELLIGENCE", "GOVERNANCE", "REASONING"],
+  OPERATIONAL: ["AUTONOMOUS_OPERATIONS", "REASONING"],
+  EXECUTION: ["AUTONOMOUS_OPERATIONS", "GOVERNANCE", "REASONING"],
 };
 
 /**
@@ -305,7 +321,11 @@ const EXECUTION_ORDER: readonly CognitiveCapability[] = [
   "EARNINGS_QUALITY",
   "RISK_INTELLIGENCE",
   "ORGANIZATIONAL_INTELLIGENCE",
+  "ORGANIZATIONAL_PROBLEM_SOLVING",
+  "DECISION_WORKBENCH",
+  "AUTONOMOUS_OPERATIONS",
   "EXECUTIVE_INTELLIGENCE",
+  "EXECUTIVE_WORKBENCH",
   "DECISION_INTELLIGENCE",
   "REASONING",
   "GOVERNANCE",
@@ -344,6 +364,14 @@ export class CognitiveOrchestrationService {
      * exact previous behaviour.
      */
     private readonly learning?: GovernedLearningLifecycle;
+    /**
+     * C-01.2: Optional product services for non-financial capability execution.
+     * These are only invoked when their evidence contracts are satisfied.
+     */
+    private readonly problemSolving?: OrganizationalProblemSolvingService;
+    private readonly decisionWorkbench?: DecisionWorkbench;
+    private readonly autonomousOps?: AutonomousOperationsEngine;
+    private readonly executiveWorkbench?: ExecutiveIntelligenceWorkbench;
 
     constructor(
         financial?: FinancialIntelligenceEngine,
@@ -352,6 +380,10 @@ export class CognitiveOrchestrationService {
         intelligence?: IntelligenceEngine,
         memory?: MemoryEngine,
         learning?: GovernedLearningLifecycle,
+        problemSolving?: OrganizationalProblemSolvingService,
+        decisionWorkbench?: DecisionWorkbench,
+        autonomousOps?: AutonomousOperationsEngine,
+        executiveWorkbench?: ExecutiveIntelligenceWorkbench,
     ) {
         this.financial = financial ?? new FinancialIntelligenceEngine();
         this.organizational = organizational ?? new OrganizationalIntelligenceEngine();
@@ -359,6 +391,10 @@ export class CognitiveOrchestrationService {
         this.intelligence = intelligence ?? new IntelligenceEngine();
         this.memory = memory ?? new MemoryEngine();
         this.learning = learning;
+        this.problemSolving = problemSolving;
+        this.decisionWorkbench = decisionWorkbench;
+        this.autonomousOps = autonomousOps;
+        this.executiveWorkbench = executiveWorkbench;
     }
 
     orchestrate(input: CognitiveOrchestrationInput): CognitiveOrchestrationResult {
@@ -797,6 +833,78 @@ export class CognitiveOrchestrationService {
                 };
             }
 
+            case "ORGANIZATIONAL_PROBLEM_SOLVING": {
+                const cases = input.problemCases ?? [];
+                if (!cases || cases.length === 0) {
+                    return this.unavailable(
+                        capability, "OrganizationalProblemSolvingService",
+                        "no organizational problem cases exist for this tenant; cannot execute without genuine evidence",
+                        [], "پرونده مسئله سازمانی برای این مستأجر وجود ندارد؛ بدون شاهد اصلی قابل اجرا نیست",
+                    );
+                }
+                // Use the most recent active case
+                const activeCase = cases.find((c) => c.stage !== "RESOLVED" && c.stage !== "LEARNED") ?? cases[0];
+                return {
+                    capability, owner: "OrganizationalProblemSolvingService", status: "EXECUTED",
+                    evidence: [`problem-case:${activeCase.problemId}`, `stage:${activeCase.stage}`, `category:${activeCase.category}`],
+                    result: {
+                        problemId: activeCase.problemId,
+                        title: activeCase.title,
+                        category: activeCase.category,
+                        stage: activeCase.stage,
+                    },
+                };
+            }
+
+            case "DECISION_WORKBENCH": {
+                const decision = input.decisionWorkbench;
+                if (!decision) {
+                    return this.unavailable(
+                        capability, "DecisionWorkbench",
+                        "no decision workbench result exists for this tenant; cannot execute without genuine evidence",
+                        [], "پرونده کارگاه تصمیم برای این مستأجر وجود ندارد؛ بدون ماتریس تصمیم قابل اجرا نیست",
+                    );
+                }
+                return {
+                    capability, owner: "DecisionWorkbench", status: "EXECUTED",
+                    evidence: [`decision:${decision.problem}`, `method:${decision.method}`, `alternatives:${decision.evaluations.length}`],
+                    result: {
+                        problem: decision.problem,
+                        method: decision.method,
+                        alternatives: decision.evaluations.map((e) => e.alternative),
+                    },
+                };
+            }
+
+            case "AUTONOMOUS_OPERATIONS": {
+                // Autonomous operations require workflow evidence which is not passed through orchestration input
+                // This capability is available when the runtime has workflow context
+                return this.unavailable(
+                    capability, "AutonomousOperationsEngine",
+                    "no workflow context available in cognitive orchestration; workflow execution requires direct runtime access",
+                    [], "بافت وَرک‌فلو در ارکستراسیون شناختی موجود نیست؛ اجرای عملیات نیازمند دسترسی مستقیم به ран‌تایم است",
+                );
+            }
+
+            case "EXECUTIVE_WORKBENCH": {
+                const workbench = input.executiveWorkbench ?? null;
+                if (!workbench || workbench.recommendations.length === 0) {
+                    return this.unavailable(
+                        capability, "ExecutiveIntelligenceWorkbench",
+                        "no executive targets/KPIs configured for this tenant; executive workbench requires targets",
+                        [], "هدف یا شاخص اجرایی برای این مستأجر تنظیم نشده؛ کارگاه هوش اجرایی نیازمند اهداف است",
+                    );
+                }
+                return {
+                    capability, owner: "ExecutiveIntelligenceWorkbench", status: "EXECUTED",
+                    evidence: workbench.recommendations.map((item) => `executive:${item.action}`),
+                    result: {
+                        recommendationCount: workbench.recommendations.length,
+                        note: "requires financial analysis result and targets for full execution",
+                    },
+                };
+            }
+
             case "REASONING":
                 // Executed by orchestrate() after all evidence capabilities.
                 return null;
@@ -1047,6 +1155,7 @@ export class CognitiveOrchestrationService {
         const financial = executed.find((entry) => entry.capability === "FINANCIAL_INTELLIGENCE" && entry.status === "EXECUTED");
         if (financial) {
             const canonical = canonicalFinancialValues(insight);
+            insightData.revenue = financial.result.revenue as number;
             insightData.profit = financial.result.profit as number;
             insightData.profitMargin = financial.result.profitMargin as number;
             if (typeof financial.result.debtRatio === "number") insightData.debtRatio = financial.result.debtRatio as number;

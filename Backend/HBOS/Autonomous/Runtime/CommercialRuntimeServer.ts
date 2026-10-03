@@ -462,7 +462,13 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     // not an Engine, and it is shared by the orchestration composition and the
     // real `/api/assistant` learning path so there is exactly one authority.
     const governedLearning = new GovernedLearningLifecycle(persistence, new GovernanceEngine(), options.now ?? (() => Date.now()));
-    const cognitiveOrchestration = new CognitiveOrchestrationService(undefined, undefined, undefined, undefined, cognitiveMemory, governedLearning);
+    // Canonical owner for the persistent, cross-engine organizational
+    // problem-solving lifecycle (product.organizational-problem-solving).
+    const problemSolving = new OrganizationalProblemSolvingService(persistence);
+    const cognitiveOrchestration = new CognitiveOrchestrationService(
+        undefined, undefined, undefined, undefined, cognitiveMemory, governedLearning,
+        problemSolving, decisionWorkbench, undefined, executiveWorkbench
+    );
     const organizationalExecution = new OrganizationalExecutionCoordinator(persistence);
     if (options.securityEventLogger) organizationalExecution.setSecurityLogger(options.securityEventLogger);
     const reports = new ReportsEngine();
@@ -470,9 +476,6 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     const resilience = new ResilienceAnalyticsService();
     const impact = new ImpactMeasurementService();
     const improvement = new ContinuousImprovementEngine();
-    // Canonical owner for the persistent, cross-engine organizational
-    // problem-solving lifecycle (product.organizational-problem-solving).
-    const problemSolving = new OrganizationalProblemSolvingService(persistence);
     // Additive source-trust assessment supporting service. It consumes an
     // already-accepted canonical ingestion result and returns metadata; it is
     // not an Engine and never mutates the protected ingestion adapter or the
@@ -598,6 +601,17 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
             if (result?.tenantId === tenantId && result.status === "READY") latestDecisionResults.set(tenantId, result);
         }
         return result?.tenantId === tenantId && result.status === "READY" ? result : undefined;
+    };
+
+    const loadProblemCases = async (tenantId: string): Promise<readonly { readonly problemId: string; readonly title: string; readonly stage: string; readonly category: string }[]> => {
+        const result = await problemSolving.listCases(tenantId, 10, 0);
+        if (!result?.cases || result.cases.length === 0) return [];
+        return result.cases.map((c) => ({
+            problemId: c.id,
+            title: c.title,
+            stage: c.stage,
+            category: c.category,
+        }));
     };
 
     const loadAnalytics = async (tenantId: string): Promise<StoredAnalytics | undefined> => {
@@ -2252,6 +2266,8 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                  */
                 const result = await loadAnalysis(session.tenantId);
                 const workbench = await loadWorkbench(session.tenantId);
+                const decision = await loadDecision(session.tenantId);
+                const problemCases = await loadProblemCases(session.tenantId);
                 const sourceSha256 = typeof result?.source?.sha256 === "string" ? result.source.sha256 : "";
                 const analytics = sourceSha256
                     ? await correlatedAnalyticsFor(session.tenantId, sourceSha256)
@@ -2279,6 +2295,10 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                     executiveWorkbench: workbench
                         ? { recommendations: workbench.recommendations.map((item) => ({ action: item.action })) }
                         : null,
+                    problemCases: problemCases.length > 0 ? problemCases : undefined,
+                    decisionWorkbench: decision
+                        ? { problem: decision.problem, method: decision.method, evaluations: decision.evaluations.map((e) => ({ alternative: e.alternative })) }
+                        : undefined,
                     // The governance gate uses the caller's real session
                     // authority; it is never bypassed for the ACTION path.
                     securityContext: executionContext(session),
