@@ -1,0 +1,78 @@
+# Evidence — `product.organizational-problem-solving` + second-pass audit (2026-09-19)
+
+Branch: `fix/autonomous-product-factory`
+Pre-change trusted checkpoint (HEAD at audit start): `f43224218a695568197c9c4bafafab9568d41965`
+Remote parity at start: local `HEAD` == `origin/fix/autonomous-product-factory` (verified; `git rev-list --left-right --count origin/fix/autonomous-product-factory...HEAD` = 0/0)
+Environment limit: `gh` is not authenticated in this environment, so workflow/run status could not be queried from the GitHub API; `git ls-remote` parity was used instead.
+
+## 1. Fresh verification at the start of this audit
+
+| Check | Command | Result |
+|---|---|---|
+| Full Jest suite (canonical) | `node ./node_modules/jest/bin/jest.js --silent` | **278/278 suites, 2137/2137 tests PASS**, exit 0 (232.6 s) |
+| Engine baseline (pre-change spot check) | jest `CanonicalIntelligenceEngines` + `CrossEngineOrchestration.phase-11-1.9` | 2/2 suites, 14/14 tests PASS |
+
+## 2. New capability — canonical owner and real handoffs
+
+Owner: `Backend/HBOS/Product/OrganizationalProblemSolvingService.ts` (Product composition owner, **not** a sixth engine).
+
+Lifecycle stages: `OPEN → DEFINED → EVIDENCE_SET → HYPOTHESES_FORMED → ROOT_CAUSE_IDENTIFIED → OPTIONS_EVALUATED → DECISION_PENDING_APPROVAL → DECIDED → ACTION_PLANNED → EXECUTED → RESOLVED → LEARNED`.
+
+Engine/owner handoffs (all real calls):
+
+| Stage | Canonical owner invoked | What it produces |
+|---|---|---|
+| HYPOTHESES | `ReasoningEngine.reason` + `OrganizationalIntelligenceEngine.diagnose` | evidence-bound reasoning provenance; structured root causes, affected processes, recommendations |
+| ROOT_CAUSE | rank over the engine diagnosis + evidence coverage | primary/ranked causes with support ratios |
+| OPTIONS | `ReasoningEngine.reason` (+ optional `DecisionWorkbench` Expert Choice ranking) | scenario reasoning provenance; optional TOPSIS/AHP ranking |
+| DECIDE | `GovernanceEngine.evaluate({ action: "APPROVE_DECISION" })` | ALLOWED / DENIED / REVIEW_REQUIRED with policy trace; approvals fail closed |
+| PLAN / EXECUTE | `AutonomousOperationsEngine.planWorkflow` / `executeAuthorizedWorkflow` / `monitorExecution` | governed workflow plan, authorized execution, monitor; restart recovery by deterministic re-plan |
+| OUTCOME | `ImpactMeasurementService.measure` + `OrganizationalIntelligenceEngine.learnFromExecution` + `ExecutiveIntelligenceEngine.evaluatePerformance` | measured before/after impact, sustainability, ROI, executive achievement rate |
+| LEARNING | `KnowledgeEngine.learn` (+ persisted case record) | reusable organizational knowledge bound to the case signature |
+
+Persistence: tenant-scoped records through the canonical `SQLitePersistenceStore` (`problem-case:<id>`, `problem-case-index`); survives restart; cross-tenant reads return null/404.
+
+Metrics (real measurements, no invented scores): `timeToDefinitionMs`, `diagnosisTimeMs`, `diagnosisToDecisionMs`, `decisionToActionMs`, `timeToResolutionMs`, `evidenceCompleteness`, `recurrenceCount`, `actionOutcome`, `outcomeAttainment`, `futureResolutionSpeedMs`.
+
+Security/tenancy: service enforces tenant match and EXECUTE authority on execution; runtime enforces RBAC (`CREATE_DECISION`/`APPROVE_DECISION`/`READ_DASHBOARD`), object authorization (creator or ADMINISTER), and the canonical `TenantIsolation` boundary; decisions route through `GovernanceEngine` and executions are attributed to an explicit `AutonomousOperation` principal.
+
+## 3. Runtime integration
+
+`Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts`:
+- `POST /api/problems` (idempotent create), `GET /api/problems` (bounded pagination), `GET /api/problems/:id` (case + metrics), `POST /api/problems/:id/advance` (lifecycle stage).
+- `/api/ready` advertises `organizational-problem-solving` and now reports `dependencies.reasoningRuntime`.
+
+## 4. Installed-product honesty repair
+
+`Backend/HBOS/Autonomous/Runtime/RuntimeDependencyProbe.ts` (new, non-Engine): resolves `HOOSHYAR_PYTHON` or PATH `python`, reports `{ id, available, source, detail }` and never throws. Wired into `/api/ready` (lazy, cached) and the startup log of `start-commercial-runtime.ts`.
+
+Observed real state: `dist/productization/windows/payload` ships `node-runtime` and `Backend/AI_Runtime`, but **no Python interpreter**; `FinancialStatementAnalysisService.execute` returns BLOCKED when reasoning fails, so the core analysis journey depends on a Python runtime the installer does not ship. The probe makes the dependency explicit at runtime; the underlying product decision (ship Python vs. make reasoning optional) is recorded as an open product/business decision, not silently claimed complete.
+
+Startup log observed during web acceptance:
+`{"type":"HOOSHYAR_COMMERCIAL_RUNTIME_STARTED",...,"dependencies":{"reasoningRuntime":{"id":"python-reasoning-runtime","available":true,"source":"PATH","detail":"resolved"}}}`
+
+## 5. Behavioral evidence
+
+| Check | Command | Result |
+|---|---|---|
+| Service lifecycle (unit) | `jest OrganizationalProblemSolving.test.ts` | **8/8 PASS** incl. full lifecycle, restart persistence, out-of-order fail-closed, tenant isolation, governance DENY, governance REVIEW_REQUIRED→approval, restart action-plan recovery, cross-tenant outcome rejection |
+| Runtime HTTP acceptance | `jest OrganizationalProblemSolvingRuntime.test.ts` | **3/3 PASS** — full governed lifecycle over real HTTP, restart persistence, auth 401, cross-tenant 404, idempotent replay header, unknown-stage 400, out-of-order 422 |
+| Dependency probe | `jest RuntimeDependencyProbe.test.ts` | **5/5 PASS** incl. real `/api/ready` reporting with no interpreter-path leakage |
+| Focused runtime regression | jest e2e + rateLimiting + pagination + idempotency | 4 suites / 47 tests PASS (one contention timeout in the grouped run that passes in isolation and in the full suite) |
+| Full suite (post-change) | `node ./node_modules/jest/bin/jest.js --silent` | **278/278 suites, 2137/2137 tests PASS** |
+| Web acceptance | `npm run product:web:acceptance` | **PASS**, 19 reported checks |
+| Security acceptance | `npm run product:security:acceptance` | **PASS**, 15 acceptance checks |
+| Aggregate qualification | `node scripts/final-product-qualification.cjs` | 7/7 internal gates PASS, `overall: BLOCK_EXTERNAL`, exit 0 |
+| Assurance gate | `npm run product:assurance` | PASS, `productComplete:false` |
+| Changed-file typecheck | `npx tsc --noEmit` | 0 errors in changed files |
+
+## 6. Completion flags (unchanged)
+
+`assistantComplete` TRUE; `canonicalPlatformConstructionComplete` FALSE; `commercialProductRuntimeComplete` FALSE; `externalProductionDependenciesComplete` FALSE; `productComplete` FALSE.
+
+## 7. Not verified in this environment
+
+- Real browser acceptance (only HTTP-level web acceptance was executed).
+- Android device/emulator acceptance (B4 `BLOCKED_ENVIRONMENT`: no JDK/Gradle/Android SDK/adb).
+- Live CI run status (`gh` unauthenticated); Linux/macOS execution of the new code.
+- Real installed-product re-installation with the new probe (installer rebuild not performed in this audit).

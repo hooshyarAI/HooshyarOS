@@ -1,0 +1,31 @@
+{"type":"REAL_PRODUCT_QUALIFICATION","stage":"web-acceptance","status":"RUNNING"}
+
+> hooshyaros@1.0.0 product:web:acceptance
+> node scripts/web-product-acceptance.cjs
+
+{"type":"HOOSHYAR_COMMERCIAL_RUNTIME_STARTED","host":"127.0.0.1","port":4174,"health":"http://127.0.0.1:4174/health"}
+{
+  "type": "WEB_PRODUCT_ACCEPTANCE",
+  "status": "PASS",
+  "tenantId": "tenant:1cdc85e3a7d566d6",
+  "profit": 1000,
+  "root": true,
+  "session": true,
+  "analysis": true,
+  "executive": true,
+  "report": true,
+  "assistant": true,
+  "dashboard": true,
+  "multiFormat": true,
+  "financialAnalytics": true,
+  "decisionWorkbench": true,
+  "organizationalExecution": true,
+  "reportsExport": true,
+  "pdfBoundary": true,
+  "offlineQueue": true,
+  "offlineReload": true,
+  "offlineReconnect": true,
+  "storageQuota": true
+}
+{"type":"REAL_PRODUCT_QUALIFICATION","stage":"web-acceptance","status":"PASS"}
+{"launcherProof":"REAL_PRODUCT_QUALIFICATION_WEB_STEP_VIA_REPAIRED_LAUNCHER","exitCode":0}

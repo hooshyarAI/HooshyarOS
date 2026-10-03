@@ -65,21 +65,37 @@ def run_required_verification() -> bool:
     return run("npm", ["run", "build"], 45 * 60) == 0 and run("npm", ["test", "--", "--runInBand"], 60 * 60) == 0
 
 
+def windows_setup_exe() -> Path | None:
+    """Return the canonical Inno Setup wizard EXE produced by the builder.
+
+    The builder writes ``HooshyarOS-Setup-<version>.exe`` into the canonical
+    installer directory; the version comes from ``installer/HooshyarOS.iss``.
+    """
+    override = os.environ.get("HOOSHYAR_WINDOWS_FINAL_ARTIFACT")
+    if override:
+        candidate = Path(override)
+        return candidate if candidate.is_absolute() else WINDOWS_ROOT / candidate
+    if not WINDOWS_INSTALLER.exists():
+        return None
+    candidates = sorted(WINDOWS_INSTALLER.glob("HooshyarOS-Setup-*.exe"))
+    return candidates[-1] if candidates else None
+
+
 def windows_productize() -> tuple[bool, str]:
     emit("AUTONOMOUS_PRODUCTIZATION_STAGE", stage="WINDOWS")
     if not run_product_builder("WINDOWS"):
         return False, "windows-productization-builder-failed"
-    exe = WINDOWS_ROOT / os.environ.get("HOOSHYAR_WINDOWS_FINAL_ARTIFACT", "HooshyarOS-Setup.exe")
-    if env_true("HOOSHYAR_REQUIRE_REAL_WINDOWS_EXE") and (not exe.exists() or exe.stat().st_size < 100 * 1024):
+    exe = windows_setup_exe()
+    if env_true("HOOSHYAR_REQUIRE_REAL_WINDOWS_EXE") and (exe is None or not exe.exists() or exe.stat().st_size < 100 * 1024):
         return False, "windows-real-exe-not-produced"
-    if not exe.exists():
+    if exe is None or not exe.exists():
         bootstrap = WINDOWS_ROOT / "HooshyarOS-Windows-Bootstrap.zip"
         if not bootstrap.exists():
             return False, "windows-release-artifact-not-produced"
         if env_true("HOOSHYAR_REQUIRE_REAL_WINDOWS_EXE"):
             return False, "windows-real-exe-required"
     emit("AUTONOMOUS_PRODUCTIZATION_ARTIFACT", platform="WINDOWS",
-         artifact=str(exe.relative_to(ROOT)) if exe.exists() else "HooshyarOS-Windows-Bootstrap.zip")
+         artifact=str(exe.relative_to(ROOT)) if exe and exe.exists() else "HooshyarOS-Windows-Bootstrap.zip")
     return True, "ok"
 
 

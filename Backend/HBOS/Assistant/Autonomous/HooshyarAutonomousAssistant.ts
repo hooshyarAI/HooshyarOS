@@ -2,6 +2,7 @@ import {AutonomousIdentityCore} from "./AutonomousIdentityCore";
 import {AutonomousGoalManager} from "./AutonomousGoalManager";
 import {SelfEvaluationEngine} from "./SelfEvaluationEngine";
 import {ContinuousImprovementEngine} from "./ContinuousImprovementEngine";
+import type {ImprovementInput} from "./ContinuousImprovementEngine";
 import {AutonomousToolManager} from "./AutonomousToolManager";
 import {ProjectExecutionMemory} from "./ProjectExecutionMemory";
 import {AutonomousAssistantRuntime} from "./AutonomousAssistantRuntime";
@@ -20,7 +21,7 @@ export class HooshyarAutonomousAssistant {
 
     constructor(private readonly buildDaemon: Pick<AutonomousBuildDaemon, "run"> = new AutonomousBuildDaemon()) {}
 
-    async execute(goal:string){
+    async execute(goal:string, improvementInput?:ImprovementInput | null){
         const identity=this.identity.identify();
         const mission=this.goals.create(goal);
         const lifecycle= this.missionController.executeMission(goal);
@@ -33,7 +34,7 @@ export class HooshyarAutonomousAssistant {
                 completed: false,
                 runtime: null,
                 evaluation: { healthy: false },
-                improvement: { improved: false },
+                improvement: this.improvement.improve(null),
                 tool: { executed: false },
                 construction: null,
             };
@@ -41,7 +42,11 @@ export class HooshyarAutonomousAssistant {
 
         const runtime=await this.runtime.execute(goal);
         const evaluation=this.evaluation.evaluate(runtime);
-        const improvement=this.improvement.improve(evaluation);
+        // ContinuousImprovementEngine requires tenant-scoped, measured impact
+        // evidence. Internal Assistant construction produces no such evidence, so
+        // when none is supplied the engine's documented NEEDS_DATA fail-safe is
+        // used rather than fabricating tenant/domain/state/impact values.
+        const improvement=this.improvement.improve(improvementInput ?? null);
         const tool=this.tools.execute("internal_reasoning");
 
         // The Assistant is autonomous construction intelligence, not a human

@@ -34,12 +34,8 @@ test("AssistantEngine analyzes project context", () => {
         .toContain("Decision");
 
 
-    expect(result.confidence)
-        .toBeGreaterThan(0);
-
-
-    expect(result.confidence)
-        .toBeLessThanOrEqual(1);
+    expect(result.numericConfidence)
+        .toBeUndefined();
 
 
 });

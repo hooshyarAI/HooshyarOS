@@ -1,0 +1,159 @@
+HOOSHYAROS — POST-CHECKPOINT DEEP CONTINUATION AUDIT & AUTHORIZED REPAIR
+========================================================================
+Date: 2026-09-20
+Branch: fix/autonomous-product-factory
+Checkpoint before audit: f6d28f57ad3997721dabc9187e46b3efb18b10bf
+Durable checkpoint commit: 00625d099453c090c45aaca92ea323bae45764f3
+  ("chore(audit): checkpoint current verified state before deep continuation audit")
+
+------------------------------------------------------------------------
+1. PRE-MISSION BASELINE
+------------------------------------------------------------------------
+git rev-parse HEAD                    = f6d28f57ad3997721dabc9187e46b3efb18b10bf
+git rev-parse origin/<branch>         = f6d28f57ad3997721dabc9187e46b3efb18b10bf
+git ls-remote origin refs/heads/<branch> = f6d28f57ad3997721dabc9187e46b3efb18b10bf
+git rev-list --left-right --count     = 0  0
+git diff --check                      = clean
+tracked worktree                      = clean (0 tracked modifications)
+pre-existing untracked entries        = 44 (preserved; never staged)
+Pre-mission local snapshot inspected:
+  %TEMP%\hooshyar-weaving-1789885429336-fcdd6270d8a268 (2026-09-20 09:53:49 local;
+  Backend/ + Docs/ source subset copy).
+
+------------------------------------------------------------------------
+2. FRESH AUDIT SCOPE
+------------------------------------------------------------------------
+- Governing docs: AGENTS.md, Docs/HOOSHYAROS_MASTER_CHARTER.md,
+  Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md,
+  Docs/HOOSHYAROS_CAPABILITY_PROVIDER_LEVERAGE_LAW.md,
+  Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md.
+- Canonical audit memory: ACTIVE-COMMERCIALIZATION-MASTER-LEDGER.md,
+  AUTONOMOUS-COMMERCIALIZATION-EXECUTION-QUEUE.md,
+  post-renewal-decision-packages-2026-09-20.md,
+  post-checkpoint-commercial-readiness-closure-2026-09-19.md,
+  k5-subscription-entitlements-scope-decision-2026-09-19.md,
+  b1-encryption-at-rest-decision-readiness-2026-09-16.md.
+- Current code: CommercialRuntimeServer.ts, start-commercial-runtime.ts,
+  CommercialProductCompletionAudit.ts, CapabilityEvidenceAudit.ts,
+  FinancialIngestionService.ts, FinancialDataIngestionAdapter.ts,
+  PdfAcquisition.ts, PdfPageRasterizer.ts, CapabilityProviderRegistry.ts.
+- Commits not covered by the previous full-suite baseline:
+  fd82b162 (multi-format acquisition), 45bc0601 (text-based PDF ingestion),
+  5d5806bc, daa49d6c, bcc605a5, 2c751dde, f6d28f57.
+
+------------------------------------------------------------------------
+3. WORK EXPLICITLY NOT REPEATED (already verified, not reopened)
+------------------------------------------------------------------------
+Previous assurance repairs, LocalFolderWatcher repair, auth-route rate
+limiting, web password authentication, HTTP tenant/object authorization,
+RuntimeObservability metrics/request-trace, pagination/idempotency
+standardization, OCR environment-gap boundary, flake containment,
+architecture documentation reconciliation, construction remote attestation,
+offline sync, completion-audit integrity, governance/operator reconciliation,
+installed-product acceptance repair, Strategic Renewal & Continuous Innovation
+Law, capability-provider/open-source leverage governance, and the previously
+implemented text-based PDF financial ingestion. None were restarted,
+reimplemented, reverted or redesigned.
+
+------------------------------------------------------------------------
+4. NINE PRIOR ITEMS RE-INSPECTED (fresh, current code)
+------------------------------------------------------------------------
+1. Security-event/audit durability   -> GOVERNED_DECISION_REQUIRED (unchanged)
+   start-commercial-runtime.ts:11 constructs the server with no options;
+   CommercialRuntimeServer.ts:55,342,614,723,747,1129,1245,1268 still guarded.
+2. Dormant duplicate identity boundary -> GOVERNED_DECISION_REQUIRED (unchanged)
+   Auth/CommercialAuthenticationAuthorizationBoundary.ts isolated store; no
+   non-test consumer.
+3. setPassword() session invalidation -> VALIDLY_DEFERRED (unchanged; no route).
+4. /api/auth/refresh token rotation   -> VALIDLY_DEFERRED (unchanged; no
+   documented rotation requirement).
+5. Idempotency IN_PROGRESS stale claim -> GOVERNED_DECISION_REQUIRED (unchanged;
+   CommercialRuntimeServer.ts:812-848 fail-closed, no age/grace inspection).
+6. Per-session rate-limiter map eviction -> GOVERNED_DECISION_REQUIRED
+   (unchanged; CommercialRuntimeServer.ts:356,394-397 insert-only).
+7. Unreferenced duplicate scripts/product-web-acceptance.cjs ->
+   GOVERNED_DECISION_REQUIRED (unchanged; still unreferenced; package.json maps
+   product:web:acceptance -> scripts/web-product-acceptance.cjs).
+8. Dual EngineRegistry (Core/ vs Engines/) -> GOVERNED_DECISION_REQUIRED
+   (unchanged; both present).
+9. SQLite schema-migration mechanism -> VALIDLY_DEFERRED (unchanged;
+   CREATE TABLE IF NOT EXISTS; no pending schema change).
+K5 commercial.subscription-entitlements -> GOVERNED_DECISION_REQUIRED (unchanged).
+B1 encryption/key-management -> BLOCKED_HUMAN_APPROVAL (unchanged).
+No classification was changed without current-code evidence.
+
+------------------------------------------------------------------------
+5. NEW FINDING (genuinely authorized, repository-local, host-executable)
+------------------------------------------------------------------------
+CLASSIFICATION: EVIDENCE-INTEGRITY GAP (commit-bound product evidence stale
+after real runtime commits landed). Not a duplication.
+EVIDENCE: CommercialProductCompletionAudit.audit() at HEAD f6d28f57 reported
+  applicationEvidence.fresh = false, acceptanceEvidence.fresh = false
+  gaps = ["external-dependency-blocked","application-evidence-stale",
+          "acceptance-evidence-stale"]
+  because .hooshyar/web-acceptance-success.json was bound to 6a6604cf and
+  .hooshyar/security-acceptance-success.json to d06156ba, while commits
+  fd82b162/45bc0601 changed the commercial runtime. CommercialProductCompletionAudit.ts:52-57,183,206
+  requires evidence bound to the current commit.
+AUTHORITY: existing canonical harnesses and the completion contract; no new
+capability, no architecture change, no governed decision involved.
+
+REPAIR (executed with canonical owners, no code change):
+  npm run product:web:acceptance          -> PASS, commit bound to f6d28f57
+  npm run product:security:acceptance     -> PASS, commit bound to f6d28f57
+  node scripts/commercial-application-acceptance.cjs -> PASS
+      (web-application, pdf-acquisition, security-application) bound to f6d28f57
+  npm run product:web:browser:acceptance  -> PASS 7/7 (real Edge; harness-revision
+      bound per the documented design in scripts/web-browser-acceptance.cjs:59-68)
+  npm run product:pdf:ingestion:acceptance -> PASS (ocrClaimed:false)
+POST-REPAIR AUDIT: applicationEvidence.fresh = true, acceptanceEvidence.fresh =
+  true; remaining gap = ["external-dependency-blocked"] only.
+
+------------------------------------------------------------------------
+6. FRESH VERIFICATION AT HEAD f6d28f57 (executed)
+------------------------------------------------------------------------
+Full Jest regression:
+  node ./node_modules/jest/bin/jest.js --ci --runInBand
+  -> Test Suites: 285 passed, 285 total
+  -> Tests:       2200 passed, 2200 total
+  -> exit 0 (401.4 s)
+
+Product platform assurance:
+  npm run product:assurance
+  -> PASS; manifestLayers 8; qualificationCells 10; productComplete false;
+     completionPolicy "runtime + application + acceptance + CI evidence required"
+
+Final product qualification:
+  node scripts/final-product-qualification.cjs
+  -> 7/7 internal gates PASS (runtime, architecture, persistence_recovery,
+     security, dashboard_and_value, reasoning_ai, installer_and_deployment)
+  -> external.webRealBrowser = PASS; other external cells EXTERNAL_NOT_EXECUTED
+  -> overall BLOCK_EXTERNAL; exit 0
+
+Canonical commercial completion audit (post-refresh):
+  complete false; application fresh true; acceptance fresh true;
+  gaps ["external-dependency-blocked"];
+  blocked external = [payment-provider-activation, production-cloud-resources]
+
+git diff --check = clean. Architecture boundary preserved: Core/ + Engines/
+EngineRegistry duality unchanged (governed); six canonical engine files present
+(ReasoningEngine, OrganizationalIntelligenceEngine, GovernanceEngine,
+ExecutiveIntelligenceEngine, AutonomousOperationsEngine, DecisionIntelligenceEngine).
+Test integrity: only fallback `test.skip("requires better-sqlite3", ...)` guards
+exist (no better-sqlite3 on this host); no skipped behavioural coverage was added.
+
+------------------------------------------------------------------------
+7. RESULT
+------------------------------------------------------------------------
+Commit(s): 00625d09 (durable checkpoint) + this synchronization commit.
+Full suite / assurance / qualification: PASS at HEAD.
+Completion flags (unchanged, truthful):
+  assistantComplete = TRUE
+  canonicalPlatformConstructionComplete = FALSE
+  commercialProductRuntimeComplete = FALSE
+  externalProductionDependenciesComplete = FALSE
+  productComplete = FALSE
+External blockers unchanged: B1 BLOCKED_HUMAN_APPROVAL; B2/B3 BLOCKED_EXTERNAL;
+B4 BLOCKED_ENVIRONMENT; B5 AVAILABLE ON THIS HOST.
+No external evidence was manufactured; no completion flag was altered; no
+pre-existing user file was staged, modified or deleted.

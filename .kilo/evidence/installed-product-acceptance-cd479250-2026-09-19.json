@@ -1,0 +1,33 @@
+{
+  "type": "INSTALLED_PRODUCT_ACCEPTANCE",
+  "version": 1,
+  "mode": "isolated-acceptance",
+  "status": "PASS",
+  "createdAt": "2026-09-19T06:56:05.202Z",
+  "commit": "cd4792507a69c868c57a9aec49e6f247f4bc2791",
+  "installDir": "C:\\Users\\avalipour\\AppData\\Local\\Programs\\HooshyarOS-Acceptance",
+  "port": 4173,
+  "launcherHealthy": true,
+  "runtimeDependenciesVerified": true,
+  "repairedClientInstalled": true,
+  "checks": [
+    "health",
+    "ready",
+    "web-shell",
+    "register",
+    "session",
+    "pdf-boundary",
+    "ingest",
+    "analysis",
+    "dashboard",
+    "sources",
+    "tenant-isolation",
+    "offline-queue",
+    "offline-reload",
+    "offline-reconnect",
+    "restart-recovery",
+    "persistence"
+  ],
+  "sourceSha256": "d74b461f090fa4cb0870bb69e617dabe6f6a7b85e122e27bc4ca0147a0aa7e8f",
+  "profit": 200
+}

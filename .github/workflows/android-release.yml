@@ -6,18 +6,29 @@ on:
       - 'android/**'
       - 'web/**'
       - 'Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts'
+      - 'Docs/Product/PRODUCT_PLATFORM_MANIFEST.json'
+      - 'Docs/Product/PRODUCT_QUALIFICATION_MATRIX.json'
   push:
     branches: [main]
     paths:
       - 'android/**'
       - 'web/**'
       - 'Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts'
+      - 'Docs/Product/PRODUCT_PLATFORM_MANIFEST.json'
+      - 'Docs/Product/PRODUCT_QUALIFICATION_MATRIX.json'
 
 jobs:
   android-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm install
+      - name: Validate canonical product assurance contract
+        run: npm run product:assurance
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -26,6 +37,17 @@ jobs:
       - name: Build debug APK
         working-directory: android
         run: gradle :app:assembleDebug --no-daemon
+      - name: Android emulator install and launch smoke
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_2
+          # Single canonical Android acceptance owner: waits for the device and
+          # boot, installs, launches, verifies process liveness and MainActivity
+          # foreground, and emits commit-bound acceptance evidence. The previous
+          # inline adb copy duplicated this and could drift from it.
+          script: bash scripts/android-product-acceptance.sh
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:

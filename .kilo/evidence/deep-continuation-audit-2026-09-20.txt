@@ -1,0 +1,189 @@
+HOOSHYAROS — DEEP CONTINUATION AUDIT (NON-DUPLICATIVE) & AUTHORIZED REPAIR
+=========================================================================
+Date: 2026-09-20
+Branch: fix/autonomous-product-factory
+Baseline HEAD at audit start: e2678c889c2d9cf934b444fdf5fd10ee003f3eba
+Durable checkpoint commit (this mission): 1eba8f8b
+  ("chore(audit): checkpoint verified deep-audit state before next continuation")
+Predecessor audit (historical, not overwritten):
+  .kilo/evidence/post-checkpoint-deep-audit-2026-09-20.txt
+
+------------------------------------------------------------------------
+1. PRE-MISSION BASELINE (verified, not assumed)
+------------------------------------------------------------------------
+git rev-parse HEAD                              = e2678c889c2d9cf934b444fdf5fd10ee003f3eba
+git rev-parse origin/<branch>                   = e2678c889c2d9cf934b444fdf5fd10ee003f3eba
+git ls-remote origin refs/heads/<branch>        = e2678c889c2d9cf934b444fdf5fd10ee003f3eba
+git rev-list --left-right --count origin...HEAD = 0  0
+git diff --check                                = clean
+tracked worktree                                = clean (0 tracked modifications)
+pre-existing untracked top-level entries        = 44 (preserved; never staged; ~1510 paths
+                                                  when dist/ payload is expanded recursively)
+External computer snapshot inspected:
+  D:\HooshyarOS-State-Snapshots\HooshyarOS-pre-next-continuation-2026-09-20_11-25-32-e2678c88...txt
+Canonical checkpoint updated (not duplicated):
+  .kilo/plans/current-state-checkpoint-2026-09-20.md
+
+------------------------------------------------------------------------
+2. FRESH AUDIT SCOPE (repository-wide; current code is the authority)
+------------------------------------------------------------------------
+Domains searched: runtime lifecycle, security, authentication, authorization,
+tenant isolation, session lifecycle, persistence durability, audit/provenance,
+idempotency, rate limiting, ingestion, PDF acquisition (regression check only),
+spreadsheet/document ingestion, provider registry, adapters, AI/reasoning
+runtime, offline synchronization, observability, web application, acceptance
+harnesses, installer, deployment, configuration, dependency integrity,
+test/reference integrity, build reproducibility, commercialization state.
+
+Method: current source at HEAD (grep/read of CommercialRuntimeServer.ts,
+start-commercial-runtime.ts, CapabilityEvidenceAudit.ts,
+CommercialProductCompletionAudit.ts, SQLitePersistenceStore.ts,
+CommercialIdentityService.ts, Security/*, Product/*, scripts/*, web/*) plus
+focused execution of integrity/reference tests and npm-script target validation.
+
+------------------------------------------------------------------------
+3. WORK EXPLICITLY NOT REPEATED (closed; not reopened)
+------------------------------------------------------------------------
+LocalFolderWatcher repair, auth-route rate limiting, web password
+authentication, HTTP tenant/object authorization, RuntimeObservability
+metrics/request-trace, pagination/idempotency standardization, OCR boundary
+repair, flake containment, architecture documentation reconciliation,
+construction remote attestation, offline sync, completion-audit integrity,
+governance/operator reconciliation, installed-product acceptance repair,
+Strategic Renewal & Continuous Innovation Law, capability-provider /
+open-source leverage governance, post-checkpoint audit-memory stabilization,
+post-renewal audit, commit-bound acceptance evidence refresh, and the
+TEXT-BASED PDF FINANCIAL INGESTION capability. None restarted, reimplemented,
+reverted or redesigned. PDF ingestion not reopened.
+
+------------------------------------------------------------------------
+4. NINE PRIOR ITEMS + K5 + B1 RE-INSPECTED (current code; changed evidence only)
+------------------------------------------------------------------------
+1. Security-event/audit durability -> GOVERNED_DECISION_REQUIRED (unchanged)
+   start-commercial-runtime.ts:11 constructs the server with no options;
+   securityEventLogger stays optional/dormant (CommercialRuntimeServer.ts:55,342,614).
+2. Dormant duplicate identity boundary -> GOVERNED_DECISION_REQUIRED (unchanged)
+   Auth/CommercialAuthenticationAuthorizationBoundary.ts isolated; no non-test consumer.
+3. setPassword() session invalidation -> VALIDLY_DEFERRED (unchanged; no HTTP route).
+4. /api/auth/refresh token rotation -> VALIDLY_DEFERRED (unchanged; no documented requirement).
+5. Idempotency IN_PROGRESS stale claim -> GOVERNED_DECISION_REQUIRED (unchanged;
+   CommercialRuntimeServer.ts:812-848 fail-closed, no age/grace inspection).
+6. Per-session rate-limiter map eviction -> GOVERNED_DECISION_REQUIRED (unchanged;
+   CommercialRuntimeServer.ts:356,393-400 insert-only; no eviction).
+7. Unreferenced duplicate scripts/product-web-acceptance.cjs -> GOVERNED_DECISION_REQUIRED
+   (unchanged; referenced only in audit/plan docs; package.json maps
+   product:web:acceptance -> scripts/web-product-acceptance.cjs).
+8. Dual EngineRegistry (Core/ vs Engines/) -> GOVERNED_DECISION_REQUIRED (unchanged).
+9. SQLite schema-migration mechanism -> VALIDLY_DEFERRED (unchanged;
+   SQLitePersistenceStore.ts:21 uses CREATE TABLE IF NOT EXISTS; no pending schema change).
+K5 commercial.subscription-entitlements -> GOVERNED_DECISION_REQUIRED (unchanged).
+B1 encryption/key-management -> BLOCKED_HUMAN_APPROVAL (unchanged).
+No classification was changed without current-code evidence.
+
+------------------------------------------------------------------------
+5. GENUINELY NEW FINDINGS
+------------------------------------------------------------------------
+N1 (LIVE / REPAIRED) — Commit-bound application/acceptance evidence stale at HEAD.
+   EVIDENCE: `.hooshyar/web-acceptance-success.json` and
+   `.hooshyar/security-acceptance-success.json` were bound to `f6d28f57`, while
+   HEAD advanced two documentation-only commits to `e2678c88`.
+   `CommercialProductCompletionAudit.commitIsFresh` (CommercialProductCompletionAudit.ts:52-57)
+   compared the evidence commit with HEAD, so `audit()` reported
+   `applicationEvidence.fresh=false`, `acceptanceEvidence.fresh=false`,
+   gaps = ["external-dependency-blocked","application-evidence-stale",
+   "acceptance-evidence-stale"] (confirmed by direct execution).
+   AUTHORITY: existing canonical harnesses + Commercial Product Completion
+   Contract; no new capability, no architecture change, no governed decision.
+   ROOT CAUSE (ordering, not blind retry): the predecessor mission refreshed
+   evidence before committing its own documentation commits, so its refresh was
+   immediately invalidated. The correct protocol is to refresh commit-bound
+   acceptance evidence LAST, after the final commit of a mission.
+   REPAIR: canonical harnesses re-run against the final checkpoint commit with
+   NO code change (see §6). Artifacts are local (`.git/info/exclude` and
+   `.gitignore` exclude `.hooshyar/`), so the refresh creates no tracked change.
+
+N2 (governed extension) — Additional unbounded in-memory maps in the runtime.
+   `CommercialRuntimeServer.ts:412-413` (`authClientLimiters`, `authIdentityLimiters`)
+   are insert-only, and `:351-354` (`latestResults`, `latestWorkbenchResults`,
+   `latestDecisionResults`, `latestAnalyticsResults`) are per-tenant maps that
+   are only added to. Same eviction-policy class as DP-6 (per-session limiter
+   map). Recorded as part of the existing bounded eviction decision; NOT
+   implemented (a policy decision, not a code defect).
+
+N3 (governed extension) — Core/ legacy duplicate boundary beyond EngineRegistry.
+   Three `ProjectRegistry` implementations exist: `Core/ProjectRegistry.ts`,
+   `Registry/ProjectRegistry.ts`, `Services/ProjectRegistry.ts`; and two
+   `ProjectPilotEngine` implementations: `Core/ProjectPilotEngine.ts` and
+   `Engines/ProjectPilotEngine.ts`. `Core/ProjectPilotEngine` is referenced only
+   by legacy tests (`test/Autonomous.test.ts`, `test/ProjectPilot.test.ts`,
+   `test/Insight.test.ts`); the live commercial runtime's canonical engines use
+   `Engines/ProjectPilotEngine` -> `Services/ProjectRegistry`. This is the same
+   pre-existing `Core/` vs `Engines/` architecture duality as DP-8 (governed
+   architecture decision). Re-affirmed; NOT repaired.
+
+N4 (latent, not repaired) — `SQLitePersistenceStore.read()`
+   (SQLitePersistenceStore.ts:27) calls `JSON.parse` on the stored value with no
+   guard. Only reachable for externally corrupted rows; writes always serialize
+   with `JSON.stringify`. No current evidence of corruption -> latent hardening.
+
+N5 (latent, not repaired) — SQLite store has no WAL/busy_timeout pragma and no
+   schema-migration mechanism. The runtime is a single-writer process and the
+   migration gap is already VALIDLY_DEFERRED (item 9). No current failure
+   evidence -> latent hardening.
+
+No new IMPLEMENT_NOW / HOST_EXECUTABLE_NOW code defect was found beyond N1.
+
+------------------------------------------------------------------------
+6. REPAIRS EXECUTED (one canonical owner per change; no bundling)
+------------------------------------------------------------------------
+R1 — Canonical checkpoint updated to HEAD truth (commit 1eba8f8b):
+     .kilo/plans/current-state-checkpoint-2026-09-20.md only. Staged diff
+     verified: exactly one file. No user file touched.
+R2 — Commit-bound acceptance evidence re-bound at the final checkpoint commit
+     using the canonical harnesses, NO code change:
+       npm run product:web:acceptance      -> PASS, commit = final HEAD
+       npm run product:security:acceptance -> PASS, commit = final HEAD
+       node scripts/commercial-application-acceptance.cjs -> PASS
+         (web-application, pdf-acquisition, security-application), final HEAD
+     Post-repair CommercialProductCompletionAudit:
+       applicationEvidence.fresh = true, acceptanceEvidence.fresh = true,
+       remaining gap = ["external-dependency-blocked"] only.
+
+------------------------------------------------------------------------
+7. FRESH VERIFICATION AT HEAD (executed)
+------------------------------------------------------------------------
+Full Jest regression:
+  node ./node_modules/jest/bin/jest.js --ci --runInBand
+  -> Test Suites: 285 passed, 285 total
+  -> Tests:       2200 passed, 2200 total
+  -> Time:        296.0 s; exit 0
+Focused integrity/reference tests (7 suites, 36 tests, exit 0):
+  TestReferenceIntegrity, NpmLockfileIntegrity, CommercialProductCompletionAudit,
+  ProductPlatformAssurance, RuntimeIdempotency, RuntimeSessionLifecycleSweep,
+  CommercialRuntimeServer.rateLimiting.
+Product platform assurance: npm run product:assurance
+  -> PASS; manifestLayers 8; qualificationCells 10; productComplete false.
+Final product qualification: node scripts/final-product-qualification.cjs
+  -> 7/7 internal gates PASS; external.webRealBrowser = PASS;
+     other external cells EXTERNAL_NOT_EXECUTED; overall BLOCK_EXTERNAL; exit 0.
+npm-script target validation: every referenced scripts/*.(cjs|js|ts|ps1) exists.
+git diff --check = clean.
+Architecture boundary preserved: six canonical engine files present; governed
+dual EngineRegistry and Core/ legacy duality unchanged.
+Test integrity: no behavioral coverage was skipped or weakened.
+
+------------------------------------------------------------------------
+8. RESULT
+------------------------------------------------------------------------
+Commits: 1eba8f8b (canonical checkpoint) + this audit-memory synchronization.
+Full suite / assurance / qualification: PASS at HEAD.
+Completion flags (unchanged, truthful):
+  assistantComplete = TRUE
+  canonicalPlatformConstructionComplete = FALSE
+  commercialProductRuntimeComplete = FALSE
+  externalProductionDependenciesComplete = FALSE
+  productComplete = FALSE
+External blockers unchanged: B1 BLOCKED_HUMAN_APPROVAL; B2/B3 BLOCKED_EXTERNAL;
+B4 BLOCKED_ENVIRONMENT; B5 AVAILABLE ON THIS HOST.
+No external evidence was manufactured; no completion flag was altered; no
+pre-existing user file was staged, modified or deleted; no history was rewritten.

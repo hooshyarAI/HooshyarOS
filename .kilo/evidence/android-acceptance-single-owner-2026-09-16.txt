@@ -1,0 +1,78 @@
+ANDROID ACCEPTANCE — SINGLE CANONICAL OWNER IN CI — KNOT EVIDENCE
+================================================================
+Knot ID            : standardization.android-acceptance-single-owner
+Date               : 2026-09-16
+Branch             : fix/autonomous-product-factory
+Pre-change HEAD    : f18a9533c217cbe02b40734fe8b9c863f031995e
+Classification     : STANDARDIZATION_GAP (duplicated Android acceptance verification in CI callers)
+Type               : bounded, non-stage, non-reopening repository-local knot
+K8                 : CLOSED / not reopened. B1-B5 classifications unchanged.
+
+----------------------------------------------------------------
+1. DISCOVERY (current-state scan)
+----------------------------------------------------------------
+After `assurance.android-acceptance-evidence-ownership` made
+`scripts/android-product-acceptance.sh` the owner of commit-bound Android
+acceptance evidence, a scan of every CI caller found two workflows that still
+carried their own inline copy of the adb install/launch/liveness verification:
+
+  - `.github/workflows/android-release.yml` (Android Release Verification)
+  - `.github/workflows/release-artifacts.yml` (HooshyarOS Release Artifacts)
+
+Both inline blocks duplicated the canonical harness and had already drifted from
+it: they skipped the explicit device-online / `sys.boot_completed` wait and used
+a shorter Package-Manager and pidof wait budget. Duplicated acceptance logic in
+two callers can silently diverge from the single canonical owner that produces
+the qualification evidence.
+
+----------------------------------------------------------------
+2. REPAIR (one coherent root cause -> one bounded change set)
+----------------------------------------------------------------
+MOD  .github/workflows/android-release.yml
+MOD  .github/workflows/release-artifacts.yml
+     Both emulator steps now run the canonical owner:
+         script: bash scripts/android-product-acceptance.sh
+     The inline adb copies were removed. No verification step was weakened:
+     the canonical harness is strictly stronger (device + boot wait, package
+     manager readiness, install, launch, process liveness, MainActivity
+     foreground) and additionally emits commit-bound acceptance evidence.
+
+No engine, runtime, persistence, security, tenant-isolation, architecture,
+completion-gate or completion-flag change. No workflow gate removed or relaxed.
+
+----------------------------------------------------------------
+3. VERIFICATION (commands actually run)
+----------------------------------------------------------------
+YAML parse (js-yaml) of both workflows -> valid
+git grep -n "scripts/android-product-acceptance.sh" -- .github/workflows
+  -> android-release.yml:50, final-product-factory.yml:126, release-artifacts.yml:82
+git grep "adb install -r android/app/build" -- .github/workflows
+  -> no matches (all inline copies removed)
+bash -n scripts/android-product-acceptance.sh -> exit 0 (knot 1)
+jest --runTestsByPath Backend/HBOS/test/TestReferenceIntegrity.test.ts -> 2/2 PASS
+node scripts/product-platform-assurance.cjs -> status PASS, productComplete false
+node ./node_modules/jest/bin/jest.js (full suite) ->
+  Test Suites: 270 passed, 270 total
+  Tests:       2098 passed, 2098 total
+  exit 0
+
+----------------------------------------------------------------
+4. HONEST LIMITATIONS
+----------------------------------------------------------------
+- No Android emulator/JDK/Gradle/device exists on this host (B4
+  BLOCKED_ENVIRONMENT), so the two workflows were NOT executed here. Their
+  referenced owner is the canonical harness, which knot 1 verified behaviorally
+  device-free (real subprocess run with a fake adb producing its own PASS
+  evidence) and which `.github/workflows/final-product-factory.yml` already
+  invokes. The emulator execution remains the CI gate.
+- This knot changes only which harness the CI callers run; the harness itself is
+  unchanged from knot 1.
+
+----------------------------------------------------------------
+5. COMPLETION FLAGS (unchanged)
+----------------------------------------------------------------
+assistantComplete                   = TRUE
+canonicalPlatformConstructionComplete = FALSE
+commercialProductRuntimeComplete    = FALSE
+externalProductionDependenciesComplete = FALSE
+productComplete                     = FALSE

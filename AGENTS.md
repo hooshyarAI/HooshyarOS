@@ -8,7 +8,10 @@
 - `Docs/AUTONOMOUS_WEAVING_DOCTRINE.md` — expert knot-by-knot construction and recovery doctrine.
 - `Docs/AUTONOMOUS_7_DAY_BUILD_SLA.md` — permanent seven-day autonomous construction performance law.
 - `Docs/HOOSHYAROS_TOOLCHAIN_OPTIMIZATION_LAW.md` — permanent tool-first, Python-first construction and human-intervention law.
+- `Docs/HOOSHYAROS_CAPABILITY_PROVIDER_LEVERAGE_LAW.md` — permanent standard/tool/adapter-before-native reuse and external-dependency admission law (default permitted external class: free + open source + licensed for commercial use + self-hosted/offline); enforced by `Backend/HBOS/Product/CapabilityProviderRegistry.ts`.
+- Strategic Renewal & Continuous Innovation Law — permanent; embedded in `Docs/HOOSHYAROS_MASTER_CHARTER.md` §6.4, `Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md` §3 and `Docs/HOOSHYAROS_CAPABILITY_PROVIDER_LEVERAGE_LAW.md` §13; no parallel governance document, engine, registry or runtime.
 - `Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md` — canonical commercial-product completion and acceptance contract; mandatory for distinguishing canonical capability completion from real commercial product completion.
+- `Docs/KILO_EXECUTION_OPERATOR_CONTRACT.md` — bounded Kilo Code execution/operator contract.
 - Existing architecture decisions, HBOS engines, capability owners, tests and documentation — inspect before adding anything.
 
 The repository is the durable memory of the approved architecture, product principles, autonomous-construction role, decision logic and verification rules. Do not rely on conversational memory when the repository can provide the governing rule.
@@ -19,10 +22,10 @@ The autonomous Assistant builds HooshyarOS. It is not the future platform's fina
 ## Permanent two-command construction law
 The complete autonomous construction experience must be operable from Visual Studio Code through exactly two human-triggered commands:
 
-1. **Assistant Build Command** — starts/resumes autonomous construction of the HooshyarOS construction Assistant itself. From that point, Python is the first-choice worker for repository discovery, analysis, generation, verification, repair, orchestration, evidence collection and re-planning; the Assistant supplies architecture reasoning, critical review and Expert Choice; Git/GitHub supplies checkpoints, synchronization, commits, pushes and repository truth. The command must continue without routine human intervention until Assistant construction is verified complete or a bounded evidence-backed BLOCKED state is reached.
+1. **Assistant Build Command** — starts/resumes autonomous construction of the HooshyarOS construction Assistant itself. From that point, Python is the first-choice worker for repository discovery, analysis, generation, verification, repair, orchestration, evidence collection and re-planning; the Assistant supplies architecture reasoning, critical review and Expert Choice; Git/GitHub supplies checkpoints, synchronization, commits, pushes and repository truth. Approved local execution operators such as Kilo Code may execute bounded stages under the stage contract; they do not replace Python or acquire architecture authority. The command must continue without routine human intervention until Assistant construction is verified complete or a bounded evidence-backed BLOCKED state is reached.
 2. **Platform Build Command** — starts/resumes the canonical autonomous construction of the full HooshyarOS platform only after the Assistant completion gate and final Assistant verification have passed. It must continue automatically through the canonical backlog, preserving Architecture Freeze V4, governance, security, evidence and expert-weaving rules, until the canonical platform construction backlog is exhausted or a bounded evidence-backed BLOCKED state is reached.
 
-No routine manual file editing or command-by-command driving is required between these two commands. Mechanical work that Python, Git/GitHub or the Assistant can safely perform remains autonomous.
+No routine manual file editing or command-by-command driving is required between these two commands. Mechanical work that Python, Git/GitHub, the Assistant or an approved local execution operator can safely perform remains autonomous.
 
 ## Permanent seven-day completion law
 The two-command construction system is subject to a **maximum seven-calendar-day target** for completing the canonical autonomous platform construction process from the approved starting state. The seven-day requirement is a performance constraint and never permits weakening architecture, security, governance, correctness, verification, recoverability or evidence integrity. The construction fabric must optimize throughput using reuse, Python-first automation, proportional verification, bounded repair, measurable telemetry and safe parallelism.
@@ -54,6 +57,47 @@ Therefore the Assistant must actively remove unnecessary serialization, repeated
 
 The construction fabric must continuously measure generation, verification, repair and cycle time; completed capabilities per hour; retries; queue depth; blocking reasons; and cumulative backlog progress. The seven-day objective must be treated as an engineering constraint and optimized from measured evidence.
 
+### Global knowledge and open-source leverage (reuse before rebuild)
+
+HooshyarOS must intelligently leverage the world's existing science, engineering knowledge, proven methods, standards, mature tools and open-source capabilities instead of unnecessarily rebuilding commodity capabilities from scratch.
+
+Before writing native code for any capability, the construction system must inspect, in order: relevant industry standards and recognized methods; mature free/open-source capabilities; existing HooshyarOS owners, adapters and providers. The canonical evaluation order is `INDUSTRY_STANDARD → MATURE_LIBRARY → INTERNAL_CAPABILITY → ADAPTER_PROVIDER → NATIVE_IMPLEMENTATION`, governed by `Docs/HOOSHYAROS_CAPABILITY_PROVIDER_LEVERAGE_LAW.md` and enforced by `Backend/HBOS/Product/CapabilityProviderRegistry.ts`. This inspection belongs to PLAN and INSPECT, before IMPLEMENT.
+
+Externally sourced software is admissible only when it is **free, open source, licensed for commercial use and suitable for self-hosted/offline operation** where required. Paid-only, proprietary, closed-source and mandatory-cloud dependencies must not be introduced for core capability. Free availability, a free tier, popularity or convenience are not admission evidence; license and commercial-use rights must be verified from authoritative project/license evidence, and an unverifiable candidate is `DEFERRED`, never assumed.
+
+A native implementation is admissible only with recorded evidence that the earlier tiers were unsuitable (incompatible license, insufficient security or functionality, unacceptable maintenance, offline/self-hosted behaviour, performance, reliability, operational complexity, vendor lock-in, a genuinely missing required capability, or a core HooshyarOS differentiator). "We can code it ourselves" is not evidence.
+
+### Strategic renewal and continuous innovation law
+
+HooshyarOS must never treat its current architecture, product, capability set, providers, business model, operating model or assumptions as permanently correct. Strategy, product scope and even verified capability can decay as technology, markets, regulation, users, data and evidence change. Detecting decay and renewing is a permanent obligation, not a periodic project.
+
+- **Strategic decay awareness and future sensing.** Existing decisions are re-examined against current and plausible future conditions; legacy carries no automatic authority (anti-legacy-bias).
+- **Continuous strategic renewal.** The platform must be able to improve, scale, adapt, replace or retire its own capabilities, providers, models and assumptions when evidence justifies it, without weakening architecture, security, governance, correctness or evidence integrity.
+- **Constructive challenge and professional dissent.** Assumptions, plans and generated results are open to evidence-backed challenge; evidence-backed disagreement is recorded, never suppressed. Challenge is directed at ideas and evidence, never at governance or architecture authority.
+- **Bottom-up innovation and controlled experimentation.** Bounded, reversible experiments with explicit hypothesis, success criteria, scope, stop conditions and measured result are the correct response to material uncertainty. Experiments never bypass architecture, security, tenant isolation or governance and are never presented as completed capability before measurement.
+- **Exploration + exploitation, innovation portfolio (H1–H2–H3).** Balance delivery of known value with new capability: H1 improve the current core, H2 extend into adjacent capability, H3 create new future options, with explicit allocation and review. This is a planning concept, not a new subsystem, engine or database.
+- **Business-model and operating-model innovation** within approved commercial scope; commercial-scope decisions remain governance decisions and are never invented by construction.
+- **Evidence-driven scaling, adaptation, replacement or retirement.** Every renewal outcome is improve, scale, adapt, replace or retire, chosen from measured evidence — never preference.
+- **Epistemic discipline.** Claims are labelled and kept distinct: **FACT** (authoritative evidence), **ASSUMPTION** (believed, unverified), **HYPOTHESIS** (falsifiable proposition), **EXPERIMENT** (bounded test), **MEASURED RESULT** (observed outcome), **DECISION** (governed choice). An assumption or hypothesis must never be presented as a fact or a measured result.
+
+The permanent renewal loop is:
+
+```text
+OBSERVE → QUESTION → IMAGINE → FORM HYPOTHESIS → EXPERIMENT
+→ MEASURE → LEARN → IMPROVE / SCALE / REPLACE / RETIRE → OBSERVE AGAIN
+```
+
+This is integrated with the global knowledge and open-source leverage rule above; renewal first searches existing science, standards and free/open-source capabilities before inventing. The combined decision model is:
+
+```text
+UNDERSTAND THE PROBLEM → OBSERVE THE CURRENT SYSTEM → CHALLENGE ASSUMPTIONS
+→ SEARCH EXISTING SCIENCE / STANDARDS / FREE OPEN-SOURCE CAPABILITIES
+→ INVENT ONLY WHERE NECESSARY → EXPERIMENT WHEN UNCERTAINTY IS MATERIAL
+→ MEASURE → GOVERN → INTEGRATE → SCALE OR RETIRE
+```
+
+Externally sourced software admitted through renewal remains subject to the permanent permitted class: **free + open source + licensed for commercial use + suitable for self-hosted/offline operation** where required. An unverifiable license or commercial-use right remains `DEFERRED`, never assumed. This law introduces no engine, registry, innovation subsystem, strategy database, product runtime or parallel governance/orchestration hierarchy, and does not mutate Architecture Freeze V4/V4.1.
+
 ## Expert weaving contract
 Every construction cycle follows the expert weaving doctrine:
 
@@ -77,23 +121,25 @@ DETECT FAILURE → IDENTIFY LAST TRUSTED CHECKPOINT → ROLLBACK / ISOLATE
 Repairs must be bounded, evidence-driven and architecture-preserving. A failed repair leaves the run BLOCKED with failure evidence intact.
 
 ## Construction tool policy
-The construction process is permanently limited to these active tools:
+The construction process has three **principal authorities/roles**:
 
-1. **Python** — autonomous analysis, generation, verification, repair, orchestration and repository-native workers.
-2. **GitHub** — source control, repository inspection, commits, synchronization, review and publication.
-3. **This Assistant** — architecture reasoning, critical review, expert choice, implementation decisions and orchestration.
+1. **Python** — canonical repository-native construction worker, analyzer, verifier, repair worker and orchestration layer.
+2. **GitHub/Git** — source control, trusted checkpoints, synchronization, review and publication.
+3. **This Assistant** — architecture reasoning, critical review, expert choice, implementation decisions and orchestration authority.
 
-No other external coding assistant, cloud coding agent or alternative coding provider may participate in the HooshyarOS construction path. In particular, Codex, GitHub Copilot, Claude and equivalent external coding agents are prohibited from the construction path.
+**Kilo Code is an approved local VS Code execution/operator layer subordinate to these authorities.** It may perform repository inspection, bounded implementation or repair, authorized command execution, focused testing and evidence production only within an explicit stage/handoff contract. Kilo Code does not replace the Python worker, does not become a provider dependency and has no authority over architecture, product semantics, backlog order, completion rules or governance.
 
-This restriction is operational, not architectural: the HooshyarOS product may still contain provider-facing runtime abstractions when the frozen architecture explicitly requires them, but the autonomous construction fabric itself must not depend on those providers.
+No external cloud coding provider or alternative coding agent may participate as a hidden or mandatory construction dependency. Kilo Code is explicitly treated as a local execution mechanism under repository governance, not as a fourth architectural authority or provider runtime.
+
+This restriction is operational, not architectural: the HooshyarOS product may still contain provider-facing runtime abstractions when the frozen architecture explicitly requires them, but the autonomous construction fabric itself must remain provider-independent.
 
 ## Engineering rules
 1. One capability = one coherent implementation contract + verification evidence.
 2. One Capability = One Engine = One Test = One Commit.
 3. Never create a duplicate engine when an existing engine owns the capability.
 4. Prefer the smallest complete change that advances the frozen architecture.
-5. Use Python workers and GitHub as the canonical autonomous construction toolchain.
-6. Do not invoke, install, configure or rely on external coding agents/providers during construction.
+5. Use Python as the canonical construction worker and GitHub/Git as the durable repository control surface.
+6. Use Kilo Code only as a bounded local execution/operator layer under its stage contract and the Python/Assistant orchestration boundary.
 7. Run static validation, focused tests and integration verification before finalizing, using the risk-proportional cadence defined by the seven-day performance law.
 8. If verification fails, diagnose and repair automatically within a bounded budget.
 9. Preserve failure evidence; never fake a healthy result.
@@ -109,10 +155,18 @@ This restriction is operational, not architectural: the HooshyarOS product may s
 19. Parallelize independent capabilities only when dependency contracts, repository isolation and deterministic integration remain safe.
 20. Never trade architecture, security, governance, correctness or evidence integrity for apparent speed.
 21. Derive behavioral completion evidence from actual Engine/Test contracts; marker lists may guide audits but cannot override the repository's real behavior.
-22. Before delegating any mechanical development action to the human, prove that Python, Git/GitHub or the Assistant cannot safely perform it.
+22. Before delegating any mechanical development action to the human, prove that Python, Git/GitHub, the Assistant or an approved operator cannot safely perform it.
 23. Preserve repair intent end-to-end; `repair-<capabilityId>` must reach the repair worker unchanged.
 24. Use the best approved tool for each stage before considering additional human intervention.
 25. Before declaring commercial product completion, pass the Commercial Product Completion Contract and keep external production dependencies distinct from repository-native completion.
+26. When Kilo Code is selected, pass a structured handoff, keep the stage scope bounded, prefer Python for deterministic repository-native work, require focused evidence on return, and leave integration/qualification ownership with the outer construction fabric.
+27. Before writing native code, inspect standards, mature free/open-source capabilities, existing owners and adapters in the canonical leverage order, and record the reuse decision as part of PLAN/INSPECT.
+28. Admit external software only when it is free, open source, licensed for commercial use and self-hosted/offline-suitable where required; verify license and commercial-use rights from authoritative evidence; treat unverifiable candidates as `DEFERRED`.
+29. Admit a native implementation only with recorded evidence that every earlier reuse tier was unsuitable; convenience or "we can code it ourselves" is never sufficient.
+30. Treat existing architecture, product, capability set, providers and assumptions as renewable: actively detect strategic decay and re-examine decisions against current and plausible future conditions (anti-legacy-bias).
+31. Where uncertainty is material, run a bounded, reversible experiment with explicit hypothesis, success criteria, scope, stop conditions and measured result instead of a speculative rewrite; never present an unmeasured experiment as completed capability.
+32. Label claims by epistemic status — FACT, ASSUMPTION, HYPOTHESIS, EXPERIMENT, MEASURED RESULT, DECISION — and never present an assumption or hypothesis as a fact or a measured result.
+33. Resolve every renewal outcome to improve, scale, adapt, replace or retire from measured evidence; keep externally sourced software subject to the permanent permitted class and route genuine architectural contradictions through Architecture Change Control.
 
 ## Architecture changes
 Architecture Freeze V4 is the default source of truth. Change it only when an actual contradiction or missing architectural capability is demonstrated by repository evidence. If changed, update the master charter, architecture document, governance charter and affected decisions before continuing construction.
@@ -120,8 +174,10 @@ Architecture Freeze V4 is the default source of truth. Change it only when an ac
 ## Anti-drift
 Do not redesign the architecture because implementation is difficult. Do not weaken governance, security, explainability, resilience or verification to make a cycle appear complete. If a future instruction conflicts with the permanent charter, inspect the evidence and resolve the conflict explicitly rather than inventing a new construction method.
 
+Kilo Code execution does not relax any of these requirements and cannot convert a stage-local execution failure into a completion claim.
+
 ## Progress
 The autonomous build daemon must continuously emit measurable progress and throughput telemetry. It should continue until the repository reaches a stable completion state, the canonical backlog is exhausted, or a bounded evidence-backed failure blocks construction. Progress evaluation must include the seven-day performance constraint rather than merely counting successful test runs.
 
 ## Permanent toolchain optimization law
-`Docs/HOOSHYAROS_TOOLCHAIN_OPTIMIZATION_LAW.md` is mandatory governing memory. It defines the Python-first/tool-first construction method, human-intervention boundary, reuse-before-build rule, speed rule and preservation of repair intent across orchestration boundaries. Future autonomous cycles must read and obey it before construction.
+`Docs/HOOSHYAROS_TOOLCHAIN_OPTIMIZATION_LAW.md` is mandatory governing memory. It defines the Python-first/tool-first construction method, the bounded Kilo execution-operator role, human-intervention boundary, reuse-before-build rule, speed rule and preservation of repair intent across orchestration boundaries. Future autonomous cycles must read and obey it before construction.

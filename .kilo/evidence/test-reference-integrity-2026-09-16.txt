@@ -1,0 +1,121 @@
+TEST REFERENCE INTEGRITY — KNOT EVIDENCE
+================================================================
+Knot ID            : assurance.test-reference-integrity
+Date               : 2026-09-16
+Branch             : fix/autonomous-product-factory
+Pre-change HEAD    : 94d7debe6cdf7abc68079c9b20e796ce068b39f3
+Classification     : IMPLEMENTATION_GAP (stale test-path references after test relocation)
+Type               : bounded, non-stage, non-reopening repository-local knot
+K8                 : CLOSED / not reopened. B1-B5 classifications unchanged.
+
+----------------------------------------------------------------
+1. DISCOVERY (current-state scan)
+----------------------------------------------------------------
+A systematic audit extracted every `*.test.*` path referenced by the CI
+workflows, the qualification/harness scripts and package.json, and checked each
+against the filesystem. Two references pointed at files that do not exist:
+
+  A. `.github/workflows/hooshyaros-ci.yml` "Focused autonomous tests" named
+     `Backend/HBOS/test/AutonomousBuildDaemon.test.ts` — the real test lives at
+     `Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.test.ts`.
+
+  B. `scripts/final-product-qualification.cjs` `architecture` gate named
+     `Backend/HBOS/test/EngineRegistry.test.ts` — the real test lives at
+     `Backend/HBOS/test/EngineRegistry.phase-11-1.2.test.ts`.
+
+----------------------------------------------------------------
+2. REPRODUCTION (before repair)
+----------------------------------------------------------------
+node scripts/final-product-qualification.cjs
+  -> overall: "BLOCK_INTERNAL"
+  -> gates: {}
+  -> missingTests: ["Backend/HBOS/test/EngineRegistry.test.ts"]
+  -> exit 1
+  i.e. the canonical aggregate qualification runner documented by
+  Docs/FINAL_PRODUCT_QUALIFICATION_EXECUTION.md could NEVER run any internal
+  gate: a single stale required path forced BLOCK_INTERNAL permanently.
+
+node ./node_modules/jest/bin/jest.js --runInBand \
+  Backend/HBOS/test/AutonomousProjectMission.test.ts \
+  Backend/HBOS/test/AutonomousProjectMission.platform-order.test.ts \
+  Backend/HBOS/test/AutonomousPlatformWeaving.test.ts \
+  Backend/HBOS/test/AutonomousCompletionGate.test.ts \
+  Backend/HBOS/test/AutonomousBuildDaemon.test.ts
+  -> Test Suites: 4 passed, 4 total / Tests: 9 passed, 9 total / exit 0
+  i.e. Jest silently ignores a positional pattern that matches nothing, so the
+  named daemon gate quietly stopped running without any failure signal.
+
+----------------------------------------------------------------
+3. ROOT CAUSE
+----------------------------------------------------------------
+Both tests were relocated (into `Autonomous/Runtime/` and renamed with a phase
+suffix) but the executable references were not updated. Jest's tolerance of
+non-matching patterns turned one into a silent coverage omission and the other
+into a permanent BLOCK_INTERNAL for the aggregate runner.
+
+----------------------------------------------------------------
+4. REPAIR (one coherent root cause -> one bounded change set)
+----------------------------------------------------------------
+MOD  scripts/final-product-qualification.cjs
+     architecture gate: `Backend/HBOS/test/EngineRegistry.test.ts`
+     -> `Backend/HBOS/test/EngineRegistry.phase-11-1.2.test.ts`
+
+MOD  .github/workflows/hooshyaros-ci.yml
+     focused autonomous tests: `Backend/HBOS/test/AutonomousBuildDaemon.test.ts`
+     -> `Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.test.ts`
+
+NEW  Backend/HBOS/test/TestReferenceIntegrity.test.ts
+     Regression guard: extracts every `*.test.*` path referenced by
+     `.github/workflows/*`, `scripts/*` and `package.json` and fails if any
+     referenced path is absent; plus an explicit assertion that all aggregate
+     qualification gate paths exist.
+
+No engine, runtime, persistence, security, tenant-isolation, architecture,
+completion-gate or completion-flag change. No test criterion weakened.
+
+----------------------------------------------------------------
+5. VERIFICATION (commands actually run)
+----------------------------------------------------------------
+node scripts/final-product-qualification.cjs   (after repair)
+  -> all 7 internal gates PASS (runtime, architecture, persistence_recovery,
+     security, dashboard_and_value, reasoning_ai, installer_and_deployment)
+  -> external: 5 gates EXTERNAL_NOT_EXECUTED (truthful)
+  -> overall: "BLOCK_EXTERNAL", exit 0
+
+node ./node_modules/jest/bin/jest.js --runInBand <corrected CI focused list>
+  -> Test Suites: 5 passed, 5 total / Tests: 15 passed, 15 total / exit 0
+  -> includes PASS Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.test.ts
+
+jest --runTestsByPath Backend/HBOS/test/TestReferenceIntegrity.test.ts
+  -> 2/2 PASS
+
+YAML parse of .github/workflows/hooshyaros-ci.yml (js-yaml)
+  -> valid; verify steps intact
+
+node ./node_modules/typescript/bin/tsc --noEmit ... TestReferenceIntegrity.test.ts
+  -> exit 0
+
+node ./node_modules/jest/bin/jest.js   (full suite)
+  -> Test Suites: 270 passed, 270 total
+  -> Tests: 2098 passed, 2098 total
+  -> exit 0
+  (baseline before this knot: 269 suites / 2096 tests)
+
+----------------------------------------------------------------
+6. NOTES / LIMITATIONS
+----------------------------------------------------------------
+- `AuditOutput/final-product-qualification.json` is the runner's own output; it
+  is untracked (never tracked in this repository) and is left uncommitted.
+- The runner remains BLOCK_EXTERNAL by design: Windows real-device, web
+  real-browser, Android real-device, production cloud and payment activation are
+  external gates and are never promoted to PASS by repository tests.
+- No Android/Windows/device execution was required or performed by this knot.
+
+----------------------------------------------------------------
+7. COMPLETION FLAGS (unchanged)
+----------------------------------------------------------------
+assistantComplete                   = TRUE
+canonicalPlatformConstructionComplete = FALSE
+commercialProductRuntimeComplete    = FALSE
+externalProductionDependenciesComplete = FALSE
+productComplete                     = FALSE

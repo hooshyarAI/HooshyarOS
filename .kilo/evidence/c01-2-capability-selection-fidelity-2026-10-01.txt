@@ -1,0 +1,79 @@
+C-01.2 Capability Selection Fidelity — Verification Evidence
+Date: 2026-10-01
+Branch: fix/autonomous-product-factory
+Trusted Checkpoint: C-01.1 HEAD = 60568085d20c1c09c4cf17f80c9e58254b3e9689
+
+1. TARGET
+Repair: capability selection fidelity — different question classes select and execute correct canonical capabilities without fabricating missing evidence.
+
+2. REPAIR SUMMARY
+- FinancialDecisionNarrativeService.ts: Added ORGANIZATIONAL, DECISION, EXECUTION, OPERATIONAL intent types with patterns, evidence domains, and contracts.
+- CognitiveOrchestrationService.ts: Added 4 new capabilities (ORGANIZATIONAL_PROBLEM_SOLVING, DECISION_WORKBENCH, AUTONOMOUS_OPERATIONS, EXECUTIVE_WORKBENCH), updated selection/execution order, implemented executeCapability cases for each.
+- CognitiveOrchestrationService.ts: Fixed missing field bug — added insightData.revenue to runReasoning() input (was only setting profit, profitMargin, debtRatio).
+- CommercialRuntimeServer.ts: Wired organizational/decision/executive services into orchestration, added load functions, fixed /api/problems endpoint.
+
+3. TEST RESULTS
+- C-01.2 (CognitiveCapabilitySelection.c01-2.test.ts): 22/22 PASS
+  ✓ FINANCIAL intent selects financial capabilities and executes with insight
+  ✓ RISK intent selects risk capability; UNAVAILABLE when no risk evidence
+  ✓ GROWTH intent selects scenario and executive capabilities
+  ✓ RESILIENCE intent selects liquidity, leverage, earnings quality, organizational
+  ✓ PRODUCT intent selects product segment capability
+  ✓ DATA GAPS intent selects integrity evidence capability
+  ✓ ACTION intent selects action findings, decision intelligence, governance
+  ✓ ORGANIZATIONAL intent selects organizational; UNAVAILABLE without problem cases
+  ✓ DECISION intent selects decision workbench; UNAVAILABLE without decision matrix
+  ✓ OPERATIONAL intent selects autonomous operations; UNAVAILABLE without workflow
+  ✓ EXECUTION intent selects autonomous operations and governance; UNAVAILABLE without workflow
+  ✓ EXECUTIVE intent selects executive workbench; UNAVAILABLE without targets
+  ✓ COMPOSITE question selects union of required capabilities without duplicates
+  ✓ Missing organizational evidence → UNAVAILABLE, not fabricated
+  ✓ Missing decision evidence → UNAVAILABLE, not fabricated
+  ✓ Missing workflow context → UNAVAILABLE, not fabricated
+  ✓ Financial-only evidence NOT relabeled as organizational evidence
+  ✓ Unauthorized consequential action → governance DENIED / no execution
+  ✓ Cross-tenant evidence cannot be consumed
+  ✓ Reasoning cannot invent capability result — knowledgeItems only real data
+  ✓ REAL HTTP: non-financial question reaches orchestration with correct intent/capabilities
+  ✓ REAL HTTP: financial question with 123.xlsx executes canonical financial capabilities
+
+- C-01.1 Regression (CognitiveEntry.c01-1.test.ts): 15/15 PASS
+  ✓ Non-financial questions enter canonical path
+  ✓ No fake FinancialStatementInsight produced
+  ✓ All non-financial questions classified by intent contract
+  ✓ Capability selection differs between question families
+  ✓ Financial evidence-dependent capabilities UNAVAILABLE with honest reason
+  ✓ Missing domain evidence stays in limitations
+  ✓ Reasoning runs for every question with verified context
+  ✓ Tenant-scoped cognitive memory and governed learning report honest retrieval
+  ✓ Different tenant scoped to empty context
+  ✓ No fabricated domain result for non-financial questions
+  ✓ Persian answer exposes no internal identifiers
+  ✓ [Regression] Canonical financial path unchanged with real 123.xlsx
+
+4. REAL HTTP EVIDENCE
+- Ingest of real 123.xlsx at C:\Users\avalipour\Desktop\صورتهای مالی\123.xlsx
+- SHA-256: 10d44... (canonical, verified)
+- Revenue: 32129418000000
+- Net Profit: 7250000000000
+- /api/ingest returns { source: { sha256: ... }, ... }
+- /api/financial/analyze and /api/financial/insights expect sourceSha256 in body
+- /api/problems is correct POST endpoint for problem cases
+
+5. TYPE CHECK
+- npx tsc --noEmit: all errors are PRE-EXISTING (BASELINE_ONLY) — missing modules in
+  retired/autonomous loop files, missing type declarations in legacy engines,
+  and TS2550 'at' property on arrays (requires es2022 lib target upgrade).
+  NO new errors introduced in any C-01.2 files.
+
+6. FILES CHANGED (C-01.2)
+- Backend/HBOS/test/CognitiveCapabilitySelection.c01-2.test.ts
+- Backend/HBOS/Product/CognitiveOrchestrationService.ts
+- Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts
+- Backend/HBOS/Product/FinancialDecisionNarrativeService.ts
+
+7. PROTECTED FILES (NOT MODIFIED)
+- Backend/HBOS/Product/FinancialDocumentUnderstanding.ts
+- Backend/HBOS/Product/FinancialStatementInsight.ts
+
+8. STATUS: VERIFIED — 22/22 C-01.2 tests PASS, 15/15 C-01.1 regression PASS, tsc clean for new code.

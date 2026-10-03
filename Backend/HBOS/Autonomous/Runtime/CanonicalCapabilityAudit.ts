@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { AutonomousProjectMission } from "./AutonomousProjectMission";
+import { behavioralEvidenceSatisfied } from "./CapabilityEvidenceAudit";
 
 export interface CanonicalCapabilityAuditResult {
     complete: boolean;
@@ -8,6 +9,12 @@ export interface CanonicalCapabilityAuditResult {
     backlogExhausted: boolean;
     missingArtifacts: string[];
     nonAutonomousProductionItems: string[];
+    /**
+     * Roadmap capabilities whose owning implementation and focused test exist but
+     * where real behavioral evidence could not be proven (marker/regex presence is
+     * not behavioral evidence). Non-empty => completion must fail closed.
+     */
+    nonBehavioralCapabilities: string[];
 }
 
 export class CanonicalCapabilityAudit {
@@ -34,7 +41,8 @@ export class CanonicalCapabilityAudit {
                 roadmapPresent: false,
                 backlogExhausted: false,
                 missingArtifacts: ["Docs/ROADMAP.md"],
-                nonAutonomousProductionItems: []
+                nonAutonomousProductionItems: [],
+                nonBehavioralCapabilities: []
             };
         }
 
@@ -62,6 +70,7 @@ export class CanonicalCapabilityAudit {
         ];
 
         const missingArtifacts: string[] = [];
+        const nonBehavioralCapabilities: string[] = [];
         for (const [label, ...artifacts] of capabilityArtifacts) {
             if (!roadmap.includes(label)) continue;
             for (const artifact of artifacts) {
@@ -80,6 +89,28 @@ export class CanonicalCapabilityAudit {
                     }
                 }
             }
+
+            // File existence and marker/regex presence are NOT behavioral completion.
+            // A roadmap capability is only behaviorally evidenced when its owning
+            // implementation and focused test exist and the focused test actually
+            // exercises a behavior the implementation defines.
+            const implementationPath = artifacts[0];
+            const testPath = artifacts[1];
+            if (!implementationPath || !testPath) {
+                nonBehavioralCapabilities.push(label);
+                continue;
+            }
+            const implementationFile = join(root, implementationPath);
+            const testFile = join(root, testPath);
+            if (!existsSync(implementationFile) || !existsSync(testFile)) {
+                nonBehavioralCapabilities.push(label);
+                continue;
+            }
+            const implementationSource = readFileSync(implementationFile, "utf8");
+            const testSource = readFileSync(testFile, "utf8");
+            if (!behavioralEvidenceSatisfied(implementationSource, testSource, methods ?? [])) {
+                nonBehavioralCapabilities.push(label);
+            }
         }
 
         const backlogExhausted = mission.nextPlatformMission() === null;
@@ -88,11 +119,12 @@ export class CanonicalCapabilityAudit {
         const nonAutonomousProductionItems = ["Cloud Deployment"].filter(item => roadmap.includes(item) && !cloudComplete);
 
         return {
-            complete: roadmapPresent && backlogExhausted && missingArtifacts.length === 0,
+            complete: roadmapPresent && backlogExhausted && missingArtifacts.length === 0 && nonBehavioralCapabilities.length === 0,
             roadmapPresent,
             backlogExhausted,
             missingArtifacts,
-            nonAutonomousProductionItems
+            nonAutonomousProductionItems,
+            nonBehavioralCapabilities
         };
     }
 }

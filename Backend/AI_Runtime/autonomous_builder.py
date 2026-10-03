@@ -4,6 +4,15 @@ Known canonical capabilities retain explicit architecture-aware generators.
 Unknown capabilities are no longer rejected: the worker derives a minimal
 engine/test/documentation scaffold from the mission contract, while keeping
 business semantics deliberately out of the generator.
+
+Python remains the canonical construction worker. A separately governed local
+operator such as Kilo Code may invoke this worker, but does not replace it or
+acquire architecture authority.
+
+Blockers produce machine-readable HELP_REQUIRED / ESCALATE output. An approved
+execution operator may resolve the blocker and return evidence via
+``--evidence-dir``; Python re-verifies the evidence before continuing. Kilo is
+never a mandatory runtime dependency.
 """
 from __future__ import annotations
 
@@ -19,17 +28,31 @@ if str(ROOT) not in sys.path:
 
 from Backend.AI_Runtime.autonomous_spec import generic_artifacts, spec_from_prompt, write_missing, write_overwrite
 
-ALLOWED_AGENT = "python"
+CONSTRUCTION_WORKER = "python"
+APPROVED_EXECUTION_OPERATORS = {"python", "kilo"}
 
 
 def enforce_construction_policy() -> None:
-    """Refuse non-Python autonomous construction workers."""
-    agent = os.environ.get("HOOSHYAR_AGENT", ALLOWED_AGENT).strip().lower()
-    if agent != ALLOWED_AGENT:
+    """Validate the execution operator without changing the canonical worker."""
+    operator = os.environ.get("HOOSHYAR_EXECUTION_OPERATOR")
+    legacy_agent = os.environ.get("HOOSHYAR_AGENT")
+    selected = (operator or legacy_agent or "python").strip().lower()
+    if selected not in APPROVED_EXECUTION_OPERATORS:
         raise RuntimeError(
-            f"Unsupported autonomous construction provider: {agent or '<empty>'}; "
-            "repository-native Python is the only approved construction worker."
+            f"Unsupported autonomous execution operator: {selected or '<empty>'}; "
+            f"approved operators are {', '.join(sorted(APPROVED_EXECUTION_OPERATORS))}."
         )
+    os.environ["HOOSHYAR_EXECUTION_OPERATOR"] = selected
+    os.environ["HOOSHYAR_CONSTRUCTION_WORKER"] = CONSTRUCTION_WORKER
+
+
+def _emit_blocker(capability_id: str, missing: list[str]) -> None:
+    """Emit machine-readable HELP_REQUIRED / ESCALATE output for a blocked stage."""
+    print("HELP_REQUIRED: blocked by unmet dependencies")
+    print(f"CAPABILITY: {capability_id}")
+    print(f"MISSING: {', '.join(missing)}")
+    print(f"EVIDENCE_REQUIRED: {', '.join(missing)}")
+    print("ESCALATE: approved execution operator may resolve and re-verify")
 
 
 PLATFORM_CAPABILITIES = {
@@ -382,11 +405,17 @@ def _needs_reweave(capability_id: str, artifacts) -> bool:
 
 
 def main() -> int:
+    # Kilo is an approved operator layer only; it is never imported or required here.
     enforce_construction_policy()
     parser = argparse.ArgumentParser()
     parser.add_argument("--prompt", required=True)
     parser.add_argument("--repair", action="store_true")
     parser.add_argument("--issue", default="")
+    parser.add_argument(
+        "--evidence-dir",
+        default="",
+        help="Operator evidence directory for re-verification after blocker resolution.",
+    )
     args = parser.parse_args()
     match = re.search(r"Capability ID:\s*([^\n]+)", args.prompt)
     requested_id = match.group(1).strip() if match else ""
@@ -403,9 +432,17 @@ def main() -> int:
     missing = []
     if capability_id in CAPABILITY_DEPENDENCIES:
         missing = [p for p in CAPABILITY_DEPENDENCIES[capability_id] if not (ROOT / p).exists()]
+
     if missing:
-        print(f"Blocked by unmet dependencies for {capability_id}: {', '.join(missing)}")
-        return 3
+        if args.evidence_dir:
+            evidence_path = Path(args.evidence_dir)
+            if evidence_path.exists():
+                # Re-verify after potential approved-operator intervention.
+                missing = [p for p in missing if not (ROOT / p).exists()]
+
+        if missing:
+            _emit_blocker(capability_id, missing)
+            return 3
 
     if args.repair or requested_id.startswith("repair-"):
         repaired = write_overwrite(ROOT, artifacts)

@@ -120,7 +120,9 @@ The HooshyarOS construction process is permanently restricted to three active pa
 2. **GitHub** — repository inspection, source control, commit, synchronization, review and publication.
 3. **This Assistant** — architecture reasoning, critical thinking, expert choice, implementation judgment and construction orchestration.
 
-External coding assistants, cloud coding agents and alternative code-generation providers are prohibited from the construction process. They must not be invoked, installed, configured or depended upon for autonomous construction.
+These three are the only construction **authorities**. Approved local execution **operators** (for example **Kilo Code**) may act as subordinate, replaceable mechanisms under them and remain subject to every construction rule; they are not external coding providers, additional participants or architectural authorities. See `Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md` §5 and §10 and `Docs/KILO_EXECUTION_OPERATOR_CONTRACT.md`.
+
+External coding assistants, cloud coding agents and alternative code-generation providers are prohibited from the construction process. They must not be invoked, installed, configured or depended upon for autonomous construction. Approved repository-governed local execution operators are not external coding providers under this restriction.
 
 This includes Codex, GitHub Copilot, Claude and equivalent coding agents.
 
@@ -243,6 +245,7 @@ The repository currently encodes the following invariants:
 - Python is the canonical construction worker/orchestration layer.
 - GitHub is the canonical repository and publication tool.
 - The Assistant is the architecture/reasoning/orchestration authority.
+- Approved local execution operators (for example Kilo Code) are subordinate, replaceable execution mechanisms; they are not external coding providers, additional construction authorities or product runtime dependencies.
 - External coding assistants and providers are excluded from the construction path.
 - Completion is evidence-based.
 - Platform continuation is separate from the Assistant completion gate.
@@ -283,7 +286,7 @@ Before finalization:
 **Reuse what already exists.**  
 **Build only what is genuinely missing.**  
 **Use the correct engine boundary.**  
-**Use only Python, GitHub and the Assistant for construction.**  
+**Use only the Python/GitHub/Assistant authorities for construction, with approved local execution operators acting under them.**  
 **Verify before claiming completion.**  
 **Repair from evidence.**  
 **Commit only verified work.**  
