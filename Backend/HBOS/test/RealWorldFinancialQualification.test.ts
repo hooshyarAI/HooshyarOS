@@ -742,6 +742,22 @@ const REAL_XLSX = process.env.HOOSHYAR_REAL_XLSX
     const result = await adapter.ingestXlsx("real-tenant", "123.xlsx", readFileSync(REAL_XLSX));
     const document = result.model.document;
     expect(document).toBeTruthy();
+
+    console.log("[CASE 1] realFile =", REAL_XLSX);
+    console.log("[CASE 1] documentStatus =", document!.status);
+    console.log("[CASE 1] currency =", document!.currency, "unitMultiplier =", document!.unitMultiplier, "factCount =", document!.facts.length);
+    console.log("[CASE 1] sectionStatuses =", JSON.stringify(
+      document!.sections.map((section) => ({
+        type: section.type,
+        state: section.state,
+        factCount: section.facts.length,
+        lines: section.startLine + "-" + section.endLine,
+        ...(section.failureCode ? { failureCode: section.failureCode } : {}),
+      })),
+      null,
+      2,
+    ));
+
     expect(document!.unitMultiplier).toBe(M);
     expect(document!.facts.length).toBeGreaterThan(40);
 

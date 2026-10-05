@@ -67,6 +67,9 @@ export type StatementMeasure =
   | "GROSS_PROFIT"
   | "OPERATING_EXPENSES"
   | "OPERATING_PROFIT"
+  | "OTHER_OPERATING_INCOME"
+  | "OTHER_OPERATING_EXPENSES"
+  | "NON_OPERATING_INCOME"
   | "INTEREST"
   | "PRE_TAX_INCOME"
   | "TAX"
@@ -97,6 +100,9 @@ export const STATEMENT_MEASURES: ReadonlyArray<StatementMeasure> = [
   "GROSS_PROFIT",
   "OPERATING_EXPENSES",
   "OPERATING_PROFIT",
+  "OTHER_OPERATING_INCOME",
+  "OTHER_OPERATING_EXPENSES",
+  "NON_OPERATING_INCOME",
   "INTEREST",
   "PRE_TAX_INCOME",
   "TAX",
@@ -275,6 +281,12 @@ const MEASURE_ALIASES = buildAliasMap([
   ["GROSS_PROFIT", ["سود ناخالص", "سود زیان ناخالص", "زیان ناخالص", "gross profit", "gross loss"]],
   ["OPERATING_EXPENSES", ["هزینه‌های فروش اداری و عمومی", "هزینه‌های عملیاتی", "هزینه‌های فروش و اداری و عمومی", "operating expenses", "selling general and administrative expenses"]],
   ["OPERATING_PROFIT", ["سود زیان عملیاتی", "سود عملیاتی", "زیان عملیاتی", "operating profit", "operating income", "operating loss"]],
+  // Other operating income / expense are the two lines a real Iranian income
+  // statement prints between SG&A and operating profit ("سایر درآمدها" /
+  // "سایر هزینه‌ها"). Without them the operating-profit identity cannot be
+  // evaluated, because gross profit - SG&A is not the whole operating result.
+  ["OTHER_OPERATING_INCOME", ["سایر درآمدها", "سایر درآمدهای عملیاتی", "سایر درآمد عملیاتی", "سایر درآمدهای عملیات", "other operating income", "other income"]],
+  ["OTHER_OPERATING_EXPENSES", ["سایر هزینه‌ها", "سایر هزینه ها", "سایر هزینه‌های عملیاتی", "سایر هزینه های عملیاتی", "سایر هزینه عملیاتی", "other operating expenses", "other expenses"]],
   ["EXPENSES", ["جمع هزینه‌ها", "مجموع هزینه‌ها", "هزینه‌ها", "total expenses", "expenses"]],
   ["NET_PROFIT", ["سود زیان خالص", "سود خالص", "زیان خالص", "سود زیان پس از مالیات", "net profit", "net income", "net loss", "profit for the year"]],
   ["OPERATING_CASH_FLOW", ["جریان نقدی عملیاتی", "جریان‌های نقدی عملیاتی", "خالص جریان‌های نقدی عملیاتی", "جریان نقدینگی عملیاتی", "جریان خالص ورود خروج نقد حاصل از فعالیت های عملیاتی", "جریان خالص ورود خروج نقد حاصل از فعالیتهای عملیاتی", "net cash from operating activities", "net cash provided by operating activities", "cash flows from operating activities"]],
@@ -295,6 +307,11 @@ const MEASURE_ALIASES = buildAliasMap([
   ["SHORT_TERM_DEBT", ["تسهیلات مالی", "تسهیلات مالی کوتاه مدت", "تسهیلات کوتاه مدت", "بدهی‌های کوتاه مدت", "short-term debt", "short term debt", "short-term borrowings"]],
   ["LONG_TERM_DEBT", ["تسهیلات مالی بلندمدت", "تسهیلات مالی بلند مدت", "بدهی‌های بلندمدت", "long-term debt", "long term debt", "long-term borrowings"]],
   ["INTEREST", ["هزینه‌های مالی", "هزینه مالی", "هزینه‌های تامین مالی", "finance costs", "finance cost", "interest expense", "interest expenses"]],
+  // The net non-operating result a real statement prints between finance costs
+  // and the pre-tax line ("سایر درآمدها و هزینه‌های غیرعملیاتی"). It is a signed
+  // net amount: income positive, expense negative, exactly as printed. Without it
+  // the pre-tax identity cannot be evaluated at all.
+  ["NON_OPERATING_INCOME", ["سایر درآمدها و هزینه‌های غیرعملیاتی", "سایر درآمدها و هزینه های غیرعملیاتی", "سایر درآمدها و هزینه‌های غیر عملیاتی", "سایر درآمدها و هزینه های غیر عملیاتی", "سایر درآمد و هزینه غیرعملیاتی", "سایر درآمدهای و هزینه های غیرعملیاتی", "سایر درآمد و هزینه‌های غیرعملیاتی", "non-operating income and expenses", "other non-operating income and expenses", "other income and expenses non-operating"]],
   // Real Persian statements print the pre-tax line as "عملیات در حال تداوم"
   // (operations) as often as "عملیاتی" (operating); both spellings must match or
   // the pre-tax line is silently discarded on a real report.
@@ -712,7 +729,7 @@ function isMeasureForSection(measure: StatementMeasure, sectionType: FinancialSe
     return ["ASSETS", "CURRENT_ASSETS", "NON_CURRENT_ASSETS", "CASH", "RECEIVABLES", "INVENTORY", "PPE", "LIABILITIES", "CURRENT_LIABILITIES", "NON_CURRENT_LIABILITIES", "PAYABLES", "SHORT_TERM_DEBT", "LONG_TERM_DEBT", "EQUITY"].includes(measure);
   }
   if (sectionType === "INCOME_STATEMENT") {
-    return ["REVENUE", "COGS", "GROSS_PROFIT", "OPERATING_EXPENSES", "OPERATING_PROFIT", "INTEREST", "PRE_TAX_INCOME", "TAX", "EXPENSES", "NET_PROFIT"].includes(measure);
+    return ["REVENUE", "COGS", "GROSS_PROFIT", "OPERATING_EXPENSES", "OPERATING_PROFIT", "OTHER_OPERATING_INCOME", "OTHER_OPERATING_EXPENSES", "NON_OPERATING_INCOME", "INTEREST", "PRE_TAX_INCOME", "TAX", "EXPENSES", "NET_PROFIT"].includes(measure);
   }
   if (sectionType === "CASH_FLOW_STATEMENT") {
     return ["OPERATING_CASH_FLOW", "INVESTING_CASH_FLOW", "FINANCING_CASH_FLOW", "NET_CASH_FLOW"].includes(measure);

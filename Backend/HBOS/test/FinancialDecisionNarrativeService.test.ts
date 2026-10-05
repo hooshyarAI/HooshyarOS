@@ -210,7 +210,7 @@ describe("B-02 question-driven cognitive control", () => {
         ["چه اقداماتی باید بررسی شود؟", "ACTION"],
         ["چه اقدامی باید انجام شود؟", "ACTION"],
         ["چه کاری باید انجام شود؟", "ACTION"],
-        ["ضعف عملای شرکت چگونه است؟", "OPERATIONAL"],
+        ["ضعف عملیاتی شرکت چگونه است؟", "OPERATIONAL"],
         ["مشکلات عملیاتی شرکت چیست؟", "OPERATIONAL"],
         ["هوا امروز چطور است؟", "GENERAL"],
      ])("%s routes to %s", (question, expected) => {

@@ -555,7 +555,7 @@ const INTENT_RULES: readonly IntentRule[] = [
      intent: "OPERATIONAL",
      weight: 100,
      patterns: [
-       /عملیات/, /اجرا/, /تنفيذ/, /جریانی/, /چالش.*اجرایی/, /عملای/,
+        /عملیات/, /اجرا/, /تنفيذ/, /جریانی/, /چالش.*اجرایی/,
        /operational/, /execution/, /workflow/, /runbook/,
      ],
   },

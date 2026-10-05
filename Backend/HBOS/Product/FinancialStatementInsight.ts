@@ -451,20 +451,69 @@ export function composeFinancialStatementInsight(
     grossProfit,
     ["revenue", "cogs", "grossProfit"],
   );
-  pushCheck(
-    "operating-profit-identity",
-    "Gross profit - operating expenses should equal operating profit.",
-    () => (grossProfit !== null && operatingExpenses !== null ? grossProfit - operatingExpenses : null),
-    operatingProfit,
-    ["grossProfit", "operatingExpenses", "operatingProfit"],
-  );
-  // Operating profit + non-operating items should equal pre-tax profit, but no
-  // canonical non-operating measure exists, so a difference can never be
-  // attributed to a mismatch. It is NOT_TESTABLE unless the two are equal.
+  // Operating profit is gross profit less operating expenses, adjusted by the
+  // other operating income/expense a real statement prints between SG&A and
+  // operating profit. Those two lines are optional: a statement without them
+  // keeps the plain gross-profit - operating-expenses test, and any residual
+  // difference is still reported as MISMATCH rather than explained away.
+  const otherOperatingIncome = currentFact(facts, "OTHER_OPERATING_INCOME");
+  const otherOperatingExpenses = currentFact(facts, "OTHER_OPERATING_EXPENSES");
+  const operatingIdentityDescription =
+    "Gross profit - operating expenses + other operating income - other operating expenses should equal operating profit.";
+  if (grossProfit === null || operatingExpenses === null || operatingProfit === null) {
+    integrity.push({
+      id: "operating-profit-identity",
+      description: operatingIdentityDescription,
+      status: "NOT_TESTABLE",
+      expected: null,
+      actual: operatingProfit,
+      difference: null,
+      missing: [
+        ...(grossProfit === null ? ["grossProfit"] : []),
+        ...(operatingExpenses === null ? ["operatingExpenses"] : []),
+        ...(operatingProfit === null ? ["operatingProfit"] : []),
+      ],
+    });
+  } else {
+    // Expense lines are normalized to a magnitude (the same convention the
+    // canonical statement already uses for COGS/SG&A), so a source that prints
+    // "سایر هزینه‌ها" as either sign is evaluated identically.
+    const expected =
+      grossProfit -
+      operatingExpenses +
+      (otherOperatingIncome ?? 0) -
+      (otherOperatingExpenses === null ? 0 : Math.abs(otherOperatingExpenses));
+    const difference = operatingProfit - expected;
+    integrity.push({
+      id: "operating-profit-identity",
+      description: operatingIdentityDescription,
+      expected,
+      actual: operatingProfit,
+      difference,
+      status: Math.abs(difference) <= toleranceFor(expected) ? "RECONCILED" : "MISMATCH",
+      missing: [
+        ...(otherOperatingIncome === null ? ["otherOperatingIncome"] : []),
+        ...(otherOperatingExpenses === null ? ["otherOperatingExpenses"] : []),
+      ],
+    });
+  }
+  // Pre-tax profit is operating profit less finance costs plus the net
+  // non-operating result the statement prints ("سایر درآمدها و هزینه‌های
+  // غیرعملیاتی"). Both components are optional: a statement that prints no
+  // non-operating line is reconciled by equality alone, and any residual that
+  // the available evidence cannot explain stays NOT_TESTABLE — it is never
+  // upgraded to a pass and never reported as a source mismatch.
+  const nonOperatingIncome = currentFact(facts, "NON_OPERATING_INCOME");
+  const preTaxDescription =
+    "Operating profit - finance costs + non-operating income should equal pre-tax profit.";
+  const preTaxMissing = [
+    ...(nonOperatingIncome === null ? ["nonOperatingIncome"] : []),
+    ...(interest === null ? ["interest"] : []),
+  ];
   if (operatingProfit === null || preTaxIncome === null) {
     integrity.push({
       id: "pre-tax-identity",
-      description: "Operating profit + non-operating items should equal pre-tax profit.",
+      description: preTaxDescription,
       status: "NOT_TESTABLE",
       expected: null,
       actual: preTaxIncome,
@@ -475,24 +524,42 @@ export function composeFinancialStatementInsight(
       ],
     });
   } else if (Math.abs(preTaxIncome - operatingProfit) <= toleranceFor(operatingProfit)) {
+    // The statement prints no non-operating result at all; operating profit is
+    // the pre-tax result.
     integrity.push({
       id: "pre-tax-identity",
-      description: "Operating profit + non-operating items should equal pre-tax profit.",
-      status: "RECONCILED",
+      description: preTaxDescription,
       expected: operatingProfit,
       actual: preTaxIncome,
       difference: preTaxIncome - operatingProfit,
+      status: "RECONCILED",
       missing: [],
     });
-  } else {
+  } else if (nonOperatingIncome === null && interest === null) {
     integrity.push({
       id: "pre-tax-identity",
-      description: "Operating profit + non-operating items should equal pre-tax profit.",
+      description: preTaxDescription,
       status: "NOT_TESTABLE",
       expected: operatingProfit,
       actual: preTaxIncome,
       difference: preTaxIncome - operatingProfit,
-      missing: ["nonOperatingItems"],
+      missing: ["nonOperatingIncome", "interest"],
+    });
+  } else {
+    const expected =
+      operatingProfit -
+      (interest === null ? 0 : Math.abs(interest)) +
+      (nonOperatingIncome ?? 0);
+    const difference = preTaxIncome - expected;
+    const reconciled = Math.abs(difference) <= toleranceFor(expected);
+    integrity.push({
+      id: "pre-tax-identity",
+      description: preTaxDescription,
+      expected,
+      actual: preTaxIncome,
+      difference,
+      status: reconciled ? "RECONCILED" : "NOT_TESTABLE",
+      missing: reconciled ? preTaxMissing : ["nonOperatingItems"],
     });
   }
   pushCheck(
