@@ -198,16 +198,22 @@ describe("FinancialDecisionNarrativeService", () => {
  */
 describe("B-02 question-driven cognitive control", () => {
   describe("mandatory intent regression cases", () => {
-    test.each([
-      ["این صورت مالی را تحلیل کن", "ANALYZE"],
-      ["تاب‌آوری شرکت را بررسی کن", "RESILIENCE"],
-      ["مهم‌ترین ریسک مالی چیست؟", "RISK"],
-      ["چرا سود تغییر کرده است؟", "PROFIT_CHANGE"],
-      ["چه اطلاعاتی برای نتیجه‌گیری بهتر کم است؟", "DATA_GAPS"],
-      ["برای رشد و توسعه چه پیشنهادهایی داری؟", "GROWTH"],
-      ["الان برای بهبود وضعیت مالی شرکت چه کار کنم؟", "ACTION"],
-      ["هوا امروز چطور است؟", "GENERAL"],
-    ])("%s routes to %s", (question, expected) => {
+     test.each([
+        ["این صورت مالی را تحلیل کن", "ANALYZE"],
+        ["تاب‌آوری شرکت را بررسی کن", "RESILIENCE"],
+        ["مهم‌ترین ریسک مالی چیست؟", "RISK"],
+        ["چرا سود تغییر کرده است؟", "PROFIT_CHANGE"],
+        ["چه اطلاعاتی برای نتیجه‌گیری بهتر کم است؟", "DATA_GAPS"],
+        ["برای رشد و توسعه چه پیشنهادهایی داری؟", "GROWTH"],
+        ["الان برای بهبود وضعیت مالی شرکت چه کار کنم؟", "ACTION"],
+        ["چه عملیاتی باید انجام شود؟", "ACTION"],
+        ["چه اقداماتی باید بررسی شود؟", "ACTION"],
+        ["چه اقدامی باید انجام شود؟", "ACTION"],
+        ["چه کاری باید انجام شود؟", "ACTION"],
+        ["ضعف عملای شرکت چگونه است؟", "OPERATIONAL"],
+        ["مشکلات عملیاتی شرکت چیست؟", "OPERATIONAL"],
+        ["هوا امروز چطور است؟", "GENERAL"],
+     ])("%s routes to %s", (question, expected) => {
       expect(classifyQuestion(question)).toBe(expected);
     });
 

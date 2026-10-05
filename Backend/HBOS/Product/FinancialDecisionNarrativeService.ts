@@ -187,6 +187,32 @@ export function formatFaRatio(value: number | null | undefined): string {
   return `${formatFaDecimal(value, 2)} برابر`;
 }
 
+export function formatFaAmountScaled(value: number | null | undefined, currency: string, unitMultiplier: number): string {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) return "نامشخص";
+  const scaled = value / unitMultiplier;
+  // Format scaled with up to 3 decimal places, remove trailing zeros
+  let numStr = formatFaDecimal(scaled, 3);
+  if (numStr.includes('٫')) {
+    const [intPart, decPart] = numStr.split('٫');
+    const trimmedDec = decPart.replace(/۰+$/, '');
+    numStr = trimmedDec === '' ? intPart : `${intPart}٫${trimmedDec}`;
+  }
+  // Determine unit label
+  let unitLabel = "";
+  if (unitMultiplier >= 1e9) {
+    unitLabel = "میلیارد";
+  } else if (unitMultiplier >= 1e6) {
+    unitLabel = "میلیون";
+  }
+  // Get currency label in Persian
+  const currencyLabel = currency === "IRR" ? "ریال" : (currency || "واحد پول");
+  // Build the result: [number] [unit label] [currency label]
+  const parts = [numStr];
+  if (unitLabel) parts.push(unitLabel);
+  parts.push(currencyLabel);
+  return parts.join(' ');
+}
+
 /* ------------------------------------------------------------------------- *
  * Persian labels for canonical identifiers and localized limitations.
  *
@@ -352,11 +378,11 @@ export function localizeStatementLimitations(insight: FinancialStatementInsight)
  * Internal intent identifiers never appear here; this is matching-only.
  */
 export const normalizeQuestion = (question: string): string => String(question ?? "")
-  .replace(/[يى]/g, "ی")                    // Arabic yeh -> Persian yeh
-  .replace(/ك/g, "ک")                              // Arabic kaf -> Persian keheh
-  .replace(/[ً-ْٰ]/g, "")                 // Arabic diacritics
-  .replace(/[\u200B-\u200F\u2028\u2029\uFEFF]/g, "") // ZWNJ / bidi marks / BOM
-  .replace(/[؟?!.,:;«»"'()[\]{}\-–—_/\\]/g, " ")    // punctuation -> space
+  .replace(/[يى]/g, "ی")
+  .replace(/ك/g, "ک")
+  .replace(/[ً-ْٰ]/g, "")
+  .replace(/[\u200B-\u200F\u2028\u2029\uFEFF]/g, "")
+  .replace(/[؟?!.,:;«»"'()[\]{}\-–—_/\\]/g, " ")
   .replace(/\s+/g, " ")
   .trim()
   .toLowerCase();
@@ -491,7 +517,13 @@ const INTENT_RULES: readonly IntentRule[] = [
       /recommend/,
       /what should i do/,
       /next step/,
-      /action plan/,
+       /action plan/,
+       /چه (اقدام|عمل) باید بررسی شود?/,
+       /چه (اقدام|عمل) باید انجام/,
+       /چه اقداماتی باید (بررسی|انجام) شود/,
+       /چه اقدامی باید (بررسی|انجام) شود/,
+       /چه عملیاتی باید انجام شود/,
+       /چه کاری باید انجام شود/
     ],
   },
   {
@@ -520,12 +552,12 @@ const INTENT_RULES: readonly IntentRule[] = [
     ],
   },
   {
-    intent: "OPERATIONAL",
-    weight: 100,
-    patterns: [
-      /عملیات/, /اجرا/, /تنفيذ/, /جریانی/, /چالش.*اجرایی/,
-      /operational/, /execution/, /workflow/, /runbook/,
-    ],
+     intent: "OPERATIONAL",
+     weight: 100,
+     patterns: [
+       /عملیات/, /اجرا/, /تنفيذ/, /جریانی/, /چالش.*اجرایی/, /عملای/,
+       /operational/, /execution/, /workflow/, /runbook/,
+     ],
   },
   {
     intent: "ANALYZE",
@@ -627,51 +659,50 @@ const INTENT_CONTRACT: Readonly<Record<AssistantIntent, Omit<QuestionIntent, "pr
  * Returns the structured control contract for one question.
  */
 export function analyzeQuestion(question: string): QuestionIntent {
-  const q = normalizeQuestion(question);
+    const q = normalizeQuestion(question);
+    if (!q) {
+      return { primaryIntent: "GENERAL", secondaryIntents: [], ...INTENT_CONTRACT.GENERAL, answerMode: "FOCUSED" };
+    }
 
-  if (!q) {
-    return { primaryIntent: "GENERAL", secondaryIntents: [], ...INTENT_CONTRACT.GENERAL, answerMode: "FOCUSED" };
-  }
+    // Scoring scan: collect EVERY matching intent, then rank. Nothing collapses
+    // onto the first keyword hit, so a multi-part question keeps all its parts.
+    const scored = INTENT_RULES
+      .map((rule, index) => ({ intent: rule.intent, weight: rule.weight, index, matched: rule.patterns.some((pattern) => pattern.test(q)) }));
 
-  // Scoring scan: collect EVERY matching intent, then rank. Nothing collapses
-  // onto the first keyword hit, so a multi-part question keeps all its parts.
-  const scored = INTENT_RULES
-    .map((rule, index) => ({ intent: rule.intent, weight: rule.weight, index, matched: rule.patterns.some((pattern) => pattern.test(q)) }))
-    .filter((entry) => entry.matched)
-    .sort((a, b) => (b.weight - a.weight) || (a.index - b.index));
+    const filtered = scored.filter((entry) => entry.matched);
 
-  if (scored.length === 0) {
-    return { primaryIntent: "GENERAL", secondaryIntents: [], ...INTENT_CONTRACT.GENERAL, answerMode: "FOCUSED" };
-  }
+   if (filtered.length === 0) {
+     return { primaryIntent: "GENERAL", secondaryIntents: [], ...INTENT_CONTRACT.GENERAL, answerMode: "FOCUSED" };
+   }
 
-  const [primary, ...rest] = scored;
-  const secondaryIntents = rest.map((entry) => entry.intent);
+   const [primary, ...rest] = filtered.sort((a, b) => (b.weight - a.weight) || (a.index - b.index));
+   const secondaryIntents = rest.map((entry) => entry.intent);
 
-  // Evidence domains and analysis paths are the union over every detected
-  // intent, so a composite question is answered from all required evidence.
-  const requiredEvidenceDomains = Array.from(new Set<EvidenceDomain>(
-    [primary.intent, ...secondaryIntents].flatMap((intent) => INTENT_CONTRACT[intent].requiredEvidenceDomains),
-  ));
-  const requestedAnalysis = Array.from(new Set<string>(
-    [primary.intent, ...secondaryIntents].flatMap((intent) => INTENT_CONTRACT[intent].requestedAnalysis),
-  ));
-  const requestedOutcome = secondaryIntents.length > 0
-    ? `${INTENT_CONTRACT[primary.intent].requestedOutcome} همراه با ${secondaryIntents.map((intent) => INTENT_CONTRACT[intent].userGoal).join(" و ")}`
-    : INTENT_CONTRACT[primary.intent].requestedOutcome;
+   // Evidence domains and analysis paths are the union over every detected
+   // intent, so a composite question is answered from all required evidence.
+   const requiredEvidenceDomains = Array.from(new Set<EvidenceDomain>(
+     [primary.intent, ...secondaryIntents].flatMap((intent) => INTENT_CONTRACT[intent].requiredEvidenceDomains),
+   ));
+   const requestedAnalysis = Array.from(new Set<string>(
+     [primary.intent, ...secondaryIntents].flatMap((intent) => INTENT_CONTRACT[intent].requestedAnalysis),
+   ));
+   const requestedOutcome = secondaryIntents.length > 0
+     ? `${INTENT_CONTRACT[primary.intent].requestedOutcome} همراه با ${secondaryIntents.map((intent) => INTENT_CONTRACT[intent].userGoal).join(" و ")}`
+     : INTENT_CONTRACT[primary.intent].requestedOutcome;
 
-  return {
-    primaryIntent: primary.intent,
-    secondaryIntents,
-    userGoal: secondaryIntents.length > 0
-      ? `${INTENT_CONTRACT[primary.intent].userGoal} همراه با ${secondaryIntents.map((intent) => INTENT_CONTRACT[intent].userGoal).join(" و ")}`
-      : INTENT_CONTRACT[primary.intent].userGoal,
-    requestedAnalysis,
-    requestedOutcome,
-    requiredEvidenceDomains,
-    // A question expressing more than one intent must be answered compositely;
-    // one expressing a single intent gets a focused answer.
-    answerMode: secondaryIntents.length > 0 ? "COMPOSITE" : "FOCUSED",
-  };
+   return {
+     primaryIntent: primary.intent,
+     secondaryIntents,
+     userGoal: secondaryIntents.length > 0
+       ? `${INTENT_CONTRACT[primary.intent].userGoal} همراه با ${secondaryIntents.map((intent) => INTENT_CONTRACT[intent].userGoal).join(" و ")}`
+       : INTENT_CONTRACT[primary.intent].userGoal,
+     requestedAnalysis,
+     requestedOutcome,
+     requiredEvidenceDomains,
+     // A question expressing more than one intent must be answered compositely;
+     // one expressing a single intent gets a focused answer.
+     answerMode: secondaryIntents.length > 0 ? "COMPOSITE" : "FOCUSED",
+   };
 }
 
 /**
@@ -873,7 +904,7 @@ export function composeFindingGroups(insight: FinancialStatementInsight): Findin
   }
   if (currentAssets !== null && currentLiabilities !== null && currentLiabilities > currentAssets) {
     risks.push({
-      message: `بدهیهای جاری (${formatFaAmount(currentLiabilities, currency)}) از داراییهای جاری (${formatFaAmount(currentAssets, currency)}) بیشتر است؛ کسری پوشش تعهدات کوتاهمدت وجود دارد.`,
+      message: `بدهی‌های (${formatFaAmountScaled(currentLiabilities, currency, insight.unitMultiplier)}) از دارایی‌های (${formatFaAmountScaled(currentAssets, currency, insight.unitMultiplier)}) بیشتر است؛ کسری پوشش تعهدات کوتاهمدت وجود دارد.`,
       evidenceLevel: "INTERPRETATION",
       evidence: [`currentLiabilities=${currentLiabilities}`, `currentAssets=${currentAssets}`],
     });
@@ -905,7 +936,7 @@ export function composeFindingGroups(insight: FinancialStatementInsight): Findin
   const mismatch = (insight.integrity ?? []).find((check) => check.status === "MISMATCH");
   if (mismatch) {
     risks.push({
-      message: `کنترل حسابداری «${faIntegrity(mismatch.id)}» با اقلام استخراج‌شده منطبق نیست؛ ریسک ناشی از اختلاف داده بین ${formatFaAmount(Math.abs(mismatch.difference ?? 0), currency)} است.`,
+      message: `کنترل حسابداری «${faIntegrity(mismatch.id)}» با اقلام استخراج‌شده منطبق نیست؛ ریسک ناشی از اختلاف داده بین ${formatFaAmountScaled(Math.abs(mismatch.difference ?? 0), currency, insight.unitMultiplier)} است.`,
       evidenceLevel: "DERIVED_METRIC",
       evidence: [mismatch.id],
     });
@@ -1308,7 +1339,7 @@ const resilienceLines = (insight: FinancialStatementInsight): readonly string[] 
   }
   const mismatch = (insight.integrity ?? []).find((check) => check.status === "MISMATCH");
   if (mismatch) {
-    lines.push(`کنترل حسابداری: «${faIntegrity(mismatch.id)}» با اقلام استخراجشده منطبق نیست (اختلاف ${formatFaAmount(Math.abs(mismatch.difference ?? 0), currency)})؛ تا رفع آن، پایداری ارقام قابل اتکا نیست.`);
+    lines.push(`کنترل حسابداری: «${faIntegrity(mismatch.id)}» با اقلام استخراجشده منطبق نیست (اختلاف ${formatFaAmountScaled(Math.abs(mismatch.difference ?? 0), currency, insight.unitMultiplier)})؛ تا رفع آن، پایداری ارقام قابل اتکا نیست.`);
   }
   const untestable = (insight.integrity ?? []).filter((check) => check.status === "NOT_TESTABLE");
   if (untestable.length > 0) {
@@ -1559,7 +1590,7 @@ export function composeAnswer(insight: FinancialStatementInsight, question: stri
 
   // Limitations are appended once for the whole answer, by the outermost
   // composition, so a composite question does not repeat them per part.
-  if (!answeredIntents.has("RESILIENCE") && !answeredIntents.has("ACTION")) {
+  if (!answeredIntents.has("RESILIENCE") && !answeredIntents.has("ACTION") && !answeredIntents.has("PROFIT_CHANGE")) {
     sections.push({ heading: "محدودیتها", lines: limitations.length ? limitations : ["محدودیت ثبتشدهای برای این تحلیل وجود ندارد."] });
   } else {
     sections.push({ heading: "محدودیتها", lines: limitations.length ? limitations : [`این تحلیل فقط بر شواهد همین سند (${currency}) استوار است.`] });
