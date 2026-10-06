@@ -175,4 +175,123 @@ describe("RatioAnalysisService", () => {
         expect(netIncome?.pctChange).toBeCloseTo(0.5, 6);
         expect(netIncome?.signReversal).toBe(false);
     });
+
+    // F6: ROA/ROE average-balance methodology
+    test("profitability uses average balances when prior statement is provided for ROA and ROE", () => {
+        // Average-balance case for ROA
+        const current = { totalAssets: 300, netIncome: 40 };
+        const prior = { totalAssets: 100 };
+        const result = service.profitability(current, prior);
+        expect(result.status).toBe("READY");
+        expect(result.methodology).toBe("AVERAGE_BALANCE");
+        // Average assets = (300 + 100) / 2 = 200
+        // ROA = 40 / 200 = 0.2
+        expect(result.roa).toBeCloseTo(0.2, 6);
+        // ROE should be null because equity not provided
+        expect(result.roe).toBeNull();
+    });
+
+    test("profitability uses average balances for ROE when prior statement equity is provided", () => {
+        // Average-equity case for ROE
+        const current = { netIncome: 30, equity: 180 };
+        const prior = { equity: 120 };
+        const result = service.profitability(current, prior);
+        expect(result.status).toBe("READY");
+        expect(result.methodology).toBe("AVERAGE_BALANCE");
+        // Average equity = (180 + 120) / 2 = 150
+        // ROE = 30 / 150 = 0.2
+        expect(result.roe).toBeCloseTo(0.2, 6);
+        // ROA should be null because totalAssets not provided
+        expect(result.roa).toBeNull();
+    });
+
+    test("profitability DuPont reconciliation with average balances", () => {
+        // Set up a scenario where we can compute DuPont ROE and compare to direct ROE
+        const statement = {
+            netIncome: 100,
+            revenue: 1000, // netMargin = 0.1
+            totalAssets: 500, // ending assets
+            equity: 200, // ending equity
+        };
+        const priorStatement = {
+            totalAssets: 300, // prior assets
+            equity: 100, // prior equity
+        };
+        // With prior statement, average assets = (500 + 300) / 2 = 400
+        // Average equity = (200 + 100) / 2 = 150
+        // Expected direct ROE = netIncome / averageEquity = 100 / 150 = 0.6666...
+        const directResult = service.profitability(statement, priorStatement);
+        expect(directResult.methodology).toBe("AVERAGE_BALANCE");
+        expect(directResult.roe).toBeCloseTo(100 / 150, 6);
+
+        // DuPont calculation
+        // netMargin = netIncome / revenue = 100 / 1000 = 0.1
+        // assetTurnover = revenue / averageAssets = 1000 / 400 = 2.5
+        // equityMultiplier = averageAssets / averageEquity = 400 / 150 = 2.6666...
+        // DuPont ROE = 0.1 * 2.5 * (400/150) = 0.1 * 2.5 * 2.6666... = 0.6666...
+        const dupontResult = service.duPont(statement, priorStatement);
+        expect(dupontResult.methodology).toBe("AVERAGE_BALANCE");
+        expect(dupontResult.roe).toBeCloseTo(100 / 150, 6);
+        // They should be equal within tolerance
+        expect(dupontResult.roe).toBeCloseTo(directResult.roe, 10);
+    });
+
+    test("profitability uses average for ROA when prior assets exist, ending for ROE when prior equity missing", () => {
+        // Provide prior statement with totalAssets but missing equity -> ROA uses average, ROE uses ending
+        const statement = { totalAssets: 300, netIncome: 60, equity: 200 };
+        const priorStatement = { totalAssets: 100 }; // missing equity
+        const result = service.profitability(statement, priorStatement);
+        expect(result.status).toBe("READY");
+        // Methodology is ENDING_BALANCE_FALLBACK because not all ratios use average (ROE doesn't)
+        expect(result.methodology).toBe("ENDING_BALANCE_FALLBACK");
+        // ROA uses average totalAssets: (300 + 100) / 2 = 200 -> 60 / 200 = 0.3
+        expect(result.roa).toBeCloseTo(60 / 200, 6);
+        // ROE uses ending equity: 60 / 200 = 0.3
+        expect(result.roe).toBeCloseTo(60 / 200, 6);
+    });
+
+    test("profitability preserves ending-balance behavior when no prior statement provided", () => {
+        // No prior statement -> should behave as before (ending balances)
+        const statement = { totalAssets: 300, netIncome: 60, equity: 200 };
+        const result = service.profitability(statement);
+        expect(result.status).toBe("READY");
+        expect(result.methodology).toBe("ENDING_BALANCE_FALLBACK");
+        expect(result.roa).toBeCloseTo(60 / 300, 6);
+        expect(result.roe).toBeCloseTo(60 / 200, 6);
+    });
+
+    test("real benchmark from 123.xlsx uses average balances when prior statement provided", () => {
+        // Using the numbers from the mission description:
+        // Ending Assets = 32,244,256 million Rial
+        // Beginning Assets = 14,709,294 million Rial
+        // Average Assets = 23,476,775 million Rial
+        // Ending Equity = 14,836,839 million Rial
+        // Beginning Equity = 8,749,389 million Rial
+        // Average Equity = 11,793,114 million Rial
+        // Net Profit = 7,250,000 million Rial
+        // Expected ROA ≈ 0.308816, ROE ≈ 0.614766
+        const statement = {
+            totalAssets: 32244256,
+            netIncome: 7250000,
+            equity: 14836839,
+        };
+        const priorStatement = {
+            totalAssets: 14709294,
+            equity: 8749389,
+        };
+        const result = service.profitability(statement, priorStatement);
+        expect(result.status).toBe("READY");
+        expect(result.methodology).toBe("AVERAGE_BALANCE");
+        // ROA = 7250000 / ((32244256 + 14709294)/2) = 7250000 / 23476775
+        const expectedRoa = 7250000 / 23476775;
+        expect(result.roa).toBeCloseTo(expectedRoa, 6);
+        // ROE = 7250000 / ((14836839 + 8749389)/2) = 7250000 / 11793114
+        const expectedRoe = 7250000 / 11793114;
+        expect(result.roe).toBeCloseTo(expectedRoe, 6);
+        // Also verify that the previous ending-balance figures are no longer used
+        const endingRoa = 7250000 / 32244256; // ≈ 0.2248
+        const endingRoe = 7250000 / 14836839; // ≈ 0.4886
+        expect(result.roa).not.toBeCloseTo(endingRoa, 6);
+        expect(result.roe).not.toBeCloseTo(endingRoe, 6);
+    });
 });

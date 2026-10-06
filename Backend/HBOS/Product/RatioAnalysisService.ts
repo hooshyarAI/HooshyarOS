@@ -1,4 +1,4 @@
-ï»¿/**
+/**
  * Phase 09-1.13: Financial Statement Ratio Analysis (product service).
  *
  * Computes horizontal (period-over-period change) and vertical (% of base
@@ -16,7 +16,7 @@
  * magnitude whose negative value is corruption and fails closed. A ratio whose
  * derived result is undefined for a semantic reason (non-positive equity for
  * debt/equity or ROE, non-positive current liabilities for the current ratio)
- * is reported in `notApplicable` â€” never silently dropped and never computed
+ * is reported in `notApplicable` — never silently dropped and never computed
  * with a misleading denominator. Percentage change is `null` when the prior
  * value is zero or when the sign reverses, and the absolute change is always
  * preserved.
@@ -126,6 +126,8 @@ export interface ProfitabilityResult {
     unavailable: string[];
     /** Ratios whose evidence exists but the ratio is financially undefined (with reason). */
     notApplicable: string[];
+    /** Methodological basis for ROA and ROE: "AVERAGE_BALANCE" when prior-period evidence exists, otherwise "ENDING_BALANCE_FALLBACK". */
+    methodology: "AVERAGE_BALANCE" | "ENDING_BALANCE_FALLBACK";
 }
 
 export interface LeverageResult {
@@ -168,11 +170,13 @@ export interface DuPontResult {
     netMargin: number | null;
     assetTurnover: number | null;
     equityMultiplier: number | null;
-    /** netMargin Ã— assetTurnover Ã— equityMultiplier, only when all three exist. */
+    /** netMargin × assetTurnover × equityMultiplier, only when all three exist. */
     roe: number | null;
     status: "READY" | "BLOCKED";
     unavailable: string[];
     notApplicable: string[];
+    /** Methodological basis for the DuPont calculation: "AVERAGE_BALANCE" when prior-period evidence exists, otherwise "ENDING_BALANCE_FALLBACK". */
+    methodology: "AVERAGE_BALANCE" | "ENDING_BALANCE_FALLBACK";
 }
 
 export class RatioAnalysisService {
@@ -264,37 +268,74 @@ export class RatioAnalysisService {
         return { entries, status: entries.length > 0 ? "READY" : "BLOCKED", unavailable };
     }
 
-    profitability(statement: Partial<RatioStatement>): ProfitabilityResult {
-        const unavailableAll = ["grossMargin", "operatingMargin", "netMargin", "roa", "roe"];
-        if (this.hasInvalidProvidedField(statement)) {
-            return { grossMargin: null, operatingMargin: null, netMargin: null, roa: null, roe: null, status: "BLOCKED", unavailable: unavailableAll, notApplicable: [] };
-        }
-        const revenue = this.value(statement, "revenue");
-        const grossProfit = this.value(statement, "grossProfit");
-        const operatingIncome = this.value(statement, "operatingIncome");
-        const netIncome = this.value(statement, "netIncome");
-        const totalAssets = this.value(statement, "totalAssets");
-        const rawEquity = (statement as Record<string, unknown>).equity;
-        const equity = typeof rawEquity === "number" && Number.isFinite(rawEquity) ? rawEquity : null;
+      profitability(statement: Partial<RatioStatement>, priorStatement?: Partial<RatioStatement>): ProfitabilityResult {
+          const unavailableAll = ["grossMargin", "operatingMargin", "netMargin", "roa", "roe"];
+          if (this.hasInvalidProvidedField(statement)) {
+              return { grossMargin: null, operatingMargin: null, netMargin: null, roa: null, roe: null, status: "BLOCKED", unavailable: unavailableAll, notApplicable: [], methodology: "ENDING_BALANCE_FALLBACK" };
+          }
+          const revenue = this.value(statement, "revenue");
+          const grossProfit = this.value(statement, "grossProfit");
+          const operatingIncome = this.value(statement, "operatingIncome");
+          const netIncome = this.value(statement, "netIncome");
+          const totalAssets = this.value(statement, "totalAssets");
+          const rawEquity = (statement as Record<string, unknown>).equity;
+          const equity = typeof rawEquity === "number" && Number.isFinite(rawEquity) ? rawEquity : null;
 
-        // Losses legitimately produce negative margins/returns; a non-positive
-        // equity makes ROE undefined rather than a misleading signed quotient.
-        const grossMargin = this.ratio(grossProfit, revenue);
-        const operatingMargin = this.ratio(operatingIncome, revenue);
-        const netMargin = this.ratio(netIncome, revenue);
-        const roa = this.ratio(netIncome, totalAssets);
-        const roe = equity !== null && equity > 0 ? this.ratio(netIncome, equity) : null;
-        const computed = { grossMargin, operatingMargin, netMargin, roa, roe };
-        const notApplicable = roe === null && equity !== null && equity <= 0 && netIncome !== null
-            ? ["roe:equity-non-positive"]
-            : [];
-        const notApplicableKeys = new Set(notApplicable.map((reason) => reason.split(":")[0]));
-        const unavailable = unavailableAll.filter(
-            (key) => computed[key as keyof typeof computed] === null && !notApplicableKeys.has(key),
-        );
-        const status = Object.values(computed).some((value) => value !== null) ? "READY" : "BLOCKED";
-        return { ...computed, status, unavailable, notApplicable };
-    }
+          // Determine if we can use average balances for assets and equity
+          let useAverageAssets = false;
+          let useAverageEquity = false;
+          let avgAssets: number | null = null;
+          let avgEquity: number | null = null;
+          if (priorStatement) {
+              if (this.hasInvalidProvidedField(priorStatement) === false) {
+                  const priorTotalAssets = this.value(priorStatement, "totalAssets");
+                  const currentTotalAssets = this.value(statement, "totalAssets");
+                  if (priorTotalAssets !== null && currentTotalAssets !== null) {
+                      useAverageAssets = true;
+                      avgAssets = (priorTotalAssets + currentTotalAssets) / 2;
+                  }
+                  const priorEquity = this.value(priorStatement, "equity");
+                  const currentEquity = this.value(statement, "equity");
+                  if (priorEquity !== null && currentEquity !== null) {
+                      useAverageEquity = true;
+                      avgEquity = (priorEquity + currentEquity) / 2;
+                  }
+              }
+          }
+
+          const assetsForRoa = useAverageAssets ? avgAssets : this.value(statement, "totalAssets");
+          const equityForRoe = useAverageEquity ? avgEquity : this.value(statement, "equity");
+
+          // Losses legitimately produce negative margins/returns; a non-positive
+          // equity makes ROE undefined rather than a misleading signed quotient.
+          const grossMargin = this.ratio(grossProfit, revenue);
+          const operatingMargin = this.ratio(operatingIncome, revenue);
+          const netMargin = this.ratio(netIncome, revenue);
+          const roa = this.ratio(netIncome, assetsForRoa);
+          const roe = equityForRoe !== null && equityForRoe > 0 ? this.ratio(netIncome, equityForRoe) : null;
+          const computed = { grossMargin, operatingMargin, netMargin, roa, roe };
+          const notApplicable = roe === null && equityForRoe !== null && equityForRoe <= 0 && netIncome !== null
+              ? ["roe:equity-non-positive"]
+              : [];
+          const notApplicableKeys = new Set(notApplicable.map((reason) => reason.split(":")[0]));
+          const unavailable = unavailableAll.filter(
+              (key) => computed[key as keyof typeof computed] === null && !notApplicableKeys.has(key),
+          );
+          const status = Object.values(computed).some((value) => value !== null) ? "READY" : "BLOCKED";
+          let allComputedRatiosUseAverage = true;
+          if (roa !== null) {
+              if (!useAverageAssets) {
+                  allComputedRatiosUseAverage = false;
+              }
+          }
+          if (roe !== null) {
+              if (!useAverageEquity) {
+                  allComputedRatiosUseAverage = false;
+              }
+          }
+          const methodology = allComputedRatiosUseAverage ? "AVERAGE_BALANCE" : "ENDING_BALANCE_FALLBACK";
+          return { ...computed, status, unavailable, notApplicable, methodology };
+      }
 
     leverage(statement: Partial<RatioStatement>): LeverageResult {
         const unavailableAll = ["debtToEquity", "debtToAssets", "equityRatio"];
@@ -393,36 +434,62 @@ export class RatioAnalysisService {
         return { interestCoverage, status, unavailable: interestCoverage === null && notApplicable.length === 0 ? ["interestCoverage"] : [], notApplicable };
     }
 
-    /**
-     * DuPont decomposition: ROE = net margin Ã— asset turnover Ã— equity multiplier.
-     * ROE is only reported when all three factors are defined and equity is positive.
-     */
-    duPont(statement: Partial<RatioStatement>): DuPontResult {
-        const unavailableAll = ["netMargin", "assetTurnover", "equityMultiplier", "roe"];
-        if (this.hasInvalidProvidedField(statement)) {
-            return { netMargin: null, assetTurnover: null, equityMultiplier: null, roe: null, status: "BLOCKED", unavailable: unavailableAll, notApplicable: [] };
-        }
-        const netIncome = this.value(statement, "netIncome");
-        const revenue = this.value(statement, "revenue");
-        const totalAssets = this.value(statement, "totalAssets");
-        const rawEquity = (statement as Record<string, unknown>).equity;
-        const equity = typeof rawEquity === "number" && Number.isFinite(rawEquity) ? rawEquity : null;
+      /**
+       * DuPont decomposition: ROE = net margin × asset turnover × equity multiplier.
+       * ROE is only reported when all three factors are defined and equity is positive.
+       */
+      duPont(statement: Partial<RatioStatement>, priorStatement?: Partial<RatioStatement>): DuPontResult {
+          const unavailableAll = ["netMargin", "assetTurnover", "equityMultiplier", "roe"];
+          if (this.hasInvalidProvidedField(statement)) {
+              return { netMargin: null, assetTurnover: null, equityMultiplier: null, roe: null, status: "BLOCKED", unavailable: unavailableAll, notApplicable: [], methodology: "ENDING_BALANCE_FALLBACK" };
+          }
+          const netIncome = this.value(statement, "netIncome");
+          const revenue = this.value(statement, "revenue");
+          const totalAssets = this.value(statement, "totalAssets");
+          const rawEquity = (statement as Record<string, unknown>).equity;
+          const equity = typeof rawEquity === "number" && Number.isFinite(rawEquity) ? rawEquity : null;
 
-        const netMargin = this.ratio(netIncome, revenue);
-        const assetTurnover = this.ratio(revenue, totalAssets);
-        const equityMultiplier = equity !== null && equity > 0 ? this.ratio(totalAssets, equity) : null;
-        const roe = netMargin !== null && assetTurnover !== null && equityMultiplier !== null
-            ? netMargin * assetTurnover * equityMultiplier
-            : null;
-        const computed = { netMargin, assetTurnover, equityMultiplier, roe };
-        const notApplicable = equityMultiplier === null && equity !== null && equity <= 0
-            ? ["equityMultiplier:equity-non-positive", "roe:equity-non-positive"]
-            : [];
-        const notApplicableKeys = new Set(notApplicable.map((reason) => reason.split(":")[0]));
-        const unavailable = unavailableAll.filter(
-            (key) => computed[key as keyof typeof computed] === null && !notApplicableKeys.has(key),
-        );
-        const status = Object.values(computed).some((value) => value !== null) ? "READY" : "BLOCKED";
-        return { ...computed, status, unavailable, notApplicable };
-    }
+          // Determine if we can use average balances for assets and equity
+          let useAverageAssets = false;
+          let useAverageEquity = false;
+          let avgAssets: number | null = null;
+          let avgEquity: number | null = null;
+          if (priorStatement) {
+              if (this.hasInvalidProvidedField(priorStatement) === false) {
+                  const priorTotalAssets = this.value(priorStatement, "totalAssets");
+                  const currentTotalAssets = this.value(statement, "totalAssets");
+                  if (priorTotalAssets !== null && currentTotalAssets !== null) {
+                      useAverageAssets = true;
+                      avgAssets = (priorTotalAssets + currentTotalAssets) / 2;
+                  }
+                  const priorEquity = this.value(priorStatement, "equity");
+                  const currentEquity = this.value(statement, "equity");
+                  if (priorEquity !== null && currentEquity !== null) {
+                      useAverageEquity = true;
+                      avgEquity = (priorEquity + currentEquity) / 2;
+                  }
+              }
+          }
+
+          const assetsForTurnover = useAverageAssets ? avgAssets : this.value(statement, "totalAssets");
+          const equityForMultiplier = useAverageEquity ? avgEquity : this.value(statement, "equity");
+
+          const netMargin = this.ratio(netIncome, revenue);
+          const assetTurnover = this.ratio(revenue, assetsForTurnover);
+          const equityMultiplier = equityForMultiplier !== null && equityForMultiplier > 0 ? this.ratio(assetsForTurnover, equityForMultiplier) : null;
+          const roe = netMargin !== null && assetTurnover !== null && equityMultiplier !== null
+              ? netMargin * assetTurnover * equityMultiplier
+              : null;
+          const computed = { netMargin, assetTurnover, equityMultiplier, roe };
+          const notApplicable = equityMultiplier === null && equityForMultiplier !== null && equityForMultiplier <= 0
+              ? ["equityMultiplier:equity-non-positive", "roe:equity-non-positive"]
+              : [];
+          const notApplicableKeys = new Set(notApplicable.map((reason) => reason.split(":")[0]));
+          const unavailable = unavailableAll.filter(
+              (key) => computed[key as keyof typeof computed] === null && !notApplicableKeys.has(key),
+          );
+          const status = Object.values(computed).some((value) => value !== null) ? "READY" : "BLOCKED";
+          const methodology = (useAverageAssets && useAverageEquity) ? "AVERAGE_BALANCE" : "ENDING_BALANCE_FALLBACK";
+          return { ...computed, status, unavailable, notApplicable, methodology };
+      }
 }
