@@ -9,6 +9,8 @@ on:
         description: "Optional reason for a manual worker run"
         required: false
         type: string
+  issue_comment:
+    types: [created]
 
 concurrency:
   group: hooshyaros-opencode-continuous-worker
@@ -20,6 +22,7 @@ permissions:
 
 jobs:
   continuous-worker:
+    if: ${{ github.event_name != 'issue_comment' || (github.event.issue.pull_request == null && github.event.issue.title == 'HooshyarOS Continuous Worker Control' && contains(github.event.comment.body, '/opencode-run')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
