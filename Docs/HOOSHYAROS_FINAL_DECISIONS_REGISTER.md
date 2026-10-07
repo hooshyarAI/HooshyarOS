@@ -205,7 +205,7 @@ Never:
 - redesign the frozen architecture merely because implementation is difficult;
 - invent duplicate engines;
 - change the Assistant into an end-user advisor;
-- introduce external coding providers into the construction process;
+- introduce unapproved external coding providers into the construction process;
 - declare completion from file existence;
 - skip validation or integration evidence;
 - weaken security, governance, explainability or resilience;
@@ -245,8 +245,8 @@ The repository currently encodes the following invariants:
 - Python is the canonical construction worker/orchestration layer.
 - GitHub is the canonical repository and publication tool.
 - The Assistant is the architecture/reasoning/orchestration authority.
-- Approved local execution operators (for example Kilo Code) are subordinate, replaceable execution mechanisms; they are not external coding providers, additional construction authorities or product runtime dependencies.
-- External coding assistants and providers are excluded from the construction path.
+- Approved execution operators (Kilo Code locally and OpenCode remotely) are subordinate, replaceable execution mechanisms; they are not construction authorities or product runtime dependencies.
+- Unapproved external coding assistants and providers are excluded from the construction path.
 - Completion is evidence-based.
 - Platform continuation is separate from the Assistant completion gate.
 - Platform selection is based on genuinely missing capabilities and satisfied dependencies.
