@@ -1,0 +1,176 @@
+name: HooshyarOS Continuous OpenCode Worker
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Optional reason for a manual worker run"
+        required: false
+        type: string
+
+concurrency:
+  group: hooshyaros-opencode-continuous-worker
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  continuous-worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TARGET_BRANCH: fix/autonomous-product-factory
+      MODEL: opencode/big-pickle
+      OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout current target branch
+        uses: actions/checkout@v6
+        with:
+          ref: fix/autonomous-product-factory
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Guard credentials and repository state
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${OPENCODE_API_KEY}" || { echo "BLOCKED_FREE_MODEL_UNAVAILABLE: OPENCODE_API_KEY is not configured"; exit 20; }
+          git fetch origin "${TARGET_BRANCH}"
+          START_SHA="$(git rev-parse "origin/${TARGET_BRANCH}")"
+          git checkout -B "opencode/continuous-${GITHUB_RUN_ID}" "${START_SHA}"
+          printf 'START_SHA=%s\n' "${START_SHA}" >> "${GITHUB_ENV}"
+          printf 'WORKER_BRANCH=opencode/continuous-%s\n' "${GITHUB_RUN_ID}" >> "${GITHUB_ENV}"
+          git status --short
+
+      - name: Install OpenCode
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://opencode.ai/install | bash
+          echo "$HOME/.opencode/bin" >> "${GITHUB_PATH}"
+          opencode --version
+
+      - name: Install repository dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts
+
+      - name: Run one governed autonomous knot
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > .opencode-continuous-prompt.md <<'PROMPT'
+          You are OpenCode, the governed remote execution operator for HooshyarOS.
+
+          Before doing anything else, read these repository authorities in this order:
+          1. Docs/HOOSHYAROS_MASTER_CHARTER.md
+          2. Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md
+          3. Docs/ARCHITECTURE.md
+          4. Assistant/SYSTEM_PROMPT.md
+          5. Docs/OPENCODE_EXECUTION_OPERATOR_CONTRACT.md
+          6. Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md
+          7. AGENTS.md
+          Then inspect current Git history, current HEAD, trusted checkpoints, relevant .kilo/evidence, .kilo/plans, Docs/Product/PRODUCT_CONSTRUCTION_ROADMAP.json, and the canonical commercialization queue/ledger.
+
+          IMPORTANT CURRENT-STATE RULE:
+          Repository state is authoritative. Historical checkpoints are evidence seeds only. Do not restart already verified F1/F6/CCC/UX work unless current evidence proves regression or invalidation. Reconcile stale or contradictory evidence before selecting new work.
+
+          EXECUTION CONTRACT:
+          - Work only on the current worker branch.
+          - Exactly ONE primary knot per run.
+          - Select the next genuinely missing knot from the canonical repository backlog after the audit.
+          - Do not invent a parallel backlog or reorder the canonical backlog merely for convenience.
+          - Preserve Architecture Freeze V4/V4.1 and all five canonical intelligence engines.
+          - Reuse existing owners/providers before native implementation.
+          - Keep change scope minimal and bounded.
+          - Do not modify governance/architecture-control files, .github workflow files, package manifests/lockfiles, secrets, deployment configuration, or other control-plane files. If such a change is truly required, enter BLOCKED with evidence.
+          - Do not force-push, reset hard, clean unrelated work, or delete history.
+          - Do not push the branch yourself; the outer workflow owns publication.
+          - Do not create a PR yourself; the outer workflow owns promotion.
+          - Do not weaken, delete, skip, or rewrite tests merely to make them pass.
+          - Run proportional focused verification for the knot, plus any integration verification required by its dependencies.
+          - Record directly-required evidence for the knot.
+          - Commit exactly ONE coherent verified change for the knot.
+          - After commit, stop. Do not start a second knot.
+          - Final response must clearly report: selected knot, owner engine, start SHA, changed paths, tests, verification, commit SHA, blockers, and next-state recommendation.
+
+          ALLOWED UNATTENDED ACTIONS:
+          repository audit, evidence reconciliation, routine implementation, standardization, bounded repair, focused tests, evidence creation, one commit.
+
+          HARD BLOCK:
+          architecture/governance changes, security or tenant-isolation boundary changes, product-scope invention, billing/subscription policy invention, destructive migrations, external production activation, secret handling, force-push/history rewrite, test weakening, protected control-plane edits, or unresolved contract contradictions.
+
+          Return one of:
+          ADVANCED / RECONCILED / BLOCKED / NO_SAFE_WORK / BLOCKED_FREE_MODEL_UNAVAILABLE.
+          PROMPT
+
+          opencode run --auto --model "${MODEL}" "$(cat .opencode-continuous-prompt.md)" 2>&1 | tee opencode-worker.log
+
+      - name: Remove temporary prompt and validate worker diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .opencode-continuous-prompt.md
+          git status --short
+          test -z "$(git status --porcelain)" || true
+          git diff --check "origin/${TARGET_BRANCH}...HEAD"
+          COMMITS_AHEAD="$(git rev-list --count "origin/${TARGET_BRANCH}..HEAD")"
+          echo "COMMITS_AHEAD=${COMMITS_AHEAD}"
+          test "${COMMITS_AHEAD}" -eq 1
+
+      - name: Apply change-scope firewall
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-only "origin/${TARGET_BRANCH}...HEAD" > changed-paths.txt
+          echo "Changed paths:"
+          cat changed-paths.txt
+
+          if grep -Eq '^(AGENTS\.md|AUTONOMOUS_MISSION\.md|Docs/ARCHITECTURE\.md|Docs/HOOSHYAROS_MASTER_CHARTER\.md|Docs/HOOSHYAROS_GOVERNANCE_CHARTER\.md|Docs/HOOSHYAROS_TOOLCHAIN_OPTIMIZATION_LAW\.md|Docs/HOOSHYAROS_FINAL_DECISIONS_REGISTER\.md|Assistant/SYSTEM_PROMPT\.md|Docs/ARCHITECTURE_DECISIONS/|\.github/|package\.json$|package-lock\.json$|npm-shrinkwrap\.json$|\.env|.*\.pem$|.*\.key$|.*\.p12$)' changed-paths.txt; then
+            echo "BLOCKED: protected/control-plane path changed"
+            exit 21
+          fi
+
+      - name: Reconcile target and fast-forward promote
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "${TARGET_BRANCH}"
+          CURRENT_TARGET_SHA="$(git rev-parse "origin/${TARGET_BRANCH}")"
+          echo "START_SHA=${START_SHA}"
+          echo "CURRENT_TARGET_SHA=${CURRENT_TARGET_SHA}"
+          test "${CURRENT_TARGET_SHA}" = "${START_SHA}" || {
+            echo "BLOCKED: target branch changed during worker run"
+            exit 22
+          }
+
+          WORKER_SHA="$(git rev-parse HEAD)"
+          test "${WORKER_SHA}" != "${START_SHA}" || {
+            echo "NO_SAFE_WORK: worker made no committed change"
+            exit 0
+          }
+
+          git merge-base --is-ancestor "${START_SHA}" "${WORKER_SHA}"
+          git push origin "${WORKER_SHA}:refs/heads/${TARGET_BRANCH}"
+          echo "ADVANCED: promoted ${WORKER_SHA} to ${TARGET_BRANCH}"
+
+      - name: Final evidence summary
+        if: always()
+        shell: bash
+        run: |
+          echo "RUN_ID=${GITHUB_RUN_ID}"
+          echo "TARGET_BRANCH=${TARGET_BRANCH}"
+          echo "MODEL=${MODEL}"
+          echo "START_SHA=${START_SHA:-unknown}"
+          echo "WORKER_BRANCH=${WORKER_BRANCH:-unknown}"
+          if test -f opencode-worker.log; then
+            echo "OpenCode final lines:"
+            tail -80 opencode-worker.log || true
+          fi
