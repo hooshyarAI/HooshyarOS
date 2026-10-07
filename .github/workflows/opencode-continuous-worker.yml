@@ -60,7 +60,7 @@ jobs:
           set -euo pipefail
           curl -fsSL https://opencode.ai/install | bash
           echo "$HOME/.opencode/bin" >> "${GITHUB_PATH}"
-          opencode --version
+          "$HOME/.opencode/bin/opencode" --version
 
       - name: Install repository dependencies
         shell: bash
