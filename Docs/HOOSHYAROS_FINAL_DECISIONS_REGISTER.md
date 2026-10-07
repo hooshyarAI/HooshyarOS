@@ -120,11 +120,11 @@ The HooshyarOS construction process is permanently restricted to three active pa
 2. **GitHub** — repository inspection, source control, commit, synchronization, review and publication.
 3. **This Assistant** — architecture reasoning, critical thinking, expert choice, implementation judgment and construction orchestration.
 
-These three are the only construction **authorities**. Approved local execution **operators** (for example **Kilo Code**) may act as subordinate, replaceable mechanisms under them and remain subject to every construction rule; they are not external coding providers, additional participants or architectural authorities. See `Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md` §5 and §10 and `Docs/KILO_EXECUTION_OPERATOR_CONTRACT.md`.
+These three are the only construction **authorities**. Approved execution **operators** may act as subordinate, replaceable mechanisms under them and remain subject to every construction rule; they are not additional authorities, product providers or architecture owners.
 
-External coding assistants, cloud coding agents and alternative code-generation providers are prohibited from the construction process. They must not be invoked, installed, configured or depended upon for autonomous construction. Approved repository-governed local execution operators are not external coding providers under this restriction.
+The approved operator set includes **Kilo Code** (local) and **OpenCode** (remote/CI), with the latter governed by `Docs/OPENCODE_EXECUTION_OPERATOR_CONTRACT.md`.
 
-This includes Codex, GitHub Copilot, Claude and equivalent coding agents.
+Unapproved external coding assistants, cloud coding agents and alternative code-generation providers remain prohibited. OpenCode is an explicit repository-specific operator approval, not a general approval of external coding agents.
 
 This restriction applies to the **construction process**, not to unrelated provider-facing runtime abstractions that may exist in the finished product architecture. Such product abstractions must not become hidden dependencies of the autonomous construction fabric.
 
@@ -265,7 +265,9 @@ Before changing code:
 - [ ] Dependencies checked
 - [ ] Reuse opportunities checked
 - [ ] Python/GitHub construction path confirmed
-- [ ] No prohibited external coding agent selected
+- [ ] Approved operator contract identified (Kilo or OpenCode)
+- [ ] Free-only model policy satisfied
+- [ ] No unapproved external coding agent selected
 - [ ] Security/governance/observability implications checked
 
 Before finalization:
