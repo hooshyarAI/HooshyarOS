@@ -306,9 +306,9 @@ The human supplies product intent, approved decisions and governance. The constr
 
 Repository-native tooling is preferred. **Python is the preferred implementation/orchestration worker for autonomous construction, analysis, generation, verification and repair where appropriate**, because it provides a reproducible local execution layer.
 
-The autonomous construction path must remain provider-independent. Codex, GitHub Copilot, Claude or another external coding provider must not become hidden architectural dependencies or mandatory runtime components.
+The autonomous construction path must remain provider-independent. Codex, GitHub Copilot, Claude and other unapproved external coding providers must not become hidden architectural dependencies or mandatory runtime components.
 
-Kilo Code is permitted as an execution/operator layer only and does not alter this provider-independence rule.
+Kilo Code and OpenCode are permitted only as governed execution/operator layers and do not alter this provider-independence rule.
 
 All construction flows must use the stage-bounded atomic construction rules in Section 5. A routine task should be decomposed and completed one bounded stage at a time, with local recovery and checkpointing after each verified stage.
 
@@ -485,13 +485,15 @@ For the autonomous Assistant itself, DONE additionally means the verified comple
 
 **KILO CODE: APPROVED LOCAL EXECUTION / OPERATOR LAYER**
 
+**OPENCODE: APPROVED REMOTE/CI EXECUTION / OPERATOR LAYER**
+
 **STAGE-BOUNDED ATOMIC CONSTRUCTION: REQUIRED**
 
 **LOCAL STAGE RECOVERY: REQUIRED**
 
 **TRUSTED CHECKPOINTING: REQUIRED**
 
-**EXTERNAL CODING PROVIDERS: NON-MANDATORY AND MUST NOT BECOME ARCHITECTURAL DEPENDENCIES**
+**UNAPPROVED EXTERNAL CODING PROVIDERS: PROHIBITED; APPROVED OPERATORS REMAIN NON-MANDATORY AND MUST NOT BECOME ARCHITECTURAL DEPENDENCIES**
 
 ---
 
