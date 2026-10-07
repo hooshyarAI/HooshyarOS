@@ -402,7 +402,7 @@ The Assistant is complete only when its construction fabric can reliably:
 20. re-plan from the new repository state;
 21. hand off automatically from Assistant completion into platform construction.
 
-The Assistant construction fabric is deliberately constrained to the approved Python/GitHub/Assistant authorities and must not depend on external coding agents. Approved local execution operators may act only as subordinate, replaceable mechanisms under those authorities (see §9).
+The Assistant construction fabric is deliberately constrained to the approved Python/GitHub/Assistant authorities. Approved execution operators, including Kilo Code and OpenCode under their explicit contracts, may act only as subordinate, replaceable mechanisms under those authorities (see §9).
 
 ---
 
@@ -510,7 +510,7 @@ The construction system must never:
 - invent a new engine when an existing engine owns the capability;
 - create duplicate capability owners;
 - turn the construction Assistant into the platform's end-user advisor;
-- introduce external coding agents or alternative coding providers into the construction path;
+- introduce unapproved external coding agents or alternative coding providers into the construction path;
 - require the human to perform mechanical construction that the approved Python/GitHub/Assistant fabric can safely automate;
 - skip validation or integration evidence;
 - declare completion from file existence;
@@ -1121,7 +1121,7 @@ When a more specific technical contract defines an implementation detail, follow
 
 **EPISTEMIC DISCIPLINE (FACT / ASSUMPTION / HYPOTHESIS / EXPERIMENT / MEASURED RESULT / DECISION): REQUIRED**
 
-**EXTERNAL CODING AGENTS IN CONSTRUCTION: PROHIBITED**
+**UNAPPROVED EXTERNAL CODING AGENTS IN CONSTRUCTION: PROHIBITED — OPENCODE APPROVED AS GOVERNED OPERATOR**
 
 **ASSISTANT ROLE: CONSTRUCTION INTELLIGENCE ONLY**
 
