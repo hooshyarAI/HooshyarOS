@@ -1,6 +1,6 @@
 # HooshyarOS Development Constitution
 
-Version: 1.6
+Version: 1.7
 
 ---
 
@@ -240,14 +240,15 @@ The Assistant must use the platform's autonomous construction engine whenever th
 The HooshyarOS construction fabric is owned by HooshyarOS and uses replaceable execution operators. The active operator set may include:
 
 1. **Python** for repository-native analysis, generation, verification, repair and orchestration where appropriate.
-2. **Kilo Code** as an optional local execution/operator adapter for governed repository implementation, command execution, testing, repair, standardization, evidence and Git operations.
-3. **Cline or other approved adapters** only when explicitly approved by repository governance.
+2. **Kilo Code** as a governed local execution/operator adapter.
+3. **OpenCode** as a governed remote/CI execution/operator adapter under `Docs/OPENCODE_EXECUTION_OPERATOR_CONTRACT.md`.
+4. Other operators only when explicitly approved by repository governance.
 
 GitHub remains the repository/source-control/CI integration surface. The Assistant remains the architecture reasoning, governance-aware decision and construction orchestration authority.
 
 No operator has authority over Architecture Freeze V4, governance decisions, product semantics, engine ownership, completion rules or persistent construction memory.
 
-The construction fabric must never depend on a specific operator or external coding provider. Operator failure must be handled by bounded substitution to another approved operator or by an evidence-backed BLOCKED state.
+The construction fabric must never depend on a specific operator or external coding provider. Operator failure must be handled by bounded substitution to another approved operator or by an evidence-backed BLOCKED state. OpenCode may run unattended for routine repository work, but its contract keeps it subordinate to the Assistant/Python/GitHub authorities and prevents architecture or governance changes.
 
 The canonical execution order is one genuinely missing capability at a time, with implementation, verification evidence, checkpoint and repository state treated as one transaction. A continuation token is orchestration state, not a platform capability.
 

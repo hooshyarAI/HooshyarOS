@@ -17,9 +17,9 @@ The construction path has three **principal authorities/roles**:
 2. **GitHub/Git** — repository state, trusted checkpoints, synchronization, commits, review and publication.
 3. **This Assistant** — architecture reasoning, critical review, Expert Choice, architecture protection and construction orchestration.
 
-**Approved execution operators are subordinate execution mechanisms, not additional architectural authorities.** Kilo Code is an approved local VS Code execution/operator layer. It may inspect the repository, execute bounded commands, apply governed implementation/repair changes, run focused tests and produce evidence when the active stage contract authorizes those actions.
+**Approved execution operators are subordinate execution mechanisms, not additional architectural authorities.** Kilo Code is an approved local VS Code execution/operator layer and OpenCode is an approved remote/CI execution/operator layer. Both may inspect the repository, execute bounded commands, apply governed implementation/repair changes, run focused tests and produce evidence when the active stage/operator contract authorizes those actions.
 
-Kilo Code does not replace Python as the canonical construction worker, does not become a provider dependency, and does not acquire authority over architecture, product semantics, backlog ordering, completion rules or governance.
+Kilo Code and OpenCode do not replace Python as the canonical construction worker, do not become product-provider dependencies, and do not acquire authority over architecture, product semantics, backlog ordering, completion rules or governance.
 
 TypeScript/Node remains the implementation technology wherever the frozen platform architecture requires it; Python is the canonical construction worker and orchestration layer, not a second product architecture.
 
@@ -81,7 +81,7 @@ A failed knot must be repaired by the approved construction fabric from a truste
 
 An orchestration layer must never normalize a repair goal into the base capability before the repair worker executes.
 
-Kilo Code repair execution is stage-bounded: it receives the exact handoff, repairs only the authorized target, produces focused evidence, and returns control to the outer Python/GitHub/Assistant verification flow.
+Kilo Code and OpenCode repair execution is stage-bounded: each receives the exact handoff, repairs only the authorized target, produces focused evidence, and returns control to the outer Python/GitHub/Assistant verification flow.
 
 ## 9. Completion rule
 
