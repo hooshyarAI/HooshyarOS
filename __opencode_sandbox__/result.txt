@@ -1,0 +1,4 @@
+EXPERIMENT=OpenCode write capability
+MEASURED_RESULT=PASS
+WORKER=OpenCode
+SCOPE=__opencode_sandbox__/result.txt
