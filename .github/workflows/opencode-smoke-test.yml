@@ -28,5 +28,10 @@ jobs:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          model: opencode/gpt-5.5
+          model: opencode/big-pickle
+          prompt: |
+            EXPERIMENT ONLY — READ-ONLY.
+            Do not edit files, create branches, commit, push, or open PRs.
+            Read AGENTS.md and inspect the repository at a high level.
+            Report EXPERIMENT and MEASURED RESULT only.
           use_github_token: true
