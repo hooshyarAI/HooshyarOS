@@ -185,7 +185,7 @@ The platform must preferentially reuse existing:
 
 Creating a parallel Agent, duplicate Engine, duplicate business semantic, duplicate orchestration hierarchy or provider-specific construction path is prohibited unless an explicit architecture decision establishes a genuine missing capability or contradiction.
 
-The construction fabric must not depend on an external coding agent. Existing product provider integrations may exist only where approved by product architecture; they must never become dependencies of the construction fabric itself.
+The construction fabric must not make any coding operator an architectural dependency. Approved repository-governed operators may execute bounded work under their explicit contracts, but they remain replaceable, subordinate mechanisms and must never become owners of architecture, governance, product semantics or completion.
 
 ### 6.3 Global Knowledge and Open-Source Leverage Law — PERMANENT
 
@@ -429,17 +429,22 @@ TypeScript remains the canonical implementation language where the platform arch
 
 ### Mandatory construction toolchain
 
-Only these three participants are permitted in the HooshyarOS construction process:
+The construction process has three **authorities**:
 
 1. **Python** — autonomous worker, generator, analyzer, verifier, repair and orchestration layer.
 2. **GitHub** — repository, source control, synchronization, commits, review and publication.
 3. **This Assistant** — architecture reasoning, critical review, expert choice and construction orchestration.
 
-These three are the only construction **authorities**. Approved local execution **operators** may act as subordinate, replaceable mechanisms under them, but they are not additional participants, authorities or providers. In particular, **Kilo Code** is an approved local VS Code execution/operator layer — a repository-governed local mechanism, not an external coding provider and not an architectural authority. An approved operator may inspect the repository, execute authorized commands, apply governed implementation/repair changes, run focused tests and produce evidence only inside an explicit stage/handoff contract. See `Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md` §5 and §10, `Docs/KILO_EXECUTION_OPERATOR_CONTRACT.md` and `Docs/ARCHITECTURE_DECISIONS/KILO_GOVERNED_OPERATOR_DECISION.md`.
+Approved **execution operators** act beneath these authorities and are replaceable mechanisms rather than additional authorities. The approved set is:
 
-External coding assistants, cloud coding agents and alternative code-generation providers are prohibited from the construction path. They must not be invoked, installed, configured or depended upon for autonomous construction. Approved repository-governed local execution operators are not external coding providers under this prohibition.
+- **Kilo Code** — local VS Code execution/operator.
+- **OpenCode** — remote/CI execution/operator governed by `Docs/OPENCODE_EXECUTION_OPERATOR_CONTRACT.md`.
 
-This includes Codex, GitHub Copilot, Claude and equivalent coding agents.
+An operator may inspect the repository, execute authorized commands, apply governed implementation/repair changes, run focused tests, produce evidence and perform unattended routine work when its contract explicitly permits those actions.
+
+OpenCode has no authority over Architecture Freeze V4/V4.1, governance, product semantics, canonical engine ownership, backlog ordering, completion gates, security boundaries or persistent construction memory.
+
+Unapproved external coding assistants and code-generation providers remain prohibited. OpenCode is an explicit repository-specific operator approval, not a general approval of external coding agents.
 
 Provider-facing abstractions may exist inside the finished product where an approved runtime architecture requires them, but such providers must never become dependencies of the autonomous construction fabric.
 
