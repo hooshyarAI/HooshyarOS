@@ -1,6 +1,9 @@
 name: HooshyarOS Continuous OpenCode Worker
 
 on:
+  push:
+    paths:
+      - ".github/workflows/opencode-continuous-worker.yml"
   schedule:
     - cron: "*/30 * * * *"
   workflow_dispatch:
