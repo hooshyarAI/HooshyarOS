@@ -1,5 +1,5 @@
 const CACHE = 'hooshyar-shell-v5';
-const APP_SHELL = ['/', '/index.html', '/app.js', '/result-presentation.js', '/offline-sync.js', '/styles.css', '/manifest.webmanifest'];
+const APP_SHELL = ['/', '/index.html', '/app.js', '/result-presentation.js', '/offline-sync.js', '/result-charts.js', '/styles.css', '/manifest.webmanifest'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(APP_SHELL)));

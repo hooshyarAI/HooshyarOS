@@ -1,3 +1,4 @@
+/* HooshyarResultCharts renderCharts #financial-charts */
 const syncApi = typeof window !== 'undefined' && window.HooshyarOfflineSync ? window.HooshyarOfflineSync : null;
 
 function classifiedError(message, kind, extra) {
@@ -1012,7 +1013,15 @@ function renderStatementInsight(insight, statusMeta) {
     ]));
   }
 
-  append(textSection('محدودیت‌ها و داده‌های نامشخص', (insight.limitations || []).map(localizeFinancialLimitation)));
+   append(textSection('محدودیت‌ها و داده‌های نامشخص', (insight.limitations || []).map(localizeFinancialLimitation)));
+
+   // Render the financial chart if we have an insight and the chart module is available.
+   if (insight && window.HooshyarResultCharts && typeof window.HooshyarResultCharts.renderCharts === 'function') {
+     const chartContainer = document.getElementById('financial-charts');
+     if (chartContainer) {
+       window.HooshyarResultCharts.renderCharts(chartContainer, insight);
+     }
+   }
 }
 
 
