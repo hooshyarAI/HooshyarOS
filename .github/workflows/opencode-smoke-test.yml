@@ -1,0 +1,32 @@
+name: OpenCode Smoke Test (Experimental)
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  smoke-test:
+    if: >
+      github.event.issue.pull_request == null &&
+      github.event.issue.title == 'OpenCode Smoke Test (EXPERIMENT)' &&
+      (contains(github.event.comment.body, '/oc') || contains(github.event.comment.body, '/opencode'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Run OpenCode
+        uses: anomalyco/opencode/github@latest
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          model: opencode/gpt-5.6-luna
+          use_github_token: true
