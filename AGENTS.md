@@ -125,3 +125,11 @@ The autonomous build daemon must continuously emit measurable progress and throu
 
 ## Permanent toolchain optimization law
 `Docs/HOOSHYAROS_TOOLCHAIN_OPTIMIZATION_LAW.md` is mandatory governing memory. It defines the Python-first/tool-first construction method, human-intervention boundary, reuse-before-build rule, speed rule and preservation of repair intent across orchestration boundaries. Future autonomous cycles must read and obey it before construction.
+
+
+## EXPLICIT EXPERIMENTAL SANDBOX EXCEPTION — NON-MERGEABLE
+This branch `experiment/opencode-write-sandbox` is a temporary, isolated tool-capability experiment and must never be merged into `main`.
+For this branch only, OpenCode is explicitly authorized to perform a bounded write test **only inside** `__opencode_sandbox__/` and only when invoked by the dedicated OpenCode write-smoke-test workflow.
+No architecture, governance, product, source-code, tests, documentation, configuration, or CI files outside `__opencode_sandbox__/` may be changed.
+The experiment must create at most one file, run only the explicitly requested sandbox verification, and stop after reporting the measured result.
+This exception does not amend HooshyarOS governance and is not valid on `main` or any production branch.
