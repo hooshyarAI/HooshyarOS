@@ -66,7 +66,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat > .opencode-continuous-prompt.md <<'PROMPT'
+          PROMPT_FILE="${RUNNER_TEMP}/opencode-continuous-prompt.md"
+          cat > "${PROMPT_FILE}" <<'PROMPT'
           You are OpenCode, the governed remote execution operator for HooshyarOS.
 
           Before doing anything else, read these repository authorities in this order:
@@ -111,19 +112,18 @@ jobs:
           ADVANCED / RECONCILED / BLOCKED / NO_SAFE_WORK / BLOCKED_FREE_MODEL_UNAVAILABLE.
           PROMPT
 
-          opencode run --auto --model "${MODEL}" "$(cat .opencode-continuous-prompt.md)" 2>&1 | tee opencode-worker.log
+          opencode run --auto --model "${MODEL}" "$(cat "${PROMPT_FILE}")" 2>&1 | tee opencode-worker.log
 
       - name: Remove temporary prompt and validate worker diff
         shell: bash
         run: |
           set -euo pipefail
-          rm -f .opencode-continuous-prompt.md
           git status --short
-          test -z "$(git status --porcelain)" || true
+          test -z "$(git status --porcelain)" || { echo "BLOCKED: OpenCode left uncommitted changes"; exit 23; }
           git diff --check "origin/${TARGET_BRANCH}...HEAD"
           COMMITS_AHEAD="$(git rev-list --count "origin/${TARGET_BRANCH}..HEAD")"
           echo "COMMITS_AHEAD=${COMMITS_AHEAD}"
-          test "${COMMITS_AHEAD}" -eq 1
+          test "${COMMITS_AHEAD}" -le 1
 
       - name: Apply change-scope firewall
         shell: bash
@@ -158,6 +158,7 @@ jobs:
           }
 
           git merge-base --is-ancestor "${START_SHA}" "${WORKER_SHA}"
+          git push origin "${WORKER_SHA}:refs/heads/${WORKER_BRANCH}"
           git push origin "${WORKER_SHA}:refs/heads/${TARGET_BRANCH}"
           echo "ADVANCED: promoted ${WORKER_SHA} to ${TARGET_BRANCH}"
 
