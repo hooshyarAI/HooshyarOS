@@ -22,7 +22,7 @@ jobs:
         with:
           ref: experiment/opencode-write-sandbox
           fetch-depth: 1
-          persist-credentials: false
+          persist-credentials: true
 
       - name: Run OpenCode
         uses: anomalyco/opencode/github@latest
