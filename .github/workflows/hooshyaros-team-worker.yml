@@ -18,7 +18,8 @@ on:
 
 concurrency:
   group: hooshyaros-autonomous-construction
-  cancel-in-progress: false
+  # A newer governed team dispatch supersedes stale queued waves. This never authorizes parallel construction.
+  cancel-in-progress: true
 
 permissions:
   contents: write
