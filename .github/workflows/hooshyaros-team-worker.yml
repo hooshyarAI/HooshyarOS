@@ -16,8 +16,9 @@ on:
 
 concurrency:
   group: hooshyaros-autonomous-construction
-  # A newer governed team dispatch supersedes stale queued waves. This never authorizes parallel construction.
-  cancel-in-progress: true
+  # A governed active wave is never cancelled by a later dispatch. The external Dispatcher
+  # and post-completion Continuation workflow enforce single-wave admission.
+  cancel-in-progress: false
 
 permissions:
   contents: write
