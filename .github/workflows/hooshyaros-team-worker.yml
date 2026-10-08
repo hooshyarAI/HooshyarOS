@@ -122,6 +122,66 @@ jobs:
           if plan.get("wave_status") != "READY":
               raise SystemExit("BLOCKED: plan is not READY")
 
+          leases=plan.get("leases",[])
+          if not leases:
+              raise SystemExit("BLOCKED: READY plan has no leases")
+          protected=[
+              ".github/", "Docs/ARCHITECTURE.md", "Docs/HOOSHYAROS_MASTER_CHARTER.md",
+              "Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md", "Assistant/SYSTEM_PROMPT.md",
+              "package.json", "package-lock.json", ".env"
+          ]
+          satisfied_statuses={"COMPLETED","VERIFIED","PROMOTED","MEMORIZED","CLOSED"}
+
+          def norm(p):
+              p=str(p).strip().lstrip("./")
+              if "*" in p: p=p.split("*",1)[0]
+              return p.rstrip("/")
+
+          def overlaps(a,b):
+              aa,bb=norm(a),norm(b)
+              return bool(aa) and bool(bb) and (aa==bb or aa.startswith(bb+"/") or bb.startswith(aa+"/"))
+
+          registry_items=registry.get("items",[])
+          registry_by_id={str(x.get("id")):x for x in registry_items}
+          planned_ids=set()
+          planned_scopes=[]
+          for lease in leases:
+              missing=[k for k in ("id","role","focus","owner","mode","write_scope") if not lease.get(k)]
+              if missing: raise SystemExit(f"BLOCKED: lease {lease.get("id","unknown")} missing {missing}")
+              lid=str(lease["id"])
+              m=re.match(r"^work-([0-9]{4})(?:-|$)",lid)
+              if not m: raise SystemExit(f"BLOCKED: invalid governed lease identity {lid}")
+              work_id=f"WORK-{m.group(1)}"
+              if work_id in planned_ids: raise SystemExit(f"BLOCKED: duplicate Work Registry identity in plan {work_id}")
+              planned_ids.add(work_id)
+              mode=str(lease["mode"]).upper()
+              if mode not in {"AUDIT","IMPLEMENT","REVIEW","VERIFY"}: raise SystemExit(f"BLOCKED: invalid mode for {lid}")
+              scope=[str(x) for x in lease["write_scope"]]
+              if f".kilo/team/results/{lid}/" not in scope:
+                  raise SystemExit(f"BLOCKED: lease {lid} missing its evidence root")
+              for item in scope:
+                  n=norm(item)
+                  if any(n==p.rstrip("/") or n.startswith(p) for p in protected):
+                      raise SystemExit(f"BLOCKED: lease {lid} touches protected path {item}")
+              for dep in lease.get("dependencies",[]) or []:
+                  d=str(dep)
+                  if d.startswith("WORK-"):
+                      dep_item=registry_by_id.get(d)
+                      if not dep_item: raise SystemExit(f"BLOCKED: {lid} missing dependency record {d}")
+                      dep_status=str(dep_item.get("status","")).upper()
+                      if dep_status not in satisfied_statuses:
+                          raise SystemExit(f"BLOCKED: {lid} dependency {d} not satisfied (status={dep_status})")
+              existing=registry_by_id.get(work_id)
+              if existing:
+                  attempts=existing.get("execution_attempts",[]) or []
+                  unresolved=[a for a in attempts if not bool(a.get("promoted")) and str(a.get("state","")).upper() not in {"SUPERSEDED","DUPLICATE","INVALID"}]
+                  if unresolved:
+                      raise SystemExit(f"BLOCKED: {lid} has unresolved prior execution attempts")
+              for prev_id,prev_scope in planned_scopes:
+                  if any(overlaps(a,b) for a in scope for b in prev_scope):
+                      raise SystemExit(f"BLOCKED: write-scope overlap {lid} <-> {prev_id}")
+              planned_scopes.append((lid,scope))
+
           items=registry.setdefault("items",[])
           by_id={str(x.get("id")):x for x in items}
           next_id=str(registry.get("next_id",""))
