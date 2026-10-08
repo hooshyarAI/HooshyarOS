@@ -105,7 +105,9 @@ jobs:
               if not (explicit_free or free_named):
                   continue
 
-              if m.get("reasoning") is not True or m.get("tool_call") is not True:
+              reasoning = m.get("reasoning") is True or caps.get("reasoning") is True
+              tool_call = m.get("tool_call") is True or caps.get("toolcall") is True or caps.get("tool_call") is True
+              if not reasoning or not tool_call:
                   continue
 
               limit = m.get("limit") or {}
@@ -120,7 +122,7 @@ jobs:
               score += 30 if m.get("structured_output") else 0
               score += min(30.0, math.log2(max(context, 1)) * 2.0)
               score += min(20.0, math.log2(max(output, 1)) * 1.5)
-              if m.get("attachment"):
+              if attachment:
                   score += 5
               family = str(m.get("family") or "").lower()
               if any(x in family for x in ("mini", "small", "nano")):
