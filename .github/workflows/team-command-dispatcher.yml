@@ -14,12 +14,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  dispatch:
+  parse-command:
     if: >-
       ${{ github.event.issue.pull_request == null &&
           github.event.issue.number == 122 &&
           startsWith(github.event.comment.body, '/opencode-team-run') }}
+    runs-on: ubuntu-slim
+    outputs:
+      acceptance_authorization_id: ${{ steps.parse.outputs.acceptance_authorization_id }}
+    steps:
+      - id: parse
+        shell: bash
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          set -euo pipefail
+          AUTH=""
+          if printf '%s\n' "${COMMENT_BODY}" | grep -Eq '(^|[[:space:]])acceptance=[A-Za-z0-9._-]+'; then
+            AUTH="$(printf '%s\n' "${COMMENT_BODY}" | sed -n 's/.*\(^\|[[:space:]]\)acceptance=\([A-Za-z0-9._-][A-Za-z0-9._-]*\).*/\2/p' | head -1)"
+          fi
+          printf 'acceptance_authorization_id=%s\n' "${AUTH}" >> "${GITHUB_OUTPUT}"
+          echo "TEAM_COMMAND_ACCEPTANCE_AUTHORIZATION_ID=${AUTH:-NONE}"
+
+  dispatch:
+    needs: parse-command
     uses: ./.github/workflows/team-dispatch-authority.yml
     with:
       reason: Issue #122 governed command dispatch via single authority
+      acceptance_authorization_id: ${{ needs.parse-command.outputs.acceptance_authorization_id }}
     secrets: inherit
