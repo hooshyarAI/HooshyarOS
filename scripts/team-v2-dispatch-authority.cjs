@@ -171,12 +171,16 @@ if (require.main === module) {
     process.exit(20);
   }
 
-  const runs = ghJson([`repos/${REPOSITORY}/actions/workflows/${WORKER_WORKFLOW_ID}/runs?branch=${TARGET_BRANCH}&status=in_progress&per_page=20`]);
-  const active = Array.isArray(runs.workflow_runs) ? runs.workflow_runs.length : 0;
-  console.log(`ACTIVE_TEAM_WORKERS=${active}`);
+  const activeStatuses = ["queued","pending","waiting","requested","in_progress","action_required"];
+  let active = 0;
+  for (const status of activeStatuses) {
+    const runs = ghJson([`repos/${REPOSITORY}/actions/workflows/${WORKER_WORKFLOW_ID}/runs?branch=${TARGET_BRANCH}&status=${status}&per_page=20`]);
+    active += Array.isArray(runs.workflow_runs) ? runs.workflow_runs.length : 0;
+  }
+  console.log(`ACTIVE_OR_QUEUED_TEAM_WORKERS=${active}`);
   if (active > 0) {
-    console.log("TEAM_WORKER_DISPATCH=REFUSED_ACTIVE_RUN");
-    comment("TEAM DISPATCH AUTHORITY REFUSED: active Team Worker exists; no duplicate wave dispatched.");
+    console.log("TEAM_WORKER_DISPATCH=REFUSED_ACTIVE_OR_QUEUED_RUN");
+    comment("TEAM DISPATCH AUTHORITY REFUSED: active/queued Team Worker exists; no duplicate dispatch.");
     process.exit(20);
   }
 
