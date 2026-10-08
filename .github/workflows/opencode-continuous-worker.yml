@@ -280,12 +280,22 @@ jobs:
           git push origin "${WORKER_SHA}:refs/heads/${TARGET_BRANCH}"
           echo "ADVANCED: promoted ${WORKER_SHA} to ${TARGET_BRANCH}"
 
-      - name: Auto-continue active master mission
+      - name: Auto-continue active master mission (single-worker fallback only)
         if: success()
         shell: bash
         run: |
           set -euo pipefail
           PLAN=.kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md
+          TEAM_MANIFEST=.kilo/team/TEAM-WORKER-V1.json
+          TEAM_READY=FALSE
+          if test -f "$TEAM_MANIFEST" && grep -q '"status": "READY_MANUAL"' "$TEAM_MANIFEST"; then
+            TEAM_READY=TRUE
+          fi
+          if test "$TEAM_READY" = "TRUE"; then
+            echo "TEAM_WORKER_V1_READY=TRUE"
+            echo "Single-worker auto-continuation is suppressed while Team Worker V1 is ready."
+            exit 0
+          fi
           if test -f "$PLAN" && grep -Fxq 'MISSION_STATUS = ACTIVE' "$PLAN" && grep -Fxq 'CONTINUE_ALLOWED = TRUE' "$PLAN"; then
             echo "ACTIVE_MASTER_MISSION=TRUE"
             gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/workflows/opencode-continuous-worker.yml/dispatches" \
