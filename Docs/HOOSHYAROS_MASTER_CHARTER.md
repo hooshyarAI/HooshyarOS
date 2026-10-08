@@ -1331,3 +1331,210 @@ Qualification evidence must record:
 - failure evidence.
 
 Qualification never grants a model architecture, governance, product, security or completion authority.
+
+
+### 6.10 Autonomous Construction Team Organization V2 — PERMANENT / MEMORY-GOVERNED / CAPACITY-CONTROLLED
+
+HooshyarOS autonomous construction shall operate as a professional governed team organization when parallel work is beneficial. This organization is a control-plane operating model over the existing construction fabric; it is **not** a new product engine, intelligence engine, or Architecture Freeze V4/V4.1 change.
+
+The canonical organization is:
+
+```text
+MISSION DIRECTOR
+      |
+      v
+PLANNER
+      |
+      v
+MEMORY & EDITOR
+      |
+      v
+ORCHESTRATOR
+      |
+      +----> SPECIALIST WORKER POOL
+      |          |
+      |          v
+      |       EVIDENCE
+      |          |
+      |          v
+      |         QC
+      |          |
+      |          v
+      |      INTEGRATOR
+      |
+      +----> WATCHDOG / ALERTING
+      |
+      +----> EXECUTIVE + TECHNICAL REPORTING
+      |
+      v
+PERSISTENT ORGANIZATIONAL MEMORY
+```
+
+#### V2 leadership and control roles
+
+1. **MISSION DIRECTOR** — operational authority for mission priority, conflict resolution, capacity allocation and governed continuation. The Director does not override architecture authority, governance law or evidence.
+2. **PLANNER** — converts the active mission into dependency-aware Work Packages and Micro-Stages, assigns stable IDs, defines readiness, dependencies, write scope, evidence contract and verification contract.
+3. **MEMORY & EDITOR** — protects organizational memory integrity; consolidates prior work, detects duplicate/repeated/stale/superseded evidence, links decisions/defects/blockers/commits to work, records corrections with provenance and produces authoritative reports. The Editor may correct factual inconsistency in memory when evidence supports the correction, but may never cosmetically improve failed technical output.
+4. **ORCHESTRATOR** — dispatches only READY, non-duplicate, dependency-satisfied work to the existing governed worker mechanism.
+5. **SPECIALIST WORKER POOL** — bounded execution by domain; each worker has one lease, one isolated branch, one explicit write scope and one coherent verified commit.
+6. **QC** — independent verification; worker self-report never substitutes for QC.
+7. **INTEGRATOR** — only promotion authority for team output; verifies ancestry, scope, evidence, target drift and integration state.
+8. **WATCHDOG** — detects stopped, stalled, failed, timed-out and blocked workers/waves and preserves evidence while alerting the human only when a governed human intervention is actually required.
+9. **REPORTING** — maintains executive and technical status reports from memory/evidence, not from worker prose alone.
+
+These roles may be implemented by existing control-plane stages and approved operators. Creating separate autonomous agents for these roles is not required and is prohibited unless an evidence-backed capability gap is demonstrated.
+
+#### Stable identity law
+
+The organizational memory uses stable identifiers that are never recycled:
+
+```text
+MISSION-####
+PROGRAM-####
+WAVE-####
+WORK-####
+DECISION-####
+EVIDENCE-####
+BLOCKER-####
+DEFECT-####
+COMMIT-####
+REPORT-####
+RECOVERY-####
+```
+
+A historical item keeps its identifier permanently. A renamed task is linked to its existing ID rather than renumbered. Legacy artifacts without IDs must be backfilled by the Memory & Editor role from repository evidence; backfill must never fabricate unknown historical facts.
+
+#### Canonical Work Registry lifecycle
+
+```text
+DISCOVERED -> REGISTERED -> PLANNED -> READY -> LEASED -> EXECUTING
+-> VERIFYING -> QC -> INTEGRATING -> PROMOTED -> MEMORIZED -> CLOSED
+```
+
+Governed failure path:
+
+```text
+EXECUTING -> BLOCKED -> DIAGNOSING -> REPAIRED -> REVERIFYING
+```
+
+Duplicate/superseded path:
+
+```text
+DISCOVERED -> DUPLICATE -> LINKED -> CLOSED
+```
+
+Only `READY + NOT_DUPLICATE + DEPENDENCIES_SATISFIED` work may be dispatched.
+
+Before execution, the Planner/Editor must classify the candidate against existing memory as one or more of:
+
+```text
+EXISTS / DONE / VERIFIED / IN_PROGRESS / BLOCKED / SUPERSEDED / DUPLICATE / REGRESSION
+```
+
+A capability that is `EXISTS_IN_CODE` but `NOT_RUNTIME_INTEGRATED` is not silently marked complete; the contradiction is recorded and routed to the correct verification work.
+
+#### Persistent memory law
+
+The organizational memory is durable repository state under:
+
+```text
+.kilo/team/memory/
+```
+
+The canonical ledgers are:
+
+```text
+mission-state.json
+work-registry.json
+evidence-registry.json
+decision-registry.json
+defect-registry.json
+blocker-registry.json
+commit-registry.json
+wave-history.json
+```
+
+Every active or completed work item should link, where applicable, to its owner, dependency set, blocker set, write scope, verification contract, evidence IDs, decision IDs, defect IDs, commit IDs, recovery IDs and resulting report.
+
+Memory status for evidence is explicit:
+
+```text
+OBSERVED / REPRODUCED / VERIFIED / INTEGRATION_VERIFIED
+/ ACCEPTED / STALE / SUPERSEDED / INVALID
+```
+
+Stale memory cannot be used as proof of current completion. Failed evidence is preserved; it is never deleted merely because a later run is cleaner.
+
+#### Decision and defect traceability
+
+A Decision Record must capture: question, decision, rationale, evidence, owner, date, impact and review trigger.
+
+A Defect Record must link:
+
+```text
+DEFECT -> FIX WORK -> VERIFICATION WORK -> CLOSURE
+```
+
+A Blocker Record must preserve root cause, first observation, affected work, dependency, current status, last attempted governed action and safe-unblock condition so later waves do not rediscover the same blocker.
+
+#### Anti-duplication and anti-waste law
+
+The construction team must maximize **correct throughput**, not activity volume. Re-opening completed work without current regression/invalidation evidence is prohibited. Parallelism that increases collision, false-green risk, duplicate work or integration debt is not productive throughput and must be reduced or blocked.
+
+The next action is selected from:
+
+**VALUE x RISK x DEPENDENCY x READINESS x SPEED**
+
+using the full accumulated memory and evidence, not only the latest worker report.
+
+#### V2 role mapping to the existing construction fabric
+
+V2 does not create a second orchestration hierarchy. The existing governed team mechanism remains the execution substrate:
+
+- Mission Director = governed continuation/priority gate;
+- Planner = dependency-aware synthesis and Work Registry;
+- Memory & Editor = evidence/decision/defect/blocker consolidation and report authority;
+- Orchestrator = existing Team Worker control plane;
+- Specialist Pool = existing isolated workers;
+- QC = independent semantic/structural quality gate;
+- Integrator = sole promotion mechanism;
+- Watchdog = existing stop/stall/failure notification layer;
+- Reporting = persisted mission/wave/report artifacts.
+
+The existing V1 execution protocol therefore remains valid as the mechanical worker contract, while V2 becomes the permanent organizational governance and memory layer over it.
+
+#### V2 implementation sequence
+
+```text
+TEAM-ORG-01  Director + Planner + Editor + Orchestrator
+TEAM-ORG-02  Stable Work Registry and identity
+TEAM-ORG-03  Evidence / Decision / Defect / Blocker ledgers
+TEAM-ORG-04  Memory context injection into planning/execution
+TEAM-ORG-05  Dependency graph + dynamic wave planning
+TEAM-ORG-06  Independent QC + Integrator strengthening
+TEAM-ORG-07  Recovery + Watchdog + alerts
+TEAM-ORG-08  Empirical adaptive model qualification
+TEAM-ORG-09  Automatic next-wave generation
+TEAM-ORG-10  Evidence-backed capacity scaling 12 -> 25 -> 50 -> 100
+```
+
+No V2 stage authorizes product implementation while the active mission explicitly requires reconciliation-only work.
+
+#### Completion law
+
+Team success requires:
+
+```text
+WORK REGISTRY UPDATED
++ EVIDENCE PERSISTED
++ INDEPENDENT QC
++ INTEGRATION VERIFIED
++ MEMORY UPDATED
++ MISSION STATE PERSISTED
++ NEXT SAFE WORK IDENTIFIED
+```
+
+A green workflow, worker count or commit count alone is never sufficient.
+
+**V2 TEAM ORGANIZATION: REGISTERED AS A PERMANENT CONSTRUCTION-PROCESS LAW.**
+
