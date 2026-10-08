@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "next_id": "COMMIT-0006",
+  "items": [
+    {
+      "id": "COMMIT-0001",
+      "sha": "41d8c5f8",
+      "purpose": "F6 ROA/ROE average-balance repair",
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "COMMIT-0002",
+      "sha": "61f94d1a13bbf12f39014406b275b2f7fea0bf6d",
+      "purpose": "team diff gate: strict code, Markdown whitespace warning",
+      "status": "INTEGRATED"
+    },
+    {
+      "id": "COMMIT-0003",
+      "sha": "21718a64754498f6cbdabd926bd08ecdb2d8b464",
+      "purpose": "immediate per-worker stop alerting",
+      "status": "INTEGRATED"
+    },
+    {
+      "id": "COMMIT-0004",
+      "sha": "3535384c958f52163fa33b6897727dfd288e587c",
+      "purpose": "controlled target-drift recovery",
+      "status": "INTEGRATED"
+    },
+    {
+      "id": "COMMIT-0005",
+      "sha": "9a1f10a57088ae9dc410248dc65562d8252c4aec",
+      "purpose": "recovery synthesis / automatic continuation",
+      "status": "INTEGRATED"
+    }
+  ]
+}
