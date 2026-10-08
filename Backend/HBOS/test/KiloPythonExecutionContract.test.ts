@@ -16,7 +16,7 @@ describe("Kilo/Python execution contract", () => {
 
     it("keeps Kilo out of the provider abstraction", () => {
         expect(toolchain).toContain("Kilo Code is an approved local VS Code execution/operator layer");
-        expect(toolchain).toContain("does not replace Python as the canonical construction worker");
+        expect(toolchain).toContain("do not replace Python as the canonical construction worker");
         expect(kiloContract).toContain("Kilo Code is an approved local VS Code execution/operator layer");
         expect(kiloContract).toContain("Python is the canonical repository-native construction worker");
         expect(kiloContract).toContain("Kilo Code MUST NOT redefine or bypass");
