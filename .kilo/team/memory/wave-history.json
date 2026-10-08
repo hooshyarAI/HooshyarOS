@@ -5,7 +5,7 @@
     {
       "id": "WAVE-0010",
       "run_id": 37743827267,
-      "status": "RECOVERY_REVIEW_REQUIRED",
+      "status": "RECOVERED_EVIDENCE_PRESERVED",
       "workers_total": 12,
       "workers_successful": 11,
       "workers_failed": 1,
@@ -14,5 +14,11 @@
       "synthesis": "NOT_RELEASED_FROM_PRIMARY_RUN",
       "recovery": "EVIDENCE_PRESERVING_RECOVERY_ATTEMPTED"
     }
-  ]
+  ],
+  "current": {
+    "id": "WAVE-0011",
+    "run_id": 37759400053,
+    "status": "QUEUED",
+    "note": "Latest governed V2 run accepted; prepare job queued. No worker completion inferred yet."
+  }
 }
