@@ -156,3 +156,99 @@ WAVE-0010 = Recovery review / evidence preservation
 ```
 
 Accepted F1/F6/CCC/UX work is not repeated without current regression or invalidation evidence.
+
+## Admission Gate — mandatory before Dispatch
+
+Planning and execution are separate authorities. The Planner/Synthesizer may create an undispatched lease in NEXT-WAVE-PLAN.json, but the Orchestrator may not dispatch a lease that has no corresponding WORK-#### record in work-registry.json.
+
+The Team Manager must therefore run a single **Plan Admission Gate** before the immutable execution START_SHA is captured:
+
+```text
+PLAN READY
+  -> validate stable WORK-#### identity
+  -> validate next_id / non-recycled identity
+  -> create missing Work Registry row atomically
+  -> set status=READY, readiness=READY
+  -> preserve lease owner/mode/scope/evidence requirements
+  -> commit + push with target-head concurrency check
+  -> recapture immutable START_SHA
+  -> Orchestrator dispatch
+```
+
+A worker must never create its own Work Registry identity during execution. A missing registry row is an **admission problem**, not permission for a specialist to self-register.
+
+Admission is idempotent: an already-admitted work item is reused only when its identity is still governed and its registry state remains eligible. Terminal, contradictory or malformed records cause BLOCKED; they are never silently overwritten.
+
+## Throughput Law — speed without quality dilution
+
+Team speed is optimized through **safe parallelism**, not fixed headcount:
+
+```text
+effective_parallelism =
+  min(
+    requested_capacity,
+    number_of_dependency_ready_leases,
+    number_of_non_overlapping_write_scopes
+  )
+```
+
+Default requested capacity is 8. It is a ceiling, not a target. A wave with one ready lease runs one worker; a wave with six independent leases may run six concurrently; no empty seats are filled.
+
+Parallel execution is permitted only when all leases are independently:
+- READY and dependency-satisfied;
+- non-duplicate with no unresolved prior attempts;
+- protected-boundary clear;
+- verification-executable;
+- write-scope non-overlapping.
+
+High-risk or tightly coupled work is serialized even when spare runner capacity exists. Evidence-heavy audits may parallelize; shared-memory reconciliation, architecture/control-plane changes, and promotion remain serialized authorities.
+
+## Quality / Synergy Operating Loop
+
+The team operates as a coordinated pipeline rather than independent agents producing disconnected reports:
+
+```text
+DIRECTOR
+  ↓ priority / conflict / capacity
+PLANNER
+  ↓ dependency DAG + lease contracts
+MEMORY & EDITOR
+  ↓ identity / dedup / evidence context
+MANAGER / ADMISSION
+  ↓ atomic Work Registry admission
+ORCHESTRATOR
+  ↓ bounded parallel dispatch
+SPECIALISTS
+  ↓ isolated commits + result evidence
+INDEPENDENT QC
+  ↓ semantic + structural + runtime verification
+INTEGRATOR
+  ↓ atomic promotion / fail-closed
+MEMORY UPDATE
+  ↓ accepted facts / stale marking / metrics
+REPORTING
+  ↓ executive + technical status
+REPLAN
+```
+
+Specialists do not negotiate scope with one another. Their synergy comes from shared evidence, explicit dependency contracts, common stable IDs, isolated write scopes and QC feedback—not from concurrent editing of the same files.
+
+The team shall optimize these performance measures together:
+
+`REAL_PRODUCT_ADVANCEMENT`, `CORRECT_THROUGHPUT`, `EVIDENCE_QUALITY`, `DUPLICATE_WORK_RATE`, `FALSE_GREEN_RATE`, `REGRESSION_RATE`, `RECOVERY_RATE`, `BLOCKED_WORK_AGE`, `INTEGRATION_CONFLICT_RATE`, `MEMORY_ACCURACY`, `QC_ACCEPTANCE_RATE`, `DECISION_REUSE`.
+
+Speed is considered a failure when it increases duplicate work, false-green claims, integration conflicts, or rework.
+
+## Wave Closure Law
+
+A wave is not complete merely because worker jobs succeeded.
+
+```text
+WORKER SUCCESS
+  ≠ QC ACCEPTANCE
+  ≠ INTEGRATION
+  ≠ PROMOTION
+  ≠ MEMORY CLOSURE
+```
+
+The wave reaches COMPLETE only after the applicable chain has been independently verified. If any mandatory gate fails, the result is preserved and the next safe action is RECOVERY, RECONCILIATION, or BLOCKED—never blind rerun of the same lease.
