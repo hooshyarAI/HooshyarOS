@@ -2,7 +2,7 @@
   "schema_version": "1.0",
   "wave_status": "READY",
   "base_mission": ".kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md",
-  "created_from_sha": "76ba54614e00b05b72b7759afb99d277ba180d0b",
+  "created_from_sha": "e564682ad02df31adc458995d4232128c7fa0fd3",
   "leases": [
     {
       "id": "team-org-02-memory-backfill",
@@ -11,7 +11,8 @@
       "owner": "MEMORY_EDITOR",
       "mode": "AUDIT",
       "write_scope": [
-        ".kilo/team/memory/**"
+        ".kilo/team/memory/**",
+        ".kilo/team/results/team-org-02-memory-backfill/"
       ]
     },
     {
@@ -21,7 +22,8 @@
       "owner": "INTEGRATOR",
       "mode": "REVIEW",
       "write_scope": [
-        ".kilo/team/results/wave-10-recovery-reconciliation/**"
+        ".kilo/team/results/wave-10-recovery-reconciliation/**",
+        ".kilo/team/results/wave-10-recovery-reconciliation/"
       ]
     },
     {
@@ -31,8 +33,10 @@
       "owner": "PLANNER",
       "mode": "REVIEW",
       "write_scope": [
-        ".kilo/team/results/next-capability-reconciliation/**"
+        ".kilo/team/results/next-capability-reconciliation/**",
+        ".kilo/team/results/next-capability-reconciliation/"
       ]
     }
-  ]
+  ],
+  "control_note": "V2 bootstrap wave: memory backfill + Wave 10 recovery reconciliation + next-capability reconciliation. No product implementation."
 }
