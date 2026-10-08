@@ -67,7 +67,7 @@ function validateWork({ plan, registry, workId, leaseId }) {
   const scopes = Array.isArray(lease.write_scope) ? lease.write_scope.map(String) : [];
   const evidenceRoot = `.kilo/team/results/${lease.id}/`;
   if (!scopes.includes(evidenceRoot)) {
-    violations.push({ code: "EVIDENCE_ROOT_MISSING", detail: evidenceRoot);
+    violations.push({ code: "EVIDENCE_ROOT_MISSING", detail: evidenceRoot });
   }
 
   const protectedPrefixes = [".github/","Docs/ARCHITECTURE.md","Docs/HOOSHYAROS_MASTER_CHARTER.md","Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md","Assistant/SYSTEM_PROMPT.md","package.json","package-lock.json",".env"];
