@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0",
+  "next_id": "EVIDENCE-0006",
+  "backfill_required": true,
+  "items": [
+    {
+      "id": "EVIDENCE-0001",
+      "subject": "Wave 10 independent semantic QC",
+      "status": "VERIFIED",
+      "source": "Team Wave 10 run 37743827267",
+      "note": "QC completed successfully; integration still failed."
+    },
+    {
+      "id": "EVIDENCE-0002",
+      "subject": "Wave 10 architecture-governance worker validation defect",
+      "status": "VERIFIED",
+      "source": "Team Wave 10 run 37743827267",
+      "note": "Markdown trailing whitespace caused git diff --check failure; content evidence was preserved."
+    },
+    {
+      "id": "EVIDENCE-0003",
+      "subject": "123.xlsx benchmark audit",
+      "status": "VERIFIED",
+      "source": ".kilo/team/results/benchmark-123/result.md",
+      "note": "Real benchmark harness gaps were identified; skipped tests and false-green paths were recorded."
+    },
+    {
+      "id": "EVIDENCE-0004",
+      "subject": "Intelligence-brain audit",
+      "status": "VERIFIED",
+      "source": ".kilo/team/results/intelligence-brain/result.md",
+      "note": "Causal capabilities exist but runtime composition is the primary gap."
+    },
+    {
+      "id": "EVIDENCE-0005",
+      "subject": "F6 ROA/ROE average-balance repair",
+      "status": "ACCEPTED",
+      "source": "commit 41d8c5f8 / f6-roa-roe-average-balance-checkpoint-2026-10-06.md",
+      "note": "Do not repeat absent regression or invalidation."
+    }
+  ]
+}
