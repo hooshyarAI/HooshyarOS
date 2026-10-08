@@ -383,7 +383,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          opencode run --help > "${RUNNER_TEMP}/opencode-run-help.txt"
+          opencode run --help > "${RUNNER_TEMP}/opencode-run-help.txt" 2>&1
           grep -q -- "--model" "${RUNNER_TEMP}/opencode-run-help.txt"
           grep -q -- "--auto" "${RUNNER_TEMP}/opencode-run-help.txt"
           grep -q -- "--agent" "${RUNNER_TEMP}/opencode-run-help.txt"
