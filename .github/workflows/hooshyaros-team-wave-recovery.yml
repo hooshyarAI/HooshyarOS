@@ -181,3 +181,188 @@ jobs:
           gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/122/comments" \
             -f body="HooshyarOS Team Wave Recovery #${RUN_NUMBER}: controlled target-drift recovery completed or blocked. Inspect Run ${RUN_ID} for RECOVERY_GATE and recovered worker evidence."
           true
+
+  recover-synthesize:
+    needs: recover-controlled-drift
+    if: ${{ needs.recover-controlled-drift.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      issues: write
+      actions: write
+    env:
+      TARGET_BRANCH: fix/autonomous-product-factory
+      OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      RUN_ID: ${{ github.event.workflow_run.id }}
+    steps:
+      - name: Checkout recovered target
+        uses: actions/checkout@v6
+        with:
+          ref: fix/autonomous-product-factory
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Install OpenCode with bounded recovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          ok=0
+          for attempt in 1 2 3; do
+            echo "RECOVERY_SYNTH_INSTALL_ATTEMPT=${attempt}"
+            if curl -fsSL https://opencode.ai/install | bash && "$HOME/.opencode/bin/opencode" --version; then
+              ok=1
+              break
+            fi
+            test "$attempt" -lt 3 && sleep 5
+          done
+          test "$ok" -eq 1
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+
+      - name: Select free synthesis candidates
+        id: models
+        shell: bash
+        run: |
+          set -euo pipefail
+          CATALOG="${RUNNER_TEMP}/recovery-models.txt"
+          opencode models --refresh --verbose > "$CATALOG" 2>&1
+          python3 - "$CATALOG" <<'PY' > "${RUNNER_TEMP}/recovery-model.env"
+          import json,re,sys
+          raw=open(sys.argv[1],encoding='utf-8',errors='replace').read()
+          raw=re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]",'',raw)
+          lines=raw.splitlines(); dec=json.JSONDecoder(); models={}
+          def mid_ok(v): return bool(re.fullmatch(r'[^\s/]+/[^\s]+',v.strip()))
+          for i,line in enumerate(lines):
+              mid=line.strip()
+              if not mid_ok(mid): continue
+              block='\n'.join(lines[i+1:]).lstrip(); b=block.find('{')
+              if b<0: continue
+              try: obj,_=dec.raw_decode(block[b:])
+              except Exception: continue
+              if isinstance(obj,dict): models[mid]=obj
+          ranked=[]
+          for mid,m in models.items():
+              caps=m.get('capabilities') or {}; cost=m.get('cost') or {}; vals=[v for v in cost.values() if isinstance(v,(int,float))] if isinstance(cost,dict) else []
+              name=mid.split('/',1)[-1].lower(); free=(bool(vals) and all(v==0 for v in vals)) or mid=='opencode/big-pickle' or name.endswith('-free') or '-free-' in name
+              reasoning=m.get('reasoning') is True or caps.get('reasoning') is True; tool=m.get('tool_call') is True or caps.get('toolcall') is True or caps.get('tool_call') is True
+              if not free or not reasoning or not tool: continue
+              lim=m.get('limit') or {}; ctx=int(lim.get('context') or 0); out=int(lim.get('output') or 0)
+              if ctx<100000 or out<8000: continue
+              structured=m.get('structured_output') is True or caps.get('structured_output') is True
+              score=100+(35 if reasoning else 0)+(30 if tool else 0)+(20 if structured else 0)+min(40,ctx/100000*8)+min(35,out/8000*5)
+              if mid=='opencode/big-pickle': score+=3
+              ranked.append((score,mid,ctx,out))
+          ranked.sort(reverse=True)
+          top=ranked[:4]
+          if not top: raise SystemExit('BLOCKED_FREE_MODEL_UNAVAILABLE')
+          print('RECOVERY_SYNTH_CANDIDATES='+'|'.join(x[1] for x in top))
+          print('RECOVERY_SYNTH_RANKING='+' ; '.join(f'{x[1]} score={x[0]:.1f} ctx={x[2]} out={x[3]}' for x in top))
+          PY
+          cat "${RUNNER_TEMP}/recovery-model.env" >> "$GITHUB_ENV"
+          CANDIDATES="$(sed -n 's/^RECOVERY_SYNTH_CANDIDATES=//p' "${RUNNER_TEMP}/recovery-model.env")"
+          test -n "$CANDIDATES"
+          echo "RECOVERY_SYNTH_CANDIDATES=$CANDIDATES"
+
+      - name: Preflight synthesis CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          opencode run --help > "${RUNNER_TEMP}/recovery-run-help.txt" 2>&1
+          grep -q -- '--model' "${RUNNER_TEMP}/recovery-run-help.txt"
+          grep -q -- '--auto' "${RUNNER_TEMP}/recovery-run-help.txt"
+
+      - name: Synthesize recovered worker evidence into next-wave plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROMPT="${RUNNER_TEMP}/recovery-synth-prompt.md"
+          cat > "$PROMPT" <<'EOF'
+          You are the HooshyarOS governed Team Synthesizer in RECOVERY mode.
+
+          The previous Team Wave completed its independent QC but failed integration because controlled target-plane drift occurred.
+          Worker evidence has now been recovered into .kilo/team/results/. Do NOT repeat the initial audit wave.
+
+          Read the Master Charter, Governance Charter, Architecture Freeze V4/V4.1, OpenCode Contract, active mission, Team Protocol, NEXT-WAVE schema, and every recovered worker report.
+
+          Produce the next evidence-backed dependency-aware Micro-Stage wave.
+          Resolve stale/contradictory evidence explicitly.
+          Preserve high-severity findings and do not invent completion.
+          Prioritize P0 control/evidence/harness/security, then P1 reasoning/financial/123, then P2 reporting/charts, then P3 performance/process/flow, then P4 commercial/application.
+          Do not repeat an already completed audit.
+          Product implementation is allowed ONLY when the active mission now explicitly permits it; otherwise use AUDIT/RECONCILE/VERIFY modes.
+
+          Update ONLY:
+          .kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md
+          .kilo/team/NEXT-WAVE-PLAN.json
+
+          NEXT-WAVE-PLAN must conform to its schema, use unique lease IDs, include the evidence root for every lease, use explicit non-overlapping write scopes, and never touch protected architecture/governance/control-plane paths.
+
+          Add TEAM_WAVE_SYNTHESIS to the mission with:
+          WAVE_ID, RECOVERY_SOURCE_RUN, WORKERS_COMPLETED, WORKERS_BLOCKED, KEY_FINDINGS, CONTRADICTIONS, OVERLAPS, DEPENDENCY_ORDER, NEXT_MICRO_STAGES, EVIDENCE_PATHS, QC_STATUS, CONTINUE_DECISION.
+
+          Commit exactly one coherent synthesis commit and stop.
+          EOF
+
+          status=1
+          IFS='|' read -r -a CANDIDATES <<< "${RECOVERY_SYNTH_CANDIDATES}"
+          LOG="${RUNNER_TEMP}/recovery-synth.log"
+          : > "$LOG"
+          for candidate in "${CANDIDATES[@]}"; do
+            echo "RECOVERY_SYNTH_MODEL_ATTEMPT=${candidate}" | tee -a "$LOG"
+            if timeout --signal=TERM --kill-after=30s 18m opencode run --auto --model "$candidate" "$(cat "$PROMPT")" 2>&1 | tee -a "$LOG"; then
+              echo "RECOVERY_SYNTH_MODEL_SELECTED=${candidate}" | tee -a "$LOG"
+              status=0
+              echo "RECOVERY_SYNTH_MODEL=${candidate}" >> "$GITHUB_ENV"
+              break
+            fi
+          done
+          test "$status" -eq 0
+
+      - name: Validate and promote recovered synthesis
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="$(git rev-parse HEAD)"
+          AHEAD="$(git rev-list --count "${BASE}^..HEAD")"
+          # The synthesizer was instructed to make exactly one commit; inspect parent count directly.
+          PARENT_COUNT="$(git cat-file -p HEAD | grep '^parent ' | wc -l | tr -d ' ')"
+          test "$PARENT_COUNT" -eq 1
+          PARENT="$(git rev-parse HEAD^)"
+          CHANGED="$(git diff --name-only "$PARENT...HEAD")"
+          EXPECTED=$'.kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md\n.kilo/team/NEXT-WAVE-PLAN.json'
+          test "$CHANGED" = "$EXPECTED" || { printf '%s\n' "$CHANGED"; exit 51; }
+          test -f .kilo/team/NEXT-WAVE-PLAN.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('.kilo/team/NEXT-WAVE-PLAN.json').read_text(encoding='utf-8'))
+          if p.get('schema_version')!='1.0': raise SystemExit('invalid schema_version')
+          if p.get('wave_status') not in {'READY','BLOCKED','COMPLETE','NOT_READY'}: raise SystemExit('invalid wave_status')
+          leases=p.get('leases',[]); ids=set()
+          for l in leases:
+              for k in ('id','role','focus','owner','mode','write_scope'):
+                  if not l.get(k): raise SystemExit('missing '+k)
+              if l['id'] in ids: raise SystemExit('duplicate lease '+l['id'])
+              ids.add(l['id'])
+              if f".kilo/team/results/{l['id']}/" not in l['write_scope']: raise SystemExit('missing evidence root')
+          print('RECOVERY_SYNTH_PLAN_VALID=TRUE')
+          PY
+          git fetch origin "$TARGET_BRANCH"
+          CURRENT="$(git rev-parse "origin/$TARGET_BRANCH")"
+          test "$CURRENT" = "$(git rev-parse HEAD^)" || { echo 'BLOCKED_RECOVERY: target changed during recovery synthesis'; exit 52; }
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
+          echo "RECOVERY_SYNTH_PROMOTED=$(git rev-parse HEAD)"
+
+      - name: Continue next governed wave after recovery
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          PLAN=.kilo/team/NEXT-WAVE-PLAN.json
+          MISSION=.kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md
+          if test -f "$PLAN" && grep -q '"wave_status": "READY"' "$PLAN" && grep -Fxq 'MISSION_STATUS = ACTIVE' "$MISSION" && grep -Fxq 'CONTINUE_ALLOWED = TRUE' "$MISSION"; then
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/workflows/hooshyaros-team-worker.yml/dispatches" -f ref=main -f 'inputs[reason]=Automatic continuation after controlled team-wave recovery'
+          else
+            echo 'RECOVERY_TEAM_CONTINUE=FALSE'
+          fi
