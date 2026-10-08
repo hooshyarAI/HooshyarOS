@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "next_id": "WORK-0011",
+  "next_id": "WORK-0012",
   "backfill_required": true,
   "items": [
     {
@@ -430,7 +430,7 @@
     {
       "id": "WORK-0010",
       "title": "work-0010-team-v2-acceptance",
-      "status": "READY",
+      "status": "FAILED",
       "mode": "AUDIT",
       "priority": "P1",
       "owner": "SPECIALIST_WORKER_POOL",
@@ -450,7 +450,7 @@
       "test_scope": "TEAM_CONTROL_PLANE_ONLY_NO_PRODUCT_CODE_CHANGE",
       "risk": "P0",
       "value": "Decides whether Team V2 is reliable enough to continue product construction.",
-      "readiness": "READY",
+      "readiness": "NOT_READY",
       "estimated_complexity": "LOW_CONTROL_PLANE_ACCEPTANCE",
       "write_scope": [
         ".kilo/team/results/work-0010-team-v2-acceptance/"
@@ -465,12 +465,17 @@
       "execution_attempts": [
         {
           "run_id": 37818114064,
-          "state": "RESERVED_EXECUTING",
-          "promoted": false,
-          "commit": null,
-          "start_sha": "89dfee45651c0a8c4dbe1ffadddf88d735fae36c",
           "lease_id": "work-0010-team-v2-acceptance",
-          "reserved_at": "2026-10-08T17:39:15.222619+00:00"
+          "state": "EXECUTED_UNPROMOTED",
+          "qc": "FAIL_INDEPENDENT_SEMANTIC_QC",
+          "promoted": false,
+          "commit": "85c2cbdf",
+          "branch": "opencode/team-work-0010-team-v2-acceptance-37818114064",
+          "start_sha": "3d1d54068b76969bdd8e00f4958aa7b322b97954",
+          "artifact_status": "WORKER_PASS",
+          "qc_job_id": 113455516924,
+          "failure": "QC correctly rejected false-green acceptance because historical memory/baseline contradictions remained and the Wrapper failed to distinguish current-wave patch evidence from historical result context.",
+          "note": "Do not rerun WORK-0010. Consume its findings through WORK-0011 Memory & Editor Reconciliation."
         }
       ],
       "reservations": [
@@ -478,11 +483,57 @@
           "run_id": 37818114064,
           "lease_id": "work-0010-team-v2-acceptance",
           "start_sha": "89dfee45651c0a8c4dbe1ffadddf88d735fae36c",
-          "state": "EXECUTING",
-          "planned_branch": "opencode/team-work-0010-team-v2-acceptance-37818114064"
+          "state": "RELEASED_FAILED_SEMANTIC_QC",
+          "planned_branch": "opencode/team-work-0010-team-v2-acceptance-37818114064",
+          "released_at": "2026-10-08T17:51:00Z"
         }
       ],
-      "last_state_change_by": "TEAM_MANAGER_RESERVATION_37818114064"
+      "last_state_change_by": "TEAM-MANAGER-RECONCILIATION-RUN-37818114064",
+      "governance_state": "EXECUTED_UNPROMOTED",
+      "failure_reconciliation": {
+        "run_id": 37818114064,
+        "classification": "SEMANTIC_QC_FOUND_REAL_MEMORY_AND_EVIDENCE_INCONSISTENCIES",
+        "worker_execution": "PASS",
+        "branch_preservation": "PASS",
+        "qc_workspace": "PASS",
+        "independent_qc": "FAIL_WITH_SUBSTANTIVE_FINDINGS",
+        "duplicate_dispatch": "FORBIDDEN",
+        "next_action": "WORK-0011"
+      }
+    },
+    {
+      "id": "WORK-0011",
+      "title": "Team V2 Memory and Evidence Reconciliation",
+      "status": "READY",
+      "mode": "AUDIT",
+      "priority": "P0",
+      "owner": "MEMORY_EDITOR",
+      "dependencies": [
+        "WORK-0010"
+      ],
+      "evidence_required": [
+        "reconciled_defect_registry",
+        "reconciled_evidence_registry",
+        "reconciled_blocker_registry",
+        "reconciled_wave_and_mission_state",
+        "historical_baseline_supersession",
+        "one_coherent_commit",
+        "exactly_one_result_report"
+      ],
+      "purpose": "FINAL MEMORY/EVIDENCE RECONCILIATION BEFORE LAST TEAM V2 ACCEPTANCE",
+      "blockers": [
+        "TEAM_V2_ACCEPTANCE"
+      ],
+      "test_scope": "NO_PRODUCT_CODE_CHANGE_MEMORY_AND_EVIDENCE_INTEGRITY_ONLY",
+      "risk": "P0",
+      "value": "Remove real false-green contradictions detected by independent QC without rewriting or deleting historical evidence.",
+      "write_scope": [
+        ".kilo/team/memory/",
+        ".kilo/team/results/work-0006-team-performance-evaluation/PRE-GATE-BASELINE.md",
+        ".kilo/team/results/work-0011-team-v2-memory-reconciliation/"
+      ],
+      "focus": "Reconcile only facts proven by repository evidence after W10 QC: (1) register the repaired F1/F2 control-plane defects and their repair commits; (2) add W10 evidence and its independent QC rejection to evidence memory without claiming acceptance; (3) reconcile stale WAVE-0011 / mission-state / unpromoted-attempt counts to current known facts, preserving prior values as historical; (4) re-scope BLOCKER-0005 using currently verifiable worker refs and do not close it; (5) preserve BLOCKER-0004 lineage divergence as OPEN/UNDECIDED; (6) explicitly supersede the false Wave 10 claims in WORK-0006 PRE-GATE-BASELINE.md with a correction section while preserving the original text; (7) do not promote any product or worker code; (8) do not modify .github/**, Architecture Freeze V4/V4.1, product code, tests, or accepted F1-F6/CCC/UX work. The result must make the next acceptance wave capable of judging the team without historical contradictions masquerading as current truth.",
+      "estimated_complexity": "MEDIUM_MEMORY_RECONCILIATION"
     }
   ],
   "backfill_required_scope": {
@@ -513,9 +564,9 @@
     ]
   },
   "registry_reconciliation": {
-    "last_reconciled_run": 37816306137,
+    "last_reconciled_run": 37818114064,
     "principle": "EXECUTED_BUT_UNPROMOTED_ATTEMPTS_ARE_REGISTERED_AND_BLOCK_DUPLICATE_REDISPATCH",
     "acceptance_wave": "WORK-0009",
-    "acceptance_recovery": "WORK-0009 failed closed on control-plane defects; WORK-0010 is a fresh non-duplicate acceptance lease after targeted repairs."
+    "acceptance_recovery": "W10 semantic QC correctly blocked false-green; W11 is the sole targeted memory/evidence reconciliation before the final Team V2 acceptance attempt."
   }
 }
