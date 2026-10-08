@@ -1,0 +1,30 @@
+{
+  "schema_version": "1.0",
+  "next_id": "DECISION-0005",
+  "items": [
+    {
+      "id": "DECISION-0001",
+      "decision": "Architecture Freeze V4/V4.1 remains unchanged",
+      "status": "ACTIVE",
+      "evidence": "Docs/HOOSHYAROS_MASTER_CHARTER.md"
+    },
+    {
+      "id": "DECISION-0002",
+      "decision": "Team V2 is an organizational overlay, not a product engine",
+      "status": "ACTIVE",
+      "evidence": "TEAM-ORGANIZATION-V2.json"
+    },
+    {
+      "id": "DECISION-0003",
+      "decision": "V1 worker execution remains the mechanical substrate",
+      "status": "ACTIVE",
+      "evidence": "TEAM-WORKER-V1.json + TEAM-WORKER-V1-PROTOCOL.md"
+    },
+    {
+      "id": "DECISION-0004",
+      "decision": "Accepted F1/F6/CCC/UX work is not repeated without regression/invalidation evidence",
+      "status": "ACTIVE",
+      "evidence": "active mission"
+    }
+  ]
+}
