@@ -227,3 +227,20 @@ The plan must prevent:
 - repeated audit loops.
 
 When no safe next lease exists, the plan must say `COMPLETE` or `BLOCKED` with evidence rather than inventing work.
+
+## Model Qualification Gate
+
+Before a worker wave is released, the control plane should prefer an empirical free-model qualification gate over metadata-only selection.
+
+The gate:
+1. refreshes the current OpenCode model catalog;
+2. filters to eligible zero-cost models with required reasoning/tool capability;
+3. ranks the best candidates using differentiated context/output/capability evidence;
+4. runs a harmless, non-customer, non-secret reasoning probe against the top candidates;
+5. excludes candidates that fail to produce the required probe result;
+6. exposes the surviving ordered candidates to every worker as the wave fallback set.
+
+Worker-level fallback remains mandatory because a model that passes the generic probe can still fail during a real task.
+
+Model qualification is infrastructure evidence only. It never grants a model architecture, governance or product authority.
+
