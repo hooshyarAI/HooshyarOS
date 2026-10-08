@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "next_id": "DECISION-0005",
+  "next_id": "DECISION-0014",
   "items": [
     {
       "id": "DECISION-0001",
@@ -25,6 +25,78 @@
       "decision": "Accepted F1/F6/CCC/UX work is not repeated without regression/invalidation evidence",
       "status": "ACTIVE",
       "evidence": "active mission"
+    },
+    {
+      "id": "DECISION-0005",
+      "decision": "Organizational memory is backfilled from repository evidence only, never from recollection",
+      "status": "ACTIVE",
+      "evidence": "AGENTS.md capability-evidence rule + TEAM-ORGANIZATION-V2-PROTOCOL.md V2 migration rule",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "note": "Unknown history is recorded as UNKNOWN with its reason. No missing historical fact is inferred."
+    },
+    {
+      "id": "DECISION-0006",
+      "decision": "REPORT-#### and RECOVERY-#### namespaces stay unbacked rather than gaining a ninth ledger",
+      "status": "ACTIVE",
+      "evidence": "TEAM-ORGANIZATION-V2.json stable_ids vs TEAM-ORGANIZATION-V2-PROTOCOL.md memory-ledger list",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "note": "Both namespaces are declared in stable_ids but neither has a canonical ledger. Creating one would introduce exactly the parallel governance hierarchy V2 forbids. No ledger was invented."
+    },
+    {
+      "id": "DECISION-0007",
+      "decision": "Every memory claim is scoped to this branch lineage until the canonical lineage is decided",
+      "status": "ACTIVE",
+      "evidence": "EVIDENCE lineage divergence record + BLOCKER-0004",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "note": "Naming the canonical lineage is MISSION_DIRECTOR/INTEGRATOR authority. An AUDIT-mode memory lease must not merge, rebase, move a branch or decide it."
+    },
+    {
+      "id": "DECISION-0008",
+      "decision": "Wave 10 audits are not re-run; their unpromoted artifacts are cited by branch provenance instead",
+      "status": "ACTIVE",
+      "evidence": "BLOCKER-0003 + all Wave 10 evidence records",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "note": "Re-running them would be duplicate work against a mission that forbids repeating accepted audits without regression evidence. The correct remedy is governed promotion by WORK-0004, not a new audit."
+    },
+    {
+      "id": "DECISION-0009",
+      "decision": "A repeated execution of an already-attempted lease must be recorded, not silently repeated",
+      "status": "ACTIVE",
+      "evidence": "EVIDENCE prior unpromoted attempt record",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "note": "This is the MEMORY_EDITOR deduplication mandate made enforceable: the Work Registry now carries WORK-0003.execution_attempts so the next dispatch sees that the lease ran once and was not promoted."
+    },
+    {
+      "id": "DECISION-0010",
+      "decision": "Unpromoted worker-branch evidence keeps its worker-reported state but is labelled branch-scoped",
+      "status": "ACTIVE",
+      "evidence": "TEAM-ORGANIZATION-V2-PROTOCOL.md evidence discipline",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "note": "A worker's self-reported state is preserved verbatim; only its reachability and provenance are annotated. Preserving failed and unpromoted evidence is mandatory; upgrading or deleting it is forbidden."
+    },
+    {
+      "id": "DECISION-0011",
+      "decision": "Reused prior unpromoted ledger content as the baseline after independent re-verification instead of regenerating it",
+      "status": "ACTIVE",
+      "evidence": "Capability Provider Leverage Law reuse order applied to organizational memory; EVIDENCE-0019 / EVIDENCE-0022",
+      "recorded_by": "work-0003-memory-backfill-37788700120",
+      "note": "Reuse-before-rebuild governs process memory as well as product capability. Two prior attempts of this lease already produced a machine-verified baseline; regenerating it from nothing would repeat completed work and burn the wave budget. Adoption was conditional on re-deriving every material claim, which produced six corrections. This is reuse with verification, not trust."
+    },
+    {
+      "id": "DECISION-0012",
+      "decision": "The unpromoted WORK-0004 root-cause reattribution is recorded as a pending memory correction, not applied",
+      "status": "ACTIVE",
+      "evidence": "EVIDENCE-0020 + BLOCKER-0001",
+      "recorded_by": "work-0003-memory-backfill-37788700120",
+      "note": "BLOCKER-0001 keeps its recorded title, status and evidence. Root-cause attribution and promotion are INTEGRATOR/MISSION_DIRECTOR authority, and the claiming lease is unpromoted and not QC-adjudicated. Recording a pending correction is the MEMORY_EDITOR duty; asserting it as fact would be memory fabrication."
+    },
+    {
+      "id": "DECISION-0013",
+      "decision": "WORK-0003 must not be dispatched a fourth time at the same START_SHA without QC adjudication or promotion",
+      "status": "ACTIVE",
+      "evidence": "EVIDENCE-0023 + DEFECT-0008 + BLOCKER-0005",
+      "recorded_by": "work-0003-memory-backfill-37788700120",
+      "note": "Three executions of one lease are a governance cost, not a memory problem. The binding constraint is promotion and QC, which this AUDIT lease may not perform. Until WORK-0004 adjudicates and promotes, a further dispatch is duplicate governed work and must be refused by the ORCHESTRATOR."
     }
   ]
 }
