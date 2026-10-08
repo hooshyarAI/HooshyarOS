@@ -41,6 +41,24 @@ jobs:
           node scripts/lib/team-v2-authorization.test.cjs
           node scripts/lib/team-v2-reservation.test.cjs
           node scripts/team-v2-dispatch-authority.test.cjs
+      - name: Real negative admission against current target
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          TARGET_BRANCH: fix/autonomous-product-factory
+          TEAM_CONTROL_ISSUE: "122"
+          TEAM_WORKER_WORKFLOW_ID: "378094136"
+        run: |
+          set +e
+          node scripts/team-v2-dispatch-authority.cjs > "${RUNNER_TEMP}/negative-admission.txt" 2>&1
+          rc=$?
+          set -e
+          cat "${RUNNER_TEMP}/negative-admission.txt"
+          test "${rc}" -eq 20
+          grep -q 'ACCEPTANCE_AUTHORIZATION_REQUIRED' "${RUNNER_TEMP}/negative-admission.txt"
+          ! grep -q 'TEAM_RESERVATION_CREATED=' "${RUNNER_TEMP}/negative-admission.txt"
+          echo "REAL_NEGATIVE_ADMISSION=PASS"
+
       - name: Worker route contract audit
         run: |
           set -euo pipefail
