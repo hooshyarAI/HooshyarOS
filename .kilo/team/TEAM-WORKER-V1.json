@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "team_version": "V1",
-  "status": "READY_MANUAL",
+  "status": "V2_OVERLAY_ACTIVE",
   "mode": "AUDIT_PARALLEL",
   "initial_pool_size": 12,
   "scale_targets": [
@@ -101,5 +101,9 @@
       "focus": "runtime/application/acceptance/commercial completion gaps and evidence",
       "owner": "Executive Intelligence Engine"
     }
-  ]
+  ],
+  "organization_version": "V2",
+  "organization_overlay": ".kilo/team/TEAM-ORGANIZATION-V2.json",
+  "organization_protocol": ".kilo/team/TEAM-ORGANIZATION-V2-PROTOCOL.md",
+  "memory_root": ".kilo/team/memory/"
 }
