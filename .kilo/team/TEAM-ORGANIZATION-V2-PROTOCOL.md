@@ -28,6 +28,10 @@ MISSION DIRECTOR
 
 WATCHDOG observes the whole path independently.
 
+## Capacity law
+
+The V1 worker list is a specialist capability catalog, not a standing headcount. Under Team V2, active concurrency is derived only from the current `NEXT-WAVE-PLAN.json` READY leases. There is no legacy-pool fallback, no requirement to fill a fixed seat count, and no dispatch of work that is not READY, dependency-satisfied and non-duplicate. A missing or invalid V2 plan is a BLOCKED control state, not permission to start the legacy pool.
+
 ## Authority boundaries
 
 **MISSION DIRECTOR** decides operational priority, capacity and conflict handling. It cannot redefine architecture, governance or completion evidence.
