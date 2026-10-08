@@ -194,7 +194,8 @@ jobs:
           subprocess.check_call(["git","config","user.name","github-actions[bot]"])
           subprocess.check_call(["git","config","user.email","41898282+github-actions[bot]@users.noreply.github.com"])
           subprocess.check_call(["git","add",str(registry_path)])
-          subprocess.check_call(["git","commit","-m",f"governance(team): admit governed plan before dispatch ({",".join(admitted)})"])
+          commit_label=",".join(admitted)
+          subprocess.check_call(["git","commit","-m",f"governance(team): admit governed plan before dispatch ({commit_label})"])
 
           subprocess.check_call(["git","fetch","origin",target])
           current=subprocess.check_output(["git","rev-parse",f"origin/{target}"],text=True).strip()
