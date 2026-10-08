@@ -1303,11 +1303,12 @@ jobs:
           - Docs/ARCHITECTURE.md
           - .kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md
           - .kilo/team/TEAM-WORKER-V1-PROTOCOL.md
-          - .kilo/team/results/*/result.md
-           - .kilo/team/results/*/worker.patch
-           - .kilo/team/results/*/changed-files.txt
+          - the CURRENT leased worker result directory under .kilo/team/results/<current-lease-id>/result.md
+          - the CURRENT leased worker patch under .kilo/team/results/<current-lease-id>/worker.patch
+          - the CURRENT leased changed-files.txt
+          Historical result directories under .kilo/team/results/* are context only. They are not current-wave outputs and MUST NOT be required to contain worker.patch/changed-files artifacts.
 
-          Independently determine whether the successful worker outputs and actual changes are:
+          Independently determine whether the successful CURRENT-WAVE worker outputs and actual changes are:
           - within their assigned scope;
           - evidence-backed rather than model assertions;
           - non-duplicative;
@@ -1315,7 +1316,8 @@ jobs:
           - consistent with Architecture Freeze V4/V4.1;
           - explicit about unknowns and blocked items;
           - suitable inputs to the Team Synthesizer.
-           - the actual patch MUST corroborate the worker report; a report alone is never sufficient.
+          - the current lease IDs are provided by LEASE_IDS at runtime. Evaluate only those current-wave outputs for acceptance.
+          - the actual patch MUST corroborate the worker report; a report alone is never sufficient.
 
           Reject false-green evidence, fabricated claims, unsupported completion claims, or contradictions that were silently ignored.
 
@@ -1329,20 +1331,26 @@ jobs:
           LOG="${RUNNER_TEMP}/team-semantic-qc.log"
           status=1
           IFS='|' read -r -a CANDIDATES <<< "${QC_MODEL_CANDIDATES}"
+          attempt_no=0
           for candidate in "${CANDIDATES[@]}"; do
+            attempt_no=$((attempt_no+1))
+            ATTEMPT_LOG="${RUNNER_TEMP}/qc-attempt-${attempt_no}.log"
+            : > "${ATTEMPT_LOG}"
             echo "QC_MODEL_ATTEMPT=${candidate}" | tee -a "${LOG}"
-            if timeout --signal=TERM --kill-after=30s 12m opencode run --auto --agent plan --model "${candidate}" "$(cat "${PROMPT}")" 2>&1 | tee -a "${LOG}"; then
-              if grep -q "QC_DECISION=PASS" "${LOG}" && ! grep -q "QC_DECISION=FAIL" "${LOG}"; then
+            if timeout --signal=TERM --kill-after=30s 12m opencode run --auto --agent plan --model "${candidate}" "$(cat "${PROMPT}")" 2>&1 | tee "${ATTEMPT_LOG}" | tee -a "${LOG}"; then
+              if grep -q "^QC_DECISION=PASS$" "${ATTEMPT_LOG}" && ! grep -q "^QC_DECISION=FAIL$" "${ATTEMPT_LOG}"; then
                 status=0
+                echo "QC_FINAL_DECISION=PASS" | tee -a "${LOG}"
                 break
               fi
             fi
           done
-          test "${status}" -eq 0 || {
+          if test "${status}" -ne 0; then
+            echo "QC_FINAL_DECISION=FAIL" | tee -a "${LOG}"
             echo "TEAM_QC_STATUS=FAIL"
             tail -120 "${LOG}" || true
             exit 30
-          }
+          fi
           echo "TEAM_QC_STATUS=PASS"
           tail -80 "${LOG}"
 
@@ -1352,7 +1360,7 @@ jobs:
         run: |
           set +e
           DECISION="FAIL"
-          if test -f "${RUNNER_TEMP}/team-semantic-qc.log" && grep -q "QC_DECISION=PASS" "${RUNNER_TEMP}/team-semantic-qc.log" && ! grep -q "QC_DECISION=FAIL" "${RUNNER_TEMP}/team-semantic-qc.log"; then DECISION="PASS"; fi
+          if test -f "${RUNNER_TEMP}/team-semantic-qc.log" && grep -q "^QC_FINAL_DECISION=PASS$" "${RUNNER_TEMP}/team-semantic-qc.log"; then DECISION="PASS"; fi
           export DECISION
           python3 - <<PY
           import hashlib, json, pathlib, os
