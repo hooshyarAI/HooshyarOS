@@ -1239,3 +1239,24 @@ AUDIT COMPLETE + REMAINING WORK RECONCILED + PLAN UPDATED + SAFE MICRO-STAGES EX
 
 Canonical active state:
 .kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md
+
+
+## Adaptive Free-Model Selection Policy for Autonomous Construction
+
+Automatic construction is **free-only but model-adaptive**. The operator must not be locked to one fixed free model when the configured OpenCode catalog exposes other eligible free models.
+
+Before each autonomous worker run:
+1. refresh the available OpenCode model catalog;
+2. identify only models whose effective input/output/reasoning cost is zero and whose provider is currently authenticated/available;
+3. rank eligible models by task fitness, prioritizing reasoning, tool calling, structured output, context capacity, output capacity and current catalog metadata;
+4. use the highest-ranked eligible model for the current Micro-Stage;
+5. if that model fails technically before producing a usable governed result, automatically move to the next eligible free candidate, preserving failure evidence;
+6. never fall back automatically to a paid model.
+
+Model selection is an execution mechanism, not an architecture or product decision. A model may not redefine governance, architecture, product semantics or completion rules.
+
+For complex reasoning, financial analysis, repository-scale work or multi-file construction, model fitness must favor strong reasoning + tool calling + sufficient context over raw speed alone.
+
+When no eligible free model is available, the run enters `BLOCKED_FREE_MODEL_UNAVAILABLE`. This is an infrastructure/model-availability blocker, not permission to use a paid model.
+
+No customer financial data, personal data, secrets or confidential external-company material may be sent to a free-model endpoint when current provider terms permit model-improvement use.
