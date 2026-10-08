@@ -37,6 +37,9 @@ jobs:
   prepare:
     if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-22.04
+    env:
+      TEAM_RESERVATION_ID: ${{ inputs.reservation_id }}
+      TEAM_RESERVATION_REF: ${{ inputs.reservation_ref }}
     outputs:
       start_sha: ${{ steps.final_state.outputs.start_sha }}
       matrix: ${{ steps.pool.outputs.matrix }}
@@ -785,6 +788,8 @@ jobs:
     env:
       TARGET_BRANCH: fix/autonomous-product-factory
       START_SHA: ${{ needs.prepare.outputs.start_sha }}
+      RESERVATION_ID: ${{ inputs.reservation_id }}
+      RESERVATION_REF: ${{ inputs.reservation_ref }}
       RESERVATION_ID: ${{ inputs.reservation_id }}
       RESERVATION_REF: ${{ inputs.reservation_ref }}
       RESERVATION_ID: ${{ inputs.reservation_id }}
