@@ -4,6 +4,8 @@ on:
   schedule:
     - cron: "*/10 * * * *"
   workflow_dispatch:
+  workflow_job:
+    types: [completed]
 
 permissions:
   contents: read
@@ -189,3 +191,73 @@ Run:
         run: |
           echo "WATCHDOG_RUN=${WATCHDOG_RUN:-unknown}"
           echo "ALERT_NEEDED=${ALERT_NEEDED:-unknown}"
+
+  worker-job-watchdog:
+    if: ${{ github.event_name == 'workflow_job' && startsWith(github.event.workflow_job.name, 'team-worker (') && github.event.workflow_job.conclusion != 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+      actions: read
+    env:
+      CONTROL_ISSUE: "122"
+      ALERT_EMAIL: ${{ secrets.HOOSHYAROS_ALERT_EMAIL }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      RESEND_FROM_EMAIL: ${{ secrets.HOOSHYAROS_ALERT_FROM }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Build immediate worker-stop alert
+        shell: bash
+        run: |
+          set -euo pipefail
+          JOB_ID="${{ github.event.workflow_job.id }}"
+          JOB_NAME="${{ github.event.workflow_job.name }}"
+          CONCLUSION="${{ github.event.workflow_job.conclusion }}"
+          RUN_ID="${{ github.event.workflow_job.run_id }}"
+          URL="${{ github.event.workflow_job.html_url }}"
+          SHA="${{ github.event.workflow_job.head_sha }}"
+          body="$(cat <<EOF
+HooshyarOS — یک Worker تیمی متوقف شد.
+
+Worker: ${JOB_NAME}
+Job ID: ${JOB_ID}
+Run ID: ${RUN_ID}
+Conclusion: ${CONCLUSION}
+Head SHA: ${SHA}
+
+جزئیات:
+${URL}
+
+این Worker از بقیه Workerها ایزوله است؛ توقف آن به‌تنهایی کل Wave را متوقف نمی‌کند.
+
+برای شروع Wave/ادامه‌ی کنترل‌شده:
+/opencode-team-run
+EOF
+          )"
+          printf '%s\n' "${body}" > "${RUNNER_TEMP}/worker-stop-alert.txt"
+          echo "WORKER_STOP_ALERT=TRUE" >> "${GITHUB_ENV}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${CONTROL_ISSUE}/comments" -f body="${body}"
+
+      - name: Send immediate worker-stop email when configured
+        if: ${{ env.WORKER_STOP_ALERT == 'TRUE' && env.RESEND_API_KEY != '' && env.ALERT_EMAIL != '' && env.RESEND_FROM_EMAIL != '' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, subprocess
+          body=open(os.environ["RUNNER_TEMP"]+"/worker-stop-alert.txt",encoding="utf-8").read()
+          payload=json.dumps({
+              "from":os.environ["RESEND_FROM_EMAIL"],
+              "to":[os.environ["ALERT_EMAIL"]],
+              "subject":"HooshyarOS — توقف یک Worker تیمی",
+              "text":body
+          })
+          subprocess.run([
+              "curl","-fsS","https://api.resend.com/emails",
+              "-H","Authorization: Bearer "+os.environ["RESEND_API_KEY"],
+              "-H","Content-Type: application/json",
+              "--data",payload
+          ],check=True)
+          PY
