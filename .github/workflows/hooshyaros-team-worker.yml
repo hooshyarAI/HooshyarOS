@@ -29,7 +29,7 @@ permissions:
 jobs:
   prepare:
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'issue_comment' && github.event.issue.pull_request == null && github.event.issue.number == 122 && startsWith(github.event.comment.body, '/opencode-team-run')) }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     outputs:
       start_sha: ${{ steps.state.outputs.start_sha }}
       matrix: ${{ steps.pool.outputs.matrix }}
@@ -268,7 +268,7 @@ jobs:
   model-qualification:
     needs: prepare
     if: ${{ needs.prepare.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 15
     outputs:
       candidates: ${{ steps.qualify.outputs.candidates }}
@@ -473,7 +473,7 @@ jobs:
       fail-fast: false
       max-parallel: ${{ fromJSON(needs.prepare.outputs.max_parallel) }}
       matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 90
     continue-on-error: true
     permissions:
@@ -852,7 +852,7 @@ jobs:
   quality-control:
     needs: [prepare, model-qualification, team-worker]
     if: ${{ always() && needs.prepare.result == 'success' && needs.model-qualification.result == 'success' && needs.team-worker.result != 'cancelled' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 30
     permissions:
       contents: read
@@ -1028,7 +1028,7 @@ jobs:
   integrate:
     needs: [prepare, team-worker, quality-control]
     if: ${{ always() && needs.prepare.result == 'success' && needs.quality-control.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 30
     permissions:
       contents: write
@@ -1124,7 +1124,7 @@ jobs:
   synthesize:
     needs: [integrate, model-qualification]
     if: ${{ success() && needs.model-qualification.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 45
     permissions:
       contents: write
