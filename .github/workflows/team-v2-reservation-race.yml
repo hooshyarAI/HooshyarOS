@@ -1,0 +1,82 @@
+name: HooshyarOS Team V2 Reservation Race Validation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/lib/team-v2-reservation.cjs'
+      - '.github/workflows/team-v2-reservation-race.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  race:
+    strategy:
+      fail-fast: false
+      matrix:
+        slot: [one, two]
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TEST_REF: refs/team-v2-test/reservation-race-${{ github.run_id }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 1
+      - name: Attempt atomic ref creation
+        shell: bash
+        run: |
+          set +e
+          START_SHA="$(git rev-parse HEAD)"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" -f "ref=${TEST_REF}" -f "sha=${START_SHA}" > "${RUNNER_TEMP}/race.txt" 2>&1
+          rc=$?
+          set -e
+          if test "${rc}" -eq 0; then RESULT=WIN; else RESULT=LOSE; fi
+          echo "SLOT=${{ matrix.slot }}" > "${RUNNER_TEMP}/race-result.txt"
+          echo "RESULT=${RESULT}" >> "${RUNNER_TEMP}/race-result.txt"
+          echo "RC=${rc}" >> "${RUNNER_TEMP}/race-result.txt"
+          cat "${RUNNER_TEMP}/race.txt" || true
+      - name: Upload race result
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reservation-race-${{ matrix.slot }}
+          path: ${{ runner.temp }}/race-result.txt
+
+  adjudicate:
+    needs: race
+    if: always()
+    runs-on: ubuntu-slim
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TEST_REF: refs/team-v2-test/reservation-race-${{ github.run_id }}
+    steps:
+      - name: Download results
+        uses: actions/download-artifact@v8
+        with:
+          pattern: reservation-race-*
+          path: ${{ runner.temp }}/race-results
+      - name: Require exactly one winner
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(find "${RUNNER_TEMP}/race-results" -name race-result.txt -type f | sort)
+          test "${#files[@]}" -eq 2
+          wins="$(grep -h '^RESULT=WIN$' "${files[@]}" | wc -l | tr -d ' ')"
+          loses="$(grep -h '^RESULT=LOSE$' "${files[@]}" | wc -l | tr -d ' ')"
+          test "${wins}" -eq 1
+          test "${loses}" -eq 1
+          echo "RESERVATION_RACE=PASS"
+      - name: Cleanup temporary ref
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/${TEST_REF#refs/}" >/dev/null 2>&1
+          true
