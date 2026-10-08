@@ -9,7 +9,7 @@ on:
         type: string
 
 concurrency:
-  group: hooshyaros-autonomous-construction
+  group: hooshyaros-single-recovery
   cancel-in-progress: false
 
 permissions:
