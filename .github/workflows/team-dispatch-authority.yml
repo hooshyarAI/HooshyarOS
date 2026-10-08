@@ -7,6 +7,11 @@ on:
         description: "Reason for the governed Team Worker dispatch"
         required: true
         type: string
+      acceptance_authorization_id:
+        description: "Optional one-shot Team V2 Acceptance Authorization ID"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   actions: write
@@ -26,6 +31,7 @@ jobs:
       TEAM_WORKER_WORKFLOW_ID: "378094136"
       TEAM_CONTROL_ISSUE: "122"
       TEAM_DISPATCH_REASON: ${{ inputs.reason }}
+      TEAM_ACCEPTANCE_AUTHORIZATION_ID: ${{ inputs.acceptance_authorization_id }}
     steps:
       - name: Checkout control-plane authority
         uses: actions/checkout@v6
