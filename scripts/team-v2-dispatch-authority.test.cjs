@@ -21,7 +21,7 @@ assert.equal(admissionViolations(base()).length, 0);
 
 {
   const f=base(); f.gate={gate_id:"TEAM-V2-ACCEPTANCE",status:"ARMED",hold_after_pass:true};
-  assert.ok(admissionViolations(f).some(v=>v.code==="ACCEPTANCE_HOLD"));
+  assert.ok(admissionViolations(f).some(v=>v.code==="ACCEPTANCE_AUTHORIZATION_REQUIRED"));
 }
 {
   const f=base(); delete f.plan.leases[0].role; delete f.plan.leases[0].focus;
