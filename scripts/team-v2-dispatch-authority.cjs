@@ -2,7 +2,7 @@
 "use strict";
 const { execFileSync } = require("node:child_process");
 const { evaluateGate } = require("./lib/team-v2-gate.cjs");
-const { validateWork } = require("./lib/team-v2-admission.cjs");
+const { validateWork, deriveTaskClass } = require("./lib/team-v2-admission.cjs");
 const { validateAuthorization } = require("./lib/team-v2-authorization.cjs");
 const { reservationId, reservationRef } = require("./lib/team-v2-reservation.cjs");
 const crypto = require("node:crypto");
@@ -82,7 +82,7 @@ function admissionViolations({ gate, plan, registry, authorization = null, accep
   const scopes = [];
 
   for (const lease of leases) {
-    for (const key of ["id", "role", "focus", "owner", "mode", "write_scope"]) {
+    for (const key of ["id", "role", "focus", "owner", "mode", "task_class", "write_scope"]) {
       const miss = required(lease?.[key], key);
       if (miss) violations.push({ code: miss.code, detail: `${lease?.id || "unknown"}: ${miss.detail}` });
     }
@@ -99,6 +99,13 @@ function admissionViolations({ gate, plan, registry, authorization = null, accep
     const mode = String(lease?.mode || "");
     if (!["AUDIT", "IMPLEMENT", "REVIEW", "VERIFY"].includes(mode)) {
       violations.push({ code: "LEASE_MODE_INVALID", detail: `${lid}: ${mode}` });
+    }
+    const taskClass = String(lease?.task_class || "").toUpperCase();
+    const derivedTaskClass = deriveTaskClass(lease);
+    if (!["PLAN", "AUDIT", "IMPLEMENT", "REPAIR", "REVIEW", "VERIFY", "QC", "MEMORY"].includes(taskClass)) {
+      violations.push({ code: "TASK_CLASS_INVALID", detail: `${lid}: ${taskClass}` });
+    } else if (derivedTaskClass && taskClass !== derivedTaskClass) {
+      violations.push({ code: "TASK_CLASS_MISMATCH", detail: `${lid}: explicit=${taskClass} derived=${derivedTaskClass}` });
     }
 
     const scope = Array.isArray(lease?.write_scope) ? lease.write_scope.map(String) : [];
@@ -119,6 +126,9 @@ function admissionViolations({ gate, plan, registry, authorization = null, accep
     } else {
       if (String(item.status || "") !== "READY") {
         violations.push({ code: "REGISTRY_STATUS_NOT_READY", detail: `${workId}: status=${String(item.status)}` });
+      }
+      if (item.task_class && String(item.task_class).toUpperCase() !== taskClass) {
+        violations.push({ code: "REGISTRY_TASK_CLASS_MISMATCH", detail: `${workId}: registry=${item.task_class} lease=${taskClass}` });
       }
       if (String(item.readiness || "") !== "READY") {
         violations.push({ code: "REGISTRY_NOT_READY", detail: `${workId}: readiness=${String(item.readiness)}` });
