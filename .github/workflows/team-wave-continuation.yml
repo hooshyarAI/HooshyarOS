@@ -32,6 +32,18 @@ jobs:
           import base64, json, os, subprocess
 
           repo=os.environ["GITHUB_REPOSITORY"]
+          gate_path=".kilo/team/TEAM-V2-ACCEPTANCE-GATE.json"
+          gate_raw=subprocess.check_output([
+              "gh","api",f"repos/{repo}/contents/{gate_path}?ref={os.environ['TARGET_BRANCH']}"
+          ],text=True)
+          gate_obj=json.loads(gate_raw)
+          gate= json.loads(base64.b64decode(gate_obj["content"].replace("\n","")).decode("utf-8"))
+          print(f"TEAM_V2_ACCEPTANCE_GATE={gate.get('status')}")
+          print(f"TEAM_V2_HOLD_AFTER_PASS={gate.get('hold_after_pass')}")
+          if gate.get("status")=="ARMED" and gate.get("hold_after_pass") is True:
+              print("TEAM_CONTINUE=FALSE_ACCEPTANCE_HOLD")
+              raise SystemExit(0)
+
           path=".kilo/team/NEXT-WAVE-PLAN.json"
           raw=subprocess.check_output([
               "gh","api",f"repos/{repo}/contents/{path}?ref={os.environ['TARGET_BRANCH']}"
