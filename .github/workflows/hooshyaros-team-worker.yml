@@ -697,7 +697,7 @@ jobs:
           LOG="${RUNNER_TEMP}/opencode-team-${WORKER_ID}.log"
           : > "${LOG}"
           status=1
-          IFS='|' read -r -a CANDIDATES <<< "${SYNTH_MODEL_CANDIDATES}"
+          IFS='|' read -r -a CANDIDATES <<< "${MODEL_CANDIDATES}"
 
           for candidate in "${CANDIDATES[@]}"; do
             echo "MODEL_ATTEMPT=${candidate}" | tee -a "${LOG}"
