@@ -454,6 +454,39 @@ jobs:
           git checkout -b "opencode/team-${WORKER_ID}-${GITHUB_RUN_ID}" "${START_SHA}"
           test -z "$(git status --porcelain)"
 
+      - name: Bind Team V2 memory context
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+          lid=os.environ["WORKER_ID"]
+          m=re.match(r"^work-([0-9]{4})(?:-|$)", lid)
+          if not m:
+              raise SystemExit(f"BLOCKED: worker {lid} lacks stable WORK-#### identity")
+          work_id=f"WORK-{m.group(1)}"
+          root=Path(".kilo/team/memory")
+          required=["mission-state.json","work-registry.json","evidence-registry.json","decision-registry.json","defect-registry.json","blocker-registry.json","commit-registry.json","wave-history.json"]
+          for name in required:
+              if not (root/name).exists():
+                  raise SystemExit(f"BLOCKED: V2 memory file missing: {name}")
+          registry=json.loads((root/"work-registry.json").read_text(encoding="utf-8"))
+          matches=[x for x in registry.get("items",[]) if x.get("id")==work_id]
+          if len(matches)!=1:
+              raise SystemExit(f"BLOCKED: no unique Work Registry item for {work_id}")
+          status=str(matches[0].get("status","")).upper()
+          if status in {"CLOSED","MEMORIZED","PROMOTED","DUPLICATE","SUPERSEDED"}:
+              raise SystemExit(f"BLOCKED: terminal Work Registry status for {work_id}: {status}")
+          print(f"V2_WORK_ID={work_id}")
+          print(f"V2_WORK_STATUS={status}")
+          print("V2_MEMORY_CONTEXT=READY")
+          with open(os.environ["GITHUB_ENV"],"a",encoding="utf-8") as out:
+              out.write(f"WORK_ID={work_id}\n")
+          PY
+
       - name: Install repository dependencies when required
         if: ${{ matrix.mode == 'IMPLEMENT' || matrix.mode == 'VERIFY' }}
         shell: bash
