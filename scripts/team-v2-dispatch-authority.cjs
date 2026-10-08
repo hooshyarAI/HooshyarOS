@@ -203,7 +203,7 @@ function consumedAuthorizationRefExists(authorizationId) {
   }
 }
 function writeAdmissionRecord(record) {
-  const dir = require("node:os").tmpdir() + "/team-v2-admission";
+  const dir = (process.env.RUNNER_TEMP || require("node:os").tmpdir()) + "/team-v2-admission";
   fs.mkdirSync(dir, { recursive: true });
   const path = dir + "/" + record.reservation_id + ".json";
   fs.writeFileSync(path, JSON.stringify(record, null, 2) + "\n", "utf8");
