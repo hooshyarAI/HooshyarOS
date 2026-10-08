@@ -68,6 +68,21 @@ jobs:
           root = Path(".")
           manifest_path = root / ".kilo/team/TEAM-WORKER-V1.json"
           next_plan = root / ".kilo/team/NEXT-WAVE-PLAN.json"
+          org_manifest_path = root / ".kilo/team/TEAM-ORGANIZATION-V2.json"
+          org_protocol_path = root / ".kilo/team/TEAM-ORGANIZATION-V2-PROTOCOL.md"
+          work_registry_path = root / ".kilo/team/memory/work-registry.json"
+          mission_state_path = root / ".kilo/team/memory/mission-state.json"
+
+          if not org_manifest_path.exists() or not org_protocol_path.exists():
+              raise SystemExit("BLOCKED: Team Organization V2 manifest/protocol missing")
+          if not work_registry_path.exists() or not mission_state_path.exists():
+              raise SystemExit("BLOCKED: V2 team memory ledgers missing")
+          org_manifest = json.loads(org_manifest_path.read_text(encoding="utf-8"))
+          if org_manifest.get("status") != "ACTIVE":
+              raise SystemExit("BLOCKED: Team Organization V2 is not ACTIVE")
+          work_registry = json.loads(work_registry_path.read_text(encoding="utf-8"))
+          if not work_registry.get("items"):
+              raise SystemExit("BLOCKED: V2 Work Registry is empty")
 
           if next_plan.exists():
               plan = json.loads(next_plan.read_text(encoding="utf-8"))
