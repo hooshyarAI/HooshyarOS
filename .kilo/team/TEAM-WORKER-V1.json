@@ -105,5 +105,9 @@
   "organization_version": "V2",
   "organization_overlay": ".kilo/team/TEAM-ORGANIZATION-V2.json",
   "organization_protocol": ".kilo/team/TEAM-ORGANIZATION-V2-PROTOCOL.md",
-  "memory_root": ".kilo/team/memory/"
+  "memory_root": ".kilo/team/memory/",
+  "catalog_type": "SPECIALIST_CAPABILITY_CATALOG",
+  "active_concurrency_policy": "V2_DYNAMIC_FROM_READY_LEASES_ONLY",
+  "legacy_parallel_defaults_under_v2": "DISABLED",
+  "legacy_pool_fallback_under_v2": "FORBIDDEN"
 }
