@@ -1,0 +1,57 @@
+{
+  "schema_version": "1.0",
+  "next_id": "WORK-0003",
+  "backfill_required": true,
+  "items": [
+    {
+      "id": "WORK-0001",
+      "title": "Post-Recovery / Architecture + Audit Reconciliation",
+      "status": "ACTIVE",
+      "mode": "RECONCILIATION_ONLY",
+      "priority": "P0",
+      "owner": "MISSION_DIRECTOR",
+      "dependencies": [
+        "WORK-0002_CONTROL_PLANE_SAFETY"
+      ],
+      "evidence_required": [
+        "current_repository_state",
+        "governance_matrix",
+        "capability_dependency_evidence_graph",
+        "remaining_audit_inventory",
+        "next_missing_capability"
+      ]
+    },
+    {
+      "id": "WORK-0002",
+      "title": "Team Organization V2 Operationalization",
+      "status": "ACTIVE",
+      "mode": "CONSTRUCTION_PROCESS",
+      "priority": "P0",
+      "owner": "MEMORY_EDITOR",
+      "dependencies": [
+        "TEAM-WORKER-V1"
+      ],
+      "write_scope": [
+        ".kilo/team/**",
+        "Docs/HOOSHYAROS_MASTER_CHARTER.md",
+        ".kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md"
+      ],
+      "rule": "NO_NEW_PRODUCT_ENGINE"
+    },
+    {
+      "id": "WORK-0003",
+      "title": "Legacy Work and Evidence Backfill",
+      "status": "PLANNED",
+      "mode": "RECONCILIATION",
+      "priority": "P0",
+      "owner": "PLANNER",
+      "dependencies": [
+        "WORK-0002"
+      ],
+      "write_scope": [
+        ".kilo/team/memory/**"
+      ],
+      "status_reason": "Created by V2 migration; must derive historical records from repository evidence rather than recollection."
+    }
+  ]
+}
