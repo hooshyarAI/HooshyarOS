@@ -462,7 +462,27 @@
         "start_sha": "52b537826dbfc3ac7a512e2126a161db4808cbb8",
         "state": "ADMITTED_BEFORE_DISPATCH"
       },
-      "execution_attempts": []
+      "execution_attempts": [
+        {
+          "run_id": 37818114064,
+          "state": "RESERVED_EXECUTING",
+          "promoted": false,
+          "commit": null,
+          "start_sha": "89dfee45651c0a8c4dbe1ffadddf88d735fae36c",
+          "lease_id": "work-0010-team-v2-acceptance",
+          "reserved_at": "2026-10-08T17:39:15.222619+00:00"
+        }
+      ],
+      "reservations": [
+        {
+          "run_id": 37818114064,
+          "lease_id": "work-0010-team-v2-acceptance",
+          "start_sha": "89dfee45651c0a8c4dbe1ffadddf88d735fae36c",
+          "state": "EXECUTING",
+          "planned_branch": "opencode/team-work-0010-team-v2-acceptance-37818114064"
+        }
+      ],
+      "last_state_change_by": "TEAM_MANAGER_RESERVATION_37818114064"
     }
   ],
   "backfill_required_scope": {
