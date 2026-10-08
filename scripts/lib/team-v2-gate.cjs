@@ -7,9 +7,13 @@ function evaluateGate(gate, authorization, ctx = {}) {
     return { decision: "REFUSE", code: "INVALID_GATE", violations };
   }
 
-  const armed = gate.status === "ARMED" && gate.hold_after_pass === true;
-  if (!armed) {
+  if (gate.status === "ARMED" && gate.hold_after_pass === true) {
+    // Held gate requires an explicit one-shot acceptance authorization.
+  } else if (["PASSED", "DISARMED", "RELEASED"].includes(String(gate.status || "").toUpperCase()) && gate.hold_after_pass !== true) {
     return { decision: "ALLOW_NORMAL", code: "GATE_NOT_HELD", violations };
+  } else {
+    violations.push({ code: "GATE_STATE_INVALID", detail: "unsupported or contradictory gate state" });
+    return { decision: "REFUSE", code: "GATE_STATE_INVALID", violations };
   }
 
   if (!authorization || typeof authorization !== "object") {
