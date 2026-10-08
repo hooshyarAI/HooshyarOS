@@ -785,6 +785,8 @@ jobs:
     env:
       TARGET_BRANCH: fix/autonomous-product-factory
       START_SHA: ${{ needs.prepare.outputs.start_sha }}
+      RESERVATION_ID: ${{ inputs.reservation_id }}
+      RESERVATION_REF: ${{ inputs.reservation_ref }}
       WORKER_ID: ${{ matrix.id }}
       WORKER_ROLE: ${{ matrix.role }}
       WORKER_FOCUS: ${{ matrix.focus }}
@@ -1551,6 +1553,55 @@ jobs:
           if not obj.get("actual_change_inspected"):
               raise SystemExit("BLOCKED: QC did not inspect actual worker changes")
           print("PERSISTED_QC=PASS")
+          PY
+
+      - name: Project authoritative claim into registry
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "${RESERVATION_ID}"
+          test -n "${RESERVATION_REF}"
+          python3 - <<'PY'
+          import json, os, re, subprocess
+          from pathlib import Path
+
+          repo=os.environ["GITHUB_REPOSITORY"]
+          rid=os.environ["RESERVATION_ID"].strip()
+          ref=os.environ["RESERVATION_REF"].strip()
+          if not re.fullmatch(r"[a-f0-9]{64}", rid): raise SystemExit("BLOCKED: invalid reservation id")
+          if not re.fullmatch(r"team-v2/active/WORK-[0-9]{4}", ref): raise SystemExit("BLOCKED: invalid reservation ref")
+          claim_ref="team-v2/claims/"+rid
+          raw=subprocess.check_output(["gh","api","repos/"+repo+"/git/ref/"+claim_ref],text=True)
+          claim=json.loads(raw)
+          claim_sha=str(claim.get("object",{}).get("sha",""))
+          if claim_sha != os.environ["START_SHA"]:
+              raise SystemExit("BLOCKED: claim ref does not bind to wave START_SHA")
+
+          lease_ids=json.loads(os.environ["LEASE_IDS"])
+          if len(lease_ids)!=1: raise SystemExit("BLOCKED: claim projection currently requires one lease")
+          lid=str(lease_ids[0])
+          m=re.match(r"^work-([0-9]{4})(?:-|$)",lid)
+          if not m: raise SystemExit("BLOCKED: invalid lease id "+lid)
+          work_id="WORK-"+m.group(1)
+          registry_path=Path(".kilo/team/memory/work-registry.json")
+          registry=json.loads(registry_path.read_text(encoding="utf-8"))
+          item=next((x for x in registry.get("items",[]) if str(x.get("id"))==work_id),None)
+          if not item: raise SystemExit("BLOCKED: registry row missing "+work_id)
+          attempts=item.setdefault("execution_attempts",[])
+          run_id=int(os.environ["GITHUB_RUN_ID"])
+          matches=[a for a in attempts if int(a.get("run_id",-1))==run_id]
+          if matches and len(matches)!=1: raise SystemExit("BLOCKED: ambiguous registry attempt for run")
+          if matches:
+              if str(matches[0].get("reservation_id")) != rid: raise SystemExit("BLOCKED: registry attempt reservation mismatch")
+          else:
+              attempts.append({"run_id":run_id,"state":"RESERVED_EXECUTING","promoted":False,"commit":None,"start_sha":os.environ["START_SHA"],"lease_id":lid,"reservation_id":rid,"claim_ref":"refs/team-v2/claims/"+rid})
+          reservations=item.setdefault("reservations",[])
+          if not any(int(x.get("run_id",-1))==run_id and str(x.get("lease_id"))==lid for x in reservations):
+              reservations.append({"run_id":run_id,"lease_id":lid,"start_sha":os.environ["START_SHA"],"state":"EXECUTING","reservation_id":rid,"claim_ref":"refs/team-v2/claims/"+rid})
+          registry_path.write_text(json.dumps(registry,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+          print("CLAIM_PROJECTION=READY")
           PY
 
       - name: Integrate independently verified worker commits
