@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0",
+  "next_id": "WAVE-0011",
+  "waves": [
+    {
+      "id": "WAVE-0010",
+      "run_id": 37743827267,
+      "status": "RECOVERY_REVIEW_REQUIRED",
+      "workers_total": 12,
+      "workers_successful": 11,
+      "workers_failed": 1,
+      "qc": "PASS",
+      "integration": "FAIL_DUE_CONTROLLED_TARGET_DRIFT",
+      "synthesis": "NOT_RELEASED_FROM_PRIMARY_RUN",
+      "recovery": "EVIDENCE_PRESERVING_RECOVERY_ATTEMPTED"
+    }
+  ]
+}
