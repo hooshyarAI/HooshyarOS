@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "next_id": "WORK-0003",
+  "next_id": "WORK-0006",
   "backfill_required": true,
   "items": [
     {
@@ -53,6 +53,46 @@
         ".kilo/team/memory/**"
       ],
       "status_reason": "Created by V2 migration; must derive historical records from repository evidence rather than recollection."
+    },
+    {
+      "id": "WORK-0004",
+      "title": "Wave 10 Recovery / Integration Reconciliation",
+      "status": "READY",
+      "mode": "REVIEW",
+      "priority": "P0",
+      "owner": "INTEGRATOR",
+      "dependencies": [
+        "WORK-0001"
+      ],
+      "write_scope": [
+        ".kilo/team/results/work-0004-wave10-recovery/"
+      ],
+      "evidence_required": [
+        "worker_envelopes",
+        "qc_result",
+        "target_drift",
+        "recovery_outcome"
+      ]
+    },
+    {
+      "id": "WORK-0005",
+      "title": "Next Genuinely Missing Capability Reconciliation",
+      "status": "READY",
+      "mode": "REVIEW",
+      "priority": "P1",
+      "owner": "PLANNER",
+      "dependencies": [
+        "WORK-0001",
+        "WORK-0003"
+      ],
+      "write_scope": [
+        ".kilo/team/results/work-0005-next-capability/"
+      ],
+      "evidence_required": [
+        "current_audit_inventory",
+        "dependency_graph",
+        "value_risk_dependency_readiness_speed"
+      ]
     }
   ]
 }
