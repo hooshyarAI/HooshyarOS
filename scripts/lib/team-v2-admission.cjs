@@ -30,7 +30,7 @@ function validateWork({ plan, registry, workId, leaseId }) {
     return violations;
   }
 
-  for (const key of ["id","role","focus","owner","mode","write_scope"]) {
+  for (const key of ["id","role","focus","owner","mode","task_class","write_scope"]) {
     if (lease[key] === undefined || lease[key] === null || lease[key] === "") {
       violations.push({ code: `MISSING_${key.toUpperCase()}`, detail: `${leaseId}: missing ${key}` });
     }
@@ -39,6 +39,10 @@ function validateWork({ plan, registry, workId, leaseId }) {
   const derived = workIdFromLeaseId(lease.id);
   if (derived !== workId) {
     violations.push({ code: "LEASE_ID_WORK_ID_MISMATCH", detail: `${lease.id} -> ${derived} expected ${workId}` });
+  }
+  const taskClass = String(lease.task_class || "").toUpperCase();
+  if (!["PLAN","AUDIT","IMPLEMENT","REPAIR","REVIEW","VERIFY","QC","MEMORY"].includes(taskClass)) {
+    violations.push({ code: "TASK_CLASS_INVALID", detail: String(lease.task_class || "") });
   }
   if (!VALID_MODES.has(String(lease.mode || ""))) {
     violations.push({ code: "LEASE_MODE_INVALID", detail: String(lease.mode || "") });
