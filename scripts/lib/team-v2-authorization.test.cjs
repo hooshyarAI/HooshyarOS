@@ -8,6 +8,8 @@ const ctx = {
   targetBranch: "fix/autonomous-product-factory",
   targetSha: "a".repeat(40),
   planSha256: "b".repeat(64),
+  leaseSha256: "c".repeat(64),
+  taskClass: "MEMORY",
   now: "2026-10-08T20:00:00Z"
 };
 
