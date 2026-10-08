@@ -222,6 +222,11 @@ if (require.main === module) {
   const acceptanceLease = Array.isArray(plan.leases) && plan.leases.length === 1 ? plan.leases[0] : null;
   const acceptanceWorkId = acceptanceLease ? workIdFromLeaseId(acceptanceLease.id) : null;
   const authorizationId = String(process.env.TEAM_ACCEPTANCE_AUTHORIZATION_ID || "").trim();
+  if (authorizationId && !/^ACCAUTH-[A-Za-z0-9._-]{1,48}$/.test(authorizationId)) {
+    console.log("TEAM_WORKER_DISPATCH=REFUSED_INVALID_AUTHORIZATION_ID");
+    comment("TEAM DISPATCH AUTHORITY REFUSED: invalid authorization id format.");
+    process.exit(20);
+  }
   const authorizationPath = authorizationId ? "control-plane/authorizations/" + authorizationId + ".json" : "";
   let authorization = null;
   if (authorizationPath) authorization = readRepoJson(authorizationPath, "main");
@@ -237,7 +242,7 @@ if (require.main === module) {
     now: new Date().toISOString()
   });
 
-  if (authorization || gate.status === "ARMED") {
+  if (authorization) {
     const authViolations = validateAuthorization(authorization, {
       workId: acceptanceWorkId,
       leaseId: acceptanceLease?.id || null,
