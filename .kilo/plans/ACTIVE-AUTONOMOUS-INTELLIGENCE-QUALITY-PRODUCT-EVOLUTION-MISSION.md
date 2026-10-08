@@ -224,45 +224,88 @@ COMMAND = .kilo/team/COMMANDS/POST-TEAM-V2-PERFORMANCE-AUDIT-EDIT-REPAIR.md
 No remaining-stage product repair may begin before WORK-0006 passes its gate.
 
 
-## RECOVERY SYNTHESIS — WAVE-0011 PROMOTION RECONCILIATION
+## RECOVERY SYNTHESIS — WAVE-0011 PROMOTION RECONCILIATION (REV 2)
 
 This section is the recovery synthesis record. It reconciles the promoted target state
 against the organizational ledgers and states the next wave. It is not a product plan and
 claims no product outcome.
 
-SYNTHESIS_HEAD_SHA = 266d5ccbc3f7a0b156b0d25d1d313c65c155496a
+SYNTHESIS_REVISION = 2
+SYNTHESIS_SUPERSEDES = the rev-1 synthesis carried in commit e8730ccb95eace9c268019b5b60e3b01f808f164. Git is the durable record of rev 1; nothing is deleted here, only re-measured. Where rev 1 and rev 2 differ, rev 2's measurement governs.
+SYNTHESIS_BASE_SHA = e8730ccb95eace9c268019b5b60e3b01f808f164 (tip of origin/fix/autonomous-product-factory and of this checkout at synthesis start; the synthesis is exactly one commit on top of it)
 SYNTHESIS_SCOPE = .kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md + .kilo/team/NEXT-WAVE-PLAN.json only. No memory ledger was edited in this step.
 NEXT_WAVE_PLAN = .kilo/team/NEXT-WAVE-PLAN.json (wave_status READY, one lease, schema-valid)
-CONTROL_NOTE = V2 recovery wave; no product implementation.
+CONTROL_NOTE = V2 recovery synthesis, revision 2; no product implementation.
 
-### A. What the promotion actually changed (FACT, measured on this lineage)
+### A. The promoted target state, re-verified at SYNTHESIS_BASE_SHA (FACT)
 
-| Lease | Result path at SYNTHESIS_HEAD_SHA | Integrating commit |
-|---|---|---|
-| WORK-0003 | `.kilo/team/results/work-0003-memory-backfill/result.md` present | bd0c7939 |
-| WORK-0005 | `.kilo/team/results/work-0005-next-capability/result.md` present | 0ab0f063 |
-| WORK-0004 | `.kilo/team/results/work-0004-wave10-recovery/result.md` present | 266d5ccb |
+| Lease | Result path present | Integrating commit | Relation to its worker branch |
+|---|---|---|---|
+| WORK-0003 | `.kilo/team/results/work-0003-memory-backfill/result.md` + all 8 ledgers | bd0c7939 | tree-identical to `94fb1c2a` over `.kilo/team/memory/**` + that result path |
+| WORK-0004 | `.kilo/team/results/work-0004-wave10-recovery/result.md` | 266d5ccb | byte-identical to `305466cc`'s `result.md` |
+| WORK-0005 | `.kilo/team/results/work-0005-next-capability/result.md` | 0ab0f063 | tree-identical to `bbeb2c08` over that result path |
+| WORK-0006 | `.kilo/team/results/work-0006-team-performance-evaluation/PRE-GATE-BASELINE.md` | 00d06882 | pre-existing artifact, not a WAVE-0011 result |
 
-Established input for this synthesis: WORK-0003 and WORK-0005 evidence were integrated by the
-prior recovery run, and WORK-0004 previously executed and independently QC-passed, with this
-recovery promoting only that existing evidence. No lease was re-executed to produce this state.
+Established input, carried forward unchanged: WORK-0003 and WORK-0005 evidence were integrated by
+the prior recovery run; WORK-0004 previously executed and independently QC-passed, and this recovery
+promoted only that existing evidence. No lease was re-executed to produce this state, and none was
+re-executed by this synthesis. What is now promoted is the *payload*; whether each item is QC-adjudicated
+is a separate question and is not answered by payload presence.
 
-### B. What did NOT change (unchanged in kind, re-verified)
+### B. What changed since rev 1 (the only delta that moves this plan)
 
-- Wave 10's eleven audit reports are still unpromoted: every `origin/opencode/team-*-37743827267`
-  ref fails `merge-base --is-ancestor` against HEAD. BLOCKER-0003 stays OPEN. DECISION-0008 holds —
-  they are cited by branch provenance, never re-audited.
-- `origin/main` still contains zero `.kilo/team/memory/` paths and zero `.kilo/team/results/` paths.
-  BLOCKER-0004 stays OPEN. `canonical_lineage` remains UNDECIDED and every claim above is scoped to
-  this branch lineage. `9151fe4d` is still not an ancestor of HEAD.
-- Seven unpromoted V2 worker refs still exist and were not retired.
-- No governed recovery run has ever succeeded. WORK-0004 established that the recovery path dies on a
-  `$GITHUB_ENV` read inside the same `set -u` step and that the 2-file drift allowlist blocks 18 of 20
-  real drift paths. BLOCKER-0005 must be re-scoped by the reconciliation lease, not closed.
-- Gate A is not adjudicated. No product work was dispatched, planned as dispatchable, or performed.
-- Architecture Freeze V4/V4.1 is unmodified. No charter, governance authority or test was touched.
+1. `origin/main` advanced `8be3e4e8` → **`704d42ff`** ("fix(team): make promotion recovery idempotent
+   for existing evidence"). Counts: `origin/main` 84 → **85** commits ahead; this lineage 667 → **668**
+   ahead; `origin/main` still holds **0** `.kilo/team/memory/` and **0** `.kilo/team/results/` paths.
+   `9151fe4d` is an ancestor of `origin/main` but still **not** an ancestor of HEAD.
+2. **WORK-0004 finding F-2 is now stale as to `origin/main`.** `d90d8e11` ("fix(team): configure
+   integration git identity before cherry-pick") inserted `git config user.name "github-actions[bot]"`
+   / `git config user.email …` at lines 1088–1089 of `hooshyaros-team-worker.yml`, ahead of
+   `git cherry-pick` at line 1126. The missing-committer-identity defect WORK-0004 recorded as P0/LIVE
+   is repaired **on the `origin/main` control plane only**.
+3. **F-3 is still live on `origin/main` at `704d42ff`.** `hooshyaros-team-wave-recovery.yml` line 88
+   `cat recovery.env >> "${GITHUB_ENV}"` still precedes line 90's use of `${RECOVERY_START_SHA}` in the
+   same `set -euo pipefail` step. The `$GITHUB_ENV` same-step defect class is unrepaired.
+4. **New governed promotion-recovery path exists on `origin/main` only.**
+   `.github/workflows/team-promotion-recovery.yml` (added `8be3e4e8`, hardened `704d42ff`) is
+   `workflow_dispatch`-only, hardcodes `TARGET_BRANCH=fix/autonomous-product-factory` and
+   `START_SHA=6c9d4da5`, defaults `RECOVERY_WORK_COMMIT=305466cc`, asserts the source run's
+   `quality-control` and WORK-0004 job conclusions are both `success`, asserts the commit changes
+   exactly `.kilo/team/results/work-0004-wave10-recovery/result.md`, then promotes only that path.
+   This is the only measured control-plane mechanism capable of un-stranding governed evidence, and it
+   promotes one lease at a time.
+5. **New and material: the team control-plane workflows are ABSENT from this lineage entirely.**
+   Verified — no `.github/workflows/*team*` path exists at the merge base `99542164`, at Wave 10's
+   `START_SHA 04119244`, at `6c9d4da5`, at `e8730ccb`, or on worker branches `7010e238` and `94fb1c2a`.
+   All five team workflows (`hooshyaros-team-worker.yml`, `hooshyaros-team-wave-recovery.yml`,
+   `team-promotion-recovery.yml`, `team-queue-bootstrap.yml`, `team-stop-alert.yml`) exist only on
+   `origin/main`. So BLOCKER-0004 is deeper than "two divergent lineages": the memory lineage that
+   holds every ledger also holds **no dispatch substrate**, and every governed promotion of its
+   evidence had to be executed by a workflow that does not exist on it.
+6. **V2 worker refs are 7, not 5.** Added since rev 1:
+   `origin/opencode/team-work-0003-memory-backfill-37788700120` @ `94fb1c2a` and
+   `origin/opencode/team-work-0005-next-capability-37788700120` @ `bbeb2c08`. Both are orphaned
+   duplicates of content already present here (section A). The refs remain unretired; the *content*
+   they carried is no longer stranded.
 
-### C. Genuine memory/status reconciliation required before new product work
+### C. What did NOT change (unchanged in kind, re-verified at SYNTHESIS_BASE_SHA)
+
+- Wave 10's eleven audit reports are still unpromoted: all 11 `origin/opencode/team-*-37743827267`
+  refs fail `git merge-base --is-ancestor … HEAD` (0 ancestors, 11 non-ancestors), and
+  `.kilo/team/results/` holds no Wave 10 report directory. BLOCKER-0003 stays OPEN. DECISION-0008 holds
+  — they are cited by branch provenance, never re-audited.
+- `origin/main` still contains zero `.kilo/team/memory/` paths. BLOCKER-0004, DEFECT-0002 and
+  BLOCKER-0005 stay OPEN. `canonical_lineage` remains UNDECIDED and every claim here is scoped to this
+  branch lineage.
+- Gate A is not adjudicated. WORK-0006's `PRE-GATE-BASELINE.md` still carries the three claims promoted
+  WORK-0004 disproves — "Original Integrator job: FAIL due controlled target drift" (line 16), "Recovery
+  workflow: executed and preserved evidence" (line 17), and the derived metric rows (lines 31–32) — and
+  that file is inside WORK-0006's own write scope, so only WORK-0006 may correct it.
+- No accepted F1/F6/CCC/UX work shows current regression or invalidation evidence.
+- Architecture Freeze V4/V4.1 is unmodified. No charter, governance authority, test or protected path
+  was touched by this synthesis.
+
+### D. Genuine memory/status reconciliation required before new product work
 
 Promotion changed the authoritative state, but the ledgers still encode the pre-promotion state. This
 is a real contradiction, not bookkeeping: the ORCHESTRATOR dispatches on promoted Work Registry state,
@@ -270,81 +313,107 @@ so a stale registry either re-dispatches already-executed governed work or lets 
 disproven baseline. Stale items, each machine-checkable:
 
 1. `WORK-0003` — status `EXECUTED_AWAITING_QC`, readiness `EXECUTED`, all three `execution_attempts`
-   `promoted: false`. `fourth_dispatch_rule: REFUSE` was conditioned on absent QC/promotion; that
-   condition is now met, so the guard is both stale and mis-gating.
+   `promoted: false`, and commit `PENDING_THIS_LEASE_COMMIT`. `fourth_dispatch_rule: REFUSE` was
+   conditioned on absent QC/promotion; that condition is now met, so the guard is both stale and
+   mis-gating.
 2. `WORK-0004` — status `READY`, readiness `BLOCKED_BY_DEPENDENCIES`, attempts `promoted: false` /
-   `qc: NOT_PERFORMED`, note "WORK-0004 is not DONE". Now false; a lease would be duplicate work.
+   `qc: NOT_PERFORMED`, note "WORK-0004 is not DONE". Now false as to promotion; a lease would be
+   duplicate governed work.
 3. `WORK-0005` — status `READY`, readiness `BLOCKED_BY_DEPENDENCIES`, attempt `promoted: false`. Now
-   false; a lease would duplicate already-executed planning.
-4. `BLOCKER-0005` — `promotions_performed: 0`, `qc_adjudications_found: 0`,
-   `unpromoted_team_worker_branches: 5`. Stale as to content, still open as to orphan refs and the
-   unrepaired control-plane path.
+   false as to promotion; a lease would duplicate already-executed planning.
+4. `BLOCKER-0005` — `unpromoted_team_worker_branches: 5` (now 7), `promotions_performed: 0`,
+   `qc_adjudications_found: 0`, `integrations_performed: 0`, `root_cause` = "none reached the target
+   lineage". Stale as to content (section A), and now under-scoped as to mechanism (B.4, B.5). It must
+   be RE-SCOPED, not closed: the orphan refs are unretired, no governed recovery has succeeded through
+   the wave-recovery path, and the only working promotion path lives on the undecided lineage.
 5. `mission-state.truth_note` asserts "no governed V2 worker result has been promoted or QC-adjudicated"
-   and `next_state` names a promotion step that already happened. Both false.
-6. `wave-history` WAVE-0011 `promotion_state = NO_WORKER_RESULT_PROMOTED_TO_TARGET_LINEAGE` and
-   `current.status = EXECUTING_AWAITING_QC_AND_PROMOTION`. Both stale.
-7. `EVIDENCE-0020` + `DECISION-0012` — the reason the missing-git-committer-identity reattribution was
-   withheld ("claiming lease unpromoted and not QC-adjudicated") no longer holds, so BLOCKER-0001
-   re-adjudication becomes available. Attribution stays INTEGRATOR/MISSION_DIRECTOR authority: the
-   reconciliation lease records it as adjudicable and opens the adjudication; it does not re-title
-   BLOCKER-0001.
+   and `next_state` names a promotion step that already happened. Both false as to promotion.
+   `mission-state.target_lineage.origin_main_tip` is `d90d8e11` (now `704d42ff`, 85 ahead).
+6. `wave-history` WAVE-0011 `promotion_state = NO_WORKER_RESULT_PROMOTED_TO_TARGET_LINEAGE`,
+   `unpromoted_worker_results: 5` (now 7, of which 2 are duplicated content) and
+   `current.status = EXECUTING_AWAITING_QC_AND_PROMOTION`. All stale.
+7. `EVIDENCE-0020` + `DECISION-0012` — the stated reason for withholding the missing-git-committer-identity
+   reattribution ("claiming lease is unpromoted and not QC-adjudicated") no longer holds. The
+   reattribution is now independently corroborated by `d90d8e11`. BLOCKER-0001 re-adjudication becomes
+   available, but attribution stays INTEGRATOR/MISSION_DIRECTOR authority: the reconciliation lease
+   records it as adjudicable and opens the adjudication; it does not re-title BLOCKER-0001 or accept it.
 8. `EVIDENCE-0021` — the WORK-0005 selection `product.impact-measurement` content-addressed evidence
-   binding is now admissible planning input, and is still barred from dispatch by the WORK-0006 gate.
-9. `DEFECT-0008` and `memory/README.md` — "three executions ... none promoted, none QC-adjudicated" and
-   the five-stranded-results bullet are false as to content.
-10. `BLOCKER-0004` — recorded counts are stale: `origin/main` is now `8be3e4e8`, 84 commits ahead (was
-    81), this lineage 667 ahead (was 662), memory still absent on `origin/main`.
-11. `NEXT-WAVE-PLAN.json` failed its own schema: `control_note` and `work_ids` are rejected by
-    `additionalProperties: false`. Repaired in this synthesis; that content is carried in this section.
+   binding is now admissible planning input, and remains barred from dispatch by the WORK-0006 gate.
+9. `DEFECT-0002`, `DEFECT-0008` and `memory/README.md` — "three executions … none promoted, none
+   QC-adjudicated", the five-stranded-results bullet and the "nothing in them is … promoted or accepted,
+   including this backfill" claim are false as to content. DEFECT-0002's `detail` also carries stale
+   lineage counts (80/662). DEFECT-0008's `fix_work: WORK-0004_INTEGRATOR_PROMOTION_AND_QC` is now
+   partly discharged — its remaining content is the unretired refs and the still-unrepaired
+   wave-recovery path, not the promotion itself.
+10. `BLOCKER-0004` — recorded counts are stale: `origin_main_tip 0bfe3eae`/80 ahead (refresh block says
+    `d90d8e11`/81), this lineage 662 ahead. Now `704d42ff`, 85 ahead, this lineage 668 ahead, memory
+    still absent on `origin/main`. The blocker must also absorb B.5: the dispatch substrate is absent
+    from this lineage.
+11. New record required: the rev-1 synthesis admitted `work-0008-wave11-promotion-reconciliation` into
+    the plan at `e8730ccb` but the Work Registry has no `WORK-0008` row and no `work-0008` worker ref
+    exists. The lease was never dispatched. Re-stating it is a plan refresh of undispatched work, not a
+    second dispatch of attempted work — and it must be recorded as such before it can be dispatched twice.
 
-### D. Dispatch-gate adjudication — every candidate, with its refusal reason
+### E. Dispatch-gate adjudication — every candidate, with its refusal reason
 
-Gate: READY + NOT_DUPLICATE + DEPENDENCIES_SATISFIED + PROTECTED_BOUNDARY_CLEAR + VERIFICATION_EXECUTABLE.
+Gate (TEAM-ORGANIZATION-V2-PROTOCOL.md): READY + NOT_DUPLICATE + DEPENDENCIES_SATISFIED
++ PROTECTED_BOUNDARY_CLEAR + VERIFICATION_EXECUTABLE.
 
 | Candidate | Verdict | Evidence-backed reason |
 |---|---|---|
-| Re-run WORK-0003 | REFUSED | Purpose delivered and promoted; three prior attempts; DECISION-0013 and `fourth_dispatch_rule`. A fourth dispatch is duplicate governed work. |
-| Re-run WORK-0004 | REFUSED | Executed, QC-passed and promoted. Re-execution duplicates reconciled Wave-10 evidence. |
-| Re-run WORK-0005 | REFUSED | Executed and promoted; the report exists on this lineage. |
-| WORK-0006 Gate A | NOT READY | Registry status `PLANNED`, readiness `BLOCKED_BY_DEPENDENCIES`; its dependencies' recorded statuses are exactly the stale items in section C; its own baseline carries disproven claims only it may correct. |
-| WORK-0007 | NOT READY | Gated `ONLY_AFTER_WORK-0006_ACCEPTED`; Gate A not adjudicated. |
-| Control-plane repair of WORK-0004 F-2/F-3/F-4/F-5/F-9 | BLOCKED_CONTROL_PLANE | Real and still-live P0/P1 gaps in `.github/workflows/**`, but `.github/**` is in `TEAM-WORKER-V1.json.protected_paths`, so PROTECTED_BOUNDARY is not clear for a worker lease. This needs the Director/control-plane path. WORK-0004's own recommendation was `BLOCKED_CONTROL_PLANE`, not another wave. |
-| Wave 10 evidence promotion (BLOCKER-0003) | NOT READY | Measured recoverable 11/11, but the governed recovery path is broken and no INTEGRATOR lease is grantable here. Deferred, not re-audited. |
-| `product.impact-measurement` evidence binding (P-07) | BARRED | WORK-0006 gate and mission line 217 forbid remaining-stage product repair until Gate A is accepted. The selection is real; the authorization is not. |
-| Canonical lineage decision (BLOCKER-0004) | DIRECTOR DECISION, not a lease | P0 governance contradiction requiring owner authority per COMMAND-0001 HUMAN INTERVENTION, with INTEGRATOR execution. DECISION-0007 forbids an AUDIT lease naming the lineage. |
-| **Memory/status reconciliation** | **ADMITTED — one lease** | New stable ID, no prior attempt, dependencies satisfied by promoted evidence, memory-only write scope, boundary clear, verification mechanically executable. |
+| Re-run WORK-0003 | REFUSED | Purpose delivered and its payload promoted (section A); three prior attempts; DECISION-0013 and `fourth_dispatch_rule`. A fourth dispatch is duplicate governed work. |
+| Re-run WORK-0004 | REFUSED | Executed and its payload promoted. Re-execution duplicates reconciled Wave-10 evidence. |
+| Re-run WORK-0005 | REFUSED | Executed and its payload promoted; the report is present on this lineage. |
+| Re-run `work-0008` | REFUSED as a *second* dispatch | `work-0008` has zero execution attempts — no registry row, no worker ref (D.11) — so this is not duplicate governed work; but it must not be re-issued under a new ID, and it must not be dispatched twice. One admission, refreshed, not duplicated. |
+| WORK-0006 Gate A | NOT READY | Registry status `PLANNED`, readiness `BLOCKED_BY_DEPENDENCIES`; its dependencies' recorded statuses are exactly the stale items in section D; and its own `PRE-GATE-BASELINE.md` carries disproven claims that only WORK-0006 may correct (section C). |
+| WORK-0007 | NOT READY | Gated `ONLY_AFTER_WORK-0006_ACCEPTED`; Gate A is not adjudicated. |
+| Control-plane repair of WORK-0004 F-3 / F-4 / F-5 / F-9 | BLOCKED_CONTROL_PLANE | Real and still-live P1 gaps (B.3), but `.github/**` is in `TEAM-WORKER-V1.json.protected_paths`, so PROTECTED_BOUNDARY is not clear for a worker lease; and per B.5 the affected workflow files do not exist on this lineage at all, so no lease here could repair them. WORK-0004's own recommendation was `BLOCKED_CONTROL_PLANE`, not another wave. |
+| Control-plane repair of WORK-0004 F-2 | CLOSED_ON_ORIGIN_MAIN_ONLY | Repaired by `d90d8e11` (B.2). No lease is justified here, and this lineage neither contains nor consumes that repair (B.5). Recorded, not re-leased. |
+| Wave 10 evidence promotion (BLOCKER-0003) | NOT READY | Measured recoverable 11/11, but all 11 refs are still non-ancestors (section C); the wave-recovery path is still broken (B.3); and the one working promotion path (B.4) is single-lease and hardcoded to WORK-0004. Deferred, not re-audited. |
+| `product.impact-measurement` evidence binding (P-07) | BARRED | The WORK-0006 gate and mission line 217 forbid remaining-stage product repair until Gate A is accepted. The selection is real; the authorization is not. |
+| Canonical lineage decision (BLOCKER-0004 / DEFECT-0002) | DIRECTOR DECISION, not a lease | P0 governance contradiction requiring owner authority, with INTEGRATOR execution. DECISION-0007 forbids an AUDIT lease naming the lineage — and B.5 shows the decision now also determines which lineage can dispatch at all. |
+| Retirement of the 7 orphan V2 worker refs | BLOCKED_CONTROL_PLANE | A control-plane ref action, not a worker lease, and WORK-0004's R-9 deliberately left it untaken. Recorded for the Director path. |
+| **Memory/status reconciliation** | **ADMITTED — one lease** | Stable ID already allocated and undispatched, dependencies satisfied by promoted evidence, memory-only write scope, protected boundary clear, verification mechanically executable. |
 
-### E. Admitted lease
+### F. Admitted lease
 
-`work-0008-wave11-promotion-reconciliation` — MEMORY_EDITOR, MODE=AUDIT,
-write scope `.kilo/team/memory/**` + `.kilo/team/results/work-0008-wave11-promotion-reconciliation/`.
-Its mandatory first act is to register itself as `WORK-0008` in the Work Registry
-(`next_id = WORK-0008`, unused) before any other edit, and to stop and report BLOCKED if that
-registration cannot be made truthfully.
+`work-0008-wave11-promotion-reconciliation` — MEMORY_EDITOR, MODE=AUDIT, write scope
+`.kilo/team/memory/**` + `.kilo/team/results/work-0008-wave11-promotion-reconciliation/`.
 
-### F. Uncertainty preserved, not resolved
+Its mandatory first act is to register itself as `WORK-0008` in the Work Registry (`next_id = WORK-0008`,
+unused) before any other edit, and to stop and report BLOCKED if that registration cannot be made
+truthfully. It is the only lease in this plan. **No product implementation lease is planned, and none is
+permitted until this lease completes and the control/memory state is re-measured as genuinely READY.**
+
+### G. Uncertainty preserved, not resolved
 
 1. **Bootstrap ordering.** The protocol does not state whether a work item's Work Registry row must
    exist before dispatch or may be created by the lease as its first act. The stricter reading would
    make this wave NOT_READY with zero leases. The lease makes registration its mandatory first
    obligation and its stated stop condition so that either reading is satisfied without dispatching
    unregistered work.
-2. **QC depth.** WORK-0004's QC pass is given as an established fact for this synthesis. No QC
-   artifact is persisted in the repository — the same class as promoted WORK-0004 finding F-7 — so it
-   must be recorded as a reported pass, not as an ACCEPTED evidence artifact.
-3. **WORK-0003 QC status.** Promoted, but not shown to be QC-adjudicated. Its evidence status must not
-   be upgraded to ACCEPTED on promotion alone.
-4. **Lineage.** Canonical lineage UNDECIDED; `origin/main` keeps advancing (81 → 84 during this
-   synthesis), so divergence magnitude is a moving target.
-5. **Control-plane defects.** WORK-0004 verified them live at `0bfe3eae`; `origin/main` has since moved
-   to `8be3e4e8`. Their status at the newer tip was not re-verified here — outside this step's write
-   scope, and it must not be assumed either way.
-6. **The eleven Wave 10 reports** remain branch-scoped evidence. Nothing in this section adjudicates
+2. **QC depth.** WORK-0004's QC pass is an established input to this synthesis and is additionally
+   gated by the promotion path's own assertion (B.4). No QC artifact is persisted in the repository —
+   the same class as promoted WORK-0004 finding F-7 — so it must be recorded as a control-plane-asserted
+   pass, not as an ACCEPTED evidence artifact.
+3. **Which mechanism promoted what.** The payload presence in section A is FACT. That
+   `team-promotion-recovery.yml` specifically performed each promotion is an ASSUMPTION from its
+   hardcoded defaults and the matching commit authors; no run id for those promotions was observed here.
+   The reconciliation lease must record it as such, not as provenance.
+4. **WORK-0003 and WORK-0005 QC status.** Payloads promoted; neither is shown to be QC-adjudicated.
+   Promotion alone must not upgrade any evidence record to ACCEPTED.
+5. **Lineage.** Canonical lineage UNDECIDED; `origin/main` keeps advancing (81 → 84 → 85 across two
+   syntheses), so divergence magnitude is a moving target. B.5 means the divergence now decides which
+   lineage can dispatch, not merely which holds the ledgers.
+6. **Control-plane defect status on this lineage.** F-3 and F-4 were re-measured on `origin/main` only.
+   This lineage carries no team workflow at all (B.5), so their state here is not merely unrepaired — it
+   is inapplicable, and nothing here may be asserted about a copy that does not exist.
+7. **The eleven Wave 10 reports** remain branch-scoped evidence. Nothing in this section adjudicates
    their content.
 
-### G. Non-claims
+### H. Non-claims
 
 No QC, integration, acceptance, Gate A verdict, product outcome, mission completion or commercial
 readiness is claimed or implied. No accepted F1/F6/CCC/UX work is reopened — no current
 regression/invalidation evidence was found. No new product engine is proposed. Architecture Freeze
-V4/V4.1 is unchanged.
+V4/V4.1 is unchanged. No memory ledger was edited by this synthesis step.
