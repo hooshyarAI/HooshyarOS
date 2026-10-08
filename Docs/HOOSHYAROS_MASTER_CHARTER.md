@@ -1260,3 +1260,51 @@ For complex reasoning, financial analysis, repository-scale work or multi-file c
 When no eligible free model is available, the run enters `BLOCKED_FREE_MODEL_UNAVAILABLE`. This is an infrastructure/model-availability blocker, not permission to use a paid model.
 
 No customer financial data, personal data, secrets or confidential external-company material may be sent to a free-model endpoint when current provider terms permit model-improvement use.
+
+
+### 6.8 Autonomous Team Worker Law — PERMANENT / CAPACITY-CONTROLLED
+
+HooshyarOS construction may operate as an autonomous team rather than a single worker when the current dependency graph contains independently executable Micro-Stages. The team is a construction mechanism, not a new product engine and not a change to Architecture Freeze V4/V4.1.
+
+The canonical team loop is:
+
+**ORCHESTRATE → LEASE → ISOLATE → EXECUTE IN PARALLEL → VERIFY INDEPENDENTLY → INTEGRATE → QC → PROMOTE → REPLAN**
+
+Initial capacity is twelve workers. The pool may scale to 25, 50 or 100 only when evidence demonstrates sufficient independent work, runner capacity, model availability, integration capacity, and no material degradation in correctness, evidence quality or governance.
+
+Parallelism is dependency-aware, not count-driven. A worker may execute a Micro-Stage in parallel only when:
+- dependencies are satisfied;
+- its write scope is isolated;
+- no protected boundary is touched;
+- independent verification is possible;
+- the active mission permits that stage.
+
+Every worker receives an explicit Work Lease:
+- worker identity;
+- role/focus;
+- owning canonical engine;
+- immutable START_SHA;
+- allowed write scope;
+- mission/stage identifier;
+- verification contract.
+
+Workers must never share a working tree. Each worker operates on an isolated branch and produces at most one coherent verified commit for its assigned knot. Worker branches are integrated only after independent evidence/QC and target-drift verification.
+
+The Integrator is the only team-level promotion mechanism. Worker self-report is not independent QC.
+
+A single worker failure must not stop safe independent workers. Failed, blocked, timed-out or unavailable-model workers preserve evidence and remain independently observable.
+
+The team must never:
+- create duplicate engines merely to gain parallelism;
+- allow overlapping uncontrolled writes to the same product surface;
+- weaken tests to unblock a wave;
+- bypass protected architecture/governance/control-plane boundaries;
+- infer product completion from worker count or green unit tests.
+
+The approved first implementation is documented in:
+- `.kilo/team/TEAM-WORKER-V1.json`
+- `.kilo/team/TEAM-WORKER-V1-PROTOCOL.md`
+
+The initial V1 mode is **AUDIT_PARALLEL** because the active master mission's first objective requires reconciliation before product implementation. Future implementation waves may use the same team mechanism only after their Micro-Stage dependency and write-scope graph is evidence-backed.
+
+The existing single-worker path remains the recovery fallback until the team implementation completes its first controlled wave.
