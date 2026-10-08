@@ -147,7 +147,7 @@ jobs:
           planned_scopes=[]
           for lease in leases:
               missing=[k for k in ("id","role","focus","owner","mode","write_scope") if not lease.get(k)]
-              if missing: raise SystemExit(f"BLOCKED: lease {lease.get("id","unknown")} missing {missing}")
+              if missing: raise SystemExit(f"BLOCKED: lease {lease.get('id','unknown')} missing {missing}")
               lid=str(lease["id"])
               m=re.match(r"^work-([0-9]{4})(?:-|$)",lid)
               if not m: raise SystemExit(f"BLOCKED: invalid governed lease identity {lid}")
