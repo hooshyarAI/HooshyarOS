@@ -32,6 +32,7 @@ jobs:
       TEAM_CONTROL_ISSUE: "122"
       TEAM_DISPATCH_REASON: ${{ inputs.reason }}
       TEAM_ACCEPTANCE_AUTHORIZATION_ID: ${{ inputs.acceptance_authorization_id }}
+      TEAM_AUTHORIZATION_SIGNING_SECRET: ${{ secrets.TEAM_AUTHORIZATION_SIGNING_SECRET }}
     steps:
       - name: Checkout control-plane authority
         uses: actions/checkout@v6
