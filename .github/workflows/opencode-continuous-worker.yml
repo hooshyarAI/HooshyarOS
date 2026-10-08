@@ -1,16 +1,12 @@
 name: HooshyarOS Continuous OpenCode Worker
 
 on:
-  schedule:
-    - cron: "*/30 * * * *"
   workflow_dispatch:
     inputs:
       reason:
-        description: "Optional reason for a manual worker run"
+        description: "Optional reason for a manual single-worker recovery run"
         required: false
         type: string
-  issue_comment:
-    types: [created]
 
 concurrency:
   group: hooshyaros-autonomous-construction
@@ -23,7 +19,7 @@ permissions:
 
 jobs:
   continuous-worker:
-    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'issue_comment' && github.event.issue.pull_request == null && github.event.issue.title == 'HooshyarOS Continuous Worker Control' && (github.event.comment.body == '/opencode-run' || startsWith(github.event.comment.body, '/opencode-run '))) }}
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
