@@ -6,6 +6,7 @@ on:
       - HooshyarOS Continuous OpenCode Worker
       - HooshyarOS Autonomous Team Worker
     types: [completed]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -13,12 +14,13 @@ permissions:
 
 jobs:
   notify-stop:
-    if: ${{ github.event.workflow_run.conclusion != 'success' && github.event.workflow_run.conclusion != 'skipped' }}
+    if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success' && github.event.workflow_run.conclusion != 'skipped' }}
     runs-on: ubuntu-latest
     env:
       CONTROL_ISSUE: "122"
       CONTROL_TITLE: "HooshyarOS Continuous Worker Control"
       TARGET_BRANCH: "fix/autonomous-product-factory"
+      RESTART_COMMAND: "/opencode-team-run"
       ALERT_EMAIL: ${{ secrets.HOOSHYAROS_ALERT_EMAIL }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       RESEND_FROM_EMAIL: ${{ secrets.HOOSHYAROS_ALERT_FROM }}
@@ -65,7 +67,7 @@ ${RUN_URL}
 
 برای ادامه دستی کارمند:
 در Issue #${CONTROL_ISSUE} با عنوان "${CONTROL_TITLE}" یک کامنت جدید ایجاد کنید که ابتدای آن دقیقاً این باشد:
- /opencode-run
+ ${RESTART_COMMAND}
 
 این اعلان نباید خودش کارمند را دوباره اجرا کند؛ شروع مجدد فقط با فرمان دستی بالا انجام می‌شود.
 EOF
@@ -86,7 +88,7 @@ EOF
         run: |
           set -euo pipefail
 
-          SUBJECT="HooshyarOS — کارمند خودکار متوقف شد (Run #${RUN_NUMBER})"
+          SUBJECT="HooshyarOS — تیم/کارمند خودکار متوقف شد (Run #${RUN_NUMBER})"
           BODY="$(cat "${RUNNER_TEMP}/stop-report.txt")"
 
           payload="$(jq -n \
