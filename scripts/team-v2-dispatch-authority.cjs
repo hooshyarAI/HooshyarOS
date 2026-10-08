@@ -4,6 +4,8 @@ const { execFileSync } = require("node:child_process");
 const { evaluateGate } = require("./lib/team-v2-gate.cjs");
 const { validateWork, workIdFromLeaseId } = require("./lib/team-v2-admission.cjs");
 const { validateAuthorization } = require("./lib/team-v2-authorization.cjs");
+const { reservationId, reservationRef } = require("./lib/team-v2-reservation.cjs");
+const crypto = require("node:crypto");
 
 const TARGET_BRANCH = process.env.TARGET_BRANCH || "fix/autonomous-product-factory";
 const WORKER_WORKFLOW_ID = process.env.TEAM_WORKER_WORKFLOW_ID || "378094136";
@@ -170,8 +172,20 @@ function readRepoFileText(path) {
   return Buffer.from(String(obj.content).replace(/\n/g, ""), "base64").toString("utf8");
 }
 function sha256(text) {
-  const { createHash } = require("node:crypto");
-  return createHash("sha256").update(text, "utf8").digest("hex");
+  return crypto.createHash("sha256").update(text, "utf8").digest("hex");
+}
+function createRef(ref, sha) {
+  try {
+    execFileSync("gh", ["api", "--method", "POST", "repos/" + REPOSITORY + "/git/refs", "-f", "ref=" + ref, "-f", "sha=" + sha], { stdio: "inherit" });
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+function deleteRef(ref) {
+  try {
+    execFileSync("gh", ["api", "--method", "DELETE", "repos/" + REPOSITORY + "/git/refs/" + ref.replace(/^refs\//, "")], { stdio: "ignore" });
+  } catch (_) {}
 }
 function comment(body) {
   try {
@@ -247,14 +261,56 @@ if (require.main === module) {
   }
 
   const reason = process.env.TEAM_DISPATCH_REASON || "Governed Team V2 dispatch via single authority";
-  execFileSync("gh", [
-    "api", "--method", "POST",
-    `repos/${REPOSITORY}/actions/workflows/${WORKER_WORKFLOW_ID}/dispatches`,
-    "-f", "ref=main",
-    "-f", `inputs[reason]=${reason}`
-  ], { stdio: "inherit" });
+  const leases = Array.isArray(plan.leases) ? plan.leases : [];
+  if (leases.length !== 1) {
+    console.log("TEAM_WORKER_DISPATCH=REFUSED MULTI_LEASE_RESERVATION_NOT_YET_SUPPORTED");
+    comment("TEAM DISPATCH AUTHORITY REFUSED: reservation is currently bounded to one lease (parallelism=1).");
+    process.exit(20);
+  }
+  const lease = leases[0];
+  const workId = workIdFromLeaseId(lease.id);
+  if (!workId) {
+    console.log("TEAM_WORKER_DISPATCH=REFUSED INVALID_WORK_ID");
+    comment("TEAM DISPATCH AUTHORITY REFUSED: invalid Work ID for reservation.");
+    process.exit(20);
+  }
+  const item = Array.isArray(registry.items) ? registry.items.find(x => String(x?.id) === workId) : null;
+  const attempts = Array.isArray(item?.execution_attempts) ? item.execution_attempts : [];
+  const attemptNo = attempts.length + 1;
+  const inputsHash = sha256(JSON.stringify({ gate, plan, registry, targetSha, authorizationId }));
+  const rid = reservationId({ workId, leaseId: lease.id, startSha: targetSha, inputsHash, attemptNo });
+  const rref = reservationRef(workId);
+  if (!createRef(rref, targetSha)) {
+    console.log("TEAM_WORKER_DISPATCH=REFUSED_RESERVATION_CONFLICT");
+    comment("TEAM DISPATCH AUTHORITY REFUSED: authoritative reservation ref already exists or could not be created; no Worker dispatch.");
+    process.exit(20);
+  }
+  console.log("TEAM_RESERVATION_CREATED=" + rid);
+  console.log("TEAM_RESERVATION_REF=" + rref);
+  const beforeDispatchSha = readTargetSha();
+  if (beforeDispatchSha !== targetSha) {
+    deleteRef(rref);
+    console.log("TEAM_WORKER_DISPATCH=REFUSED_TARGET_DRIFT_BEFORE_DISPATCH");
+    comment("TEAM DISPATCH AUTHORITY REFUSED: target drifted after reservation; reservation revoked before dispatch.");
+    process.exit(20);
+  }
+
+  try {
+    execFileSync("gh", [
+      "api", "--method", "POST",
+      `repos/${REPOSITORY}/actions/workflows/${WORKER_WORKFLOW_ID}/dispatches`,
+      "-f", "ref=main",
+      "-f", "inputs[reason]=" + reason,
+      "-f", "inputs[reservation_id]=" + rid,
+      "-f", "inputs[reservation_ref]=" + rref.replace(/^refs\//, "")
+    ], { stdio: "inherit" });
+  } catch (error) {
+    console.log("TEAM_WORKER_DISPATCH=REFUSED_DISPATCH_API_FAILURE");
+    comment("TEAM DISPATCH AUTHORITY REFUSED: Worker dispatch API failed after reservation creation; reservation preserved for adjudication.");
+    process.exit(20);
+  }
 
   console.log("TEAM_WORKER_DISPATCH=SUCCESS");
-  comment(`TEAM DISPATCH AUTHORITY ACCEPTED: one governed Team Worker dispatch created. reason=${reason}; target=${TARGET_BRANCH}`);
+  comment(`TEAM DISPATCH AUTHORITY ACCEPTED: one governed Team Worker dispatch created. reason=${reason}; target=${TARGET_BRANCH}; reservation=${rid}`);
 }
 module.exports = { admissionViolations, workIdFromLeaseId, overlaps };
