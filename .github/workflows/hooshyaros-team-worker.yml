@@ -1074,12 +1074,40 @@ jobs:
           COMMIT_SHA="$(git rev-parse HEAD)"
           echo "commit_sha=${COMMIT_SHA}" >> "${GITHUB_OUTPUT}"
 
-      - name: Push isolated worker branch
-        if: ${{ success() }}
+      - name: Preserve isolated worker branch and execution snapshot
+        if: ${{ always() }}
+        id: preserve_worker
         shell: bash
+        env:
+          VALIDATE_OUTCOME: ${{ steps.validate.outcome }}
         run: |
-          set -euo pipefail
-          git push origin "HEAD:opencode/team-${WORKER_ID}-${GITHUB_RUN_ID}"
+          set +e
+          BRANCH="opencode/team-${WORKER_ID}-${GITHUB_RUN_ID}"
+          AHEAD="$(git rev-list --count "${START_SHA}..HEAD" 2>/dev/null || echo 0)"
+          DIRTY="$(git status --porcelain 2>/dev/null || true)"
+          mkdir -p "${RUNNER_TEMP}/worker-preservation"
+          git status --short > "${RUNNER_TEMP}/worker-preservation/status.txt" 2>&1 || true
+          git log -1 --format="%H%n%s%n%an%n%ae" > "${RUNNER_TEMP}/worker-preservation/head.txt" 2>&1 || true
+          git diff --binary "${START_SHA}...HEAD" > "${RUNNER_TEMP}/worker-preservation/worker.patch" 2>&1 || true
+          COMMIT_SHA=""
+          PUSH_RC=0
+          PRESERVED="FALSE"
+          if test "${AHEAD}" -eq 1 && test -z "${DIRTY}"; then
+            COMMIT_SHA="$(git rev-parse HEAD)"
+            git push origin "HEAD:${BRANCH}"
+            PUSH_RC=$?
+            if test "${PUSH_RC}" -eq 0; then PRESERVED="TRUE"; fi
+          fi
+          echo "commit_sha=${COMMIT_SHA}" >> "${GITHUB_OUTPUT}"
+          echo "branch_preserved=${PRESERVED}" >> "${GITHUB_OUTPUT}"
+          printf "START_SHA=%s\nWORKER_ID=%s\nWORK_ID=%s\nAHEAD=%s\nVALIDATE_OUTCOME=%s\nPUSH_RC=%s\nBRANCH_PRESERVED=%s\nCOMMIT_SHA=%s\n" \
+            "${START_SHA}" "${WORKER_ID}" "${WORK_ID}" "${AHEAD}" "${VALIDATE_OUTCOME}" "${PUSH_RC}" "${PRESERVED}" "${COMMIT_SHA}" \
+            > "${RUNNER_TEMP}/worker-preservation/state.txt"
+          if test "${VALIDATE_OUTCOME}" = "success" && test "${PUSH_RC}" -ne 0; then
+            echo "BLOCKED: validated worker commit could not be preserved remotely"
+            exit 41
+          fi
+          exit 0
 
       - name: Persist worker result envelope
         if: always()
@@ -1099,7 +1127,7 @@ jobs:
             "owner_engine":"${OWNER_ENGINE}",
             "mode":"${WORKER_MODE}",
             "status":"${STATUS}",
-            "commit_sha":"${{ steps.validate.outputs.commit_sha }}",
+            "commit_sha":"${{ steps.preserve_worker.outputs.commit_sha }}",
             "branch":"opencode/team-${WORKER_ID}-${GITHUB_RUN_ID}",
             "start_sha":"${START_SHA}",
             "model":"${MODEL:-unknown}",
@@ -1116,6 +1144,7 @@ jobs:
           path: |
             ${{ runner.temp }}/team-result/${{ matrix.id }}/
             ${{ runner.temp }}/opencode-team-${{ matrix.id }}.log
+            ${{ runner.temp }}/worker-preservation/
           if-no-files-found: warn
 
   quality-control:
@@ -1187,6 +1216,21 @@ jobs:
                   dest=repo / ".kilo" / "team" / "results" / wid / "result.md"
                   dest.parent.mkdir(parents=True, exist_ok=True)
                   shutil.copy2(report, dest)
+
+               if obj["status"]=="SUCCESS":
+                   branch=obj.get("branch","")
+                   commit=obj.get("commit_sha","")
+                   start=obj.get("start_sha","")
+                   if not branch or not commit or not start:
+                       raise SystemExit(f"QC_FAIL: {wid} missing branch/commit/start provenance")
+                   subprocess.check_call(["git","fetch","origin",branch])
+                   subprocess.check_call(["git","merge-base","--is-ancestor",start,commit])
+                   patch=subprocess.check_output(["git","diff",f"{start}...origin/{branch}"],text=True)
+                   patch_path=repo / ".kilo" / "team" / "results" / wid / "worker.patch"
+                   patch_path.parent.mkdir(parents=True, exist_ok=True)
+                   patch_path.write_text(patch,encoding="utf-8")
+                   changed=subprocess.check_output(["git","diff","--name-only",f"{start}...origin/{branch}"],text=True)
+                   (patch_path.parent/"changed-files.txt").write_text(changed,encoding="utf-8")
 
           if success == 0:
               raise SystemExit("QC_FAIL: zero successful workers")
@@ -1260,8 +1304,10 @@ jobs:
           - .kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md
           - .kilo/team/TEAM-WORKER-V1-PROTOCOL.md
           - .kilo/team/results/*/result.md
+           - .kilo/team/results/*/worker.patch
+           - .kilo/team/results/*/changed-files.txt
 
-          Independently determine whether the successful worker reports are:
+          Independently determine whether the successful worker outputs and actual changes are:
           - within their assigned scope;
           - evidence-backed rather than model assertions;
           - non-duplicative;
@@ -1269,6 +1315,7 @@ jobs:
           - consistent with Architecture Freeze V4/V4.1;
           - explicit about unknowns and blocked items;
           - suitable inputs to the Team Synthesizer.
+           - the actual patch MUST corroborate the worker report; a report alone is never sufficient.
 
           Reject false-green evidence, fabricated claims, unsupported completion claims, or contradictions that were silently ignored.
 
@@ -1299,6 +1346,34 @@ jobs:
           echo "TEAM_QC_STATUS=PASS"
           tail -80 "${LOG}"
 
+      - name: Persist independent QC adjudication
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set +e
+          DECISION="FAIL"
+          if test -f "${RUNNER_TEMP}/team-semantic-qc.log" && grep -q "QC_DECISION=PASS" "${RUNNER_TEMP}/team-semantic-qc.log" && ! grep -q "QC_DECISION=FAIL" "${RUNNER_TEMP}/team-semantic-qc.log"; then DECISION="PASS"; fi
+          export DECISION
+          python3 - <<PY
+          import json, pathlib, os
+          log=pathlib.Path("${RUNNER_TEMP}/team-semantic-qc.log")
+          content=log.read_text(encoding="utf-8",errors="replace") if log.exists() else ""
+          reasons=[x.strip() for x in content.splitlines()[-80:] if x.strip() and not x.startswith(("QC_MODEL_ATTEMPT=","QC_DECISION="))]
+          obj={"schema_version":"1.0","run_id":int("${{ github.run_id }}"),"decision":os.environ.get("DECISION","FAIL"),"lease_ids":json.loads("""${LEASE_IDS}"""),"independence":"SEPARATE_QC_JOB_AND_SESSION","actual_change_inspected":True,"reasons":reasons[-20:]}
+          out=pathlib.Path("${RUNNER_TEMP}/team-qc-adjudication")
+          out.mkdir(parents=True,exist_ok=True)
+          (out/"qc-result.json").write_text(json.dumps(obj,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+          (out/"qc.log").write_text(content,encoding="utf-8")
+          PY
+
+      - name: Upload independent QC adjudication
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: team-qc-adjudication
+          path: ${{ runner.temp }}/team-qc-adjudication/
+          if-no-files-found: warn
+
   integrate:
     needs: [prepare, team-worker, quality-control]
     if: ${{ always() && needs.prepare.result == 'success' && needs.quality-control.result == 'success' }}
@@ -1319,11 +1394,33 @@ jobs:
           fetch-depth: 0
 
       - name: Download worker result artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           pattern: team-result-*
           merge-multiple: true
           path: ${{ runner.temp }}/team-results
+
+
+      - name: Download persisted QC adjudication
+        uses: actions/download-artifact@v8
+        with:
+          name: team-qc-adjudication
+          path: ${{ runner.temp }}/team-qc-adjudication
+
+      - name: Require persisted independent QC PASS
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "${RUNNER_TEMP}/team-qc-adjudication/qc-result.json"
+          python3 - "${RUNNER_TEMP}/team-qc-adjudication/qc-result.json" <<PY
+          import json,sys
+          obj=json.load(open(sys.argv[1],encoding="utf-8"))
+          if obj.get("decision")!="PASS":
+              raise SystemExit(f"BLOCKED: persisted QC decision is {obj.get("decision")}")
+          if not obj.get("actual_change_inspected"):
+              raise SystemExit("BLOCKED: QC did not inspect actual worker changes")
+          print("PERSISTED_QC=PASS")
+          PY
 
       - name: Integrate independently verified worker commits
         shell: bash
