@@ -20,7 +20,8 @@ permissions:
 
 jobs:
 
-  cancel-obsolete:    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'issue_comment' && github.event.issue.pull_request == null && github.event.issue.number == 122 && startsWith(github.event.comment.body, '/team-queue-bootstrap')) }}
+  cancel-obsolete:
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'issue_comment' && github.event.issue.pull_request == null && github.event.issue.number == 122 && startsWith(github.event.comment.body, '/team-queue-bootstrap')) }}
     runs-on: ubuntu-slim
     timeout-minutes: 15
     env:
