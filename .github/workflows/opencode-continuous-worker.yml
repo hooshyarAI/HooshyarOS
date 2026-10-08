@@ -100,10 +100,13 @@ jobs:
 
           for model_id, m in models:
               cost = m.get("cost")
-              if not isinstance(cost, dict):
-                  continue
-              numeric_costs = [v for v in cost.values() if isinstance(v, (int, float))]
-              if not numeric_costs or any(v > 0 for v in numeric_costs):
+              provider, _, model_name = model_id.partition("/")
+              explicit_free = False
+              if isinstance(cost, dict):
+                  numeric_costs = [v for v in cost.values() if isinstance(v, (int, float))]
+                  explicit_free = bool(numeric_costs) and all(v == 0 for v in numeric_costs)
+              free_named = model_id == "opencode/big-pickle" or model_name.lower().endswith("-free") or "-free-" in model_name.lower()
+              if not (explicit_free or free_named):
                   continue
 
               if m.get("reasoning") is not True or m.get("tool_call") is not True:
