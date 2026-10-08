@@ -1,0 +1,126 @@
+name: HooshyarOS Team V2 Acceptance Authorization
+
+on:
+  workflow_dispatch:
+    inputs:
+      authorization_id:
+        description: "Unique authorization id, e.g. ACCAUTH-0001"
+        required: true
+        type: string
+      confirmation:
+        description: "Type ACCEPT-ONE-WAVE-WORK-0011 exactly"
+        required: true
+        type: string
+      expires_minutes:
+        description: "Authorization lifetime (10-120 minutes)"
+        required: false
+        default: "30"
+        type: string
+
+concurrency:
+  group: hooshyaros-team-v2-acceptance-authorization
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  mint:
+    if: ${{ github.actor == github.repository_owner }}
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      SIGNING_SECRET: ${{ secrets.TEAM_AUTHORIZATION_SIGNING_SECRET }}
+      TARGET_BRANCH: fix/autonomous-product-factory
+      AUTH_ID: ${{ inputs.authorization_id }}
+      CONFIRMATION: ${{ inputs.confirmation }}
+      EXPIRY_MINUTES: ${{ inputs.expires_minutes }}
+    steps:
+      - name: Checkout control branch
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Validate human authorization request
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${CONFIRMATION}" = "ACCEPT-ONE-WAVE-WORK-0011"
+          test -n "${SIGNING_SECRET}" || { echo "BLOCKED: signing secret missing"; exit 20; }
+          python3 - <<'PY'
+          import base64, datetime, hashlib, hmac, json, os, pathlib, re, subprocess
+          aid=os.environ["AUTH_ID"].strip()
+          if not re.fullmatch(r"ACCAUTH-[A-Za-z0-9._-]{1,48}", aid):
+              raise SystemExit("BLOCKED: invalid authorization id")
+          mins=int(os.environ["EXPIRY_MINUTES"])
+          if not 10 <= mins <= 120:
+              raise SystemExit("BLOCKED: expiry must be 10..120 minutes")
+          repo=os.environ["GITHUB_REPOSITORY"]
+          def api(path):
+              return json.loads(subprocess.check_output(["gh","api",path],text=True))
+          target=api("repos/"+repo+"/git/ref/heads/"+os.environ["TARGET_BRANCH"])["object"]["sha"]
+          raw=api("repos/"+repo+"/contents/.kilo/team/NEXT-WAVE-PLAN.json?ref="+os.environ["TARGET_BRANCH"])
+          plan_text=base64.b64decode(str(raw["content"]).replace("\n","")).decode()
+          plan=json.loads(plan_text)
+          gate_raw=api("repos/"+repo+"/contents/.kilo/team/TEAM-V2-ACCEPTANCE-GATE.json?ref="+os.environ["TARGET_BRANCH"])
+          gate=json.loads(base64.b64decode(str(gate_raw["content"]).replace("\n","")).decode())
+          if gate.get("gate_id")!="TEAM-V2-ACCEPTANCE" or gate.get("status")!="ARMED" or gate.get("hold_after_pass") is not True:
+              raise SystemExit("BLOCKED: acceptance gate is not ARMED+hold")
+          leases=plan.get("leases",[])
+          if len(leases)!=1 or leases[0].get("id")!="work-0011-team-v2-memory-reconciliation":
+              raise SystemExit("BLOCKED: current plan is not exact WORK-0011 acceptance candidate")
+          lease=leases[0]
+          if lease.get("task_class")!="MEMORY" or lease.get("owner")!="MEMORY_EDITOR":
+              raise SystemExit("BLOCKED: WORK-0011 task class/owner mismatch")
+          now=datetime.datetime.now(datetime.timezone.utc)
+          expiry=now+datetime.timedelta(minutes=mins)
+          auth_dir="repos/"+repo+"/contents/control-plane/authorizations?ref=main"
+          try: entries=api(auth_dir)
+          except Exception: entries=[]
+          active=0
+          for entry in entries if isinstance(entries,list) else []:
+              name=str(entry.get("name",""))
+              if not name.endswith(".json"): continue
+              try:
+                  existing=api("repos/"+repo+"/contents/control-plane/authorizations/"+name+"?ref=main")
+                  obj=json.loads(base64.b64decode(str(existing["content"]).replace("\n","")).decode())
+                  not_after=datetime.datetime.fromisoformat(str(obj.get("expiry",{}).get("not_after","")).replace("Z","+00:00"))
+                  if obj.get("consumed") is not True and not_after > now: active+=1
+              except Exception:
+                  pass
+          if active>0: raise SystemExit("BLOCKED: active unconsumed acceptance authorization exists")
+          auth={
+            "schema":"team-v2.acceptance-authorization.v1",
+            "authorization_id":aid,
+            "gate_id":"TEAM-V2-ACCEPTANCE",
+            "scope":{"wave_id":"WAVE-ACCEPT-0001","work_id":"WORK-0011","lease_id":lease["id"],"task_class":"MEMORY","max_worker_reservations":1,"max_candidate_failovers":3},
+            "bindings":{"plan_sha256":hashlib.sha256(plan_text.encode()).hexdigest(),"lease_sha256":hashlib.sha256(json.dumps(lease,sort_keys=True,separators=(",",":")).encode()).hexdigest(),"target_branch":os.environ["TARGET_BRANCH"],"target_sha":target},
+            "expiry":{"issued_at":now.isoformat().replace("+00:00","Z"),"not_after":expiry.isoformat().replace("+00:00","Z")},
+            "issued_by":os.environ["GITHUB_ACTOR"],
+            "consumed":False
+          }
+          canonical=json.dumps(auth,sort_keys=True,separators=(",",":"),ensure_ascii=False)
+          auth["signature"]=hmac.new(os.environ["SIGNING_SECRET"].encode(),canonical.encode(),hashlib.sha256).hexdigest()
+          out=pathlib.Path(os.environ["RUNNER_TEMP"])/"acceptance-auth.json"
+          out.write_text(json.dumps(auth,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+          print("AUTHORIZATION_TARGET_SHA="+target)
+          print("AUTHORIZATION_ID="+aid)
+          print("AUTHORIZATION_READY=TRUE")
+          PY
+
+      - name: Publish signed authorization
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "${RUNNER_TEMP}/acceptance-auth.json"
+          mkdir -p control-plane/authorizations
+          cp "${RUNNER_TEMP}/acceptance-auth.json" "control-plane/authorizations/${AUTH_ID}.json"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "control-plane/authorizations/${AUTH_ID}.json"
+          git commit -m "governance(team): issue one-shot acceptance authorization ${AUTH_ID}"
+          git push origin "HEAD:refs/heads/main"
+          echo "ACCEPTANCE_AUTHORIZATION_PUBLISHED=${AUTH_ID}"
