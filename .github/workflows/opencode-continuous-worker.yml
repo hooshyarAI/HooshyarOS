@@ -28,7 +28,7 @@ jobs:
     timeout-minutes: 45
     env:
       TARGET_BRANCH: fix/autonomous-product-factory
-      MODEL: opencode/big-pickle
+      MODEL_POLICY: adaptive-free
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -59,6 +59,101 @@ jobs:
           curl -fsSL https://opencode.ai/install | bash
           echo "$HOME/.opencode/bin" >> "${GITHUB_PATH}"
           "$HOME/.opencode/bin/opencode" --version
+
+      - name: Select best available free model
+        shell: bash
+        run: |
+          set -euo pipefail
+          CATALOG="${RUNNER_TEMP}/opencode-models-verbose.txt"
+          "$HOME/.opencode/bin/opencode" models --refresh --verbose > "$CATALOG"
+          python3 - "$CATALOG" <<'PY' > "${RUNNER_TEMP}/model-selection.env"
+          import json
+          import math
+          import re
+          import sys
+          from datetime import datetime, timezone
+
+          text = open(sys.argv[1], encoding="utf-8", errors="replace").read()
+          lines = text.splitlines()
+          decoder = json.JSONDecoder()
+          models = []
+          i = 0
+
+          def is_model_id(s):
+              return bool(re.fullmatch(r"[^\\s/]+/[^\\s]+", s))
+
+          while i < len(lines):
+              line = lines[i].strip()
+              if is_model_id(line) and i + 1 < len(lines):
+                  raw = "\\n".join(lines[i + 1:])
+                  try:
+                      obj, _ = decoder.raw_decode(raw.lstrip())
+                  except Exception:
+                      i += 1
+                      continue
+                  if isinstance(obj, dict) and "name" in obj:
+                      models.append((line, obj))
+              i += 1
+
+          candidates = []
+          now = datetime.now(timezone.utc)
+
+          for model_id, m in models:
+              cost = m.get("cost")
+              if not isinstance(cost, dict):
+                  continue
+              numeric_costs = [v for v in cost.values() if isinstance(v, (int, float))]
+              if not numeric_costs or any(v > 0 for v in numeric_costs):
+                  continue
+
+              if m.get("reasoning") is not True or m.get("tool_call") is not True:
+                  continue
+
+              limit = m.get("limit") or {}
+              context = int(limit.get("context") or 0)
+              output = int(limit.get("output") or 0)
+              if context < 100_000 or output < 8_000:
+                  continue
+
+              score = 0.0
+              score += 100 if m.get("reasoning") else 0
+              score += 80 if m.get("tool_call") else 0
+              score += 30 if m.get("structured_output") else 0
+              score += min(30.0, math.log2(max(context, 1)) * 2.0)
+              score += min(20.0, math.log2(max(output, 1)) * 1.5)
+              if m.get("attachment"):
+                  score += 5
+              family = str(m.get("family") or "").lower()
+              if any(x in family for x in ("mini", "small", "nano")):
+                  score -= 8
+
+              updated = m.get("last_updated") or m.get("release_date")
+              if updated:
+                  try:
+                      dt = datetime.fromisoformat(str(updated).replace("Z", "+00:00"))
+                      age_days = max(0.0, (now - dt).total_seconds() / 86400.0)
+                      score += max(0.0, 10.0 - min(10.0, age_days / 30.0))
+                  except Exception:
+                      pass
+
+              if model_id == "opencode/big-pickle":
+                  score += 5  # verified HooshyarOS baseline
+              candidates.append((score, model_id, context, output, m.get("name", model_id)))
+
+          candidates.sort(reverse=True)
+          top = candidates[:4]
+          if not top:
+              print("MODEL_SELECTION_STATUS=BLOCKED_FREE_MODEL_UNAVAILABLE")
+              raise SystemExit(20)
+
+          print("MODEL_SELECTION_STATUS=OK")
+          print("SELECTED_MODEL=" + top[0][1])
+          print("MODEL_CANDIDATES=" + "|".join(x[1] for x in top))
+          print("MODEL_RANKING=" + " ; ".join(f"{x[1]} score={x[0]:.2f} ctx={x[2]} out={x[3]}" for x in top))
+          PY
+          cat "${RUNNER_TEMP}/model-selection.env" | tee -a "${GITHUB_ENV}"
+          test "${MODEL_SELECTION_STATUS:-}" = "OK"
+          echo "Adaptive free-model policy selected: ${SELECTED_MODEL}"
 
       - name: Install repository dependencies
         shell: bash
@@ -119,7 +214,20 @@ jobs:
           PROMPT
 
           OPENCODE_LOG="${RUNNER_TEMP}/opencode-worker.log"
-          opencode run --auto --model "${MODEL}" "$(cat "${PROMPT_FILE}")" 2>&1 | tee "${OPENCODE_LOG}"
+          : > "${OPENCODE_LOG}"
+          status=1
+          IFS='|' read -r -a CANDIDATES <<< "${MODEL_CANDIDATES}"
+          for candidate in "${CANDIDATES[@]}"; do
+            echo "MODEL_ATTEMPT=${candidate}" | tee -a "${OPENCODE_LOG}"
+            if timeout --signal=TERM --kill-after=30s 20m opencode run --auto --model "${candidate}" "$(cat "${PROMPT_FILE}")" 2>&1 | tee -a "${OPENCODE_LOG}"; then
+              status=0
+              echo "MODEL_SELECTED=${candidate}" | tee -a "${OPENCODE_LOG}"
+              echo "MODEL=${candidate}" >> "${GITHUB_ENV}"
+              break
+            fi
+            echo "MODEL_FAILED=${candidate}" | tee -a "${OPENCODE_LOG}"
+          done
+          test "${status}" -eq 0 || { echo "BLOCKED: all ranked free model candidates failed"; exit 24; }
 
       - name: Remove temporary prompt and validate worker diff
         shell: bash
@@ -190,7 +298,9 @@ jobs:
         run: |
           echo "RUN_ID=${GITHUB_RUN_ID}"
           echo "TARGET_BRANCH=${TARGET_BRANCH}"
-          echo "MODEL=${MODEL}"
+          echo "MODEL_POLICY=${MODEL_POLICY}"
+          echo "MODEL=${MODEL:-unknown}"
+          echo "MODEL_CANDIDATES=${MODEL_CANDIDATES:-unknown}"
           echo "START_SHA=${START_SHA:-unknown}"
           echo "WORKER_BRANCH=${WORKER_BRANCH:-unknown}"
           if test -f "${RUNNER_TEMP}/opencode-worker.log"; then
