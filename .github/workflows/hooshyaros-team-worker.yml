@@ -233,7 +233,7 @@ jobs:
           "$HOME/.opencode/bin/opencode" models --refresh --verbose > "${CATALOG}" 2>&1
 
           python3 - "${CATALOG}" "${RUNNER_TEMP}/qualified-models.env" <<'PY'
-          import json, math, re, subprocess, sys, time
+          import json, math, os, re, subprocess, sys, time
           from datetime import datetime, timezone
 
           catalog=sys.argv[1]
@@ -327,9 +327,9 @@ jobs:
           failures=[]
           for score,mid,ctx,out in top:
               start=time.monotonic()
-              log="${RUNNER_TEMP}/probe-"+re.sub(r"[^A-Za-z0-9_.-]+","_",mid)+".log"
+              log=os.path.join(os.environ["RUNNER_TEMP"], "probe-"+re.sub(r"[^A-Za-z0-9_.-]+","_",mid)+".log")
               cmd=[
-                  "$HOME/.opencode/bin/opencode","run","--auto","--agent","plan",
+                  os.path.join(os.environ["HOME"], ".opencode", "bin", "opencode"),"run","--auto","--agent","plan",
                   "--model",mid,probe_prompt
               ]
               try:
