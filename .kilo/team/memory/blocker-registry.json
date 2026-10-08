@@ -25,21 +25,34 @@
         "WORK-0006"
       ],
       "evidence": {
-        "team_run": 37759400053,
-        "team_status": "pending",
+        "team_run": 37760777088,
+        "control_plane_commit": "9151fe4dbe85f9fbda0a3a7555a2206fb2e92461",
+        "team_status": "queued",
         "team_jobs": "prepare queued",
-        "other_live_runs": [
-          "37759380907",
-          "37759380906",
-          "37759380882",
-          "37759380935",
-          "37759380909",
-          "37759380914",
-          "37759380937"
+        "runner_allocated": false,
+        "observed_at": "2026-10-08",
+        "repository_queued_runs": [
+          37761201201,
+          37761137718,
+          37760919224,
+          37760904755,
+          37760848195,
+          37760848144,
+          37760848140,
+          37760848123,
+          37760848102,
+          37760848091,
+          37760848043,
+          37760848031,
+          37760848028,
+          37760848026,
+          37760848024,
+          37760777088,
+          37760726625
         ]
       },
-      "root_cause": "No worker job has been allocated to Team Run #15 while multiple repository workflows are simultaneously queued.",
-      "safe_unblock": "allow GitHub Actions runner scheduling to release the Team Worker; do not launch stale duplicate waves",
+      "root_cause": "No runner has been allocated to Team Run #16 while multiple repository workflows are simultaneously queued. GitHub Actions status page currently reports the service operational, so the local repository queue remains the observed blocker.",
+      "safe_unblock": "Do not launch additional duplicate Team waves. Preserve Run #16 and let the current scheduler clear the queue; once a runner is allocated, execute the governed V2 wave and require real job evidence.",
       "rule": "No product completion, failure or retry inference from queued state."
     }
   ]
