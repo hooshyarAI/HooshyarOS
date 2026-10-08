@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "next_id": "BLOCKER-0002",
+  "items": [
+    {
+      "id": "BLOCKER-0001",
+      "title": "Wave 10 integration target drift",
+      "status": "RECOVERY_REVIEW_REQUIRED",
+      "severity": "P0",
+      "affected_work": [
+        "WORK-0001"
+      ],
+      "evidence": "Team Wave 10 integrate failure + recovery workflow",
+      "safe_unblock": "controlled recovery verifies drift paths and imports only independently QC-passed worker results"
+    }
+  ]
+}
