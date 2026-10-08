@@ -278,6 +278,7 @@ jobs:
 
           ranked = []
           for mid, m in models.items():
+              caps = m.get("capabilities") or {}
               cost = m.get("cost")
               name = mid.split("/", 1)[1] if "/" in mid else mid
               explicit_free = False
@@ -287,7 +288,9 @@ jobs:
               named_free = mid == "opencode/big-pickle" or name.lower().endswith("-free") or "-free-" in name.lower()
               if not (explicit_free or named_free):
                   continue
-              if m.get("reasoning") is not True or m.get("tool_call") is not True:
+              reasoning = m.get("reasoning") is True or caps.get("reasoning") is True
+              tool_call = m.get("tool_call") is True or caps.get("toolcall") is True or caps.get("tool_call") is True
+              if not reasoning or not tool_call:
                   continue
 
               limit = m.get("limit") or {}
@@ -296,13 +299,19 @@ jobs:
               if ctx < 100_000 or out < 8_000:
                   continue
 
+              structured_output = m.get("structured_output") is True or caps.get("structured_output") is True
+              attachment = m.get("attachment") is True or caps.get("attachment") is True
               score = 100.0
-              score += 70.0 if mode in ("AUDIT","REVIEW","VERIFY") else 30.0
-              score += 70.0 if mode == "IMPLEMENT" else 30.0
-              score += 35.0 if m.get("structured_output") else 0.0
+              if mode in ("AUDIT","REVIEW","VERIFY"):
+                  score += 35.0 if caps.get("reasoning") is True else 0.0
+                  score += 15.0 if structured_output else 0.0
+              if mode == "IMPLEMENT":
+                  score += 30.0 if tool_call else 0.0
+                  score += 15.0 if attachment else 0.0
+              score += 35.0 if structured_output else 0.0
               score += min(30.0, math.log2(max(ctx,1))*2.0)
               score += min(20.0, math.log2(max(out,1))*1.5)
-              if m.get("attachment"):
+              if attachment:
                   score += 5
               family = str(m.get("family") or "").lower()
               if any(x in family for x in ("mini","small","nano")):
@@ -606,13 +615,15 @@ jobs:
               if brace<0: continue
               try: obj,_=dec.raw_decode(block[brace:])
               except Exception: continue
-              if isinstance(obj,dict) and "name" in obj: seen[mid]=obj
+              if isinstance(obj,dict): seen[mid]=obj
           ranked=[]
           for mid,m in seen.items():
-              cost=m.get("cost"); name=mid.split("/",1)[1] if "/" in mid else mid
+              caps=m.get("capabilities") or {}; cost=m.get("cost"); name=mid.split("/",1)[1] if "/" in mid else mid
               vals=[v for v in cost.values() if isinstance(v,(int,float))] if isinstance(cost,dict) else []
               free=(bool(vals) and all(v==0 for v in vals)) or mid=="opencode/big-pickle" or name.lower().endswith("-free") or "-free-" in name.lower()
-              if not free or m.get("reasoning") is not True or m.get("tool_call") is not True: continue
+              reasoning=m.get("reasoning") is True or caps.get("reasoning") is True
+              tool_call=m.get("tool_call") is True or caps.get("toolcall") is True or caps.get("tool_call") is True
+              if not free or not reasoning or not tool_call: continue
               lim=m.get("limit") or {}; ctx=int(lim.get("context") or 0); out=int(lim.get("output") or 0)
               if ctx<100_000 or out<8_000: continue
               score=180+(30 if m.get("structured_output") else 0)+min(30,math.log2(max(ctx,1))*2)+min(20,math.log2(max(out,1))*1.5)
@@ -835,13 +846,15 @@ jobs:
               if brace<0: continue
               try: obj,_=dec.raw_decode(block[brace:])
               except Exception: continue
-              if isinstance(obj,dict) and "name" in obj: seen[mid]=obj
+              if isinstance(obj,dict): seen[mid]=obj
           ranked=[]
           for mid,m in seen.items():
-              cost=m.get("cost"); name=mid.split("/",1)[1] if "/" in mid else mid
+              caps=m.get("capabilities") or {}; cost=m.get("cost"); name=mid.split("/",1)[1] if "/" in mid else mid
               vals=[v for v in cost.values() if isinstance(v,(int,float))] if isinstance(cost,dict) else []
               free=(bool(vals) and all(v==0 for v in vals)) or mid=="opencode/big-pickle" or name.lower().endswith("-free") or "-free-" in name.lower()
-              if not free or m.get("reasoning") is not True or m.get("tool_call") is not True: continue
+              reasoning=m.get("reasoning") is True or caps.get("reasoning") is True
+              tool_call=m.get("tool_call") is True or caps.get("toolcall") is True or caps.get("tool_call") is True
+              if not free or not reasoning or not tool_call: continue
               lim=m.get("limit") or {}; ctx=int(lim.get("context") or 0); out=int(lim.get("output") or 0)
               if ctx<100_000 or out<8_000: continue
               score=200+(30 if m.get("structured_output") else 0)+min(30,math.log2(max(ctx,1))*2)+min(20,math.log2(max(out,1))*1.5)
