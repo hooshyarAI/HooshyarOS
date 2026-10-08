@@ -1,0 +1,68 @@
+name: HooshyarOS Team V2 Control Plane Validation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/team-v2-dispatch-authority.cjs'
+      - 'scripts/team-v2-dispatch-authority.test.cjs'
+      - 'scripts/lib/team-v2-*.cjs'
+      - '.github/workflows/team-*.yml'
+      - '.github/workflows/hooshyaros-team-worker.yml'
+      - '.kilo/team/NEXT-WAVE-PLAN.schema.json'
+
+permissions:
+  contents: read
+
+jobs:
+  control-plane:
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 1
+      - name: Syntax check
+        run: |
+          set -euo pipefail
+          node --check scripts/lib/team-v2-gate.cjs
+          node --check scripts/lib/team-v2-admission.cjs
+          node --check scripts/lib/team-v2-authorization.cjs
+          node --check scripts/lib/team-v2-reservation.cjs
+          node --check scripts/team-v2-dispatch-authority.cjs
+      - name: Pure control-plane tests
+        run: |
+          set -euo pipefail
+          node scripts/lib/team-v2-gate.test.cjs
+          node scripts/lib/team-v2-admission.test.cjs
+          node scripts/lib/team-v2-authorization.test.cjs
+          node scripts/lib/team-v2-reservation.test.cjs
+          node scripts/team-v2-dispatch-authority.test.cjs
+      - name: Worker route contract audit
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          text=Path('.github/workflows/hooshyaros-team-worker.yml').read_text(encoding='utf-8')
+          required=['reservation_id','reservation_ref','WORK_TASK_CLASS','task_class_for','TEAM_RESERVATION_ID','TEAM_RESERVATION_REF']
+          missing=[x for x in required if x not in text]
+          if missing:
+              raise SystemExit('MISSING_WORKER_CONTROL_CONTRACT=' + ','.join(missing))
+          forbidden=['MODEL_ROUTING_TASK_CLASS=mode','MODEL_ROUTING_TASK_CLASS=" + mode','MODEL_ROUTING_TASK_CLASS=' + '${mode}']
+          bad=[x for x in forbidden if x in text]
+          if bad:
+              raise SystemExit('FORBIDDEN_MODE_AUTHORITY=' + ','.join(bad))
+          print('WORKER_ROUTE_CONTRACT=PASS')
+          PY
+      - name: Acceptance gate invariant
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          gate=json.load(open('.kilo/team/TEAM-V2-ACCEPTANCE-GATE.json',encoding='utf-8'))
+          if gate.get('status')!='ARMED' or gate.get('hold_after_pass') is not True:
+              raise SystemExit('ACCEPTANCE_GATE_INVARIANT_FAILED')
+          print('ACCEPTANCE_GATE=ARMED_HOLD')
+          PY
