@@ -3,6 +3,7 @@
 const { execFileSync } = require("node:child_process");
 const { evaluateGate } = require("./lib/team-v2-gate.cjs");
 const { validateWork, workIdFromLeaseId } = require("./lib/team-v2-admission.cjs");
+const { validateAuthorization } = require("./lib/team-v2-authorization.cjs");
 
 const TARGET_BRANCH = process.env.TARGET_BRANCH || "fix/autonomous-product-factory";
 const WORKER_WORKFLOW_ID = process.env.TEAM_WORKER_WORKFLOW_ID || "378094136";
@@ -157,8 +158,20 @@ function ghJson(args) {
   return JSON.parse(execFileSync("gh", ["api", ...args], { encoding: "utf8" }));
 }
 function readRepoJson(path) {
-  const obj = ghJson([`repos/${REPOSITORY}/contents/${path}?ref=${TARGET_BRANCH}`]);
+  const obj = ghJson(["repos/" + REPOSITORY + "/contents/" + path + "?ref=" + encodeURIComponent(TARGET_BRANCH)]);
   return JSON.parse(Buffer.from(String(obj.content).replace(/\n/g, ""), "base64").toString("utf8"));
+}
+function readTargetSha() {
+  const ref = ghJson(["repos/" + REPOSITORY + "/git/ref/heads/" + TARGET_BRANCH]);
+  return String(ref?.object?.sha || "");
+}
+function readRepoFileText(path) {
+  const obj = ghJson(["repos/" + REPOSITORY + "/contents/" + path + "?ref=" + encodeURIComponent(TARGET_BRANCH)]);
+  return Buffer.from(String(obj.content).replace(/\n/g, ""), "base64").toString("utf8");
+}
+function sha256(text) {
+  const { createHash } = require("node:crypto");
+  return createHash("sha256").update(text, "utf8").digest("hex");
 }
 function comment(body) {
   try {
@@ -167,12 +180,21 @@ function comment(body) {
 }
 
 if (require.main === module) {
+  const targetSha = readTargetSha();
+  if (!targetSha) {
+    console.log("TEAM_WORKER_DISPATCH=REFUSED MISSING_TARGET_SHA");
+    comment("TEAM DISPATCH AUTHORITY REFUSED: MISSING_TARGET_SHA");
+    process.exit(20);
+  }
+  const planText = readRepoFileText(".kilo/team/NEXT-WAVE-PLAN.json");
+  const plan = JSON.parse(planText);
+  const planSha256 = sha256(planText);
   const gate = readRepoJson(".kilo/team/TEAM-V2-ACCEPTANCE-GATE.json");
-  const plan = readRepoJson(".kilo/team/NEXT-WAVE-PLAN.json");
   const registry = readRepoJson(".kilo/team/memory/work-registry.json");
   const acceptanceLease = Array.isArray(plan.leases) && plan.leases.length === 1 ? plan.leases[0] : null;
   const acceptanceWorkId = acceptanceLease ? workIdFromLeaseId(acceptanceLease.id) : null;
-  const authorizationPath = process.env.TEAM_ACCEPTANCE_AUTHORIZATION_PATH || "";
+  const authorizationId = String(process.env.TEAM_ACCEPTANCE_AUTHORIZATION_ID || "").trim();
+  const authorizationPath = authorizationId ? "control-plane/authorizations/" + authorizationId + ".json" : "";
   let authorization = null;
   if (authorizationPath) authorization = readRepoJson(authorizationPath);
   const violations = admissionViolations({
@@ -182,10 +204,22 @@ if (require.main === module) {
     authorization,
     acceptanceWorkId,
     acceptanceLeaseId: acceptanceLease?.id || null,
-    targetSha: process.env.TEAM_TARGET_SHA || null,
-    planSha256: process.env.TEAM_PLAN_SHA256 || null,
+    targetSha,
+    planSha256,
     now: new Date().toISOString()
   });
+
+  if (authorization) {
+    const authViolations = validateAuthorization(authorization, {
+      workId: acceptanceWorkId,
+      leaseId: acceptanceLease?.id || null,
+      targetBranch: TARGET_BRANCH,
+      targetSha,
+      planSha256,
+      now: new Date().toISOString()
+    });
+    violations.push(...authViolations);
+  }
 
   console.log(`TEAM_DISPATCH_AUTHORITY_PLAN=${plan.wave_status}`);
   console.log(`TEAM_DISPATCH_AUTHORITY_GATE=${gate.status}`);
