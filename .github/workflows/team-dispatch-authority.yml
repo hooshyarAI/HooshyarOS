@@ -1,0 +1,36 @@
+name: HooshyarOS Team Dispatch Authority
+
+on:
+  workflow_call:
+    inputs:
+      reason:
+        description: "Reason for the governed Team Worker dispatch"
+        required: true
+        type: string
+
+permissions:
+  actions: write
+  contents: read
+  issues: write
+
+jobs:
+  authorize-and-dispatch:
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TARGET_BRANCH: "fix/autonomous-product-factory"
+      TEAM_WORKER_WORKFLOW_ID: "378094136"
+      TEAM_CONTROL_ISSUE: "122"
+      TEAM_DISPATCH_REASON: ${{ inputs.reason }}
+    steps:
+      - name: Checkout control-plane authority
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 1
+      - name: Execute single authoritative admission and dispatch
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/team-v2-dispatch-authority.cjs

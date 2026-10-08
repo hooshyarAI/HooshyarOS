@@ -354,15 +354,10 @@ jobs:
           git push origin "HEAD:refs/heads/$TARGET_BRANCH"
           echo "RECOVERY_SYNTH_PROMOTED=$(git rev-parse HEAD)"
 
-      - name: Continue next governed wave after recovery
-        if: success()
-        shell: bash
-        run: |
-          set -euo pipefail
-          PLAN=.kilo/team/NEXT-WAVE-PLAN.json
-          MISSION=.kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md
-          if test -f "$PLAN" && grep -q '"wave_status": "READY"' "$PLAN" && grep -Fxq 'MISSION_STATUS = ACTIVE' "$MISSION" && grep -Fxq 'CONTINUE_ALLOWED = TRUE' "$MISSION"; then
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/workflows/hooshyaros-team-worker.yml/dispatches" -f ref=main -f 'inputs[reason]=Automatic continuation after controlled team-wave recovery'
-          else
-            echo 'RECOVERY_TEAM_CONTINUE=FALSE'
-          fi
+  continue-next-wave:
+    needs: recover-synthesize
+    if: ${{ needs.recover-synthesize.result == 'success' }}
+    uses: ./.github/workflows/team-dispatch-authority.yml
+    with:
+      reason: Automatic continuation after controlled team-wave recovery via single authority
+    secrets: inherit

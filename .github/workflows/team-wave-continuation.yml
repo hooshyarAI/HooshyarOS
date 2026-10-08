@@ -17,66 +17,7 @@ concurrency:
 jobs:
   continue:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    runs-on: ubuntu-slim
-    timeout-minutes: 5
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      TEAM_WORKER_WORKFLOW_ID: "378094136"
-      TARGET_BRANCH: "fix/autonomous-product-factory"
-    steps:
-      - name: Manager — inspect governed continuation state
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import base64, json, os, subprocess
-
-          repo=os.environ["GITHUB_REPOSITORY"]
-          gate_path=".kilo/team/TEAM-V2-ACCEPTANCE-GATE.json"
-          gate_raw=subprocess.check_output([
-              "gh","api",f"repos/{repo}/contents/{gate_path}?ref={os.environ['TARGET_BRANCH']}"
-          ],text=True)
-          gate_obj=json.loads(gate_raw)
-          gate= json.loads(base64.b64decode(gate_obj["content"].replace("\n","")).decode("utf-8"))
-          print(f"TEAM_V2_ACCEPTANCE_GATE={gate.get('status')}")
-          print(f"TEAM_V2_HOLD_AFTER_PASS={gate.get('hold_after_pass')}")
-          if gate.get("status")=="ARMED" and gate.get("hold_after_pass") is True:
-              print("TEAM_CONTINUE=FALSE_ACCEPTANCE_HOLD")
-              raise SystemExit(0)
-
-          path=".kilo/team/NEXT-WAVE-PLAN.json"
-          raw=subprocess.check_output([
-              "gh","api",f"repos/{repo}/contents/{path}?ref={os.environ['TARGET_BRANCH']}"
-          ],text=True)
-          obj=json.loads(raw)
-          content=base64.b64decode(obj["content"].replace("\n","")).decode("utf-8")
-          plan=json.loads(content)
-          status=plan.get("wave_status")
-          leases=plan.get("leases",[])
-          print(f"CONTINUATION_PLAN_STATUS={status}")
-          print(f"CONTINUATION_LEASE_COUNT={len(leases)}")
-          if status!="READY" or not leases:
-              print("TEAM_CONTINUE=FALSE")
-              raise SystemExit(0)
-          print("TEAM_CONTINUE=ELIGIBLE")
-          PY
-
-      - name: Manager — enforce single active Team Worker
-        shell: bash
-        run: |
-          set -euo pipefail
-          active="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/${TEAM_WORKER_WORKFLOW_ID}/runs?branch=${TARGET_BRANCH}&status=in_progress&per_page=20" | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("workflow_runs",[])))')"
-          echo "ACTIVE_TEAM_WORKERS=${active}"
-          if [ "${active}" -gt 0 ]; then
-            gh issue comment 122 --repo "${GITHUB_REPOSITORY}" --body "TEAM CONTINUATION REFUSED: an active Team Worker already exists; no duplicate wave started."
-            exit 20
-          fi
-
-      - name: Manager — dispatch exactly one next governed wave
-        shell: bash
-        run: |
-          set -euo pipefail
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/workflows/${TEAM_WORKER_WORKFLOW_ID}/dispatches" \
-            -f ref=main \
-            -f 'inputs[reason]=Post-completion governed Team V2 continuation'
-          gh issue comment 122 --repo "${GITHUB_REPOSITORY}" --body "TEAM CONTINUATION ACCEPTED: previous Team Worker completed successfully and exactly one next governed wave was dispatched after completion."
+    uses: ./.github/workflows/team-dispatch-authority.yml
+    with:
+      reason: Post-completion governed Team V2 continuation via single authority
+    secrets: inherit

@@ -19,8 +19,8 @@ permissions:
   issues: write
 
 jobs:
-  bootstrap:
-    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'issue_comment' && github.event.issue.pull_request == null && github.event.issue.number == 122 && startsWith(github.event.comment.body, '/team-queue-bootstrap')) }}
+
+  cancel-obsolete:    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' || (github.event_name == 'issue_comment' && github.event.issue.pull_request == null && github.event.issue.number == 122 && startsWith(github.event.comment.body, '/team-queue-bootstrap')) }}
     runs-on: ubuntu-slim
     timeout-minutes: 15
     env:
@@ -71,21 +71,10 @@ PYRUN
             done
           done < "${RUNNER_TEMP}/workflows.txt"
           echo "CANCEL_REQUESTS=${total}"
-      - name: Manager — Dispatch only when no Team Worker is active
-        shell: bash
-        run: |
-          set -euo pipefail
-          active="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/${TEAM_WORKER_WORKFLOW_ID}/runs?branch=fix/autonomous-product-factory&status=in_progress&per_page=20" | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("workflow_runs",[])))')"
-          echo "ACTIVE_TEAM_WORKERS=${active}"
-          if [ "${active}" -gt 0 ]; then
-            echo "TEAM_WORKER_DISPATCH=REFUSED_ACTIVE_RUN"
-            gh issue comment 122 --repo "${GITHUB_REPOSITORY}" --body "TEAM QUEUE BOOTSTRAP: refused duplicate dispatch because an active Team Worker already exists. No running wave was cancelled."
-            exit 20
-          fi
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/workflows/${TEAM_WORKER_WORKFLOW_ID}/dispatches"             -f ref=main             -f 'inputs[reason]=Queue bootstrap governed dispatch via main control plane'
-          echo "TEAM_WORKER_DISPATCH=SUCCESS"
-
-      - name: Manager — Record evidence
-        shell: bash
-        run: |
-          gh issue comment 122 --repo "${GITHUB_REPOSITORY}"             --body "TEAM QUEUE BOOTSTRAP COMPLETE: manager cancelled obsolete legacy/stale Team Worker runs and dispatched exactly one fresh governed Team V2 wave. Bootstrap=${GITHUB_RUN_ID}."
+  dispatch-authority:
+    needs: cancel-obsolete
+    if: ${{ needs.cancel-obsolete.result == 'success' }}
+    uses: ./.github/workflows/team-dispatch-authority.yml
+    with:
+      reason: Queue bootstrap governed dispatch via single authority
+    secrets: inherit

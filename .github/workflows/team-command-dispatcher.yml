@@ -19,35 +19,7 @@ jobs:
       ${{ github.event.issue.pull_request == null &&
           github.event.issue.number == 122 &&
           startsWith(github.event.comment.body, '/opencode-team-run') }}
-    runs-on: ubuntu-slim
-    timeout-minutes: 5
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      TEAM_WORKER_WORKFLOW_ID: "378094136"
-      TARGET_BRANCH: "fix/autonomous-product-factory"
-    steps:
-      - name: Manager — enforce single active Team Worker
-        shell: bash
-        run: |
-          set -euo pipefail
-          raw="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/${TEAM_WORKER_WORKFLOW_ID}/runs?branch=${TARGET_BRANCH}&status=in_progress&per_page=20")"
-          active="$(python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("workflow_runs",[])))' <<< "${raw}")"
-          echo "ACTIVE_TEAM_WORKERS=${active}"
-          if [ "${active}" -gt 0 ]; then
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/122/comments"               -f body="TEAM DISPATCH REFUSED: an active Team Worker already exists. No running wave was cancelled and no duplicate wave was started."
-            exit 20
-          fi
-
-      - name: Manager — dispatch exactly one governed Team Worker
-        shell: bash
-        run: |
-          set -euo pipefail
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/workflows/${TEAM_WORKER_WORKFLOW_ID}/dispatches"             -f ref=main             -f 'inputs[reason]=Issue #122 governed command dispatch'
-          echo "TEAM_WORKER_DISPATCH=SUCCESS"
-
-      - name: Manager — record dispatch evidence
-        if: ${{ success() }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/122/comments"             -f body="TEAM DISPATCH ACCEPTED: exactly one Team Worker wave dispatched from main; single-active-run guard passed. The Team Worker itself is isolated from issue-comment events."
+    uses: ./.github/workflows/team-dispatch-authority.yml
+    with:
+      reason: Issue #122 governed command dispatch via single authority
+    secrets: inherit
