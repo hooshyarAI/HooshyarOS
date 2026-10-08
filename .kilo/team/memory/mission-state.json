@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0",
+  "current_mission": "MISSION-0001",
+  "program": "PROGRAM-0001",
+  "status": "ACTIVE",
+  "primary_work": "WORK-0001",
+  "team_org_work": "WORK-0002",
+  "team_org_version": "V2",
+  "team_status": "ACTIVE",
+  "current_wave": "WAVE-0010",
+  "current_wave_state": "RECOVERY_REVIEW_REQUIRED",
+  "first_objective": "POST-RECOVERY / ARCHITECTURE + AUDIT RECONCILIATION",
+  "next_state": "BACKFILL_MEMORY_THEN_REPLAN",
+  "protected_rules": [
+    "Architecture Freeze V4/V4.1",
+    "No duplicate engines",
+    "No blind retries",
+    "No weakened tests",
+    "No fabricated evidence"
+  ]
+}
