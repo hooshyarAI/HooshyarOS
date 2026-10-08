@@ -427,6 +427,21 @@ jobs:
               if len(active) >= requested:
                   break
 
+          def task_class_for(lease):
+              role = str(lease.get("role","")).upper()
+              focus = str(lease.get("focus","")).upper()
+              owner = str(lease.get("owner","")).upper()
+              text = f"{role} {focus} {owner}"
+              if "MEMORY" in text or "EDITOR" in owner: return "MEMORY"
+              if "QC" in text or "EVALUATOR" in owner: return "QC"
+              if "REPAIR" in text: return "REPAIR"
+              if "PLAN" in text or "PLANNER" in owner: return "PLAN"
+              if "VERIFY" in text: return "VERIFY"
+              if "REVIEW" in text: return "REVIEW"
+              if "IMPLEMENT" in text or "BUILD" in text: return "IMPLEMENT"
+              if "AUDIT" in text: return "AUDIT"
+              return str(lease.get("mode","")).upper()
+
           matrix = {
               "include": [
                   {
@@ -435,6 +450,7 @@ jobs:
                       "focus": x["focus"],
                       "owner": x["owner"],
                       "mode": x["mode"],
+                      "task_class": task_class_for(x),
                       "write_scope_json": json.dumps(x["write_scope"], ensure_ascii=False, separators=(",", ":")),
                       "write_root": f".kilo/team/results/{x['id']}/"
                   }
@@ -611,12 +627,14 @@ jobs:
               except Exception: continue
               if isinstance(obj,dict): models[mid]=obj
 
-          modes=[]
+          task_classes=[]
           for item in (matrix.get("include") or []):
-              mode=str(item.get("mode","")).upper()
-              if mode not in {"AUDIT","IMPLEMENT","REVIEW","VERIFY"}:
-                  raise SystemExit(f"BLOCKED: unsupported lease mode for routing: {mode}")
-              if mode not in modes: modes.append(mode)
+              task_class=str(item.get("task_class","")).upper()
+              if task_class not in {"PLAN","AUDIT","IMPLEMENT","REPAIR","REVIEW","VERIFY","QC","MEMORY"}:
+                  task_class=str(item.get("mode","")).upper()
+              if task_class not in {"PLAN","AUDIT","IMPLEMENT","REPAIR","REVIEW","VERIFY","QC","MEMORY"}:
+                  raise SystemExit(f"BLOCKED: unsupported lease task_class: {task_class}")
+              if task_class not in task_classes: task_classes.append(task_class)
 
           def authoritatively_free(m):
               cost=m.get("cost")
@@ -653,14 +671,19 @@ jobs:
           if not eligible: raise SystemExit("BLOCKED_FREE_MODEL_UNAVAILABLE")
 
           probes={
+            "PLAN":"You qualify for PLAN work. Do not modify files. Given A depends on B and C is independent, return exactly: TASK_PROBE=PASS, TASK=PLAN, ORDER=B>A, PARALLEL=C, SCOPE=BOUNDED.",
             "AUDIT":"You qualify for AUDIT work. Do not modify files. A=100, B=120, C is the signed source and says 100. Return exactly: TASK_PROBE=PASS, TASK=AUDIT, CONTRADICTION=TRUE, AUTHORITY=C, VALUE=100.",
             "IMPLEMENT":"You qualify for IMPLEMENT work. Do not modify files. A defect is in F and regression test T exists. Return exactly: TASK_PROBE=PASS, TASK=IMPLEMENT, MINIMAL_CHANGE=TRUE, TEST=T, SCOPE=BOUNDED.",
-            "REVIEW":"You qualify for REVIEW/QC work. Do not modify files. Worker claims a file was changed but patch does not contain it. Return exactly: TASK_PROBE=PASS, TASK=REVIEW, FALSE_GREEN=TRUE, CHECK=ACTUAL_PATCH.",
-            "VERIFY":"You qualify for VERIFY work. Do not modify files. Test is green but ran from a different commit than START_SHA. Return exactly: TASK_PROBE=PASS, TASK=VERIFY, VALID=FALSE, ACTION=REVERIFY."
+            "REPAIR":"You qualify for REPAIR work. Do not modify files. A control-plane defect has a focused regression test. Return exactly: TASK_PROBE=PASS, TASK=REPAIR, ROOT_FIX=TRUE, TEST=FOCUSED, SCOPE=CONTROL_PLANE_ONLY.",
+            "REVIEW":"You qualify for REVIEW work. Do not modify files. Worker claims a file was changed but patch does not contain it. Return exactly: TASK_PROBE=PASS, TASK=REVIEW, FALSE_GREEN=TRUE, CHECK=ACTUAL_PATCH.",
+            "VERIFY":"You qualify for VERIFY work. Do not modify files. Test is green but ran from a different commit than START_SHA. Return exactly: TASK_PROBE=PASS, TASK=VERIFY, VALID=FALSE, ACTION=REVERIFY.",
+            "QC":"You qualify for QC work. Do not modify files. Worker report says PASS but actual diff lacks the claimed change. Return exactly: TASK_PROBE=PASS, TASK=QC, DECISION=FAIL, BASIS=ACTUAL_DIFF.",
+            "MEMORY":"You qualify for MEMORY work. Do not modify files. Historical evidence says A, current repository says B. Return exactly: TASK_PROBE=PASS, TASK=MEMORY, CURRENT_TRUTH=B, HISTORICAL_PRESERVED=TRUE, CONTRADICTION=RECONCILE."
           }
 
           routes={}; union=[]; seen=set()
-          for mode in modes:
+          for mode in task_classes:
+              task_class=mode
               passed=[]
               for base,mid,ctx,out in sorted(eligible,reverse=True)[:4]:
                   start=time.monotonic()
@@ -826,15 +849,16 @@ jobs:
         env:
           ROUTE_PLANS: ${{ needs.model-qualification.outputs.route_plans }}
           WORK_MODE: ${{ matrix.mode }}
+          WORK_TASK_CLASS: ${{ matrix.task_class }}
         run: |
           set -euo pipefail
           test -n "${ROUTE_PLANS}"
           python3 - <<'PY'
           import json,os
-          mode=os.environ["WORK_MODE"].upper()
+          task_class=os.environ["WORK_TASK_CLASS"].upper()
           plans=json.loads(os.environ["ROUTE_PLANS"])
-          route=plans.get(mode) or []
-          if not route: raise SystemExit(f"BLOCKED_FREE_MODEL_UNAVAILABLE: no qualified route for {mode}")
+          route=plans.get(task_class) or []
+          if not route: raise SystemExit(f"BLOCKED_FREE_MODEL_UNAVAILABLE: no qualified route for {task_class}")
           models=[x["model"] for x in route]
           with open(os.environ["GITHUB_ENV"],"a",encoding="utf-8") as out:
               out.write("MODEL_CANDIDATES="+"|".join(models)+"\n")
