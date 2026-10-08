@@ -10,9 +10,7 @@
       "mode": "AUDIT",
       "priority": "P0",
       "owner": "MEMORY_EDITOR",
-      "dependencies": [
-        "WORK-0010"
-      ],
+      "dependencies": [],
       "evidence_required": [
         "reconciled_defect_registry",
         "reconciled_evidence_registry",
@@ -42,7 +40,18 @@
         "root_cause": "After identity normalization, evidence root still reflected the prior lease id contract.",
         "worker_started": false,
         "repair": "Use full governed lease id consistently in lease id and evidence root."
-      }
+      },
+      "input_evidence": [
+        "WORK-0010"
+      ],
+      "dependency_semantics": "FAILED_PRIOR_WORK_IS_INPUT_NOT_SUCCESS_PREREQUISITE",
+      "repair_history": [
+        {
+          "run_id": 37821016567,
+          "change": "remove WORK-0010 success dependency",
+          "reason": "recovery reconciliation consumes failed predecessor evidence"
+        }
+      ]
     }
   ]
 }
