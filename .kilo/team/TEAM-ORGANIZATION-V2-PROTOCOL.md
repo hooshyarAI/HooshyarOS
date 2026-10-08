@@ -252,3 +252,68 @@ WORKER SUCCESS
 ```
 
 The wave reaches COMPLETE only after the applicable chain has been independently verified. If any mandatory gate fails, the result is preserved and the next safe action is RECOVERY, RECONCILIATION, or BLOCKED—never blind rerun of the same lease.
+
+
+## Production Hardening — 2026-10-08
+
+The team is explicitly organized as a **generator/evaluator/integrator organization**, not a collection of independent chat agents.
+
+### 1. Brain / hands / session separation
+
+The reasoning agent, execution environment and durable evidence are separate concerns. A runner may fail, a model may time out, or an outer validator may reject a report; none of those events may erase a valid committed worker result.
+
+A Worker commit must therefore be preserved on its isolated remote branch when a coherent clean commit exists, even when a later validation gate fails. The evidence artifact must also retain the commit identity, branch, start SHA, status, patch and execution metadata.
+
+### 2. Generator → Evaluator separation
+
+The Specialist Worker generates the change and its evidence report. QC is a separate job, session and decision authority.
+
+QC must inspect:
+- the worker report;
+- the exact changed-file set;
+- the actual worker patch/commit;
+- the immutable start SHA;
+- the relevant charter/governance/architecture constraints.
+
+A report that is internally plausible but contradicted by the actual patch is FAIL.
+
+### 3. Durable evidence before promotion
+
+The mandatory evidence chain is:
+
+`WORKER_COMMIT → REMOTE_BRANCH → WORKER_ENVELOPE → QC_ADJUDICATION → INTEGRATION → TARGET_PROMOTION → MEMORY_CLOSURE`
+
+No stage may infer the next stage merely because the previous job returned green.
+
+The QC decision must be persisted as a machine-readable artifact. Integrator promotion is blocked unless that persisted adjudication is PASS and explicitly records that the actual worker change was inspected.
+
+### 4. Model-role separation
+
+Model choice is role-specific:
+- Planner/Synthesizer: strongest available reasoning configuration appropriate to planning.
+- Specialist Worker: strongest qualified model for the leased implementation/audit mode.
+- QC: prefer a different qualified candidate from the Worker when more than one qualified model exists.
+- Fallback is bounded and explicit; a model failure creates a preserved failure/recovery state rather than uncontrolled spawning or blind retries.
+
+DeepSeek-style thinking/tool use is treated as a model capability, not as an execution authority: the harness remains responsible for tool execution, durable state and verification. Official DeepSeek guidance documents thinking with tool calls, Agent Skills, and the need to preserve reasoning context across tool-call turns.
+
+### 5. Safe parallelism
+
+Parallelism is created only by independently ready leases with non-overlapping write scopes. Shared memory reconciliation, architecture/control-plane edits, QC adjudication and promotion are serialized authorities.
+
+The target is **maximum correct throughput**, not maximum worker count.
+
+### 6. Recovery law
+
+When a worker fails after producing a commit, the team preserves the remote branch and records the failure. It does not re-dispatch the same lease.
+
+Recovery requires a new governed recovery/reconciliation decision that references the failed execution evidence. A second dispatch of the same unresolved lease is a governance failure.
+
+### 7. Acceptance gate for continued investment
+
+Before the team is allowed to expand to broad remaining product work, it must demonstrate one clean end-to-end governed wave:
+
+`Admission → Reservation → Worker → Branch Preservation → Independent QC → Persisted QC Artifact → Deterministic Integration → Target Promotion → Memory Closure`
+
+Any failure in this chain is a team-control defect until its root cause is repaired and one clean acceptance wave succeeds. Product expansion remains blocked until this gate passes.
+
