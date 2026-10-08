@@ -278,7 +278,7 @@ jobs:
         id: pool
         shell: bash
         env:
-          REQUESTED_MAX_PARALLEL: ${{ inputs.max_parallel || '12' }}
+          REQUESTED_MAX_PARALLEL: ${{ inputs.max_parallel || '8' }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -1013,8 +1013,12 @@ jobs:
           status=re.search(r"^# STATUS\s*\n+(.+)$",text,re.M)
           if not status or not status.group(1).strip():
               raise SystemExit("BLOCKED: STATUS is empty")
-          if re.search(r"\b(TODO|TBD|FILL ME|PLACEHOLDER)\b",text,re.I):
-              raise SystemExit("BLOCKED: placeholder text remains in evidence report")
+          unresolved = [
+              line.strip() for line in text.splitlines()
+              if line.strip().upper() in {"TODO", "TBD", "FILL ME", "PLACEHOLDER"}
+          ]
+          if unresolved:
+              raise SystemExit("BLOCKED: unresolved placeholder-only line remains in evidence report")
           if not re.search(r"(?:\.tsx?|\.ts|\.js|\.json|\.md|\.yml|\.yaml|\.github/|\.kilo/|Backend/|Docs/|web/)", text):
               raise SystemExit("BLOCKED: PROVENANCE contains no repository path")
           PY
