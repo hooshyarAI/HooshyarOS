@@ -1,6 +1,6 @@
 "use strict";
 const assert = require("node:assert/strict");
-const { validateAuthorization, hashPayload } = require("./team-v2-authorization.cjs");
+const { validateAuthorization, hashPayload, signatureFor } = require("./team-v2-authorization.cjs");
 
 const ctx = {
   workId: "WORK-0011",
@@ -31,22 +31,25 @@ const auth = {
     policy_sha256: "d".repeat(64)
   },
   expiry: { not_after: "2026-10-08T21:00:00Z" },
-  consumed: false
+  consumed: false,
+  issued_by: "human-owner-review",
+  signature: ""
 };
+auth.signature = signatureFor(auth, "test-secret");
 
-assert.deepEqual(validateAuthorization(auth, ctx), []);
+assert.deepEqual(validateAuthorization(auth, { ...ctx, signatureSecret: "test-secret" }), []);
 assert.equal(hashPayload(auth).length, 64);
 
 const consumed = structuredClone(auth);
 consumed.consumed = true;
-assert.ok(validateAuthorization(consumed, ctx).some(x => x.code === "AUTHORIZATION_ALREADY_CONSUMED"));
+assert.ok(validateAuthorization(consumed, { ...ctx, signatureSecret: "test-secret" }).some(x => x.code === "AUTHORIZATION_ALREADY_CONSUMED"));
 
 const drift = structuredClone(auth);
 drift.bindings.target_sha = "e".repeat(40);
-assert.ok(validateAuthorization(drift, ctx).some(x => x.code === "AUTHORIZATION_TARGET_SHA_MISMATCH"));
+assert.ok(validateAuthorization(drift, { ...ctx, signatureSecret: "test-secret" }).some(x => x.code === "AUTHORIZATION_TARGET_SHA_MISMATCH"));
 
 const wrongWork = structuredClone(auth);
 wrongWork.scope.work_id = "WORK-0010";
-assert.ok(validateAuthorization(wrongWork, ctx).some(x => x.code === "AUTHORIZATION_WORK_MISMATCH"));
+assert.ok(validateAuthorization(wrongWork, { ...ctx, signatureSecret: "test-secret" }).some(x => x.code === "AUTHORIZATION_WORK_MISMATCH"));
 
 console.log("TEAM_V2_AUTHORIZATION_TEST=PASS");
