@@ -379,6 +379,21 @@ jobs:
           test -n "${SELECTED_MODEL}"
           echo "MODEL_SELECTED_FOR_WORKER=${SELECTED_MODEL}"
 
+      - name: Preflight OpenCode CLI contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          opencode run --help > "${RUNNER_TEMP}/opencode-run-help.txt"
+          grep -q -- "--model" "${RUNNER_TEMP}/opencode-run-help.txt"
+          grep -q -- "--auto" "${RUNNER_TEMP}/opencode-run-help.txt"
+          grep -q -- "--agent" "${RUNNER_TEMP}/opencode-run-help.txt"
+          if grep -q -- "--standalone" "${RUNNER_TEMP}/opencode-run-help.txt"; then
+            echo "OPENCODE_STANDALONE_SUPPORTED=TRUE"
+          else
+            echo "OPENCODE_STANDALONE_SUPPORTED=FALSE"
+          fi
+          echo "OpenCode CLI contract preflight: PASS"
+
       - name: Run assigned governed work lease
         shell: bash
         run: |
@@ -459,7 +474,7 @@ jobs:
 
           for candidate in "${CANDIDATES[@]}"; do
             echo "MODEL_ATTEMPT=${candidate}" | tee -a "${LOG}"
-            if timeout --signal=TERM --kill-after=30s 20m opencode run --standalone --auto --model "${candidate}" "$(cat "${PROMPT}")" 2>&1 | tee -a "${LOG}"; then
+            if timeout --signal=TERM --kill-after=30s 20m opencode run --auto --model "${candidate}" "$(cat "${PROMPT}")" 2>&1 | tee -a "${LOG}"; then
               status=0
               echo "MODEL_SELECTED=${candidate}" | tee -a "${LOG}"
               echo "MODEL=${candidate}" >> "${GITHUB_ENV}"
@@ -766,7 +781,7 @@ jobs:
           IFS='|' read -r -a CANDIDATES <<< "${QC_MODEL_CANDIDATES}"
           for candidate in "${CANDIDATES[@]}"; do
             echo "QC_MODEL_ATTEMPT=${candidate}" | tee -a "${LOG}"
-            if timeout --signal=TERM --kill-after=30s 12m opencode run --standalone --agent plan --model "${candidate}" "$(cat "${PROMPT}")" 2>&1 | tee -a "${LOG}"; then
+            if timeout --signal=TERM --kill-after=30s 12m opencode run --auto --agent plan --model "${candidate}" "$(cat "${PROMPT}")" 2>&1 | tee -a "${LOG}"; then
               if grep -q "QC_DECISION=PASS" "${LOG}" && ! grep -q "QC_DECISION=FAIL" "${LOG}"; then
                 status=0
                 break
@@ -1059,7 +1074,7 @@ jobs:
 
           for candidate in "${CANDIDATES[@]}"; do
             echo "SYNTH_MODEL_ATTEMPT=${candidate}" | tee -a "${LOG}"
-            if timeout --signal=TERM --kill-after=30s 20m opencode run --standalone --auto --model "${candidate}" "$(cat "${PROMPT}")" 2>&1 | tee -a "${LOG}"; then
+            if timeout --signal=TERM --kill-after=30s 20m opencode run --auto --model "${candidate}" "$(cat "${PROMPT}")" 2>&1 | tee -a "${LOG}"; then
               echo "SYNTH_MODEL_SELECTED=${candidate}" | tee -a "${LOG}"
               status=0
               echo "SYNTH_MODEL=${candidate}" >> "${GITHUB_ENV}"
