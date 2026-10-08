@@ -6,6 +6,7 @@ const { validateWork } = require("./lib/team-v2-admission.cjs");
 const { validateAuthorization } = require("./lib/team-v2-authorization.cjs");
 const { reservationId, reservationRef } = require("./lib/team-v2-reservation.cjs");
 const crypto = require("node:crypto");
+const fs = require("node:fs");
 
 const TARGET_BRANCH = process.env.TARGET_BRANCH || "fix/autonomous-product-factory";
 const WORKER_WORKFLOW_ID = process.env.TEAM_WORKER_WORKFLOW_ID || "378094136";
@@ -201,6 +202,13 @@ function consumedAuthorizationRefExists(authorizationId) {
     return false;
   }
 }
+function writeAdmissionRecord(record) {
+  const dir = require("node:os").tmpdir() + "/team-v2-admission";
+  fs.mkdirSync(dir, { recursive: true });
+  const path = dir + "/" + record.reservation_id + ".json";
+  fs.writeFileSync(path, JSON.stringify(record, null, 2) + "\n", "utf8");
+  console.log("ADMISSION_RECORD_PATH=" + path);
+}
 function comment(body) {
   try {
     execFileSync("gh", ["api", "--method", "POST", `repos/${REPOSITORY}/issues/${ISSUE_NUMBER}/comments`, "-f", `body=${body}`], { stdio: "ignore" });
@@ -215,6 +223,10 @@ if (require.main === module) {
     process.exit(20);
   }
   const planText = readRepoFileText(".kilo/team/NEXT-WAVE-PLAN.json");
+  const leaseForSnapshot = JSON.parse(planText).leases?.[0] || null;
+  const leaseSha256 = leaseForSnapshot
+    ? sha256(JSON.stringify(leaseForSnapshot, Object.keys(leaseForSnapshot).sort()))
+    : "";
   const plan = JSON.parse(planText);
   const planSha256 = sha256(planText);
   const gate = readRepoJson(".kilo/team/TEAM-V2-ACCEPTANCE-GATE.json");
@@ -239,7 +251,8 @@ if (require.main === module) {
     acceptanceLeaseId: acceptanceLease?.id || null,
     targetSha,
     planSha256,
-    now: new Date().toISOString()
+    now: new Date().toISOString(),
+    leaseSha256
   });
 
   if (authorization) {
@@ -249,6 +262,8 @@ if (require.main === module) {
       targetBranch: TARGET_BRANCH,
       targetSha,
       planSha256,
+      leaseSha256,
+      taskClass: acceptanceLease?.task_class || null,
       now: new Date().toISOString(),
       signatureSecret: process.env.TEAM_AUTHORIZATION_SIGNING_SECRET || ""
     });
@@ -310,6 +325,23 @@ if (require.main === module) {
     comment("TEAM DISPATCH AUTHORITY REFUSED: authoritative reservation ref already exists or could not be created; no Worker dispatch.");
     process.exit(20);
   }
+  writeAdmissionRecord({
+    schema: "team-v2.admission-record.v1",
+    decision: "ADMIT",
+    issued_at: new Date().toISOString(),
+    target_branch: TARGET_BRANCH,
+    target_sha: targetSha,
+    plan_sha256: planSha256,
+    lease_sha256: leaseSha256,
+    work_id: workId,
+    lease_id: lease.id,
+    task_class: lease.task_class,
+    authorization_id: authorizationId || null,
+    reason,
+    reservation_id: rid,
+    reservation_ref: rref,
+    attempt_no: attemptNo
+  });
   console.log("TEAM_RESERVATION_CREATED=" + rid);
   console.log("TEAM_RESERVATION_REF=" + rref);
   if (authorizationId && !createConsumedAuthorizationRef(authorizationId, targetSha)) {
