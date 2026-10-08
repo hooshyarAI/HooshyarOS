@@ -187,6 +187,20 @@ function deleteRef(ref) {
     execFileSync("gh", ["api", "--method", "DELETE", "repos/" + REPOSITORY + "/git/refs/" + ref.replace(/^refs\//, "")], { stdio: "ignore" });
   } catch (_) {}
 }
+function createConsumedAuthorizationRef(authorizationId, sha) {
+  if (!authorizationId) return true;
+  const ref = "refs/team-v2/auth-consumed/" + authorizationId;
+  return createRef(ref, sha);
+}
+function consumedAuthorizationRefExists(authorizationId) {
+  if (!authorizationId) return false;
+  try {
+    ghJson(["repos/" + REPOSITORY + "/git/ref/team-v2/auth-consumed/" + authorizationId]);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
 function comment(body) {
   try {
     execFileSync("gh", ["api", "--method", "POST", `repos/${REPOSITORY}/issues/${ISSUE_NUMBER}/comments`, "-f", `body=${body}`], { stdio: "ignore" });
@@ -280,6 +294,11 @@ if (require.main === module) {
   const inputsHash = sha256(JSON.stringify({ gate, plan, registry, targetSha, authorizationId }));
   const rid = reservationId({ workId, leaseId: lease.id, startSha: targetSha, inputsHash, attemptNo });
   const rref = reservationRef(workId);
+  if (authorizationId && consumedAuthorizationRefExists(authorizationId)) {
+    console.log("TEAM_WORKER_DISPATCH=REFUSED_AUTHORIZATION_ALREADY_CONSUMED");
+    comment("TEAM DISPATCH AUTHORITY REFUSED: acceptance authorization already consumed.");
+    process.exit(20);
+  }
   if (!createRef(rref, targetSha)) {
     console.log("TEAM_WORKER_DISPATCH=REFUSED_RESERVATION_CONFLICT");
     comment("TEAM DISPATCH AUTHORITY REFUSED: authoritative reservation ref already exists or could not be created; no Worker dispatch.");
@@ -287,6 +306,12 @@ if (require.main === module) {
   }
   console.log("TEAM_RESERVATION_CREATED=" + rid);
   console.log("TEAM_RESERVATION_REF=" + rref);
+  if (authorizationId && !createConsumedAuthorizationRef(authorizationId, targetSha)) {
+    deleteRef(rref);
+    console.log("TEAM_WORKER_DISPATCH=REFUSED_AUTHORIZATION_CONSUME_CONFLICT");
+    comment("TEAM DISPATCH AUTHORITY REFUSED: acceptance authorization could not be consumed atomically; reservation revoked.");
+    process.exit(20);
+  }
   const beforeDispatchSha = readTargetSha();
   if (beforeDispatchSha !== targetSha) {
     deleteRef(rref);
