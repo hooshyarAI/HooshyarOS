@@ -123,3 +123,63 @@ TEAM_MANIFEST = .kilo/team/TEAM-WORKER-V1.json
 The first team wave may parallelize the independent audit dimensions of the interrupted reconciliation because the active first objective explicitly forbids product implementation at this stage. The team must keep evidence isolated per worker and use a separate integration/QC gate.
 
 After the reconciliation is complete, implementation waves may be parallelized only from an evidence-backed dependency/write-scope graph. Parallelism must never be used to bypass the one-capability/one-owner/one-coherent-commit rule.
+
+
+## TEAM ORGANIZATION V2 — OPERATIONAL STATE
+
+TEAM_ORGANIZATION_VERSION = V2
+TEAM_ORGANIZATION_STATUS = ACTIVE
+TEAM_ORGANIZATION_IS_PRODUCT_ENGINE = FALSE
+TEAM_EXECUTION_SUBSTRATE = TEAM_WORKER_V1
+TEAM_MEMORY_ROOT = .kilo/team/memory/
+TEAM_STABLE_ID_POLICY = PERMANENT_NON_RECYCLING
+
+ORGANIZATIONAL_ROLES:
+- MISSION_DIRECTOR = governed mission priority / conflict / capacity authority
+- PLANNER = dependency-aware work packages / readiness / lease contracts
+- MEMORY_EDITOR = dedup / stale-evidence control / traceability / authoritative reporting
+- ORCHESTRATOR = dispatch READY dependency-satisfied leases
+- SPECIALIST_POOL = isolated domain workers
+- QC = independent verification
+- INTEGRATOR = sole team promotion authority
+- WATCHDOG = stop/stall/failure/blocker alerting
+- REPORTING = executive + technical reporting from evidence/memory
+
+ROLE_MAPPING:
+- Director -> governed continuation gates
+- Planner -> synthesis / dependency-aware next-wave planning
+- Memory_Editor -> persistent team ledgers + reconciliation
+- Orchestrator -> existing Team Worker workflow
+- Specialist_Pool -> current isolated workers
+- QC -> independent semantic/structural QC
+- Integrator -> deterministic promotion/recovery
+- Watchdog -> current notification workflow
+- Reporting -> mission/wave/report artifacts
+
+STABLE_IDS = MISSION-####, PROGRAM-####, WAVE-####, WORK-####, DECISION-####, EVIDENCE-####, BLOCKER-####, DEFECT-####, COMMIT-####, REPORT-####, RECOVERY-####
+
+CURRENT_PROGRAM = PROGRAM-0001
+CURRENT_MISSION = MISSION-0001
+CURRENT_PRIMARY_WORK = WORK-0001
+CURRENT_TEAM_ORG_WORK = WORK-0002
+
+WORK-0001:
+  TITLE = Post-Recovery / Architecture + Audit Reconciliation
+  STATUS = ACTIVE
+  MODE = RECONCILIATION_ONLY
+  PRIORITY = P0
+  RULE = DO_NOT_REPEAT_ACCEPTED_AUDITS_WITHOUT_REGRESSION_OR_INVALIDATION_EVIDENCE
+
+WORK-0002:
+  TITLE = Team Organization V2 Operationalization
+  STATUS = ACTIVE
+  MODE = CONSTRUCTION_PROCESS
+  PRIORITY = P0
+  DEPENDENCY = WORK-0001_CONTROL_PLANE_SAFETY + EXISTING_TEAM_WORKER_V1
+  SCOPE = .kilo/team/memory/** + TEAM ORGANIZATION V2 CONTROL DOCUMENTATION
+  RULE = NO_NEW_PRODUCT_ENGINE
+
+CURRENT_WAVE:
+  WAVE_ID = WAVE-0010
+  STATE = RECOVERY_REVIEW_REQUIRED
+  NOTE = Independent QC completed; original Integrator failed on controlled target drift; recovery path is evidence-preserving.
