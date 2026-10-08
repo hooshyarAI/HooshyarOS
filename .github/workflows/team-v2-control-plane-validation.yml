@@ -10,6 +10,7 @@ on:
       - '.github/workflows/team-*.yml'
       - '.github/workflows/hooshyaros-team-worker.yml'
       - '.kilo/team/NEXT-WAVE-PLAN.schema.json'
+      - '.github/workflows/team-v2-control-plane-validation.yml'
 
 permissions:
   contents: read
