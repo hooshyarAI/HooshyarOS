@@ -175,35 +175,9 @@ jobs:
         run: |
           set -euo pipefail
           PLAN=.kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md
-          if test -f "$PLAN" && grep -Eq '^MISSION_STATUS = ACTIVE
-        if: always()
-        shell: bash
-        run: |
-          echo "RUN_ID=${GITHUB_RUN_ID}"
-          echo "TARGET_BRANCH=${TARGET_BRANCH}"
-          echo "MODEL=${MODEL}"
-          echo "START_SHA=${START_SHA:-unknown}"
-          echo "WORKER_BRANCH=${WORKER_BRANCH:-unknown}"
-          if test -f "${RUNNER_TEMP}/opencode-worker.log"; then
-            echo "OpenCode final lines:"
-            tail -80 "${RUNNER_TEMP}/opencode-worker.log" || true
-          fi
- "$PLAN" && grep -Eq '^CONTINUE_ALLOWED = TRUE
-        if: always()
-        shell: bash
-        run: |
-          echo "RUN_ID=${GITHUB_RUN_ID}"
-          echo "TARGET_BRANCH=${TARGET_BRANCH}"
-          echo "MODEL=${MODEL}"
-          echo "START_SHA=${START_SHA:-unknown}"
-          echo "WORKER_BRANCH=${WORKER_BRANCH:-unknown}"
-          if test -f "${RUNNER_TEMP}/opencode-worker.log"; then
-            echo "OpenCode final lines:"
-            tail -80 "${RUNNER_TEMP}/opencode-worker.log" || true
-          fi
- "$PLAN"; then
+          if test -f "$PLAN" && grep -Fxq 'MISSION_STATUS = ACTIVE' "$PLAN" && grep -Fxq 'CONTINUE_ALLOWED = TRUE' "$PLAN"; then
             echo "ACTIVE_MASTER_MISSION=TRUE"
-            gh api --method POST "repos/\${GITHUB_REPOSITORY}/actions/workflows/opencode-continuous-worker.yml/dispatches" \
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/workflows/opencode-continuous-worker.yml/dispatches" \
               -f ref=main \
               -f 'inputs[reason]=Automatic continuation of active HooshyarOS master mission'
           else
