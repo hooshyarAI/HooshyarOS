@@ -1,0 +1,155 @@
+{
+  "schema_version": "1.0",
+  "current_mission": "MISSION-0001",
+  "program": "PROGRAM-0001",
+  "status": "ACTIVE",
+  "primary_work": "WORK-0001",
+  "team_org_work": "WORK-0002",
+  "team_org_version": "V2",
+  "team_status": "ACTIVE",
+  "current_wave": "WAVE-0011",
+  "current_wave_state": "EXECUTING_AWAITING_QC_AND_PROMOTION",
+  "first_objective": "POST-RECOVERY / ARCHITECTURE + AUDIT RECONCILIATION",
+  "next_state": "GOVERNED_PROMOTION_AND_QC_OF_WAVE_0011_RESULTS_THEN_WORK-0004_THEN_WORK-0005_THEN_GATE_A",
+  "protected_rules": [
+    "Architecture Freeze V4/V4.1",
+    "No duplicate engines",
+    "No blind retries",
+    "No weakened tests",
+    "No fabricated evidence"
+  ],
+  "memory_backfill_work": "WORK-0003",
+  "last_control_plane_commit": "9151fe4dbe85f9fbda0a3a7555a2206fb2e92461",
+  "current_run_id": 37788700120,
+  "truth_note": "Run 37788700120 is this lease. A runner is allocated and the WORK-0003 lease executed, but no governed V2 worker result has been promoted or QC-adjudicated: five unpromoted worker branches exist across WORK-0003, WORK-0004 and WORK-0005 at the same START_SHA, and the WORK-0003 lease has now run three times unpromoted (BLOCKER-0005, DEFECT-0008). The Wave 10 audit artifacts remain unpromoted (BLOCKER-0003). The eight organizational memory ledgers exist only on this lineage; origin/main has no .kilo/team/memory/ path and is 81 commits ahead of this branch (BLOCKER-0004). An unpromoted WORK-0004 attempt reattributes the Wave 10 integration failure to a missing git committer identity; that is recorded as pending, not applied (DECISION-0012). No completion, acceptance, QC pass, integration, promotion or product outcome may be inferred from any of this.",
+  "prior_truth_notes": [
+    "Run #16 exists on control-plane commit 9151fe4d; prepare is queued with no runner allocated. Do not infer worker execution, QC, integration, promotion, or completion until job evidence exists. GitHub currently reports Actions operational, but this repository has multiple simultaneously queued workflows."
+  ],
+  "run_id_history": [
+    {
+      "run_id": 37759400053,
+      "state": "SUPERSEDED_OR_UNKNOWN",
+      "source": "wave-history.current at START_SHA",
+      "reason": "No surviving job evidence; outcome not guessed."
+    },
+    {
+      "run_id": 37760777088,
+      "state": "QUEUED_NO_RUNNER_ALLOCATED",
+      "source": "mission-state.current_run_id at START_SHA",
+      "reason": "Team Run #16, prepare queued, no runner. Retained in BLOCKER-0002 evidence unchanged."
+    },
+    {
+      "run_id": "37776552275",
+      "state": "EXECUTED_UNPROMOTED",
+      "source": "remote branch name",
+      "reason": "Obtained a runner; WORK-0003 and WORK-0004 commits exist on worker branches; never promoted or QC-adjudicated."
+    },
+    {
+      "run_id": "37779956878",
+      "state": "EXECUTED_UNPROMOTED",
+      "source": "remote branch name",
+      "reason": "This lease."
+    },
+    {
+      "run_id": 37788700120,
+      "state": "EXECUTING",
+      "source": "branch name",
+      "reason": "Third dispatch of the WORK-0003 lease at START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b. Reused the prior unpromoted backfill after independent re-verification."
+    }
+  ],
+  "current_run_id_previous": 37779956878,
+  "last_control_plane_commit_lineage": "RESOLVES_ON_ORIGIN_MAIN_ONLY_NOT_AN_ANCESTOR_OF_THIS_BRANCH",
+  "last_control_plane_commit_in_this_lineage": "6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+  "last_control_plane_commit_in_this_lineage_note": "Verified: git merge-base --is-ancestor 9151fe4d HEAD exits non-zero while 6c9d4da5 is the tip of this lineage and of origin/fix/autonomous-product-factory. The original value is preserved rather than overwritten.",
+  "target_lineage": {
+    "canonical_lineage": "UNDECIDED",
+    "canonical_lineage_authority": "MISSION_DIRECTOR_WITH_INTEGRATOR_EXECUTION",
+    "lease_constraint": "This lease is MODE=AUDIT with a memory-only write scope. It must not merge, rebase, move a branch, promote, or name the canonical lineage.",
+    "this_branch": "6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+    "this_branch_refs": [
+      "origin/fix/autonomous-product-factory",
+      "  origin/opencode/team-work-0003-memory-backfill-37776552275",
+      "  origin/opencode/team-work-0003-memory-backfill-37779956878",
+      "  origin/opencode/team-work-0004-wave10-recovery-37776552275",
+      "  origin/opencode/team-work-0004-wave10-recovery-37779956878",
+      "  origin/opencode/team-work-0005-next-capability-37779956878"
+    ],
+    "origin_main_tip": "d90d8e115c49b1e6d50e621d6066bfa191a01a49",
+    "origin_main_tip_date": "2026-10-08 09:58:36 -0400",
+    "merge_base": "99542164a06f15aa4072a52b9debcf75125a358a",
+    "merge_base_date": "2026-08-28T18:23:10+03:30",
+    "origin_main_ahead": 81,
+    "this_branch_ahead": 662,
+    "memory_ledgers_on_origin_main": false,
+    "origin_main_team_control_commits_newer_than_9151fe4d": [
+      "d90d8e11|2026-10-08 09:58:36 -0400|fix(team): configure integration git identity before cherry-pick",
+      "0bfe3eae|2026-10-08 08:52:59 -0400|control(team): add workflow-level stop escalation alert",
+      "fdd289c2|2026-10-08 08:23:38 -0400|fix(team): align worker model candidate contract",
+      "c45ca6d5|2026-10-08 08:06:51 -0400|fix(team): simplify governed Team V2 dispatch",
+      "c62b2d28|2026-10-08 15:34:13 +0330|fix(team): correct queue governor repository env handling",
+      "850c7611|2026-10-08 15:33:31 +0330|fix(team): self-bootstrap updated queue governor",
+      "d3765999|2026-10-08 15:32:03 +0330|fix(team): make queue recovery target active runs only",
+      "89c80913|2026-10-08 15:28:36 +0330|fix(team): stop bootstrap event storm and target governed branch",
+      "b72cb22e|2026-10-08 15:28:01 +0330|fix(team): preserve target Team V2 branch during queue bootstrap",
+      "1fca304b|2026-10-08 14:27:20 +0330|fix(team): make queue bootstrap event-driven",
+      "6766e809|2026-10-08 14:26:32 +0330|control(team): add independent queue bootstrap manager",
+      "01ab0d59|2026-10-08 14:24:30 +0330|fix(team): route governed worker to explicit Ubuntu runner pool",
+      "d14553ce|2026-10-08 14:00:07 +0330|control(team): empower manager to govern Actions queue and runners",
+      "c6676993|2026-10-08 13:59:56 +0330|control(team): assign queue and runner governance to team manager"
+    ],
+    "linked_blocker": "BLOCKER-0004",
+    "recorded_by": "work-0003-memory-backfill-37779956878",
+    "refreshed_by": "work-0003-memory-backfill-37788700120",
+    "refreshed_at_run_id": 37788700120,
+    "prior_values_preserved": true,
+    "recorded_by_chain": [
+      "work-0003-memory-backfill-37779956878",
+      "work-0003-memory-backfill-37788700120"
+    ]
+  },
+  "memory_backfill_state": {
+    "backfill_rule": "EVIDENCE_FROM_REPOSITORY_ONLY_NEVER_RECOLLECTION",
+    "backfill_source": "git object database reachable from this branch and its remotes",
+    "recorded_by": "work-0003-memory-backfill-37788700120",
+    "reused_prior_attempt": {
+      "commits": [
+        "509ce84cc31d9ccfab1aae8a31d8d6bd17af1a8b",
+        "3b8b97d0660b251d29c56d60753ffcbcfa01febe"
+      ],
+      "run_ids": [
+        37776552275,
+        37779956878
+      ],
+      "state": "UNPROMOTED_ATTEMPTS_OF_SAME_LEASE",
+      "treatment": "REUSED_AS_EVIDENCE_AND_INDEPENDENTLY_RE_VERIFIED_NOT_BLINDLY_COPIED",
+      "corrections_applied": 6
+    },
+    "team_domain_backfilled": true,
+    "product_era_backfilled": false,
+    "team_domain_scope": "8 organizational ledgers under .kilo/team/memory/",
+    "known_limits": [
+      "The 11 Wave 10 audit artifacts are branch-scoped evidence, not facts about this branch.",
+      "WAVE-0001..0009 remain permanently unknown.",
+      "Pre-V2 product-era work and its 1541-commit history are not reconstructed.",
+      "No QC, integration or promotion is performed or claimed by this lease.",
+      "The canonical target lineage is UNDECIDED; every claim above is scoped to this branch lineage."
+    ],
+    "next_state_after_backfill": "GOVERNED_PROMOTION_AND_QC_THEN_WORK-0004_RECOVERY_RECONCILIATION"
+  },
+  "current_wave_state_previous": "QUEUED",
+  "current_wave_state_correction": "START_SHA recorded WAVE-0011 as QUEUED. A runner is now allocated for run 37779956878 and the WORK-0003 lease executed on it. The prior value is preserved; only the lease actually executed by this run is claimed.",
+  "next_state_previous": "BACKFILL_MEMORY_THEN_REPLAN",
+  "repository_facts": {
+    "observed_by": "work-0003-memory-backfill-37788700120",
+    "head_at_lease_start": "6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+    "start_sha_matches_head": true,
+    "total_commits_on_this_lineage": 1541,
+    "memory_ledgers_on_this_branch": 9,
+    "memory_ledger_paths_on_origin_main": 0,
+    "control_plane_commit_is_ancestor_of_head": false,
+    "v2_control_plane_range": "3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+    "v2_control_plane_commit_count": 37,
+    "wave10_worker_branch_count": 11,
+    "unpromoted_governed_worker_result_count": 5
+  }
+}

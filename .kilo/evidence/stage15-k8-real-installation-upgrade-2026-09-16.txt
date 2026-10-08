@@ -1,0 +1,158 @@
+REAL USER-INSTALLATION UPGRADE + REAL ACCEPTANCE EVIDENCE (bounded delta under Audit Memory 15.1.1)
+================================================================================
+AUDIT DELTA ID : stage15-k8-real-installation-upgrade-2026-09-16
+DATE           : 2026-09-16
+TYPE           : Bounded post-K8 installation-ready delta. Applies the final verified
+                 installation-ready installer to the user's REAL installation and runs
+                 the canonical installed-product acceptance against that REAL path.
+                 Does NOT reopen the completed Stage-15 K8 acceptance and does NOT
+                 create a new stage.
+K8 STATE       : PRESERVED (K8 productization.installed-product-acceptance = VERIFIED)
+
+1. RESUMED CONDITION (reconstructed from repository evidence only)
+================================================================================
+The 2026-09-15 installation-ready delta was already COMMITTED and PUSHED before the
+power interruption; no duplicate commit was created.
+
+  git rev-parse HEAD                                  = 6cc309abe04909d52da143e7d126eeb753c9862f
+  git rev-parse origin/fix/autonomous-product-factory  = 6cc309abe04909d52da143e7d126eeb753c9862f
+  git ls-remote origin refs/heads/fix/autonomous-product-factory
+                                                      = 6cc309abe04909d52da143e7d126eeb753c9862f
+  Commit subject: fix(productization): finalize installation-ready acceptance delta
+  Commit contents: scripts/installed-product-acceptance.cjs, Docs/HOOSHYAROS_MASTER_CHARTER.md,
+                   .kilo/evidence/stage15-k8-installer-rebuild-installation-ready-2026-09-15.txt
+
+FIRST GENUINELY UNFINISHED STEP: the user's REAL installation
+(C:\Users\avalipour\AppData\Local\Programs\HooshyarOS) still predated the repairs
+(installed web/app.js sha256 2B96FE63... and web/offline-sync.js sha256 5FB827EA...
+differed from the verified payload/source). The isolated acceptance install is NOT
+evidence that the user's real installation was upgraded.
+
+2. FINAL VERIFIED SOURCE + INSTALLER PROVENANCE
+================================================================================
+Final product payload is unchanged by the 6afbd28b -> 6cc309ab delta:
+  git diff --stat 6afbd28b..6cc309ab -- web Backend installer
+    = only scripts/installed-product-acceptance.cjs (1 file, harness only; no product code)
+
+INSTALLER (reused; provenance proven, no rebuild required)
+  path   : D:\HooshyarOS\dist\productization\windows\installer\HooshyarOS-Setup-1.0.0.exe
+  bytes  : 57452433
+  sha256 : 2235C85648E588B506B38F879709A08DB2E160E4587600895AEA829737796E4F
+  authenticode : NotSigned (no code-signing certificate on this host)
+PREVIOUS ARTIFACTS PRESERVED (not destroyed):
+  D:\HooshyarOS\dist\productization\windows\installer\HooshyarOS-Setup-1.0.0.pre-rebuild-2026-09-15.exe
+  D:\HooshyarOS\dist\productization\windows\HooshyarOS-Windows-Bootstrap.pre-rebuild-2026-09-15.zip
+
+PAYLOAD FIDELITY (payload copy vs verified source, SHA-256 equal)
+  web/app.js                                                  MATCH (AFA415BC8F90680F...)
+  web/offline-sync.js                                         MATCH (BD367BC8C002E781...)
+  Backend/HBOS/Autonomous/Runtime/start-commercial-runtime.ts MATCH (3BDEF39C739C8A84...)
+
+3. USER REAL INSTALLATION UPGRADE
+================================================================================
+REAL INSTALLATION : C:\Users\avalipour\AppData\Local\Programs\HooshyarOS
+Pre-install state  : existed; web/app.js and web/offline-sync.js were the pre-repair
+                     versions; port 4173 free; no HooshyarOS product process running.
+
+BACKUP (outside the installation directory, created before installing)
+  path    : C:\Users\avalipour\HooshyarOS-Backups\real-install-20260916-080931
+  contents (recorded, byte sizes + SHA-256):
+    data\hooshyar.sqlite     12288  sha256 442955E80388012E5599FBE583556C0E5A3BDD97F8E422FF014C42AA40B5B52B
+    product-manifest.json      142  sha256 A85781913386F82A1AC4CF4A4E891D59F5DE9A318FA4FDCA7809BAFEB69087D3
+    launch-hooshyar.cmd        248  sha256 E4EFBE011AE77487F19325129422F2D88400C66B166C57EC981D9B0831D1E4A9
+    launch-hooshyar.vbs        645  sha256 881EED7A9E6213594C64203C9713689246A737334FCA03659BFD8A3C6C289381
+  The old database was preserved, never deleted.
+
+INSTALL (final verified installer only; the older 31 MB installer was NOT used)
+  command : HooshyarOS-Setup-1.0.0.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
+            /DIR=C:\Users\avalipour\AppData\Local\Programs\HooshyarOS
+  result  : INSTALL EXIT CODE = 0 (clean in-place upgrade; same AppId = {F8F6C9B7-...})
+  registry: DisplayName "HooshyarOS" 1.0.0, InstallLocation = C:\Users\avalipour\AppData\Local\Programs\HooshyarOS\
+  descriptor preserved: installer/HooshyarOS.iss has no [InstallDelete]; [Files] uses
+            Flags: recursesubdirs createallsubdirs ignoreversion; {app}\data\hooshyar.sqlite
+            was retained and migrated in place by the runtime (12288 -> 90112 bytes).
+
+INSTALLED PROVENANCE (installed files vs verified payload)
+  web/app.js                                                  MATCH (AFA415BC8F90680F...)
+  Backend/HBOS/Autonomous/Runtime/start-commercial-runtime.ts MATCH (3BDEF39C739C8A84...)
+  web/offline-sync.js    content MATCH after LF normalization
+                          installed sha256 73B61515E84B263D... = CRLF form of the verified
+                          LF blob BD367BC8C002E781... (489 lines; 17769 -> 18258 bytes).
+                          Cause: core.autocrlf=true during the production payload build.
+                          Repaired-client markers present (classifyFailure, STORAGE_QUOTA_FAILURE).
+  launch-hooshyar.vbs / launch-hooshyar.ps1 / product-manifest.json  MATCH
+
+PAYLOAD/INSTALL COMPLETENESS AUDIT (5696 payload entries)
+  MATCH (byte-identical)            : 4929
+  CRLF-only text normalization      : 542
+  non-EOL content differences       : 2  (Backend/HBOS/test/CommercialAcceptanceBarrier.test.ts,
+                                          Docs/HOOSHYAROS_MASTER_CHARTER.md -- NON-RUNTIME; the
+                                          production installer was built from the CLEAN isolated
+                                          worktree payload, the main dist payload is stale for these)
+  "missing" from install            : 223 NON-PRODUCT entries only -- untracked/git-ignored test
+                                          artifacts (Backend/HBOS/test/test-e2e-security-*.sqlite,
+                                          Backend/HBOS/jest-*.txt, stray Backend/**/data/hooshyar.sqlite,
+                                          Backend/phase09-final-verify.ts) that exist in the main
+                                          dist payload copy but were never in the clean isolated
+                                          build payload. No product/runtime file is missing.
+
+4. REAL INSTALLED-PRODUCT ACCEPTANCE (the user's ACTUAL path)
+================================================================================
+command : node scripts/installed-product-acceptance.cjs
+          with HOOSHYAR_ACCEPTANCE_INSTALL_DIR=C:\Users\avalipour\AppData\Local\Programs\HooshyarOS
+          (canonical harness, same journey and criteria; isolated build/install skipped)
+result  : exit code 0 -- status PASS
+evidence: .hooshyar/installed-product-acceptance-real.json (git-ignored runtime evidence)
+  type            : INSTALLED_PRODUCT_ACCEPTANCE
+  mode            : real-installation
+  status          : PASS
+  createdAt       : 2026-09-16T05:01:01.466Z
+  commit          : 6cc309abe04909d52da143e7d126eeb753c9862f
+  installDir      : C:\Users\avalipour\AppData\Local\Programs\HooshyarOS
+  port            : 4173
+  launcherHealthy : true
+  runtimeDependenciesVerified : true
+  repairedClientInstalled     : true
+  sourceSha256    : d74b461f090fa4cb0870bb69e617dabe6f6a7b85e122e27bc4ca0147a0aa7e8f
+  profit          : 200
+  checks (16/16)  : health, ready, web-shell, register, session, pdf-boundary, ingest,
+                    analysis, dashboard, sources, tenant-isolation, offline-queue,
+                    offline-reload, offline-reconnect, restart-recovery, persistence
+
+ACTUAL SHORTCUTS (verified on the real installation)
+  desktop    : C:\Users\avalipour\Desktop\HooshyarOS.lnk
+               -> wscript.exe "C:\Users\avalipour\AppData\Local\Programs\HooshyarOS\launch-hooshyar.vbs"
+                  (working dir = the real install dir)
+  start menu : %APPDATA%\Microsoft\Windows\Start Menu\Programs\HooshyarOS\HooshyarOS.lnk (same target)
+
+NO MOCKS: every check drove the real installed runtime over HTTP; the launch used the real
+installed shortcut target; PDF boundary enforced by the real /api/ingest (400
+INGEST_FORMAT_UNSUPPORTED); the offline transport used the installed web/offline-sync.js;
+restart/recovery hard-killed port 4173 and relaunched through the real shortcut. Browser
+opening was not used as proof of startup and no fixed delay substituted for /health.
+
+5. COMPLETION STATE / REMAINING BLOCKERS
+================================================================================
+Completion states: UNCHANGED -- assistantComplete TRUE (functionally),
+canonicalPlatformConstructionComplete FALSE, commercialProductRuntimeComplete FALSE,
+externalProductionDependenciesComplete FALSE, productComplete FALSE.
+  B1 encryption-at-rest / key management : BLOCKED_HUMAN_APPROVAL (unchanged)
+  B2 payment-provider activation          : BLOCKED_EXTERNAL (unchanged)
+  B3 production cloud/DNS/TLS resources   : BLOCKED_EXTERNAL (unchanged)
+  B4 Android device acceptance            : BLOCKED_ENVIRONMENT (unchanged)
+  B5 Inno Setup build host                : AVAILABLE ON THIS HOST (Inno Setup 6.7.3,
+                                            C:\Users\avalipour\AppData\Local\Programs\Inno Setup 6\ISCC.exe)
+  Code-signing certificate                : EXTERNAL PREREQUISITE for signed distribution
+                                            (installer is Authenticode-NotSigned)
+
+6. K8 PRESERVATION / DO-NOT-REPEAT
+================================================================================
+The completed Stage-15 K8 verification (.kilo/plans/stage15-k8-installed-product-acceptance-checkpoint.md,
+.kilo/evidence/stage15-k8-installed-product-acceptance.txt) remains VERIFIED and is not reopened.
+This delta adds: the real-installation upgrade result, the real-installation acceptance evidence,
+and an additive `HOOSHYAR_ACCEPTANCE_INSTALL_DIR` real-target mode in the canonical harness
+(one framework; no duplicate acceptance framework; no criterion weakened).
+
+DO-NOT-REPEAT: do not claim the user's installation was upgraded from an isolated acceptance
+install; do not use the older 31 MB installer; do not delete the old database; do not
+reintroduce `cmd.exe /c "\"<path>\""` launcher quoting; do not weaken or mock the acceptance.

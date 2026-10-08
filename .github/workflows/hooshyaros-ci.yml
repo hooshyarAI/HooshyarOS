@@ -41,7 +41,7 @@ jobs:
           Backend/HBOS/test/AutonomousProjectMission.platform-order.test.ts
           Backend/HBOS/test/AutonomousPlatformWeaving.test.ts
           Backend/HBOS/test/AutonomousCompletionGate.test.ts
-          Backend/HBOS/test/AutonomousBuildDaemon.test.ts
+          Backend/HBOS/Autonomous/Runtime/AutonomousBuildDaemon.test.ts
 
       - name: Full Jest suite
         run: node ./node_modules/jest/bin/jest.js --runInBand

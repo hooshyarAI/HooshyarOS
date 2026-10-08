@@ -1,0 +1,30 @@
+ANDROID PRODUCT ACCEPTANCE — SINGLE FAILED TEST REPAIR
+Evidence type: FOCUSED SINGLE-TEST REPAIR
+Date: 2026-09-19
+Branch: fix/autonomous-product-factory
+Base HEAD before repair commit: 5a4371e1ca7688ac79a07e6728ca80c2f50dd816
+
+DEFECT
+  scripts/android-product-acceptance.test.js failed because
+  .github/workflows/final-product-factory.yml set the Android emulator
+  options to:
+    emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+  The "-no-snapshot" flag prevented snapshot-based boot, contradicting the
+  acceptance contract asserted by the workflow regression test.
+
+REQUIRED / APPLIED FIX
+  Removed ONLY "-no-snapshot" from the Android emulator-options.
+  Resulting line:
+    emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+  No test was weakened, skipped, deleted, or rewritten.
+
+FOCUSED TEST RESULT
+  Command: node ./node_modules/jest/bin/jest.js scripts/android-product-acceptance.test.js --runInBand
+  Result: PASS
+    Test Suites: 1 passed, 1 total
+    Tests:       4 passed, 4 total
+    Time:        1.867 s
+
+SCOPE
+  Only the Android workflow repair was performed. Full Jest, full platform
+  audit, product:assurance, and final-product-qualification were NOT rerun.

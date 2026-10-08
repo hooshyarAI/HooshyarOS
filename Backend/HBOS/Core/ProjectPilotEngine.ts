@@ -3,7 +3,7 @@ import { Project } from "./Project";
 import { DecisionEngine } from "./DecisionEngine";
 import { ProjectDecision } from "./ProjectDecision";
 import { ProjectInsight } from "./ProjectInsight";
-import { MemoryEngine } from "./MemoryEngine";
+import { MemoryEngine, MEMORY_INTERNAL_SCOPE } from "./MemoryEngine";
 import { MemoryEvent } from "./MemoryEvent";
 import { ReactionEngine } from "./ReactionEngine";
 
@@ -65,7 +65,7 @@ export class ProjectPilotEngine {
         );
 
 
-        this.memoryEngine.store(event);
+        this.memoryEngine.store(event, MEMORY_INTERNAL_SCOPE);
 
     }
 
@@ -100,7 +100,7 @@ export class ProjectPilotEngine {
 
     getMemory(): MemoryEvent[] {
 
-        return this.memoryEngine.retrieve();
+        return this.memoryEngine.retrieve(MEMORY_INTERNAL_SCOPE);
 
     }
 

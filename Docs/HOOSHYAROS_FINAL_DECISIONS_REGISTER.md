@@ -120,9 +120,11 @@ The HooshyarOS construction process is permanently restricted to three active pa
 2. **GitHub** — repository inspection, source control, commit, synchronization, review and publication.
 3. **This Assistant** — architecture reasoning, critical thinking, expert choice, implementation judgment and construction orchestration.
 
-External coding assistants, cloud coding agents and alternative code-generation providers are prohibited from the construction process. They must not be invoked, installed, configured or depended upon for autonomous construction.
+These three are the only construction **authorities**. Approved execution **operators** may act as subordinate, replaceable mechanisms under them and remain subject to every construction rule; they are not additional authorities, product providers or architecture owners.
 
-This includes Codex, GitHub Copilot, Claude and equivalent coding agents.
+The approved operator set includes **Kilo Code** (local) and **OpenCode** (remote/CI), with the latter governed by `Docs/OPENCODE_EXECUTION_OPERATOR_CONTRACT.md`.
+
+Unapproved external coding assistants, cloud coding agents and alternative code-generation providers remain prohibited. OpenCode is an explicit repository-specific operator approval, not a general approval of external coding agents.
 
 This restriction applies to the **construction process**, not to unrelated provider-facing runtime abstractions that may exist in the finished product architecture. Such product abstractions must not become hidden dependencies of the autonomous construction fabric.
 
@@ -203,7 +205,7 @@ Never:
 - redesign the frozen architecture merely because implementation is difficult;
 - invent duplicate engines;
 - change the Assistant into an end-user advisor;
-- introduce external coding providers into the construction process;
+- introduce unapproved external coding providers into the construction process;
 - declare completion from file existence;
 - skip validation or integration evidence;
 - weaken security, governance, explainability or resilience;
@@ -243,7 +245,8 @@ The repository currently encodes the following invariants:
 - Python is the canonical construction worker/orchestration layer.
 - GitHub is the canonical repository and publication tool.
 - The Assistant is the architecture/reasoning/orchestration authority.
-- External coding assistants and providers are excluded from the construction path.
+- Approved execution operators (Kilo Code locally and OpenCode remotely) are subordinate, replaceable execution mechanisms; they are not construction authorities or product runtime dependencies.
+- Unapproved external coding assistants and providers are excluded from the construction path.
 - Completion is evidence-based.
 - Platform continuation is separate from the Assistant completion gate.
 - Platform selection is based on genuinely missing capabilities and satisfied dependencies.
@@ -262,7 +265,9 @@ Before changing code:
 - [ ] Dependencies checked
 - [ ] Reuse opportunities checked
 - [ ] Python/GitHub construction path confirmed
-- [ ] No prohibited external coding agent selected
+- [ ] Approved operator contract identified (Kilo or OpenCode)
+- [ ] Free-only model policy satisfied
+- [ ] No unapproved external coding agent selected
 - [ ] Security/governance/observability implications checked
 
 Before finalization:
@@ -283,7 +288,7 @@ Before finalization:
 **Reuse what already exists.**  
 **Build only what is genuinely missing.**  
 **Use the correct engine boundary.**  
-**Use only Python, GitHub and the Assistant for construction.**  
+**Use only the Python/GitHub/Assistant authorities for construction, with approved local execution operators acting under them.**  
 **Verify before claiming completion.**  
 **Repair from evidence.**  
 **Commit only verified work.**  

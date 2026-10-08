@@ -1,0 +1,14 @@
+﻿QUALITY_CHECKPOINT_STAGE = 2.5
+QUALITY_CHECKPOINT_ID = global-quality-checkpoint
+QUALITY_CHECKPOINT_DATE = 2026-10-04
+QUALITY_BASELINE_COMPLETE = true
+GLOBAL_QUALITY_GATE = PASS_WITH_DOCUMENTED_GAPS
+P0 = 0
+P1 = 0
+P2 = 0
+P3 = 0
+EVIDENCE = .kilo/evidence/global-platform-quality-gate-2026-10-04.txt
+CHECKPOINT = .kilo/plans/global-quality-checkpoint-2026-10-04.md
+COMMIT = 4c5cbb3e08a0b3d665bec98212ccd36badc0ee84
+PUSH = true
+HEAD_EQUALS_REMOTE = true

@@ -1,4 +1,4 @@
-const { spawnSync } = require('node:child_process');
+const { spawnSync, execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -9,7 +9,7 @@ const gates = {
   ],
   architecture: [
     'Backend/HBOS/test/HBOSBootIntegration.test.ts',
-    'Backend/HBOS/test/EngineRegistry.test.ts',
+    'Backend/HBOS/test/EngineRegistry.phase-11-1.2.test.ts',
     'Backend/HBOS/test/EngineDependencyManager.test.ts',
     'Backend/HBOS/test/BootDependencyValidator.test.ts',
   ],
@@ -49,14 +49,49 @@ const gates = {
 const allTests = [...new Set(Object.values(gates).flat())];
 const missing = allTests.filter((file) => !fs.existsSync(file));
 
+/** Authoritative local commit, used to bind external evidence to the code it proves. */
+function headCommit() {
+  try {
+    return execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The real-browser acceptance is a host-executable external cell. It is
+ * reported PASS only when the canonical harness has written a PASS artifact
+ * bound to the current revision of that harness; a stale or missing artifact is
+ * never reported as executed.
+ */
+function harnessRevision() {
+  try {
+    const sha = execFileSync('git', ['log', '-1', '--format=%H', '--', 'scripts/web-browser-acceptance.cjs'], { cwd: process.cwd(), encoding: 'utf8' }).trim();
+    return sha || null;
+  } catch {
+    return null;
+  }
+}
+
+function browserAcceptanceStatus() {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(path.join(process.cwd(), '.hooshyar', 'web-browser-acceptance.json'), 'utf8'));
+    const expected = harnessRevision();
+    if (parsed.status === 'PASS' && expected && parsed.commit === expected) return 'PASS';
+    return 'STALE_EVIDENCE';
+  } catch {
+    return 'EXTERNAL_NOT_EXECUTED';
+  }
+}
+
 const result = {
   version: 2,
-  commit: process.env.GITHUB_SHA || 'local',
+  commit: process.env.GITHUB_SHA || headCommit() || 'local',
   timestamp: new Date().toISOString(),
   gates: {},
   external: {
     windowsRealDevice: 'EXTERNAL_NOT_EXECUTED',
-    webRealBrowser: 'EXTERNAL_NOT_EXECUTED',
+    webRealBrowser: browserAcceptanceStatus(),
     androidRealDevice: 'EXTERNAL_NOT_EXECUTED',
     paymentActivation: 'EXTERNAL_NOT_EXECUTED',
     productionCloudActivation: 'EXTERNAL_NOT_EXECUTED',

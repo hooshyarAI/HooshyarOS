@@ -1,0 +1,222 @@
+STAGE 1 — TRUSTED-INPUT-PIPELINE AUDIT (READ-ONLY)
+Model: deepseek/deepseek-flash (DeepSeek V4.1 Flash only; no Pro model)
+Date: 2026-09-27
+Branch: fix/autonomous-product-factory
+Baseline HEAD at audit start: 90b909598b00491c02be889847c02508861ffdc4
+Checkpoint commits created before this audit:
+  b0f9074e  feat(trust): label client-supplied analytics responses as unverified input
+  b9a483ff  fix(android): stop productization from overwriting canonical client
+  396d9e90  docs(governance): record Stage 0 reconciliation and duplicate EngineRegistry ACC item
+Operator: Kilo (bounded execution layer)
+
+SCOPE
+Exhaustive read-only audit of ALL actual input paths and their existing controls:
+identity/format detection, validation, canonicalization, cross-check/reconciliation,
+provenance, failure states, tests, and the exact missing delta. No source/runtime/test
+file was modified in this stage.
+
+BASELINE TESTS RUN BEFORE AUDIT (all PASS, no changes made)
+  Ingestion core (9 suites):   FinancialDataIngestionAdapter, FinancialIngestionProviderGovernance,
+      FinancialReportIngestion, IngestionDocumentNormalization, PdfIngestionRuntime,
+      Phase14-IngestionRuntime, FormatDetection, DocumentTableExtractor,
+      FinancialDocumentUnderstanding  -> 129 passed / 129
+  Acquisition/provenance/OCR (12 suites): AcquisitionResourcePolicy, MultiFormatAcquisition,
+      PdfAcquisition, PdfOcrRouting, OcrAdapter, OcrProvenance, OcrProviderAdmission,
+      DocxAcquisition, ImageAcquisition, TextFileAcquisition, IncrementalIngest,
+      ProvenanceTrace  -> 151 passed / 151
+  Connectors/offline/http-validation (7 suites): GenericApiConnector, GenericDbConnector,
+      ConnectorRegistry, LocalFolderWatcher, SyncStateStore, ProductOfflineSync,
+      CommercialRuntimeApiValidation  -> 67 passed / 67
+  TOTAL: 28 suites / 347 tests passed.
+
+================================================================================
+1. INPUT-PATH INVENTORY (evidence: file:line)
+================================================================================
+
+CANONICAL OWNER: Backend/HBOS/Product/FinancialDataIngestionAdapter.ts
+RUNTIME COMPOSER: Backend/HBOS/Product/FinancialIngestionService.ts
+
+--- 1.1 CSV ---
+ENTRY: ingestCsv (FinancialDataIngestionAdapter.ts:683); HTTP POST /api/ingest
+  (CommercialRuntimeServer.ts:1368) and POST /api/analyze (:1245).
+EXISTING IDENTIFICATION: format given by caller; delimiter-aware parse; header required.
+EXISTING VALIDATION: parseAndValidate (:1364): >=2 lines (:1366); column-count/schema
+  (:1371,:1376); ISO date /^\d{4}-\d{2}-\d{2}$/ (:1378); account required (:1379);
+  currency required (:1380); amount numeric >=0 via parseAmount (:1779); zero-row (:1384);
+  double-sided row (:1385); unterminated-quote (:1404). HTTP body validated by
+  validateAnalyzeBody (:174) and validateIngestBody (:202).
+PROVENANCE: sha256 + receivedAt + sourceType (FinancialSourceEvidence :63).
+FAILURE STATE: precise `ingestion-*` errors thrown -> /api/ingest 422 payload {error}
+  (CommercialRuntimeServer.ts:1404).
+TESTS: FinancialDataIngestionAdapter.test.ts, RuntimeIdempotency, RuntimePagination.
+STATUS: DONE for structural/type/identity validation.
+
+--- 1.2 STRUCTURED (JSON) ---
+ENTRY: ingestStructured (:712). EXISTING: JSON parse guarded (:723 ->
+  ingestion-json-parse-error); top-level schema (:727); transactions array + per-field
+  validation via validateStructuredTransactions (:1788): date/account/currency/amount/
+  zero-row/double-sided.
+STATUS: DONE for structural/type validation. No cross-field accounting reconciliation here.
+
+--- 1.3 XLSX ---
+ENTRY: ingestXlsx (:1161). EXISTING IDENTIFICATION: ZIP/OOXML magic
+  (detectFormatFromMagicBytes :326), extension-vs-format guard (:353). RESOURCE CONTROL:
+  xlsxMaxSizeBytes (:601), zip entry + total uncompressed limits passed to exceljs
+  `workbook.xlsx.load` (:1299) = CWE-409 decompression-bomb defense. SCHEMA: empty
+  workbook (:1193,:1200), ledger-header detection (:1206 / looksLikeLedgerHeader :1666),
+  ambiguous statement refused (FINANCIAL_DOCUMENT_ERROR_CODES.SPREADSHEET_STATEMENT_AMBIGUOUS
+  :1219). HTML-disguised `.xlsx` is detected and never reported as OOXML (:1173).
+STATUS: DONE (incl. resource limits classified VERIFIED_CONTROL in AcquisitionResourcePolicy.ts).
+
+--- 1.4 XLS (legacy OLE2/BIFF) ---
+ENTRY: ingestXlsBytes (:1228). EXISTING: OLE2 magic (:1242), extension-format guard
+  (:1246), size limit (:1239), encrypted-workbook rejection (:1263 -> xls-encrypted-unsupported),
+  malformed (:1264,:1266), empty workbook (:1273), ledger-header/schema (:1280), ambiguity
+  (:1287). Provider admission of governed `xls-reader` enforced fail-closed in
+  FinancialIngestionService.assertProviderAdmitted (:241) with precise
+  `xls-provider-unavailable`.
+STATUS: DONE.
+
+--- 1.5 TXT ---
+ENTRY: ingestTxt / ingestTxtBytes (:781,:791) + TextFileDecoder.decodeTextBytes;
+  FinancialIngestionService routes TXT through ingestTxtBytes (:193) and records encoding.
+STATUS: DONE for decode/encoding; document normalization shares the canonical statement path.
+
+--- 1.6 PDF ---
+ENTRY: ingestPdfBytes (:814); scanned route ingestScannedPdfBytes (:1043). EXISTING:
+  %PDF magic + text extraction via PdfAcquisition (pdf-parse provider); scanned/image-only
+  PDF throws PDF_ERROR_CODES.SCANNED and is routed to OCR ONLY when `document.pdf.ocr` is
+  admitted and a rasterizer route can be assembled (FinancialIngestionService.ingestPdfDocument
+  :260, createDefaultScannedPdfOcrRoute :292); otherwise the precise no-OCR limitation is
+  preserved (never faked). OcrProvenance attached only when OCR actually ran
+  (FinancialSourceEvidence.ocr :78, buildOcrProvenance :1742).
+STATUS: DONE.
+
+--- 1.7 DOCX ---
+ENTRY: ingestDocxBytes (:852) + DocxAcquisition (mammoth.extractRawText). Magic/format
+  detection in DocxAcquisition.detectDocxMagic. STATUS: DONE.
+
+--- 1.8 HTML / XML ---
+ENTRY: ingestHtml (:884), ingestHtmlSpreadsheetBytes (:922), ingestXml (:970) +
+  MarkupTextExtraction (assertMarkupWithinLimits; XML DOCTYPE/ENTITY/XXE rejected).
+STATUS: DONE.
+
+--- 1.9 TSV ---
+ENTRY: ingestTsv (:1011); shares canonical row validation. STATUS: DONE.
+
+--- 1.10 IMAGE ---
+ENTRY: ingestImage (:766) / ingestImageBytes (:1125) + ImageAcquisition (PNG/JPEG magic)
+  + OCR word-geometry path (buildFinancialDocumentUnderstandingFromOcrPages).
+  STATUS: DONE.
+
+--- 1.11 API (external provider) ---
+CONTRACT: GenericApiConnector.ts — endpoint required (:141), auth required (:142),
+  validateAndMap required (:143), token-bucket rate limiter (:31), 429 -> ingestion-api-rate-limited
+  (:168), non-2xx -> pagination-failed (:172), secret-header redaction (:125).
+TESTS: GenericApiConnector.test.ts, Phase08-09.OperationalClosure.test.ts (real local HTTP E2E).
+INTEGRATION: NOT wired into the commercial runtime; contract + tests only.
+STATUS: PARTIAL — transport/secret/rate controls DONE; canonical-domain schema validation of
+  mapped rows is delegated to the caller-supplied `validateAndMap`; no runtime integration.
+
+--- 1.12 DB (external provider) ---
+CONTRACT: GenericDbConnector.ts — read-only query validator (:60, REJECTS
+  INSERT/UPDATE/DELETE/DDL/transaction-control and multi-statement), row cap (:139),
+  injected mapRow. TESTS: GenericDbConnector.test.ts. INTEGRATION: not wired into runtime.
+STATUS: PARTIAL (same shape as 1.11).
+
+--- 1.13 MANUAL INPUT ---
+/api/analyze assets+liabilities (validated finite numbers, :174); /api/financial/analyze
+  manual fallback is explicitly labelled via inputProvenance DOCUMENT|LEDGER|MANUAL
+  (CommercialRuntimeServer.ts:1342-1347); client-supplied analytics endpoints now carry the
+  Stage 2 `inputTrust` = UNVERIFIED_INFORMATION / CLIENT_SUPPLIED / canonicalBinding:false.
+STATUS: PARTIAL — labelled, but not bound to any canonical verified source.
+
+--- 1.14 FUTURE PROVIDER INTERFACES ---
+CapabilityProviderRegistry.ts (admission: APPROVED/REJECTED/DEFERRED/CANDIDATE; reuse-tier
+  order), ConnectorRegistry.ts (lifecycle state machine + audit), FileSource/FileSourceMediaType
+  extensible union (FinancialDataIngestionAdapter.ts:164-177).
+STATUS: DONE as contracts.
+
+================================================================================
+2. CROSS-CUTTING CONTROLS
+================================================================================
+IDENTIFICATION: FormatDetection.ts (magic/extension/content) + detectFormatFromMagicBytes;
+  contentKind:"html" override on FinancialSourceEvidence (:72).
+PROVENANCE: FinancialSourceEvidence (sha256/receivedAt/sourceType/ocr), RawSourceRef +
+  FileSource contract (:188-289), Core/ProvenanceTrace.ts, OcrProvenance.ts; raw evidence
+  persisted tenant-scoped under `raw-source:<sha256>` (FinancialIngestionService :368).
+CANONICALIZATION: DocumentTableExtractor.ts — CANONICAL_FINANCIAL_SCHEMA (:39),
+  mapTableToCanonical (:208), mapStatementToCanonical (:586), normalizePersianLetters (:297),
+  toAsciiDigits (:350), parseStatementAmount (:370), detectStatementUnit
+  (FinancialDocumentUnderstanding.ts:287).
+RECONCILIATION / CROSS-CHECK: FinancialStatementInsight.ts integrity checks (:298-364):
+  balance-sheet-identity, gross-profit-identity, operating-profit-identity; cash-flow
+  reconciliation CFO+CFI+CFF (:104-106,:234-238) with status RECONCILED|MISMATCH|NOT_TESTABLE
+  and explicit `missing` evidence; ratio sanity via unavailable/notApplicable (:66-69);
+  QualityOfEarnings CASH_BACKED|PROFIT_NOT_CASH_BACKED|UNAVAILABLE (:96);
+  evidence-level labelling FACT/DERIVED/INTERPRETATION/RECOMMENDATION (:30-34).
+READINESS GATE: assessStatementAnalysisReadiness (FinancialDocumentUnderstanding.ts:1024);
+  /api/financial/analyze refuses READY over partial statements (CommercialRuntimeServer.ts:1282-1295).
+DUPLICATE / INCREMENTAL: IncrementalIngestGate (file-level sha256, per tenant+source :89);
+  raw-source content-hash dedup at persistence (:368); Idempotency-Key replay (IngestionJobService).
+FAILURE STATES: ingestion-* codes, PDF_ERROR_CODES, FINANCIAL_DOCUMENT_ERROR_CODES,
+  TABLE/DOCX/IMAGE/API/DB error codes; fail-closed throws; /api/ingest 422.
+RESOURCE/CWE CONTROLS: AcquisitionResourcePolicy.ts (PROPOSED_POLICY vs VERIFIED_CONTROL).
+PROVIDER LEVERAGE ENFORCEMENT: FinancialIngestionProviderGovernance + CapabilityProviderRegistry.
+
+================================================================================
+3. EXACT MISSING DELTA (no trust-state contract exists anywhere)
+================================================================================
+  * Grep over Backend/HBOS for `quarantine|QUARANTINE|trustState|TrustState|trustLevel`
+    returns ZERO implementation matches (only the Stage 2 `inputTrust` on analytics endpoints).
+  * FinancialIngestionResult (FinancialDataIngestionAdapter.ts:108) and FinancialSourceEvidence
+    (:63) expose NO trust/validation state. A source is either returned as accepted or thrown
+    as an error. The canonical lifecycle RECEIVED -> IDENTIFIED -> VALIDATED -> CROSS-CHECKED ->
+    RECONCILED -> TRUSTED / QUARANTINED / REJECTED is therefore NOT represented as data.
+    1) NO unified trust-state contract / field across all input paths.        (MISSING)
+    2) NO QUARANTINED state (only accept vs throw).                           (MISSING)
+    3) NO cross-source contradiction / cross-source agreement check
+       (reconciliation is single-document accounting identities only).        (MISSING)
+    4) NO prior-period consistency check ACROSS separate ingested sources.    (MISSING)
+    5) NO duplicate-transaction detection WITHIN a source (only file-level
+       sha256 dedup and in-memory forecasting dedup).                         (MISSING)
+    6) NO explicit chronology/period-consistency validation beyond ISO date
+       format and document-detected periodIndex (no future-date, no
+       duplicate-period, no monotonic-period enforcement).                    (PARTIAL)
+    7) Manual/client-supplied metrics are labelled (Stage 2) but not
+       canonically bound (no verification path exists).                       (PARTIAL)
+    8) API/DB connectors are contract-tested but NOT integrated into the
+       runtime, and canonical-domain schema validation is delegated to the
+       caller-supplied mapper.                                                (PARTIAL)
+  * DOCUMENTATION INCONSISTENCY: AcquisitionResourcePolicy.createAnnotatedPolicy (:67,:71)
+    still says "XLS not yet supported", but XLS ingestion is implemented and tested.
+
+================================================================================
+4. PROTECTED / ACC-BOUND CONSTRAINTS
+================================================================================
+  * FinancialDataIngestionAdapter.ts and its tests are protected from modification without
+    explicit authorization (project memory: protected_files). Any remediation that changes
+    the canonical ingestion contract or adapter semantics requires
+    REQUIRES_ARCHITECTURE_CHANGE_CONTROL.
+  * A unified trust-state field on the canonical model, duplicate-record rejection inside the
+    adapter, and cross-source reconciliation all touch frozen canonical boundaries -> ACC.
+
+================================================================================
+5. SMALLEST SAFE IMPLEMENTATION (proposed, NOT implemented this run)
+================================================================================
+Add a NEW additive supporting service (same pattern as existing Stage 08 supporting services
+such as IncrementalIngest/ConnectorRegistry) that takes an already-produced
+FinancialIngestionResult/evidence plus its integration-check output and returns an explicit
+trust assessment (RECEIVED/IDENTIFIED/VALIDATED/CROSS-CHECKED/RECONCILED/TRUSTED/QUARANTINED/
+REJECTED + missing evidence + limitations). It must NOT modify FinancialDataIngestionAdapter.ts
+and must not change any canonical calculation or schema. Focused test required. Any wiring of
+the trust field INTO the frozen canonical model remains REQUIRES_ARCHITECTURE_CHANGE_CONTROL.
+
+================================================================================
+6. DECLARATIONS
+================================================================================
+  * No completed work was repeated: PDF/XLSX ingestion, Persian-first UI, canonical financial
+    calculations, and Android CLI provisioning were audited read-only and left untouched.
+  * No Stage-1 remediation was implemented in this run.
+  * Current-standard online verification remains BLOCKED (no authoritative online source in
+    this environment).

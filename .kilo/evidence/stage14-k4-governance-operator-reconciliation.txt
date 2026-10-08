@@ -1,0 +1,109 @@
+Stage 14 — K4 standardization.governance-operator-reconciliation — DOCS-ONLY CONSISTENCY EVIDENCE
+Date: 2026-09-14
+Branch: fix/autonomous-product-factory
+Baseline (pre-change trusted checkpoint): ed3c47fc5bef775f8b975add4054fa51017095d8
+Knot class: DOCUMENTATION CONSISTENCY (docs-only). No runtime, test, architecture, completion gate or external-dependency implementation changed.
+
+================================================================================
+1. CHANGED FILES — K4 SCOPE (docs/evidence/queue/ledger/checkpoint only)
+================================================================================
+Modified (intended K4):
+  AUTONOMOUS_MISSION.md
+  Docs/HOOSHYAROS_FINAL_DECISIONS_REGISTER.md
+  Docs/HOOSHYAROS_MASTER_CHARTER.md
+  .kilo/plans/AUTONOMOUS-COMMERCIALIZATION-EXECUTION-QUEUE.md
+  .kilo/plans/ACTIVE-COMMERCIALIZATION-MASTER-LEDGER.md
+
+Pre-existing / unrelated (NOT staged, NOT touched by K4):
+  .kilo/agents/hooshyar-construction.md   (modified before K4)
+  package-lock.json                       (modified before K4)
+  untracked scratch/backup files (tmp_*.js, *.bak-*, dist/, plans/, etc.)
+
+No file under Backend/, Frontend/, web/, android/, scripts/, or any *.ts / *.js / *.tsx / *.py
+source path is part of the K4 change set.
+
+================================================================================
+2. EXACT CONFLICTING/STALE STATEMENTS IDENTIFIED AND CLASSIFICATION
+================================================================================
+Authority for the approved model (unchanged, repository truth):
+  - Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md §5 (lines 123-140) and §10 (line 347):
+    Kilo Code is an approved local VS Code execution/operator layer with no architecture ownership.
+  - Docs/ARCHITECTURE_DECISIONS/KILO_GOVERNED_OPERATOR_DECISION.md:
+    Kilo is a local subordinate execution/operator layer, not a product runtime dependency.
+  - Docs/KILO_EXECUTION_OPERATOR_CONTRACT.md and AGENTS.md: same subordinate-operator model.
+  - Assistant/SYSTEM_PROMPT.md §Authoritative construction toolchain: Kilo listed as an approved, replaceable operator.
+
+Identified statements:
+  S1. Master Charter §9 (Mandatory construction toolchain): "Only these three participants are permitted…"
+      lists Python/GitHub/Assistant and prohibits external coding providers without recording the approved
+      local operator layer. Reads broader than the approved model.
+      Classification: DOCUMENTATION DRIFT / INCOMPLETENESS (no separate governance contradiction under
+      Governance Charter §5; operators are subordinate mechanisms, not fourth participants).
+  S2. Master Charter §8 (line 314) and §17 mantra (line 654): "approved Python/GitHub/Assistant toolchain" /
+      "Use only Python, GitHub and the Assistant for construction."
+      Classification: DOCUMENTATION DRIFT (same omission; internal-consistency risk within the same charter).
+  S3. Final Decisions Register §7 (Mandatory Construction Toolchain): "permanently restricted to three active
+      participants" without the approved operator layer; §16 invariant list omits it; §18 mantra omits it.
+      Classification: DOCUMENTATION DRIFT / INCOMPLETENESS (Register is a review copy; authoritative rules
+      remain in the Master Charter / Governance Charter / Architecture Freeze V4).
+  S4. AUTONOMOUS_MISSION.md: "The only approved autonomous coding/worker runtime is repository-native Python"
+      and the completion-gate item "Python-only construction-provider enforcement".
+      Classification: GENUINE CONTRADICTION with the active Governance Charter §5/§10 and the approved
+      operator model (exclusionary "Python-only" wording excludes the approved local operator despite it
+      being a subordinate, replaceable mechanism). Resolution is docs-only terminology alignment; no rule change.
+
+================================================================================
+3. MINIMUM COHERENT DOCS-ONLY CORRECTION APPLIED
+================================================================================
+  - Docs/HOOSHYAROS_MASTER_CHARTER.md
+      §9: added the approved local execution-operator clarification (subordinate, replaceable, not a
+          participant/authority/provider; Kilo Code explicitly named and linked to the Governance Charter
+          §5/§10, the operator contract and the operator decision). Prohibition now states approved
+          repository-governed local operators are not external coding providers.
+      §8: "Python/GitHub/Assistant authorities" + operators act only as subordinate mechanisms (see §9).
+      §17 mantra: rephrased to reference the three authorities with approved operators acting under them.
+  - Docs/HOOSHYAROS_FINAL_DECISIONS_REGISTER.md
+      §7: recorded the approved local operator layer (subordinate, replaceable, not a participant/authority/
+          provider); clarification that approved local operators are not external coding providers.
+      §16: added the operator invariant.
+      §18 mantra: rephrased to match the Master Charter.
+  - AUTONOMOUS_MISSION.md
+      Permanent construction-provider rule: added the approved local-operator clarification.
+      Assistant Completion Gate: "Python-only construction-provider enforcement" ->
+          "Approved construction-provider enforcement (Python-first, with approved local operators)".
+
+No new governance rule was invented; no existing governance rule was changed. Source-of-truth hierarchy and
+Architecture Freeze V4 are preserved.
+
+================================================================================
+4. VALIDATION — AFFECTED DOCUMENTS INTERNAL CONSISTENCY
+================================================================================
+Command checks (governing docs: Master Charter, Final Decisions Register, AUTONOMOUS_MISSION.md, SYSTEM_PROMPT.md):
+  ABSENT: "Use only Python, GitHub and the Assistant for construction"
+  ABSENT: "Python-only construction-provider"
+  ABSENT: "three active participants are excluded"
+Operator coherence anchors (Master Charter, Register, AUTONOMOUS_MISSION, Governance Charter, AGENTS.md, operator contract):
+  "subordinate, replaceable"      => 6 occurrence(s)
+  "not external coding providers" => 4 occurrence(s)
+  "approved local execution"      => 13 occurrence(s)
+Cross-document result: Master Charter §9, Final Decisions Register §7/§16/§18, AUTONOMOUS_MISSION.md,
+Governance Charter §5/§10 and the operator contract/decision now agree on one model.
+
+================================================================================
+5. NO SOURCE-CODE / TEST / ARCHITECTURE / COMPLETION-GATE CHANGE
+================================================================================
+  - K4 change set contains only .md documentation + .kilo evidence/queue/ledger/checkpoint artifacts.
+  - No *.ts / *.tsx / *.js / *.cjs / *.py file changed.
+  - Doc-content dependency check: the only code reference to a K4-touched document is
+    AutonomousProductFactory.repositoryContract() which requires Docs/HOOSHYAROS_MASTER_CHARTER.md to EXIST
+    (existsSync); no test or runtime code asserts the edited prose. Completion-gate tests
+    (AssistantCompletionGate.test.ts, AutonomousCompletionGate.test.ts) use isolated temp fixtures.
+  - No completion flag changed: productComplete / commercialProductRuntimeComplete /
+    externalProductionDependenciesComplete remain FALSE.
+
+================================================================================
+6. K4 VERDICT
+================================================================================
+VERIFIED — docs-only reconciliation complete. The repository now consistently records the already-approved
+local execution-operator model (Kilo Code is a subordinate, replaceable local operator, not an external
+coding provider or architectural authority), with no governance-rule change and no source-code impact.

@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0",
+  "wave_status": "READY",
+  "base_mission": ".kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md",
+  "leases": [
+    {
+      "id": "work-0011-team-v2-memory-reconciliation",
+      "title": "Team V2 Memory and Evidence Reconciliation",
+      "status": "READY",
+      "mode": "AUDIT",
+      "priority": "P0",
+      "owner": "MEMORY_EDITOR",
+      "task_class": "MEMORY",
+      "dependencies": [],
+      "evidence_required": [
+        "reconciled_defect_registry",
+        "reconciled_evidence_registry",
+        "reconciled_blocker_registry",
+        "reconciled_wave_and_mission_state",
+        "historical_baseline_supersession",
+        "one_coherent_commit",
+        "exactly_one_result_report"
+      ],
+      "purpose": "FINAL MEMORY/EVIDENCE RECONCILIATION BEFORE LAST TEAM V2 ACCEPTANCE",
+      "blockers": [
+        "TEAM_V2_ACCEPTANCE"
+      ],
+      "test_scope": "NO_PRODUCT_CODE_CHANGE_MEMORY_AND_EVIDENCE_INTEGRITY_ONLY",
+      "risk": "P0",
+      "value": "Remove real false-green contradictions detected by independent QC without rewriting or deleting historical evidence.",
+      "write_scope": [
+        ".kilo/team/memory/",
+        ".kilo/team/results/work-0006-team-performance-evaluation/PRE-GATE-BASELINE.md",
+        ".kilo/team/results/work-0011-team-v2-memory-reconciliation/"
+      ],
+      "focus": "Reconcile only facts proven by repository evidence after W10 QC: (1) register the repaired F1/F2 control-plane defects and their repair commits; (2) add W10 evidence and its independent QC rejection to evidence memory without claiming acceptance; (3) reconcile stale WAVE-0011 / mission-state / unpromoted-attempt counts to current known facts, preserving prior values as historical; (4) re-scope BLOCKER-0005 using currently verifiable worker refs and do not close it; (5) preserve BLOCKER-0004 lineage divergence as OPEN/UNDECIDED; (6) explicitly supersede the false Wave 10 claims in WORK-0006 PRE-GATE-BASELINE.md with a correction section while preserving the original text; (7) do not promote any product or worker code; (8) do not modify .github/**, Architecture Freeze V4/V4.1, product code, tests, or accepted F1-F6/CCC/UX work. The result must make the next acceptance wave capable of judging the team without historical contradictions masquerading as current truth.",
+      "estimated_complexity": "MEDIUM_MEMORY_RECONCILIATION",
+      "role": "Team V2 Memory & Evidence Reconciliation",
+      "contract_correction": {
+        "run_id": 37821016567,
+        "root_cause": "After identity normalization, evidence root still reflected the prior lease id contract.",
+        "worker_started": false,
+        "repair": "Use full governed lease id consistently in lease id and evidence root."
+      },
+      "input_evidence": [
+        "WORK-0010"
+      ],
+      "dependency_semantics": "FAILED_PRIOR_WORK_IS_INPUT_NOT_SUCCESS_PREREQUISITE",
+      "repair_history": [
+        {
+          "run_id": 37821016567,
+          "change": "remove WORK-0010 success dependency",
+          "reason": "recovery reconciliation consumes failed predecessor evidence"
+        }
+      ]
+    }
+  ]
+}

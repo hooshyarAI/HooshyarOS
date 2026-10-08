@@ -6,9 +6,25 @@ import {
 import { ReasoningEngine, ReasoningResult } from "../Engines/ReasoningEngine";
 import { FinancialSourceEvidence } from "./FinancialDataIngestionAdapter";
 
+export interface FinancialStatementEvidenceGate {
+  /** True only when the required statement evidence was really extracted. */
+  readonly ready: boolean;
+  readonly missingMeasures: readonly string[];
+  readonly incompleteSections: readonly string[];
+  /** Precise typed code when not ready. */
+  readonly code?: string;
+  readonly reason?: string;
+}
+
 export interface FinancialStatementAnalysisInput extends FinancialAnalysisInput {
   readonly tenantId: string;
   readonly source: FinancialSourceEvidence;
+  /**
+   * Sufficiency gate from the canonical document understanding. Present only for
+   * report/statement analyses; absent for a real ledger. When present and not
+   * ready, the analysis fails closed instead of returning READY over absent data.
+   */
+  readonly documentEvidence?: FinancialStatementEvidenceGate;
 }
 
 export interface FinancialObservation {
@@ -25,6 +41,10 @@ export interface FinancialStatementAnalysisResult {
   readonly observations: readonly FinancialObservation[];
   readonly reasoningEvidence: Pick<ReasoningResult, "status" | "success">;
   readonly status: "READY" | "BLOCKED";
+  /** Precise typed code when the analysis was refused (never a fabricated READY). */
+  readonly failureCode?: string;
+  /** Non-fabricated explanation of the refusal. */
+  readonly reason?: string;
 }
 
 /**
@@ -46,6 +66,13 @@ export class FinancialStatementAnalysisService {
 
   execute(input: FinancialStatementAnalysisInput): FinancialStatementAnalysisResult {
     this.assertBoundaryInput(input);
+
+    // Fail closed BEFORE the engine runs: a document whose required statement
+    // evidence is incomplete must never yield READY zero/partial metrics.
+    const gate = input.documentEvidence;
+    if (gate && !gate.ready) {
+      return this.insufficient(input, gate);
+    }
 
     const metrics = this.financialIntelligence.analyze({
       revenue: input.revenue,
@@ -99,6 +126,26 @@ export class FinancialStatementAnalysisService {
     ].join(" | ");
   }
 
+  private insufficient(
+    input: FinancialStatementAnalysisInput,
+    gate: FinancialStatementEvidenceGate,
+  ): FinancialStatementAnalysisResult {
+    const code = gate.code?.trim() || "financial-report-insufficient-evidence";
+    const reason = gate.reason?.trim() || "required-statement-evidence-missing";
+    return {
+      capabilityId: this.capabilityId,
+      targetEngine: this.targetEngine,
+      tenantId: input.tenantId.trim(),
+      source: input.source,
+      metrics: { revenue: 0, expenses: 0, profit: 0, profitMargin: 0, debtRatio: 0, status: "BLOCKED" },
+      observations: [],
+      reasoningEvidence: { status: code, success: false },
+      status: "BLOCKED",
+      failureCode: code,
+      reason,
+    };
+  }
+
   private blocked(
     input: FinancialStatementAnalysisInput,
     metrics: FinancialAnalysisResult,
@@ -126,9 +173,15 @@ export class FinancialStatementAnalysisService {
     }
 
     const source = input.source;
+    // Accept every canonical ingestion source type, including the governed
+    // legacy XLS route and the document/report formats, so a verified canonical
+    // source is never rejected merely for its acquisition format.
+    const acceptedSourceTypes: ReadonlyArray<FinancialSourceEvidence["sourceType"]> = [
+      "CSV", "STRUCTURED", "XLSX", "XLS", "PDF", "DOCX", "HTML", "XML", "TSV", "IMAGE",
+    ];
     if (
       !source?.sourceName?.trim() ||
-      source.sourceType !== "CSV" ||
+      !acceptedSourceTypes.includes(source.sourceType) ||
       !/^[a-f0-9]{64}$/i.test(source.sha256) ||
       !source.receivedAt?.trim()
     ) {

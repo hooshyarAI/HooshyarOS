@@ -8,4 +8,6 @@ export interface Engine {
 
     health(): boolean;
 
+    shutdown?(): void | Promise<void>;
+
 }

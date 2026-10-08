@@ -1,0 +1,156 @@
+SOURCE_SHA256=10d44d0f7ae7858d57f61e69aadfd9e32ccca10a4963d84ab34c620f736c5a5f
+CANONICAL_REVENUE=32129418000000
+CANONICAL_PROFIT=7250000000000
+
+=== Q1 ===
+QUESTION: تحلیل کامل صورت مالی را انجام بده
+HTTP_STATUS: 200
+INTENT: primary=ANALYZE secondary=[] answerMode=FOCUSED
+SELECTED_CAPABILITIES: INTEGRITY_EVIDENCE -> FINANCIAL_INTELLIGENCE -> LIQUIDITY_LEVERAGE -> EXECUTIVE_INTELLIGENCE -> REASONING
+EXECUTION_ORDER: INTEGRITY_EVIDENCE -> FINANCIAL_INTELLIGENCE -> LIQUIDITY_LEVERAGE -> EXECUTIVE_INTELLIGENCE -> REASONING
+EXECUTED: INTEGRITY_EVIDENCE, FINANCIAL_INTELLIGENCE, LIQUIDITY_LEVERAGE
+UNAVAILABLE: EXECUTIVE_INTELLIGENCE(no executive target/KPI evidence exists in the canonical record; executive synthesis would require invented targets)
+EVIDENCE_SOURCES: INTEGRITY_EVIDENCE<-FinancialStatementInsight:6, FINANCIAL_INTELLIGENCE<-FinancialIntelligenceEngine:4, LIQUIDITY_LEVERAGE<-FinancialIntelligenceEngine.liquidityRatios:4
+REASONING_INPUT: status=EXECUTED confidenceSource=calculated steps=1
+CONTRADICTIONS: []
+LIMITATIONS: 1
+FINAL_STRUCTURE: intent=ANALYZE headings=[خلاصه مدیریتی | ریسکها | فرصتها و رشد | سودآوری محصول/بخش | محدودیتهای تحلیل محصول/بخش | اقدامات پیشنهادی | محدودیتها]
+ANSWER_LENGTH: 4352
+TRACE_ID: TRACE-munygoza-ct1p5qy-1
+ANSWER_HEAD: خلاصه مدیریتی / این تحلیل بر سند با وضعیت ناقص و دوره‌های دوره منتهي به ۱۴۰۵/۰۴/۳۱، تجديد ارائه شده دوره منتهي به ۱۴۰۴/۰۴/۳۱، تجديد ارائه شده به تاريخ ۱۴۰۳/۰۵/۰۱ استوار است. / درآمد: ۳۲٬۱۲۹٬۴۱۸٬۰۰۰٬۰۰۰ ریال
+
+=== Q2 ===
+QUESTION: وضعیت تاب‌آوری مالی شرکت چگونه است؟
+HTTP_STATUS: 200
+INTENT: primary=RESILIENCE secondary=[] answerMode=FOCUSED
+SELECTED_CAPABILITIES: COMPARATIVE_EVIDENCE -> FINANCIAL_INTELLIGENCE -> LIQUIDITY_LEVERAGE -> WORKING_CAPITAL -> EARNINGS_QUALITY -> ORGANIZATIONAL_INTELLIGENCE -> REASONING
+EXECUTION_ORDER: COMPARATIVE_EVIDENCE -> FINANCIAL_INTELLIGENCE -> LIQUIDITY_LEVERAGE -> WORKING_CAPITAL -> EARNINGS_QUALITY -> ORGANIZATIONAL_INTELLIGENCE -> REASONING
+EXECUTED: COMPARATIVE_EVIDENCE, FINANCIAL_INTELLIGENCE, LIQUIDITY_LEVERAGE, WORKING_CAPITAL, EARNINGS_QUALITY, ORGANIZATIONAL_INTELLIGENCE
+UNAVAILABLE: 
+EVIDENCE_SOURCES: COMPARATIVE_EVIDENCE<-RatioAnalysisService:12, FINANCIAL_INTELLIGENCE<-FinancialIntelligenceEngine:4, LIQUIDITY_LEVERAGE<-FinancialIntelligenceEngine.liquidityRatios:4, WORKING_CAPITAL<-FinancialIntelligenceEngine.workingCapital:5, EARNINGS_QUALITY<-FinancialStatementInsight:2, ORGANIZATIONAL_INTELLIGENCE<-OrganizationalIntelligenceEngine.diagnose:3
+REASONING_INPUT: status=EXECUTED confidenceSource=calculated steps=1
+CONTRADICTIONS: []
+LIMITATIONS: 0
+FINAL_STRUCTURE: intent=RESILIENCE headings=[ارزیابی تابآوری مالی بر پایه شواهد سند | حدود این ارزیابی | اقدامهای مرتبط با تابآوری | محدودیتها]
+ANSWER_LENGTH: 2009
+TRACE_ID: TRACE-munygozk-887s5ee-3
+ANSWER_HEAD: ارزیابی تابآوری مالی بر پایه شواهد سند / نقدینگی: نسبت جاری ۱٫۸ برابر (پوشش کامل بدهیهای جاری توسط داراییهای جاری) و نسبت آنی ۱٫۱۹ برابر. / نقدینگی: داراییهای جاری ۳۱٬۱۰۷٬۰۲۴٬۰۰۰٬۰۰۰ ریال بدهیهای جاری ۱۷٬۲۷۹٬۲۳۷٬۰۰۰٬۰۰۰ ریال را پوشش میدهند.
+
+=== Q3 ===
+QUESTION: مهم‌ترین ریسک‌های شرکت چیست؟
+HTTP_STATUS: 200
+INTENT: primary=RISK secondary=[] answerMode=FOCUSED
+SELECTED_CAPABILITIES: FINANCIAL_INTELLIGENCE -> LIQUIDITY_LEVERAGE -> EARNINGS_QUALITY -> RISK_INTELLIGENCE -> REASONING
+EXECUTION_ORDER: FINANCIAL_INTELLIGENCE -> LIQUIDITY_LEVERAGE -> EARNINGS_QUALITY -> RISK_INTELLIGENCE -> REASONING
+EXECUTED: FINANCIAL_INTELLIGENCE, LIQUIDITY_LEVERAGE, EARNINGS_QUALITY
+UNAVAILABLE: RISK_INTELLIGENCE(a statement document carries no canonical risk probability/impact; none was invented)
+EVIDENCE_SOURCES: FINANCIAL_INTELLIGENCE<-FinancialIntelligenceEngine:4, LIQUIDITY_LEVERAGE<-FinancialIntelligenceEngine.liquidityRatios:4, EARNINGS_QUALITY<-FinancialStatementInsight:2
+REASONING_INPUT: status=EXECUTED confidenceSource=calculated steps=1
+CONTRADICTIONS: []
+LIMITATIONS: 1
+FINAL_STRUCTURE: intent=RISK headings=[ریسکهای اصلی | چرا این ریسکها مهماند (محرکها و شواهد) | آنچه باید پایش شود | اقدام پیشنهادی | محدودیتها]
+ANSWER_LENGTH: 1722
+TRACE_ID: TRACE-munygp02-h31strc-7
+ANSWER_HEAD: ریسکهای اصلی / بدهیها (۱۷٬۴۰۷٬۴۱۷٬۰۰۰٬۰۰۰ ریال) از حقوق مالکانه (۱۴٬۸۳۶٬۸۳۹٬۰۰۰٬۰۰۰ ریال) فراتر رفته و ۲٬۵۷۰٬۵۷۸٬۰۰۰٬۰۰۰ ریال بیشتر است؛ ریسک اهرم مالی با شاهد ساختار سرمایه تأیید میشود. / نسبت بدهی به دارایی ۵۳٫۹۹٪ است؛ بیش از نیمی از داراییها از طریق بدهی تأمین شده است (این نسبت بهتنهایی یک واقعیت است و ریسک بودن آن بر پایه همین آستانه اهرمی و ساختار تأمین مالی تفسیر میشود).
+
+=== Q4 ===
+QUESTION: علت تغییر سود چیست؟
+HTTP_STATUS: 200
+INTENT: primary=PROFIT_CHANGE secondary=[] answerMode=FOCUSED
+SELECTED_CAPABILITIES: COMPARATIVE_EVIDENCE -> FINANCIAL_INTELLIGENCE -> REASONING
+EXECUTION_ORDER: COMPARATIVE_EVIDENCE -> FINANCIAL_INTELLIGENCE -> REASONING
+EXECUTED: COMPARATIVE_EVIDENCE, FINANCIAL_INTELLIGENCE
+UNAVAILABLE: 
+EVIDENCE_SOURCES: COMPARATIVE_EVIDENCE<-RatioAnalysisService:12, FINANCIAL_INTELLIGENCE<-FinancialIntelligenceEngine:4
+REASONING_INPUT: status=EXECUTED confidenceSource=calculated steps=1
+CONTRADICTIONS: []
+LIMITATIONS: 0
+FINAL_STRUCTURE: intent=PROFIT_CHANGE headings=[تغییر سود | زنجیره عوامل قابل مشاهده | واقعیت تأییدشده در برابر استنباط | محدودیتها]
+ANSWER_LENGTH: 1036
+TRACE_ID: TRACE-munygp0h-uxrivba-9
+ANSWER_HEAD: تغییر سود / سود خالص از ۳٬۳۱۹٬۰۷۶٬۰۰۰٬۰۰۰ ریال به ۷٬۲۵۰٬۰۰۰٬۰۰۰٬۰۰۰ ریال رسیده است (افزایش ۱۱۸٫۴۳٪). / سود خالص دوره جاری ۷٬۲۵۰٬۰۰۰٬۰۰۰٬۰۰۰ ریال است.
+
+=== Q5 ===
+QUESTION: چه اطلاعاتی برای نتیجه‌گیری کم است؟
+HTTP_STATUS: 200
+INTENT: primary=DATA_GAPS secondary=[] answerMode=FOCUSED
+SELECTED_CAPABILITIES: INTEGRITY_EVIDENCE -> REASONING
+EXECUTION_ORDER: INTEGRITY_EVIDENCE -> REASONING
+EXECUTED: INTEGRITY_EVIDENCE
+UNAVAILABLE: 
+EVIDENCE_SOURCES: INTEGRITY_EVIDENCE<-FinancialStatementInsight:6
+REASONING_INPUT: status=EXECUTED confidenceSource=unavailable steps=1
+CONTRADICTIONS: []
+LIMITATIONS: 0
+FINAL_STRUCTURE: intent=DATA_GAPS headings=[شکافهای داده (شواهد استخراجنشده) | شکافهای اعتبارسنجی | شکافهای عملیاتی | اقدام برای تکمیل | محدودیتها]
+ANSWER_LENGTH: 1513
+TRACE_ID: TRACE-munygp0x-clsz4zt-11
+ANSWER_HEAD: شکافهای داده (شواهد استخراجنشده) / سند با وضعیت ناقص ثبت شده و بخشی از اطلاعات ممکن است ناقص باشد. / شکافهای اعتبارسنجی
+
+=== Q6 ===
+QUESTION: برای رشد شرکت چه مسیرهایی وجود دارد؟
+HTTP_STATUS: 200
+INTENT: primary=GROWTH secondary=[] answerMode=FOCUSED
+SELECTED_CAPABILITIES: SCENARIO -> FINANCIAL_INTELLIGENCE -> EXECUTIVE_INTELLIGENCE -> REASONING
+EXECUTION_ORDER: SCENARIO -> FINANCIAL_INTELLIGENCE -> EXECUTIVE_INTELLIGENCE -> REASONING
+EXECUTED: SCENARIO, FINANCIAL_INTELLIGENCE
+UNAVAILABLE: EXECUTIVE_INTELLIGENCE(no executive target/KPI evidence exists in the canonical record; executive synthesis would require invented targets)
+EVIDENCE_SOURCES: SCENARIO<-FinancialDecisionNarrativeService.composeScenarios:1, FINANCIAL_INTELLIGENCE<-FinancialIntelligenceEngine:4
+REASONING_INPUT: status=EXECUTED confidenceSource=calculated steps=1
+CONTRADICTIONS: []
+LIMITATIONS: 1
+FINAL_STRUCTURE: intent=GROWTH headings=[مبانی رشد بر پایه شواهد سند | مسیرهای رشد در سه سناریو | سناریوی محافظهکارانه | سناریوی متوازن | سناریوی تهاجمی | پیشنیازهای مالی رشد | محدودیتها]
+ANSWER_LENGTH: 5119
+TRACE_ID: TRACE-munygp1d-tplw10a-13
+ANSWER_HEAD: مبانی رشد بر پایه شواهد سند / رشد در این تحلیل فقط از شواهد همین سند (دوره منتهي به ۱۴۰۵/۰۴/۳۱، تجديد ارائه شده دوره منتهي به ۱۴۰۴/۰۴/۳۱، تجديد ارائه شده به تاريخ ۱۴۰۳/۰۵/۰۱) استخراج می‌شود. این صورت مالی به‌تنهایی تقاضای بازار، جایگاه رقابتی یا فروش آینده را اثبات نمی‌کند. / درآمد افزایش ۹۴٫۴٪ است؛ با تثبیت علت عملیاتی این رشد و حفظ سرمایه در گردش، ظرفیت توسعه وجود دارد.
+
+=== Q7 ===
+QUESTION: الان چه اقدامی باید انجام بدهم؟
+HTTP_STATUS: 200
+INTENT: primary=ACTION secondary=[] answerMode=FOCUSED
+SELECTED_CAPABILITIES: ACTION_FINDINGS -> DECISION_INTELLIGENCE -> REASONING -> GOVERNANCE
+EXECUTION_ORDER: ACTION_FINDINGS -> DECISION_INTELLIGENCE -> REASONING -> GOVERNANCE
+EXECUTED: ACTION_FINDINGS, GOVERNANCE
+UNAVAILABLE: DECISION_INTELLIGENCE(no decision request with pairwise/criteria matrices is present in this question)
+EVIDENCE_SOURCES: ACTION_FINDINGS<-FinancialStatementInsight:9, GOVERNANCE<-GovernanceEngine.evaluate:2
+REASONING_INPUT: status=EXECUTED confidenceSource=unavailable steps=1
+CONTRADICTIONS: []
+LIMITATIONS: 1
+FINAL_STRUCTURE: intent=ACTION headings=[اقدام اولویت دار | مبنای شواهد هر اقدام | اولویت بندی بر پایه شدت | محدودیت اقدامها | محدودیتها]
+ANSWER_LENGTH: 2036
+TRACE_ID: TRACE-munygp1t-dagctn6-15
+ANSWER_HEAD: اقدام اولویت دار / کاهش اهرم مالی یا تقویت حقوق مالکانه در برنامه تأمین مالی در اولویت قرار گیرد. / بخشهای ناقص سند (ترازنامه، سود و زیان یا جریان نقد) تکمیل شود تا تصویر مدیریتی کامل گردد.
+
+=== Q8 ===
+QUESTION: برای رشد شرکت چه کنم و آیا این رشد از نظر مالی تاب‌آور است؟
+HTTP_STATUS: 200
+INTENT: primary=GROWTH secondary=[RESILIENCE,ACTION] answerMode=COMPOSITE
+SELECTED_CAPABILITIES: COMPARATIVE_EVIDENCE -> SCENARIO -> ACTION_FINDINGS -> FINANCIAL_INTELLIGENCE -> LIQUIDITY_LEVERAGE -> WORKING_CAPITAL -> EARNINGS_QUALITY -> ORGANIZATIONAL_INTELLIGENCE -> EXECUTIVE_INTELLIGENCE -> DECISION_INTELLIGENCE -> REASONING -> GOVERNANCE
+EXECUTION_ORDER: COMPARATIVE_EVIDENCE -> SCENARIO -> ACTION_FINDINGS -> FINANCIAL_INTELLIGENCE -> LIQUIDITY_LEVERAGE -> WORKING_CAPITAL -> EARNINGS_QUALITY -> ORGANIZATIONAL_INTELLIGENCE -> EXECUTIVE_INTELLIGENCE -> DECISION_INTELLIGENCE -> REASONING -> GOVERNANCE
+EXECUTED: COMPARATIVE_EVIDENCE, SCENARIO, ACTION_FINDINGS, FINANCIAL_INTELLIGENCE, LIQUIDITY_LEVERAGE, WORKING_CAPITAL, EARNINGS_QUALITY, ORGANIZATIONAL_INTELLIGENCE, GOVERNANCE
+UNAVAILABLE: EXECUTIVE_INTELLIGENCE(no executive target/KPI evidence exists in the canonical record; executive synthesis would require invented targets) | DECISION_INTELLIGENCE(no decision request with pairwise/criteria matrices is present in this question)
+EVIDENCE_SOURCES: COMPARATIVE_EVIDENCE<-RatioAnalysisService:12, SCENARIO<-FinancialDecisionNarrativeService.composeScenarios:1, ACTION_FINDINGS<-FinancialStatementInsight:9, FINANCIAL_INTELLIGENCE<-FinancialIntelligenceEngine:4, LIQUIDITY_LEVERAGE<-FinancialIntelligenceEngine.liquidityRatios:4, WORKING_CAPITAL<-FinancialIntelligenceEngine.workingCapital:5, EARNINGS_QUALITY<-FinancialStatementInsight:2, ORGANIZATIONAL_INTELLIGENCE<-OrganizationalIntelligenceEngine.diagnose:3, GOVERNANCE<-GovernanceEngine.evaluate:2
+REASONING_INPUT: status=EXECUTED confidenceSource=calculated steps=1
+CONTRADICTIONS: []
+LIMITATIONS: 2
+FINAL_STRUCTURE: intent=GROWTH headings=[مبانی رشد بر پایه شواهد سند | مسیرهای رشد در سه سناریو | سناریوی محافظهکارانه | سناریوی متوازن | سناریوی تهاجمی | ارزیابی تابآوری مالی بر پایه شواهد سند | حدود این ارزیابی | اقدام اولویت دار | مبنای شواهد هر اقدام | اولویت بندی بر پایه شدت | محدودیت اقدامها | محدودیتها]
+ANSWER_LENGTH: 7656
+TRACE_ID: TRACE-munygp20-1p3boer-17
+ANSWER_HEAD: مبانی رشد بر پایه شواهد سند / رشد در این تحلیل فقط از شواهد همین سند (دوره منتهي به ۱۴۰۵/۰۴/۳۱، تجديد ارائه شده دوره منتهي به ۱۴۰۴/۰۴/۳۱، تجديد ارائه شده به تاريخ ۱۴۰۳/۰۵/۰۱) استخراج می‌شود. این صورت مالی به‌تنهایی تقاضای بازار، جایگاه رقابتی یا فروش آینده را اثبات نمی‌کند. / درآمد افزایش ۹۴٫۴٪ است؛ با تثبیت علت عملیاتی این رشد و حفظ سرمایه در گردش، ظرفیت توسعه وجود دارد.
+
+=== Q9 ===
+QUESTION: چه ریسک‌هایی دارم و برای کاهش آنها چه اقدامی انجام دهم؟
+HTTP_STATUS: 200
+INTENT: primary=RISK secondary=[ACTION] answerMode=COMPOSITE
+SELECTED_CAPABILITIES: ACTION_FINDINGS -> FINANCIAL_INTELLIGENCE -> LIQUIDITY_LEVERAGE -> EARNINGS_QUALITY -> RISK_INTELLIGENCE -> DECISION_INTELLIGENCE -> REASONING -> GOVERNANCE
+EXECUTION_ORDER: ACTION_FINDINGS -> FINANCIAL_INTELLIGENCE -> LIQUIDITY_LEVERAGE -> EARNINGS_QUALITY -> RISK_INTELLIGENCE -> DECISION_INTELLIGENCE -> REASONING -> GOVERNANCE
+EXECUTED: ACTION_FINDINGS, FINANCIAL_INTELLIGENCE, LIQUIDITY_LEVERAGE, EARNINGS_QUALITY, GOVERNANCE
+UNAVAILABLE: RISK_INTELLIGENCE(a statement document carries no canonical risk probability/impact; none was invented) | DECISION_INTELLIGENCE(no decision request with pairwise/criteria matrices is present in this question)
+EVIDENCE_SOURCES: ACTION_FINDINGS<-FinancialStatementInsight:9, FINANCIAL_INTELLIGENCE<-FinancialIntelligenceEngine:4, LIQUIDITY_LEVERAGE<-FinancialIntelligenceEngine.liquidityRatios:4, EARNINGS_QUALITY<-FinancialStatementInsight:2, GOVERNANCE<-GovernanceEngine.evaluate:2
+REASONING_INPUT: status=EXECUTED confidenceSource=calculated steps=1
+CONTRADICTIONS: []
+LIMITATIONS: 2
+FINAL_STRUCTURE: intent=RISK headings=[ریسکهای اصلی | چرا این ریسکها مهماند (محرکها و شواهد) | آنچه باید پایش شود | اقدام اولویت دار | مبنای شواهد هر اقدام | اولویت بندی بر پایه شدت | محدودیت اقدامها | محدودیتها]
+ANSWER_LENGTH: 2940
+TRACE_ID: TRACE-munygp29-g7g3t0e-21
+ANSWER_HEAD: ریسکهای اصلی / بدهیها (۱۷٬۴۰۷٬۴۱۷٬۰۰۰٬۰۰۰ ریال) از حقوق مالکانه (۱۴٬۸۳۶٬۸۳۹٬۰۰۰٬۰۰۰ ریال) فراتر رفته و ۲٬۵۷۰٬۵۷۸٬۰۰۰٬۰۰۰ ریال بیشتر است؛ ریسک اهرم مالی با شاهد ساختار سرمایه تأیید میشود. / نسبت بدهی به دارایی ۵۳٫۹۹٪ است؛ بیش از نیمی از داراییها از طریق بدهی تأمین شده است (این نسبت بهتنهایی یک واقعیت است و ریسک بودن آن بر پایه همین آستانه اهرمی و ساختار تأمین مالی تفسیر میشود).

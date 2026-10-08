@@ -3,6 +3,8 @@ import { execFileSync } from "child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join, normalize } from "node:path";
 import { ConstructionContext, ConstructionTool } from "../../Builder/Autonomous/AutonomousConstructionEngine";
+import { KiloCodeExecutionAdapter } from "./KiloCodeExecutionAdapter";
+import type { KiloExecutionResult } from "./KiloCodeExecutionAdapter";
 import { ensurePytest } from "./PythonVerificationBootstrap";
 
 function run(command: string, args: string[], cwd: string, timeout = 15 * 60 * 1000) {
@@ -10,6 +12,7 @@ function run(command: string, args: string[], cwd: string, timeout = 15 * 60 * 1
     try {
         let executable = command;
         let executableArgs = args;
+        let useShell = false;
         if (process.platform === "win32") {
             if (command === "git") executable = "git.exe";
             if (command === "npx") {
@@ -21,7 +24,7 @@ function run(command: string, args: string[], cwd: string, timeout = 15 * 60 * 1
             cwd,
             encoding: "utf8",
             timeout,
-            shell: false,
+            shell: useShell,
             windowsHide: true,
             stdio: ["ignore", "pipe", "pipe"]
         });
@@ -63,20 +66,186 @@ function commandExists(command: string, cwd: string): boolean {
     }
 }
 
-export type ImplementationAgent = "python";
+export type ImplementationAgent = "kilo" | "python";
+
+export function selectImplementationAgent(
+    requested: string | undefined,
+    kiloAvailable: boolean,
+    pythonAvailable: boolean
+): ImplementationAgent | null {
+    const normalized = requested?.trim().toLowerCase() || "auto";
+    if (normalized === "kilo") return kiloAvailable ? "kilo" : pythonAvailable ? "python" : null;
+    if (normalized === "python") return pythonAvailable ? "python" : null;
+    if (normalized !== "auto") return null;
+    if (kiloAvailable) return "kilo";
+    if (pythonAvailable) return "python";
+    return null;
+}
 
 export function resolveImplementationAgent(root = process.cwd()): ImplementationAgent | null {
-    const requested = process.env.HOOSHYAR_AGENT?.trim().toLowerCase();
-    if (requested && requested !== "python") return null;
-    return commandExists("python", root) ? "python" : null;
+    // Unify selection with execution: use the SAME governed resolution path the
+    // KiloCodeExecutionAdapter uses to launch Kilo, so the selected operator and
+    // the executed binary are never divergent.
+    const kiloOperator = new KiloCodeExecutionAdapter();
+    const kiloAvailable = Boolean(kiloOperator.resolveCliPath());
+    return selectImplementationAgent(
+        process.env.HOOSHYAR_AGENT,
+        kiloAvailable,
+        commandExists("python", root)
+    );
 }
 
 export function repositoryStateChanged(before: string, after: string): boolean {
     return before.trim() !== after.trim();
 }
 
-export function buildAgentArgs(_agent: ImplementationAgent, prompt: string): string[] {
+export interface GitCommandResult {
+    ok: boolean;
+    code: number;
+    output: string;
+    error: string | null;
+    elapsedMs: number;
+}
+
+export type GitCommandRunner = (command: string, args: string[], cwd: string, timeout?: number) => GitCommandResult;
+
+export interface RemoteAttestation {
+    type: "AUTONOMOUS_REMOTE_ATTESTATION";
+    branch: string | null;
+    localHead: string | null;
+    originTrackingHead: string | null;
+    remoteHead: string | null;
+    remoteQuery: string;
+    trackingRefAuthoritative: false;
+    parity: boolean;
+    status: "PASS" | "FAIL" | "UNVERIFIED";
+    reason: string | null;
+    evidence: string[];
+    timestamp: string;
+}
+
+const COMMIT_SHA_PATTERN = /^[0-9a-f]{40,64}$/i;
+
+function isResolvedSha(value: string | null | undefined): value is string {
+    return Boolean(value && COMMIT_SHA_PATTERN.test(value.trim()));
+}
+
+/**
+ * Independent construction-plane remote attestation (Governance Charter §16).
+ *
+ * Proves the construction state is actually synchronized:
+ *   LOCAL HEAD == independently queried GitHub remote branch HEAD
+ *
+ * The remote branch HEAD is obtained by `git ls-remote origin refs/heads/<branch>`,
+ * never from `git status`, a push exit code, a local ref or the cached/stale
+ * `origin/<branch>` tracking ref. The tracking ref is reported for observability
+ * only and never determines parity. Any unavailable, malformed or ambiguous
+ * remote response fails closed as UNVERIFIED; unequal valid SHAs fail as FAIL.
+ * Equal SHAs prove identical committed content through Git content addressing.
+ */
+export function attestRemoteBranchParity(
+    root: string = process.cwd(),
+    branchOverride?: string,
+    runner: GitCommandRunner = run
+): RemoteAttestation {
+    const evidence: string[] = [];
+    let branch = branchOverride?.trim() || "";
+    if (!branch) {
+        const branchResult = runner("git", ["branch", "--show-current"], root);
+        branch = branchResult.ok ? branchResult.output.trim() : "";
+    }
+    const base = {
+        type: "AUTONOMOUS_REMOTE_ATTESTATION" as const,
+        branch: branch || null,
+        localHead: null as string | null,
+        originTrackingHead: null as string | null,
+        remoteHead: null as string | null,
+        remoteQuery: branch ? `git ls-remote origin refs/heads/${branch}` : "git ls-remote origin refs/heads/<branch>",
+        trackingRefAuthoritative: false as const,
+        parity: false,
+        status: "UNVERIFIED" as const,
+        reason: null as string | null,
+        evidence,
+        timestamp: new Date().toISOString()
+    };
+    if (!branch) {
+        return { ...base, reason: "BRANCH_UNRESOLVED", evidence: ["target branch could not be resolved (detached HEAD or branch query failure)"] };
+    }
+
+    const localResult = runner("git", ["rev-parse", "HEAD"], root);
+    const localHead = localResult.ok ? localResult.output.trim() : "";
+    if (!isResolvedSha(localHead)) {
+        return { ...base, reason: "LOCAL_HEAD_UNAVAILABLE", evidence: ["git rev-parse HEAD did not yield a valid commit SHA"] };
+    }
+
+    const trackingResult = runner("git", ["rev-parse", "--verify", `refs/remotes/origin/${branch}`], root);
+    const trackingHead = trackingResult.ok ? trackingResult.output.trim() : "";
+    const originTrackingHead = isResolvedSha(trackingHead) ? trackingHead : null;
+
+    const remoteResult = runner("git", ["ls-remote", "origin", `refs/heads/${branch}`], root);
+    if (!remoteResult.ok) {
+        return {
+            ...base,
+            localHead,
+            originTrackingHead,
+            reason: "REMOTE_BRANCH_QUERY_UNAVAILABLE",
+            evidence: ["independent remote query failed (no network/authorization/remote)", `remote error: ${remoteResult.error || "non-zero exit"}`]
+        };
+    }
+
+    const remoteLine = remoteResult.output
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(Boolean)
+        .map(line => line.split(/\s+/))
+        .find(parts => parts.length >= 2 && parts[1] === `refs/heads/${branch}`);
+    const remoteHead = remoteLine && isResolvedSha(remoteLine[0]) ? remoteLine[0] : null;
+    if (!remoteHead) {
+        return {
+            ...base,
+            localHead,
+            originTrackingHead,
+            reason: "REMOTE_BRANCH_RESPONSE_MALFORMED_OR_ABSENT",
+            evidence: ["git ls-remote returned no valid commit SHA for the target ref"]
+        };
+    }
+
+    const parity = localHead === remoteHead;
+    return {
+        ...base,
+        localHead,
+        originTrackingHead,
+        remoteHead,
+        parity,
+        status: parity ? "PASS" : "FAIL",
+        reason: parity ? null : "LOCAL_REMOTE_SHA_MISMATCH",
+        evidence: [
+            `localHead=${localHead}`,
+            `originTrackingHead=${originTrackingHead ?? "unavailable"} (observability only; not authoritative)`,
+            `remoteHead=${remoteHead} (independent: ${base.remoteQuery})`,
+            parity
+                ? "local HEAD equals independently queried remote branch HEAD; committed content is identical"
+                : "local HEAD differs from independently queried remote branch HEAD"
+        ]
+    };
+}
+
+export function buildAgentArgs(agent: ImplementationAgent, prompt: string): string[] {
+    // Must match the governed KiloCodeExecutionAdapter invocation contract exactly
+    // so any caller building Kilo args resolves the same governed agent selection.
+    if (agent === "kilo") return ["run", "--agent", "hooshyar-construction", "--auto", prompt];
     return ["Backend/AI_Runtime/autonomous_builder.py", "--prompt", prompt];
+}
+
+export function emitKiloEscalation(capabilityId: string, result: KiloExecutionResult): void {
+    // Machine-readable blocker signal so the orchestration layer can route the
+    // failure to an approved execution operator or recovery path (mirrors
+    // autonomous_builder.py _emit_blocker). Kilo is never a mandatory dependency.
+    console.log("HELP_REQUIRED: kilo execution failed or was blocked");
+    console.log(`CAPABILITY: ${capabilityId}`);
+    console.log("AGENT: kilo");
+    console.log(`EVIDENCE_REQUIRED: ${result.error || "kilo execution returned a non-success result"}`);
+    console.log("ESCALATE: approved execution operator may resolve and re-verify");
 }
 
 const DEFAULT_DIRECTIVES = [
@@ -95,6 +264,7 @@ const BUILDER_TEST_EVERY = Math.max(1, Number.parseInt(process.env.HOOSHYAR_BUIL
 
 function focusedTestFor(capabilityId: string): string | null {
     const known: Record<string, string> = {
+        "assurance.construction-remote-attestation": "Backend/HBOS/Autonomous/Runtime/LocalConstructionToolset.test.ts",
         "platform.user-management": "Backend/HBOS/test/UserManagementEngine.test.ts",
         "platform.organization-model": "Backend/HBOS/test/OrganizationModelEngine.test.ts",
         "platform.security-layer": "Backend/HBOS/test/SecurityLayerEngine.test.ts",
@@ -160,8 +330,8 @@ function relativeStatusPaths(statusOutput: string, root: string): string[] {
 function buildAgentPrompt(context: ConstructionContext): string {
     const requiredPaths = declaredArtifactPaths(process.cwd(), context.plan.capabilityId, context.plan.targetEngine);
     return [
-        "You are the repository-native Python implementation worker inside HooshyarOS Autonomous Operations Engine.",
-        "Read AGENTS.md, Docs/ARCHITECTURE.md, and Assistant/SYSTEM_PROMPT.md before changing code.",
+        "You are an approved execution operator inside HooshyarOS Autonomous Operations Engine.",
+        "Read AGENTS.md, Docs/ARCHITECTURE.md, Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md, and Assistant/SYSTEM_PROMPT.md before changing code.",
         "The frozen platform architecture, its Engines, decision logic, lifecycle, governance and autonomous construction rules are authoritative inputs to this mission.",
         "Architecture Freeze V4 is authoritative; do not redesign or duplicate existing engines.",
         "Implement exactly ONE capability for this mission:",
@@ -173,14 +343,16 @@ function buildAgentPrompt(context: ConstructionContext): string {
         `Architecture rules: ${context.plan.architectureRules.join(" ; ") || "preserve existing rules"}`,
         `Directives: ${DEFAULT_DIRECTIVES.join(" ; ")}`,
         "For product capabilities, the required artifact paths above are the authoritative product boundary. Do not implement the capability by rewriting an existing engine unless one of those paths is that engine path.",
-        "Use only repository-native Python construction. Do not invoke Copilot, Codex, Claude, or any cloud coding CLI.",
+        "Use only approved repository-local operators. Do not invoke Copilot, Codex, Claude, or another unapproved coding agent.",
         "Reuse existing capabilities and engine boundaries; never invent business semantics that are absent from repository architecture or evidence.",
         "Produce a real repository change when the selected deterministic capability is missing."
     ].join("\n");
 }
 
-export function createLocalConstructionTools(root = process.cwd()): ConstructionTool[] {
+export function createLocalConstructionTools(root = process.cwd(), options: { runner?: GitCommandRunner } = {}): ConstructionTool[] {
     let verificationCount = 0;
+    const kiloOperator = new KiloCodeExecutionAdapter();
+    const gitRunner: GitCommandRunner = options.runner ?? run;
     return [
         {
             name: "architecture",
@@ -203,40 +375,73 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
                 const before = run("git", REPOSITORY_STATUS_ARGS, root);
                 if (!before.ok) return { ok: false, issue: "AUTONOMOUS_REPOSITORY_STATE_UNAVAILABLE", artifact: before };
                 if (before.output.trim()) return { ok: false, issue: "AUTONOMOUS_WORKTREE_DIRTY", artifact: { clean: false, output: before.output } };
-                const agent = resolveImplementationAgent(root);
-                if (!agent) return { ok: false, issue: "AUTONOMOUS_AGENT_UNAVAILABLE", artifact: { provider: null, changed: false } };
-                const requiredPaths = declaredArtifactPaths(root, context.plan.capabilityId, context.plan.targetEngine);
-                const result = run(agent, buildAgentArgs(agent, buildAgentPrompt(context)), root, 30 * 60 * 1000);
-                const after = run("git", REPOSITORY_STATUS_ARGS, root);
-                const changed = after.ok && repositoryStateChanged(before.output, after.output);
-                const changedPaths = after.ok ? relativeStatusPaths(after.output, root) : [];
-                const allowed = requiredPaths.map(path => normalize(path));
-                const unexpectedPaths = changedPaths.filter(path => !allowed.includes(path));
-                const touchesDeclaredArtifact = changedPaths.some(path => allowed.includes(path));
-                const artifact = {
-                    type: "AUTONOMOUS_AGENT_GENERATION_RESULT",
-                    provider: agent,
-                    capabilityId: context.plan.capabilityId,
-                    capability: context.plan.capability,
-                    targetEngine: context.plan.targetEngine,
-                    requiredPaths,
-                    changedPaths,
-                    unexpectedPaths,
-                    exitCode: result.code,
-                    changed,
-                    elapsedMs: result.elapsedMs,
-                    output: result.output,
-                    error: result.error,
-                    timestamp: new Date().toISOString()
-                };
-                console.log(JSON.stringify(artifact, null, 2));
-                if (!result.ok) return { ok: false, issue: "AUTONOMOUS_AGENT_GENERATION_FAILED", artifact };
-                if (!after.ok) return { ok: false, issue: "AUTONOMOUS_REPOSITORY_STATE_UNAVAILABLE", artifact };
-                if (!changed) return { ok: false, issue: "AUTONOMOUS_AGENT_NO_REPOSITORY_CHANGE", artifact };
-                if (!touchesDeclaredArtifact || unexpectedPaths.length > 0) {
-                    return { ok: false, issue: "AUTONOMOUS_ARTIFACT_BOUNDARY_VIOLATION", artifact };
+
+                const requested = process.env.HOOSHYAR_AGENT?.trim().toLowerCase() || "auto";
+                const primaryAgent = resolveImplementationAgent(root);
+                const candidates: ImplementationAgent[] = primaryAgent === "kilo"
+                    ? ["kilo"]
+                    : primaryAgent === "python"
+                        ? ["python"]
+                        : [];
+                if (requested !== "auto" && !["kilo", "python"].includes(requested)) {
+                    return { ok: false, issue: "AUTONOMOUS_AGENT_REQUEST_INVALID", artifact: { requested } };
                 }
-                return { ok: true, artifact };
+                if (candidates.length === 0) {
+                    return { ok: false, issue: "AUTONOMOUS_AGENT_UNAVAILABLE", artifact: { providersTried: [], changed: false } };
+                }
+
+                const requiredPaths = declaredArtifactPaths(root, context.plan.capabilityId, context.plan.targetEngine);
+                const allowed = requiredPaths.map(path => normalize(path));
+                const attempts: unknown[] = [];
+
+                for (const agent of candidates) {
+                    const prompt = buildAgentPrompt(context);
+                    const result: KiloExecutionResult | { ok: boolean; code: number; output: string; error: string | null; elapsedMs: number } =
+                        agent === "kilo"
+                            ? kiloOperator.execute(prompt, root)
+                            : run(agent, buildAgentArgs(agent, prompt), root, 30 * 60 * 1000);
+                    if (agent === "kilo" && !result.ok) {
+                        emitKiloEscalation(context.plan.capabilityId, result as KiloExecutionResult);
+                    }
+                    const after = run("git", REPOSITORY_STATUS_ARGS, root);
+                    const changed = after.ok && repositoryStateChanged(before.output, after.output);
+                    const changedPaths = after.ok ? relativeStatusPaths(after.output, root) : [];
+                    const unexpectedPaths = changedPaths.filter(path => !allowed.includes(path));
+                    const touchesDeclaredArtifact = changedPaths.some(path => allowed.includes(path));
+                    const artifact = {
+                        type: "AUTONOMOUS_AGENT_GENERATION_RESULT",
+                        provider: agent,
+                        capabilityId: context.plan.capabilityId,
+                        capability: context.plan.capability,
+                        targetEngine: context.plan.targetEngine,
+                        requiredPaths,
+                        changedPaths,
+                        unexpectedPaths,
+                        exitCode: result.code,
+                        changed,
+                        elapsedMs: result.elapsedMs,
+                        output: result.output,
+                        error: result.error,
+                        timestamp: new Date().toISOString()
+                    };
+                    attempts.push(artifact);
+                    console.log(JSON.stringify(artifact, null, 2));
+
+                    if (!after.ok) return { ok: false, issue: "AUTONOMOUS_REPOSITORY_STATE_UNAVAILABLE", artifact: { attempts } };
+                    if (unexpectedPaths.length > 0) {
+                        return { ok: false, issue: "AUTONOMOUS_ARTIFACT_BOUNDARY_VIOLATION", artifact: { attempts } };
+                    }
+                    if (result.ok && changed && touchesDeclaredArtifact) {
+                        return { ok: true, artifact: { ...artifact, fallbackUsed: false } };
+                    }
+                    if (changed) {
+                        return { ok: false, issue: "AUTONOMOUS_AGENT_PARTIAL_CHANGE_REQUIRES_REPAIR", artifact: { attempts } };
+                    }
+                    if (!result.ok) return { ok: false, issue: "AUTONOMOUS_AGENT_GENERATION_FAILED", artifact: { attempts } };
+                    return { ok: false, issue: "AUTONOMOUS_AGENT_NO_REPOSITORY_CHANGE", artifact: { attempts } };
+                }
+
+                return { ok: false, issue: "AUTONOMOUS_AGENT_NO_REPOSITORY_CHANGE", artifact: { attempts } };
             }
         },
         {
@@ -291,38 +496,47 @@ export function createLocalConstructionTools(root = process.cwd()): Construction
             name: "git",
             execute: (stage) => {
                 if (stage !== "FINALIZE") return { ok: true };
-                const status = run("git", REPOSITORY_STATUS_ARGS, root);
+                const status = gitRunner("git", REPOSITORY_STATUS_ARGS, root);
                 if (!status.ok) return { ok: false, issue: "GIT_STATUS_FAILED", artifact: { output: status.output, error: status.error } };
                 if (!status.output.trim()) return { ok: false, issue: "GIT_NO_REPOSITORY_CHANGE", artifact: { clean: true, committed: false, pushed: false, changeDetected: false } };
-                const add = run("git", ["add", "-A"], root);
+                const add = gitRunner("git", ["add", "-A"], root);
                 if (!add.ok) return { ok: false, issue: "GIT_ADD_FAILED", artifact: { output: add.output, error: add.error } };
-                const staged = run("git", ["diff", "--cached", "--quiet"], root);
+                const staged = gitRunner("git", ["diff", "--cached", "--quiet"], root);
                 if (!staged.ok && staged.code !== 1) return { ok: false, issue: "GIT_STAGED_DIFF_CHECK_FAILED", artifact: { output: staged.output, error: staged.error } };
                 if (staged.code === 0) return { ok: false, issue: "GIT_NO_STAGED_CHANGE", artifact: { clean: true, committed: false, pushed: false, changeDetected: false } };
-                const commit = run("git", ["commit", "-m", "feat(hbos): autonomous construction progress"], root);
+                const commit = gitRunner("git", ["commit", "-m", "feat(hbos): autonomous construction progress"], root);
                 if (!commit.ok) return { ok: false, issue: "GIT_COMMIT_FAILED", artifact: { output: commit.output, error: commit.error } };
-                const branchResult = run("git", ["branch", "--show-current"], root);
+                const branchResult = gitRunner("git", ["branch", "--show-current"], root);
                 if (!branchResult.ok) return { ok: false, issue: "GIT_BRANCH_DETECTION_FAILED", artifact: { output: branchResult.output, error: branchResult.error } };
                 const branch = branchResult.output.trim();
                 if (!branch) return { ok: false, issue: "GIT_DETACHED_HEAD", artifact: { committed: true, pushed: false, changeDetected: true } };
-                const fetch = run("git", ["fetch", "origin", branch], root);
+                const fetch = gitRunner("git", ["fetch", "origin", branch], root);
                 if (!fetch.ok) return { ok: false, issue: "GIT_FETCH_FAILED", artifact: { branch, output: fetch.output, error: fetch.error } };
                 const remoteRef = `origin/${branch}`;
-                const remoteExists = run("git", ["rev-parse", "--verify", remoteRef], root);
+                const remoteExists = gitRunner("git", ["rev-parse", "--verify", remoteRef], root);
                 if (remoteExists.ok) {
-                    const remoteAncestor = run("git", ["merge-base", "--is-ancestor", remoteRef, "HEAD"], root);
+                    const remoteAncestor = gitRunner("git", ["merge-base", "--is-ancestor", remoteRef, "HEAD"], root);
                     if (!remoteAncestor.ok && remoteAncestor.code !== 1) return { ok: false, issue: "GIT_DIVERGENCE_CHECK_FAILED", artifact: { branch, output: remoteAncestor.output, error: remoteAncestor.error } };
                     if (remoteAncestor.code === 1) {
-                        const rebase = run("git", ["rebase", remoteRef], root);
+                        const rebase = gitRunner("git", ["rebase", remoteRef], root);
                         if (!rebase.ok) {
-                            run("git", ["rebase", "--abort"], root);
+                            gitRunner("git", ["rebase", "--abort"], root);
                             return { ok: false, issue: "GIT_REBASE_CONFLICT", artifact: { branch, output: rebase.output, error: rebase.error } };
                         }
                     }
                 }
-                const push = run("git", ["push", "origin", branch], root);
+                const push = gitRunner("git", ["push", "origin", branch], root);
                 if (!push.ok) return { ok: false, issue: "GIT_PUSH_FAILED", artifact: { branch, output: push.output, error: push.error } };
-                return { ok: true, artifact: { committed: true, pushed: true, branch, changeDetected: true } };
+
+                // Governance §16 independent remote-attestation barrier: a successful
+                // push exit code is not proof of synchronization. Verify the actual
+                // remote branch HEAD independently and fail closed otherwise.
+                const remoteAttestation = attestRemoteBranchParity(root, branch, gitRunner);
+                console.log(JSON.stringify(remoteAttestation, null, 2));
+                if (remoteAttestation.status !== "PASS") {
+                    return { ok: false, issue: "GIT_REMOTE_ATTESTATION_FAILED", artifact: { committed: true, pushed: true, branch, changeDetected: true, remoteAttestation } };
+                }
+                return { ok: true, artifact: { committed: true, pushed: true, branch, changeDetected: true, remoteAttestation } };
             }
         }
     ];

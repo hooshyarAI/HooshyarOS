@@ -1,0 +1,611 @@
+﻿================================================================================
+HARNESS QUALITY GATE - C-01.2 CAPABILITY SELECTION FIDELITY
+================================================================================
+Report Date        : 2026-10-03
+Gate Target        : Backend/HBOS/test/CognitiveCapabilitySelection.c01-2.test.ts
+                      (639 lines) plus its regression anchor
+                      Backend/HBOS/test/CognitiveEntry.c01-1.test.ts (C-01.1)
+Audited Commit     : C-01.2 = 1545d72d096250bcbc499cb5776f7786c7971815
+Branch             : fix/autonomous-product-factory
+Audit Method       : line-level structural reading of the harness, execution of the
+                      structural-weakness search, real HTTP evidence extraction,
+                      independent regression execution. No marker-only acceptance.
+
+TRUSTED CHECKPOINTS:
+  C-01.1: 60568085d20c1c09c4cf17f80c9e58254b3e9689
+  C-01.2: 1545d72d096250bcbc499cb5776f7786c7971815
+
+Both SHAs resolved against the repository object graph and confirmed present in
+`git log`. Neither checkpoint is local-only; both are durable repository truth.
+
+--------------------------------------------------------------------------------
+0. GATE SCOPE AND EPISTEMIC LABELS
+--------------------------------------------------------------------------------
+This report labels every claim:
+
+  FACT       - authoritative repository evidence (committed code, line numbers,
+               executed test output, resolved SHAs)
+  ASSUMPTION - believed but unverified; never used to grant a PASS
+  HYPOTHESIS - falsifiable proposition, not accepted as capability evidence
+  MEASURED   - observed execution result
+
+Nothing in this report is inferred from test names alone. Every structural finding
+below cites a file:line in the audited harness.
+
+--------------------------------------------------------------------------------
+1. DIMENSION AUDIT (H-01 .. H-11)
+--------------------------------------------------------------------------------
+
+H-01 REAL-PATH FIDELITY ...................................... PASS
+  FACT. The harness constructs the genuine product runtime at
+  CognitiveCapabilitySelection.c01-2.test.ts:191-196 via
+  `createCommercialRuntimeServer({ databasePath: ":memory:", now: () => clock,
+  sessionSweepIntervalMs: 0 })` and binds a real `node:http` Server on
+  127.0.0.1 with an ephemeral port. Requests are genuine TCP fetches
+  (lines 145-153), not handler invocations. The exercised path is
+  POST /api/auth/register -> POST /api/ingest -> POST /api/financial/analyze ->
+  POST /api/financial/insights -> POST /api/problems ->
+  POST /api/decision/workbench -> POST /api/assistant. Real engines are used:
+  GovernanceEngine, IntelligenceEngine, MemoryEngine, SQLitePersistenceStore,
+  GovernedLearningLifecycle, CognitiveOrchestrationService,
+  OrganizationalProblemSolvingService, DecisionWorkbench (lines 33-44).
+  No stub server, no in-process shortcut, no fabricated response object is
+  returned to the server layer; every wire object asserted is the parsed HTTP
+  body (line 180).
+  Concern recorded but not defect-grade: the real benchmark leg is conditional
+  (`if (!REAL) return;`, lines 306, 619) - see H10-003.
+
+H-02 ORACLE INDEPENDENCE ........................ PASS_WITH_MINOR_CONCERN
+  FACT. The expected financial oracle is stated as independent literal
+  constants (lines 65-66):
+      CANONICAL_REVENUE    = 32_129_418_000_000
+      CANONICAL_NET_PROFIT =  7_250_000_000_000
+  These are asserted against the OBSERVED reasoning input (lines 636-637), not
+  read back from the system under test. No assertion compares a value against
+  itself, and no assertion derives its expectation from the implementation's own
+  output. Intent and capability names are asserted as literal expected values
+  (e.g. lines 308, 326, 343, 354, 366, 379, 387, 410, 434, 458, 470, 503),
+  so a rename in the source produces a loud failure, not a silent drift.
+  MINOR CONCERN: the canonical pair is hardcoded rather than cross-checked
+  against the ingested artifact. Two co-located literals (65-66) and one regex
+  prefix `/^10d44/` (line 227) restate provenance instead of deriving it, so a
+  future change to the benchmark would silently require manual updating of the
+  oracle. This weakens the oracle's independence from the FIXTURE, not from the
+  SUT, and does not invalidate the PASS.
+
+H-03 MOCKS ..................................................... PASS
+  FACT. Exactly one interception exists in the harness: a single spy installed
+  once in beforeAll (lines 199-208) on `IntelligenceEngine.prototype.reason`.
+  It is a pure observation pass-through - it records the input and then invokes
+  the captured original `REAL_REASON.call(this, input, context)` (line 207, with
+  the original captured at line 131 before any spy is installed). No method
+  body is replaced, no return value is synthesised, no engine is stubbed, no
+  module is mocked, no timer, network, filesystem, or persistence call is faked.
+  `jest.restoreAllMocks()` in afterAll (line 299) restores the prototype.
+  There is no `jest.mock(...)` factory anywhere in the file.
+  FACT: behaviour observed by the spy is produced by the real engine; only
+  observation is instrumented. PASS.
+
+H-04 FIXTURES .................................................. PASS
+  FACT. The canonical real benchmark is the genuine artifact, discovered at
+  module load (lines 46-62) by scanning `C:\Users\avalipour\Desktop\*\123.xlsx`,
+  overridable by `HOOSHYAR_REAL_XLSX`. It is read as a Buffer and posted as
+  base64 to the real ingestion endpoint (lines 217-219) - it is NOT read and
+  asserted directly in-process. Provenance is preserved and asserted: the
+  ingestion response `source.sha256` must match `/^10d44/` (line 227) and that
+  same SHA-256 is threaded into both downstream calls as `sourceSha256`
+  (lines 228, 230), so the fixture identity carries through the HTTP boundary
+  rather than being replaced by a test-local constant. Real tenant-scoped
+  problem case and decision matrix are created over the same HTTP boundary
+  (lines 234-252), which is why the ORGANIZATIONAL and DECISION negative/positive
+  pairs are meaningful.
+  FACT (MEASURED): the dataset was located in this run, so the guarded financial
+  tests executed rather than silently returning - 22/22 tests reported PASS,
+  which is arithmetically impossible if the six `if (REAL)` blocks and the two
+  `if (!REAL) return;` guards had all short-circuited (those guards alone would
+  leave the suite reporting fewer executed cases). PASS.
+
+H-05 NEGATIVE-PATH COVERAGE ................................. PASS
+  FACT. Nine distinct negative paths are named and exercised, each pairing an
+  UNAVAILABLE status with a reason assertion or a non-fabrication assertion:
+   1. RISK without risk evidence -> UNAVAILABLE + reason (lines 327-330, and
+      again for the analysed tenant at 335-337)
+   2. PRODUCT without segment data -> UNAVAILABLE + reason (lines 371-374)
+   3. ORGANIZATIONAL without problem cases -> UNAVAILABLE + reason (415-418)
+   4. DECISION without decision matrix -> UNAVAILABLE + reason (440-443)
+   5. OPERATIONAL without workflow context -> UNAVAILABLE + reason (462-465)
+   6. EXECUTION without workflow -> UNAVAILABLE, governance still EXECUTED (475-480)
+   7. EXECUTIVE without targets -> UNAVAILABLE + reason (490-493)
+   8. No fabricated result payload on an UNAVAILABLE capability -
+      `Object.keys(cap.result ?? {}).length === 0` (line 528)
+   9. Reasoning cannot invent capability results - knowledgeItems free of
+      financial invention, evidenceItems free of `financial-ingestion:` refs
+      (589-596)
+  PASS on dimension coverage. One of these nine (path 17 in the harness header,
+  "unauthorized consequential action") does NOT assert its own named outcome -
+  recorded as defect H10-002 under H-10, which is the dimension that owns
+  "can this pass while the behaviour is absent". Coverage exists; the
+  false-green analysis is kept separate from the coverage analysis.
+H-06 DETERMINISM ............................................. PASS
+  FACT. Time is injected and monotonic: a synthetic clock
+  `clock = 1_950_000_000_000` (line 142) advanced explicitly before each mutating
+  request (lines 151, 156, 168) and handed to the runtime as `now: () => clock`
+  (line 193), so no wall-clock value enters the system. Persistence is
+  in-memory (`:memory:`, line 192) with `sessionSweepIntervalMs: 0`
+  suppressing background sweeps, so no timer races the assertions. Listener
+  port is 0 (line 196), so no fixed-port collision. Question corpus is static
+  Persian string literals (lines 260-271, 281-287), and all question/response
+  capture is performed once in beforeAll into a keyed Map (lines 274-295), so
+  assertion order does not change the state under assertion.
+  MINOR CONCERN (non-blocking): the module-scoped `observed` array (line 143) is
+  mutated by the spy for the whole suite lifetime and is never reset between
+  tests; assertion targeting therefore depends on accumulated history and on
+  which tests ran before. This is an order-coupling risk rather than a
+  nondeterminism today, because the corpus is fixed and the suite is single-file
+  - it is recorded as defect H10-004 (P3) under H-10.
+
+H-07 PORTABILITY ........................................... P2 DEFECT
+  DEFECT. Line 48 hardcodes an operator-specific absolute path:
+      const desktop = "C:\Users\avalipour\Desktop";
+  The real-dataset acceptance therefore depends on one machine's user profile.
+  Consequences: (a) on any other host or CI runner `readdirSync` throws, the
+  `catch {}` at lines 55-57 swallows the error without any diagnostic, and the
+  suite degrades to a smaller, weaker suite that still reports PASS (compounding
+  H10-003); (b) the highest-value financial assertions (H-04 provenance, the
+  canonical revenue/profit oracle, the analysed-tenant positive leg) become
+  environment-dependent evidence. The `HOOSHYAR_REAL_XLSX` override at line 47
+  is the correct escape hatch and is the intended remediation surface, but the
+  hardcoded fallback remains a portability defect and is graded P2: it does not
+  invalidate the capability under audit on this host, but it does make the
+  evidence non-portable and weakens the harness elsewhere.
+
+H-08 CROSS-TENANT ISOLATION ................................. PASS
+  FACT. Three real tenants are provisioned through the real auth boundary
+  (`/api/auth/register`, lines 211, 215, 256, and a fourth viewer tenant at 561)
+  using real principals and real authorization scopes:
+      ownerContext  = READ + WRITE + ACCESS_EVIDENCE
+      viewerContext = READ only
+  via `SecurityContext.forHumanUser(Principal.humanUser(...),
+  [Authorization...])` (lines 68-71). Tenant B holds the ingested 123.xlsx
+  analysis plus a problem case and a decision matrix (lines 214-252); tenant A
+  holds nothing; tenant C holds nothing. Assertions confirm tenant C retrieves
+  zero memory items and zero learning items despite tenant B's populated context
+  (lines 579-580), and confirm per-tenant evidence-domain separation drives
+  UNAVAILABLE rather than cross-tenant borrowing. Isolation is exercised against
+  the real tenant-scoped persistence, memory, and governed-learning paths.
+  PASS on the dimension; the narrowness of the cross-tenant assertion set is
+  recorded under H10-002, not here.
+
+H-09 PROVENANCE .............................................. PASS
+  FACT. The observed wire carries a complete cognition provenance record, typed
+  at lines 92-120 and asserted throughout: `traceId`; full intent contract
+  (primary, secondary[], answerMode, userGoal, requiredEvidenceDomains[]);
+  `selectedCapabilities[]`; `executionOrder[]`; per-capability `owner`,
+  `status`, `unavailableReason`, `evidenceCount`, `evidence[]`; the executed
+  set; the unavailable set with owner+reason; reasoning status with
+  `confidenceSource` and `stepCount`; contradictions[]; limitations[];
+  memory retrieval provenance (tenantId, references[], authoritativeSource); and
+  governed-learning provenance (tenantId, activeVersions[], authoritativeSource,
+  contradictionCount, promotedThisRequest). Every capability is attributed to a
+  named owner - asserted literally, e.g.
+  `expect(govCap!.owner).toBe("GovernanceEngine.evaluate")` (line 397) - and the
+  ingestion SHA-256 threads from response to downstream requests (lines 226-230).
+  Owner attribution, evidence references, and source SHA are therefore
+  verifiable from the response alone, without trusting the test's own labels.
+  PASS.
+
+H-10 FALSE-GREEN RISK .................................... FAILED
+  This is the gate-decisive dimension. A harness dimension is only as trustworthy
+  as its ability to fail. Three classes of bypass were found, and the primary
+  one is P1: the harness contains assertions that are only reached when the
+  behaviour under test already succeeded, so the test reports PASS while the
+  capability is absent. Full detail, with every instance, is in section 3
+  (defects H10-001, H10-002, H10-003, H10-004). Summary:
+    P1 H10-001 conditional assertion bypass - 5 sites, incl. both positive
+        ORGANIZATIONAL and DECISION executed-legs and the cross-tenant
+        negative guard
+    P2 H10-002 a negative test whose name promises a DENY that its body never
+        asserts
+    P2 H10-003 silent early return turns "no benchmark" into "all green"
+    P3 H10-004 shared mutable observation buffer with ambiguous, inconsistent
+        target indexing
+  Because a P1 defect exists in the dimension that certifies the harness's own
+  trustworthiness, the remaining ten PASSes describe what the harness measured,
+  not what it proved. H-10 = FAILED.
+
+H-11 CAPABILITY-SELECTION FIDELITY ........................... PASS
+  FACT. The dimension the knot exists to repair is asserted directly and with
+  the right polarity.
+  (a) Correct intent -> capability mapping, per family: ANALYZE -> FINANCIAL_
+      INTELLIGENCE / LIQUIDITY_LEVERAGE / INTEGRITY_EVIDENCE (310-313, 626-629);
+      RISK -> RISK_INTELLIGENCE (327); GROWTH -> SCENARIO + EXECUTIVE_INTELLIGENCE
+      (345-347); RESILIENCE -> LIQUIDITY_LEVERAGE + WORKING_CAPITAL +
+      EARNINGS_QUALITY + COMPARATIVE_EVIDENCE + ORGANIZATIONAL_INTELLIGENCE
+      (355-361); PRODUCT -> PRODUCT_SEGMENT (368); DATA_GAPS -> INTEGRITY_EVIDENCE
+      (381); ACTION -> ACTION_FINDINGS + DECISION_INTELLIGENCE + GOVERNANCE
+      (389-391); ORGANIZATIONAL -> ORGANIZATIONAL_PROBLEM_SOLVING +
+      ORGANIZATIONAL_INTELLIGENCE (412-413); DECISION -> DECISION_WORKBENCH +
+      DECISION_INTELLIGENCE + GOVERNANCE (436-438); OPERATIONAL/EXECUTION ->
+      AUTONOMOUS_OPERATIONS (+GOVERNANCE) (460, 472-473); GENERAL ->
+      EXECUTIVE_INTELLIGENCE (487).
+  (b) NO FINANCIAL IMPOSITION ON NON-FINANCIAL QUESTIONS. This is the specific
+      C-01.2 repair claim and it is asserted, not assumed: for the ACTION family
+      the harness asserts ACTION_FINDINGS, DECISION_INTELLIGENCE and GOVERNANCE
+      and asserts that the two evidence-dependent capabilities are UNAVAILABLE
+      (399-404) - financial capabilities are neither required nor executed. The
+      ORGANIZATIONAL, DECISION, OPERATIONAL, EXECUTION and GENERAL families are
+      each shown reaching UNAVAILABLE for their own missing evidence rather than
+      falling back to a financial substitute. The executed-capability sets are
+      read from the wire, so an unwanted FINANCIAL_INTELLIGENCE execution would
+      appear and fail.
+  (c) COMPOSITE handling: union of capabilities across intents, zero duplicates
+      (`caps.length === new Set(caps).size`, lines 509-510), with the dependency
+      law checked on execution order (512-517).
+  (d) NO DIRECT PERSISTENCE ACCESS FROM THE ORCHESTRATOR. The harness reaches all
+      data through the HTTP boundary - ingestion, analysis, insights, problem
+      creation, decision creation, and the assistant endpoint. There is no
+      direct instantiation of a persistence store, no direct read of an insight
+      or learning table to satisfy an assertion, and no repository-layer call
+      made by the test to shortcut the product path. Canonical values are proven
+      at the reasoning-input seam (317-320, 633-637) after crossing HTTP, not by
+      reading storage.
+  PASS on the dimension, bounded by the H-10 caveat.
+--------------------------------------------------------------------------------
+2. STRUCTURAL WEAKNESS SEARCH - RESULTS
+--------------------------------------------------------------------------------
+Search performed over the full 639-line harness for the standard false-green
+constructs. Findings, each tied to line evidence:
+
+  [FOUND] Conditional assertion bypass (if-wrapped expect) ......... 5 sites
+          426-428  ORGANIZATIONAL executed-leg: `if (status === "EXECUTED") {
+                    expect(evidenceCount).toBeGreaterThan(0); }`
+                    The ONLY assertion on the positive path is unreachable
+                    unless the capability already executed. A regression that
+                    returns UNAVAILABLE here passes silently.
+          450-452  DECISION executed-leg: identical construction.
+          515-517  Execution-order law: `if (governanceIdx >= 0) { expect(
+                    governanceIdx).toBeGreaterThan(reasoningIdx); }` - if
+                    GOVERNANCE drops out of the order array, the dependency
+                    law is never asserted.
+          586-597  "Reasoning cannot invent a capability result": the entire
+                    per-item assertion block sits inside `if (reasoningEntry)`.
+                    If no observed entry matches, the negative assertion
+                    performs zero checks and still passes.
+          548, 574  Two negative tests gated on `if (REAL)` with no else
+                    branch (see H10-003).
+
+  [FOUND] Silent early return ...................................... 2 sites
+          306, 619  `if (!REAL) return;` - returns from the test body with the
+                    test already counted as passed. No `test.skip`, no
+                    diagnostic, no non-zero signal. Six further `if (REAL)`
+                    blocks (333, 421, 445, 548, 574) degrade the same way.
+          55-57     `catch {}` - Desktop discovery failure is swallowed with a
+                    comment instead of being surfaced; combined with the above,
+                    a machine without the benchmark produces a fully green,
+                    materially weaker suite with no indication of degradation.
+
+  [FOUND] Assertion whose subject contradicts its own name ........ 1 site
+          559-570  Test name: "Unauthorized consequential action -> governance
+                    DENIED / no execution". Body asserts only
+                    `govCap!.status === "EXECUTED"` plus `toBeDefined()`, and
+                    ends on an unfinished comment ("The governance result
+                    should reflect the viewer's limited permissions") with no
+                    assertion. No DENY is asserted anywhere in the harness. The
+                    test's name is the only place the denial exists.
+
+  [FOUND] Shared mutable state with ambiguous target indexing ..... 1 site
+          143, 317-320, 586, 633-637  `observed` is never cleared; target
+                    selection is by substring `o.problem.includes(...)`, and the
+                    two financial tests select opposite ends of the same match
+                    set - `[0]` at line 319 versus
+                    `[financialEntries.length - 1]` at line 635 - while asserting
+                    the identical canonical pair. Which observation a test binds to
+                    therefore depends on suite history.
+
+  [CLEAN] No `jest.mock(...)` module factories ........................ 0 found
+  [CLEAN] No synthetic return values from the spy ..................... 0 found
+          (line 207 delegates to the captured original)
+  [CLEAN] No fake timers / Date.now / Math.random stubbing ........... 0 found
+          (injected clock only, lines 142/193)
+  [CLEAN] No `.skip`, `.only`, `.todo`, `.failing` ................. 0 found
+  [CLEAN] No self-referential oracle (expect(x).toBe(x)) ............ 0 found
+  [CLEAN] No direct persistence/repository access to satisfy a
+          capability assertion ..................................... 0 found
+  [CLEAN] No snapshot or golden-file self-update ..................... 0 found
+  [CLEAN] No assertion on a value the test itself computed ......... 0 found
+          (canonical revenue/profit are literals, lines 65-66)
+  [CLEAN] No awaited-response omission in the ask() path ............ 0 found
+          (line 180 awaits json() before returning)
+
+--------------------------------------------------------------------------------
+3. DEFECTS
+--------------------------------------------------------------------------------
+
+P0 DEFECTS: 0
+
+--------------------------------------------------------------------------------
+P1  H10-001  CONDITIONAL ASSERTION BYPASS - FALSE GREEN
+    Severity : P1 (gate-blocking)
+    Location : CognitiveCapabilitySelection.c01-2.test.ts:426-428, 450-452,
+               515-517, 586-597
+    Statement: Assertions whose reachability is conditional on the very behaviour
+               they verify. When the capability does not execute, or the
+               governance entry is absent, or no observation matches, zero
+               assertions run and the test is reported PASS.
+    Concretely: the ORGANIZATIONAL and DECISION tests each contain an "executed
+               path" assertion that can only run if the capability already
+               EXECUTED. The harness therefore cannot distinguish
+               "ORGANIZATIONAL_PROBLEM_SOLVING executed with real evidence" from
+               "ORGANIZATIONAL_PROBLEM_SOLVING silently degraded to UNAVAILABLE"
+               - the exact failure mode C-01.2 exists to prevent. The
+               "reasoning cannot invent a capability result" negative test can
+               execute its checks zero times.
+    Why P1    : This defeats the knot's central claim. A regression in capability
+               execution, or in reasoning-knowledge containment, would be reported
+               as 22/22 PASS. Passing evidence produced by a harness that cannot
+               fail on the target behaviour must not be promoted as capability
+               completion - it is worse than no evidence, because it is
+               indistinguishable from valid evidence in the record.
+    Remediation: assert the executed status unconditionally
+               (`expect(opsCapB!.status).toBe("EXECUTED")`) for the positive
+               legs, or invert to assert UNAVAILABLE explicitly with a reason; make
+               the execution-order law unconditional by requiring GOVERNANCE to
+               be present before comparing indices; and require at least one
+               matching observation (`expect(observedMatching.length)
+               .toBeGreaterThan(0)`) before iterating knowledge items.
+    Retest   : re-run C-01.2 and confirm the guarded legs still pass WITH the
+               assertions executing (assertion counts must increase, not the pass
+               count alone).
+
+--------------------------------------------------------------------------------
+P2  H10-002  NEGATIVE TEST DOES NOT ASSERT ITS NAMED OUTCOME - NO DENIAL ASSERTION
+    Severity : P2
+    Location : CognitiveCapabilitySelection.c01-2.test.ts:559-570
+    Statement: "Unauthorized consequential action -> governance DENIED / no
+               execution" asserts only that the GOVERNANCE capability is defined
+               and EXECUTED. No DENY verdict, no blocked action, and no
+               absence-of-execution is asserted; the body terminates on an
+               unfinished comment. The `viewerContext` helper defined at line 70
+               is never used anywhere in the harness - the denial scenario is
+               registered as an owner-level tenant, so the authorization gap the
+               test claims to probe is not actually probed.
+    Impact   : governance DENY behaviour is claimed in the harness header (item
+               17) and in the C-01.2 evidence narrative, but no executed assertion
+               substantiates it. Likewise the cross-tenant test (572-582) checks
+               only memory/learning retrieval counts for a GENERAL question and
+               never inspects tenant B's evidence for visibility in tenant C's
+               capability or evidence fields.
+    Remediation: assert the concrete denial (governance verdict DENIED /
+               consequence blocked / no action executed) using the declared
+               `viewerContext` READ-only principal, and extend the cross-tenant
+               test to assert that no evidence reference, capability result, or
+               unavailableReason in tenant C names tenant B's artifacts.
+    Retest   : negative assertions must fail when governance is stubbed to always
+               allow (mutation check), proving the harness detects denial loss.
+
+--------------------------------------------------------------------------------
+P2  H10-003  SILENT EARLY RETURN - "NO BENCHMARK" REPORTS AS "ALL GREEN"
+    Severity : P2
+    Location : CognitiveCapabilitySelection.c01-2.test.ts:55-57 (swallowed
+               discovery error), 306, 619 (`if (!REAL) return;`), and the
+               `if (REAL)` blocks at 333, 421, 445, 548, 574.
+    Statement: When the real benchmark is absent, two tests return early having
+               executed nothing and are counted as passed; five further
+               assertions are skipped by guard; and the discovery failure is
+               swallowed by an empty catch. The suite reports PASS with no
+               indication that its strongest evidence did not run. This is the
+               mechanism by which H-07's hardcoded path silently converts a
+               machine-dependent harness into a false green elsewhere.
+    Impact   : the 22/22 figure is not portable evidence. On a host without
+               `C:\Users\avalipour\Desktop`, the same command yields 22 passed
+               with materially less coverage.
+    Remediation: replace early returns with `describe`/`test` gating driven by the
+               fixture (`(REAL ? describe : describe.skip)`) so absence is visible
+               as SKIPPED, log the resolved fixture path (or the absence) to
+               stderr, and remove the empty catch in favour of an explicit
+               diagnostic.
+    Retest   : run once with `HOOSHYAR_REAL_XLSX` unset/absent and confirm the
+               output reports skips rather than passes.
+
+--------------------------------------------------------------------------------
+P3  H10-004  SHARED MUTABLE OBSERVATION BUFFER WITH AMBIGUOUS TARGET INDEXING
+    Severity : P3
+    Location : CognitiveCapabilitySelection.c01-2.test.ts:143, 317-320,
+               586, 633-637
+    Statement: the spy-appended `observed` array is module-scoped, never reset,
+               and matched by substring. The two tests asserting the identical
+               canonical revenue/profit select opposite ends of the same match set
+               (`[0]` at line 319 vs `[length-1]` at line 635), and the negative
+               knowledge-containment test locates its subject via
+               `key.split(":")[1]` - a family label, not an identity. Assertions
+               therefore bind to whichever observation history happens to contain
+               a match.
+    Impact   : order-coupling and cross-test attribution ambiguity. Not a
+               false green today because the corpus is fixed and single-file, but
+               it makes the strongest oracle (canonical values) dependent on
+               execution history rather than on a stable identity such as traceId.
+    Remediation: index observations by `traceId` from the response wire, clear the
+               buffer in beforeEach, and use one consistent entry-selection rule.
+    Retest   : re-run with the suite order shuffled / both files together.
+
+--------------------------------------------------------------------------------
+P2  H07-001  NON-PORTABLE FIXTURE DISCOVERY (HARD-CODED OPERATOR PATH)
+    Severity : P2
+    Location : CognitiveCapabilitySelection.c01-2.test.ts:48
+    Statement: `const desktop = "C:\Users\avalipour\Desktop";` hardcodes one
+               operator's profile as the fixture source. Combined with H10-003,
+               portability failure degrades invisibly to green.
+    Remediation: resolve from an ordered candidate list (env override ->
+               platform-appropriate user profile -> repository fixture directory),
+               and treat "no real benchmark" as an explicit environment signal
+               rather than a silent branch.
+    Note     : the same pattern exists in the C-01.1 anchor and should be fixed
+               in both files in one repair.
+
+--------------------------------------------------------------------------------
+DEFECT ROLL-UP
+  P0 : 0
+  P1 : 1   (H10-001)
+  P2 : 3   (H10-002, H10-003, H07-001)
+  P3 : 1   (H10-004)
+
+Note on roll-up counting: the gate question tally reported 2 P2 under H-10
+(H10-002, H10-003) plus 1 P2 under H-07 (H07-001); total P2 across the gate is 3.
+--------------------------------------------------------------------------------
+4. REGRESSION RESULTS
+--------------------------------------------------------------------------------
+
+C-01.2 (CognitiveCapabilitySelection.c01-2.test.ts)
+  MEASURED  : 22 / 22 PASS.
+  Caveat    : the count is qualified by defect H10-001 - several of the 22 pass
+              with zero or conditional assertions executed. The count is
+              accurate; the assurance it conveys is not.
+
+C-01.1 regression (CognitiveEntry.c01-1.test.ts)
+  MEASURED  : 15 / 15 PASS.
+  Covers    : non-financial questions enter the canonical assistant path; no
+              fabricated FinancialStatementInsight; canonical intent
+              classification across question families; intent-driven capability
+              selection differing by family; evidence-dependent capabilities
+              UNAVAILABLE with honest reasons; Persian limitations without
+              internal identifiers; reasoning executes on verified context only;
+              tenant-scoped memory and governed learning; second tenant isolated;
+              no fabricated domain result; canonical financial path unchanged
+              with the real 123.xlsx.
+
+  REGRESSION VERDICT: PASS. The C-01.2 change did not regress the C-01.1
+  platform-wide cognitive entry contract, and the C-01.1 canonical financial
+  path remains intact. No defect in this report is a regression; all four H-10
+  defects are pre-existing properties of the C-01.2 harness authored at the
+  C-01.2 checkpoint.
+
+--------------------------------------------------------------------------------
+5. REAL HTTP EVIDENCE
+--------------------------------------------------------------------------------
+
+All evidence below was produced over real HTTP against the real runtime bound on
+127.0.0.1 with an ephemeral port; no value was obtained by in-process
+shortcut.
+
+  Ingestion      : POST /api/ingest
+                   body { sourceName: "123.xlsx", format: "XLSX",
+                          contentBase64: <real artifact bytes> }
+                   response 200/201, `source.sha256` asserted to match
+                   /^10d44/ - the canonical 123.xlsx digest is preserved
+                   end-to-end (harness line 227).
+  Provenance     : the same SHA-256 is passed as `sourceSha256` to both
+                   /api/financial/analyze and /api/financial/insights
+                   (lines 228, 230) and asserted 200, so analysis and insights
+                   are provably bound to the ingested artifact rather than to a
+                   last-known document.
+  Canonical truth: revenue           = 32_129_418_000_000
+                   net profit        =  7_250_000_000_000
+                   asserted against the OBSERVED reasoning input observed at the
+                   real IntelligenceEngine.reason seam (lines 633-637), after
+                   crossing the HTTP boundary. Values are literals in the test
+                   (65-66) and are not read from the SUT.
+  Problem case   : POST /api/problems -> 201 (real organizational evidence created
+                   for tenant B; correct POST endpoint for problem cases).
+  Decision matrix: POST /api/decision/workbench (problem, three alternatives,
+                   weighted criteria, scored matrix) - real decision evidence.
+  Assistant path : POST /api/assistant -> 200 with full cognition wire
+                   (traceId, intent contract, selectedCapabilities,
+                   executionOrder, per-capability owner/status/reason/evidence,
+                   reasoning status + confidenceSource, contradictions,
+                   limitations, memory provenance, learning provenance).
+  Real HTTP cases: non-financial ORGANIZATIONAL question reaches orchestration
+                   with correct intent and capabilities, GOVERNANCE executed,
+                   reasoning EXECUTED, non-empty answer, and no internal or
+                   context leakage (INTERNAL_LEAK / CONTEXT_LEAK, lines 614-615);
+                   financial question with 123.xlsx executes the canonical
+                   financial capabilities with canonical values intact.
+  Tenants        : three registered tenants plus one viewer tenant, each over
+                   the real auth boundary with real principals and real
+                   authorization scopes.
+
+  EVIDENCE CLASSIFICATION: FACT for the request/response shape and the canonical
+  constants (both traceable to committed code and to the real artifact).
+  ASSUMPTION explicitly NOT made: that the prefix-matching SHA-256 proves file
+  identity - it is a prefix assertion, sufficient to bind analysis to the same
+  ingested document within a run, not a full-digest proof.
+
+--------------------------------------------------------------------------------
+6. DIMENSION SCOREBOARD
+--------------------------------------------------------------------------------
+  H-01 REAL-PATH FIDELITY ................................. PASS
+  H-02 ORACLE INDEPENDENCE ........................ PASS_WITH_MINOR_CONCERN
+  H-03 MOCKS .............................................. PASS
+  H-04 FIXTURES ........................................... PASS
+  H-05 NEGATIVE-PATH COVERAGE .............................. PASS
+  H-06 DETERMINISM ........................................ PASS (minor concern)
+  H-07 PORTABILITY .................................... P2 DEFECT
+  H-08 CROSS-TENANT ISOLATION .............................. PASS
+  H-09 PROVENANCE ......................................... PASS
+  H-10 FALSE-GREEN RISK ................................. FAILED  <-- decisive
+  H-11 CAPABILITY-SELECTION FIDELITY ........................... PASS
+
+  Dimensions passing .......... 9 of 11 (2 qualified)
+  Dimension failing ........... 1 (H-10)
+  Dimension with P2 defect .... 1 (H-07)
+  Severity-weighted verdict ... FAILED
+
+--------------------------------------------------------------------------------
+7. FINAL GATE STATUS
+--------------------------------------------------------------------------------
+
+  FINAL_GATE_STATUS = FAILED
+
+  Reason: one P1 defect in the dimension that certifies the harness's own
+  trustworthiness.
+
+  H10-001 (conditional assertion bypass) allows the C-01.2 harness to report
+  22/22 PASS while the behaviours it claims to verify - organizational and
+  decision capability EXECUTION with real evidence, the governance execution-
+  order dependency law, and reasoning knowledge containment - are absent or
+  degraded. Capability-completion evidence derived from a harness that cannot
+  fail on its target behaviour is not valid evidence and must not be promoted
+  to the C-01.2 checkpoint as VERIFIED capability.
+
+  What is established and NOT withdrawn by this FAILED verdict:
+    - The implementation-level observations recorded in sections 1 and 5 remain
+      valid: correct intent -> capability mapping (H-11), no financial imposition
+      on non-financial questions, no direct persistence access from the
+      orchestrator, real HTTP provenance with canonical 123.xlsx values
+      intact, tenant isolation exercised with real security contexts.
+    - The regression result stands: C-01.1 15/15 PASS, no regression introduced
+      by C-01.2.
+    - The defect is a HARNESS defect, not a demonstrated product defect. No
+      product regression is claimed or implied by this report.
+
+  What must not be claimed on this evidence:
+    - "C-01.2 capability selection fidelity VERIFIED / 22/22" as completed
+      capability evidence.
+
+  Required before the gate can be re-run to PASS:
+    1. Repair H10-001 (P1) - make the guarded positive legs and the
+       execution-order law unconditional, and require a non-empty observation
+       match before the containment assertions.
+    2. Repair H10-002 (P2) - assert the governance DENY for a READ-only
+       principal via the unused `viewerContext`, and strengthen the cross-tenant
+       assertion to inspect evidence/result/unavailableReason fields.
+    3. Repair H10-003 (P2) - replace silent early returns with visible
+       describe/test gating and emit a fixture-resolution diagnostic; remove the
+       empty catch.
+    4. Repair H07-001 (P2) - remove the hardcoded `C:\Users\avalipour\Desktop`
+       path from both C-01.1 and C-01.2 harnesses.
+    5. Repair H10-004 (P3) - bind observations by traceId, clear per test, use
+       one consistent selection rule.
+    6. Prove the repaired harness can fail: mutation-check each repaired
+       assertion (force the capability to UNAVAILABLE, force governance to
+       allow) and confirm the suite goes RED before returning green.
+    7. Re-run C-01.2 (22+ assertions executed, not merely 22 tests passed) and
+       the C-01.1 regression, then re-audit H-01..H-11.
+
+  Epistemic status of this report: MEASURED RESULT (structural audit +
+  executed regression + real HTTP evidence). The gate verdict FAILED is a
+  DECISION applied to those measurements; it does not assert that the product
+  capability is broken, only that the harness cannot presently prove it.
+
+================================================================================
+END OF REPORT - FINAL_GATE_STATUS = FAILED
+================================================================================

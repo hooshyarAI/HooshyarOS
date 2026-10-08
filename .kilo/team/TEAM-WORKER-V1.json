@@ -1,0 +1,113 @@
+{
+  "schema_version": "1.0",
+  "team_version": "V1",
+  "status": "V2_OVERLAY_ACTIVE",
+  "mode": "AUDIT_PARALLEL",
+  "initial_pool_size": 12,
+  "scale_targets": [
+    12,
+    25,
+    50,
+    100
+  ],
+  "max_parallel_initial": 12,
+  "one_worker_one_branch": true,
+  "one_worker_one_coherent_commit": true,
+  "shared_worktree": false,
+  "integration_required": true,
+  "protected_paths": [
+    ".github/**",
+    "Docs/ARCHITECTURE.md",
+    "Docs/HOOSHYAROS_MASTER_CHARTER.md",
+    "Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md",
+    "Assistant/SYSTEM_PROMPT.md",
+    "package.json",
+    "package-lock.json",
+    ".env",
+    "**/*.pem",
+    "**/*.key"
+  ],
+  "v1_write_root": ".kilo/team/results/",
+  "workers": [
+    {
+      "id": "reconciliation",
+      "role": "Post-Recovery Reconciliation",
+      "focus": "current repository state, stale evidence, contradictions, active mission continuity",
+      "owner": "Autonomous Operations Engine"
+    },
+    {
+      "id": "intelligence-brain",
+      "role": "Intelligence Brain",
+      "focus": "semantic synthesis, contextual interpretation, financial causal reasoning, cross-metric relationships, scenario/risk interpretation, decision formation",
+      "owner": "Reasoning Engine"
+    },
+    {
+      "id": "benchmark-123",
+      "role": "123.xlsx Benchmark",
+      "focus": "numeric fidelity, question understanding, reasoning, decision quality, provenance, missing-data discipline, Persian clarity",
+      "owner": "Reasoning Engine"
+    },
+    {
+      "id": "quality-harness",
+      "role": "Quality and Harness",
+      "focus": "false-green, false-positive/negative, harness fidelity, evidence binding, runtime and acceptance proof",
+      "owner": "Governance Engine"
+    },
+    {
+      "id": "information-flow",
+      "role": "Information Flow",
+      "focus": "context-evidence-provenance-state-reasoning-decision-action-outcome-learning continuity",
+      "owner": "Organizational Intelligence Engine"
+    },
+    {
+      "id": "performance-management",
+      "role": "Performance Management",
+      "focus": "goals, target/actual, trend, deviation, assignment, check-in, diagnosis, intervention, evaluation, governance",
+      "owner": "Executive Intelligence Engine"
+    },
+    {
+      "id": "process-architecture",
+      "role": "Process Architecture",
+      "focus": "AS-IS, friction, root cause, TO-BE, alternatives, comparison, implementation, measurement",
+      "owner": "Organizational Intelligence Engine"
+    },
+    {
+      "id": "report-presentation",
+      "role": "Report and Presentation",
+      "focus": "non-financial readability, Persian-first explanations, progressive disclosure, actionability, unknowns",
+      "owner": "Executive Intelligence Engine"
+    },
+    {
+      "id": "chart-gate",
+      "role": "Chart Gate",
+      "focus": "presentation-only charts, canonical server values, no browser financial calculations, accessibility and truthful gaps",
+      "owner": "Executive Intelligence Engine"
+    },
+    {
+      "id": "architecture-governance",
+      "role": "Architecture and Governance",
+      "focus": "Architecture Freeze V4/V4.1 compliance, engine ownership, dependency integrity, protected boundaries",
+      "owner": "Governance Engine"
+    },
+    {
+      "id": "open-source-leverage",
+      "role": "Capability Provider Leverage",
+      "focus": "reuse standards, mature OSS, adapters/providers, licensing and self-hosted suitability",
+      "owner": "Autonomous Operations Engine"
+    },
+    {
+      "id": "commercial-acceptance",
+      "role": "Commercial and Application Readiness",
+      "focus": "runtime/application/acceptance/commercial completion gaps and evidence",
+      "owner": "Executive Intelligence Engine"
+    }
+  ],
+  "organization_version": "V2",
+  "organization_overlay": ".kilo/team/TEAM-ORGANIZATION-V2.json",
+  "organization_protocol": ".kilo/team/TEAM-ORGANIZATION-V2-PROTOCOL.md",
+  "memory_root": ".kilo/team/memory/",
+  "catalog_type": "SPECIALIST_CAPABILITY_CATALOG",
+  "active_concurrency_policy": "V2_DYNAMIC_FROM_READY_LEASES_ONLY",
+  "legacy_parallel_defaults_under_v2": "DISABLED",
+  "legacy_pool_fallback_under_v2": "FORBIDDEN"
+}

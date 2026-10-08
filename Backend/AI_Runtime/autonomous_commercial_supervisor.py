@@ -19,7 +19,6 @@ GOVERNING_FILES = (
     "Docs/ARCHITECTURE.md",
     "Assistant/SYSTEM_PROMPT.md",
     "Docs/HOOSHYAROS_FINAL_DECISIONS_REGISTER.md",
-    "Docs/HOOSHYAROS_COMMERCIAL_SCOPE_RECONCILIATION.md",
     "Docs/Product/PRODUCT_CONSTRUCTION_ROADMAP.json",
 )
 
@@ -131,8 +130,6 @@ def enforce_construction_toolchain() -> tuple[bool, str]:
     env_blob = " ".join(f"{key}={value}" for key, value in os.environ.items()).lower()
     for provider in PROHIBITED_CONSTRUCTION_PROVIDERS:
         if provider in env_blob and f"hooshyar_allow_{provider.replace(' ', '_')}" not in env_blob:
-            # Environment names can mention unrelated text; only block explicit
-            # provider-looking construction settings, not arbitrary prose.
             if re.search(rf"(?:agent|provider|coder|coding|construction)[^\n=]*{re.escape(provider)}|{re.escape(provider)}[^\n=]*(?:agent|provider|coder|coding|construction)", env_blob):
                 return False, f"prohibited-construction-provider:{provider}"
     print("CONSTRUCTION_TOOLCHAIN_OK provider=python+github+assistant", flush=True)
@@ -159,8 +156,6 @@ def validate_plan(output: str) -> tuple[bool, str]:
     if not payload.get("stopConditions"):
         return False, "missing-stop-conditions"
     if "genuinely missing" not in mission_capability.lower() and not capability_id.startswith("repair-"):
-        # Commercial work may legitimately be expressed as a verified repair.
-        # New construction must still come through the canonical selector.
         if "implement" not in mission_capability.lower() and "provide" not in mission_capability.lower():
             return False, "mission-does-not-describe-canonical-capability-work"
     return True, capability_id
@@ -263,8 +258,6 @@ def main() -> int:
             continue
 
         if full_regression():
-            # Green regression is evidence, not permission to declare completion.
-            # The next cycle must audit the canonical backlog again.
             time.sleep(0.2)
             continue
 

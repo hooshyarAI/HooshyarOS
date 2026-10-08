@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "1.0",
+  "product": "HooshyarOS",
+  "completionRule": "No capability is complete from source evidence alone; required environments and customer workflows must pass runtime acceptance.",
+  "layers": [
+    {"id":"architecture","name":"Architecture","evidence":["charter","engine-registry","dependency-ownership","lifecycle"]},
+    {"id":"capabilities","name":"Capabilities","evidence":["capability-registry","implementation","contract","runtime-mapping"]},
+    {"id":"runtime","name":"Runtime","environments":["windows","web","android"],"evidence":["launch","health","readiness","restart-recovery"]},
+    {"id":"product","name":"Customer Product","capabilities":["authentication","tenant-isolation","financial-ingestion","financial-statement-analysis","reasoning","dashboard","persistence"]},
+    {"id":"security","name":"Security","evidence":["authentication","authorization","tenant-isolation","dependency-audit","security-tests"]},
+    {"id":"quality","name":"Quality","evidence":["unit","integration","runtime","acceptance","resilience"]},
+    {"id":"commercial","name":"Commercialization","evidence":["windows-package","web-deployment","android-release","clean-environment-acceptance","upgrade"]},
+    {"id":"autonomous","name":"Autonomous Factory","evidence":["discover","construct","run","qualify","repair","retest","commit","ci-feedback","replan"]}
+  ],
+  "environments": ["windows","web","android"],
+  "releaseEvidence": ["source","test","runtime","application","acceptance","ci"],
+  "criticalBlockers": ["runtime-failure","data-loss","tenant-isolation-failure","security-failure","release-artifact-failure","autonomous-loop-failure"]
+}

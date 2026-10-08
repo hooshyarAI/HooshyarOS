@@ -1,0 +1,323 @@
+GOVERNED COMMERCIALIZATION B1–B5 CURRENT-TRUTH AUDIT — EVIDENCE ARTIFACT
+================================================================================
+AUDIT ID       : governed-commercialization-b1-b5-truth-2026-09-16
+DATE           : 2026-09-16
+TYPE           : Bounded read-only architecture/security/readiness audit of the remaining
+                 B1–B5 blockers, plus the mandated bounded B5 document-consistency
+                 correction. Does NOT reopen K8. Does NOT create a new stage/framework.
+BRANCH         : fix/autonomous-product-factory
+PRE-CHANGE TRUSTED CHECKPOINT : bc341ab13e2e08b85c2431c5d7d0b6968817b863
+CURRENT AUDIT BASELINE (before this delta) : stage15-k8-installed-product-acceptance-2026-09-15
+K8 STATE       : PRESERVED (productization.installed-product-acceptance = VERIFIED)
+
+1. SOURCES READ FOR MEMORY RECONCILIATION
+================================================================================
+- Docs/HOOSHYAROS_MASTER_CHARTER.md §15.1.1, §15.1.1a, §15.1.2, §15.1.4
+- .kilo/plans/ACTIVE-COMMERCIALIZATION-MASTER-LEDGER.md
+- .kilo/plans/AUTONOMOUS-COMMERCIALIZATION-EXECUTION-QUEUE.md
+- .kilo/plans/stage15-k8-installed-product-acceptance-checkpoint.md
+- .kilo/evidence/stage15-k8-installed-product-acceptance.txt
+- .kilo/evidence/stage15-k8-installer-rebuild-installation-ready-2026-09-15.txt
+- .kilo/evidence/stage15-k8-real-installation-upgrade-2026-09-16.txt
+- .kilo/plans/blocker-b1-b5-readiness-delta-2026-09-14.md (superseded)
+- .kilo/plans/conditional-k5-k7-readiness-delta-2026-09-14.md (superseded)
+- .kilo/plans/1787979074910-encryption-audit-plan.md (Phase 05C-D4 record)
+- .kilo/plans/1787787070827-phase-05c-e-security-audit.md (Phase 05C-E record)
+- plans/1787979074910-phase-05c-d1-design.md (Phase 05C-D1 record)
+- Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md
+- Docs/ARCHITECTURE_DECISIONS/ (KILO_GOVERNED_OPERATOR_DECISION.md only)
+- Docs/Product/PRODUCT_QUALIFICATION_MATRIX.json
+
+2. GIT / GITHUB PARITY (freshly executed)
+================================================================================
+git rev-parse HEAD
+  = bc341ab13e2e08b85c2431c5d7d0b6968817b863
+git rev-parse origin/fix/autonomous-product-factory
+  = bc341ab13e2e08b85c2431c5d7d0b6968817b863
+git ls-remote origin refs/heads/fix/autonomous-product-factory
+  = bc341ab13e2e08b85c2431c5d7d0b6968817b863  refs/heads/fix/autonomous-product-factory
+
+PARITY: local == origin tracking == independent ls-remote == bc341ab1  (PARITY_HOLDS)
+Recent history: bc341ab1 -> 6cc309ab -> 6afbd28b -> 14995d7d (K8 and its bounded deltas).
+The K8 bounded deltas (6afbd28b, 6cc309ab, bc341ab1) changed no product runtime code.
+
+WORKING TREE: pre-existing unrelated modifications preserved and NOT touched:
+  M .kilo/agents/hooshyar-construction.md
+  M package-lock.json
+  ?? (multiple unrelated untracked artifacts: .kilo/kilo.jsonc.bak-*, tmp_*.js, dist/, etc.)
+No git reset/clean/revert/stash/checkout was performed.
+
+3. B5 RECONCILIATION — HOST EVIDENCE
+================================================================================
+Host probe (fresh): C:\Users\avalipour\AppData\Local\Programs\Inno Setup 6\ISCC.exe
+  exists = True
+  directory = C:\Users\avalipour\AppData\Local\Programs\Inno Setup 6  (Inno Setup 6)
+  file size = 1456272 bytes
+The installation-ready installer was successfully compiled with it (Inno Setup 6.7.3
+recorded in .kilo/evidence/stage15-k8-installer-rebuild-installation-ready-2026-09-15.txt),
+and the real installed-product acceptance PASSED 16/16 against the produced artifact.
+
+B5 CORRECTED CLASSIFICATION: AVAILABLE ON THIS HOST (not BLOCKED_ENVIRONMENT).
+Root cause of the stale record: the 2026-09-14 probe checked only the two Program Files
+locations and missed %LOCALAPPDATA%\Programs\Inno Setup 6. Both current build entry
+points already search LocalAppData:
+  scripts/build-windows-installer.ps1:20-24
+  scripts/installed-product-acceptance.cjs:42
+
+STALE B5 RECORDS FOUND AND RECONCILED (current sources only):
+  - Docs/HOOSHYAROS_MASTER_CHARTER.md §15.1.2 queue row: "B1–B5 BLOCKED"  -> corrected.
+  - .kilo/plans/ACTIVE-COMMERCIALIZATION-MASTER-LEDGER.md line 174: "B1–B5 remain unchanged" -> corrected.
+  - .kilo/plans/stage15-k8-installed-product-acceptance-checkpoint.md §7: "B5 Inno Setup host on other machines" -> corrected.
+  - Audit Memory §15.1.1 body already carried the correction (2026-09-15) and is preserved.
+Historical/superseded dated artifacts (.kilo/plans/blocker-b1-b5-readiness-delta-2026-09-14.md,
+post-k2/post-k3 reaudits, conditional-k5-k7 delta, fresh-governed-reaudit) accurately recorded
+the 2026-09-14 host state and remain as traceable superseded evidence; they are NOT rewritten.
+A clearly-marked superseded banner was added to the primary B1–B5 readiness artifact only.
+
+B5 is a BUILD-HOST prerequisite, not a product capability. Code-signing (Authenticode) remains
+a separate EXTERNAL prerequisite; the produced installer is NotSigned.
+
+4. B1 — ENCRYPTION AT REST / KEY MANAGEMENT
+================================================================================
+WHAT EXISTS (committed):
+  - Backend/HBOS/Security/EncryptionService.ts — AES-256-GCM, per-tenant DEK, KEK derived from
+    a root key (scrypt), envelope wrap/unwrap, fail-secure key-required error; commit 1608a7ea.
+  - Backend/HBOS/Persistence/SQLiteAdapter.ts — optional field-level encryption config, creates
+    `encryption_keys` DEK-metadata table, encrypt/decrypt helpers for ENCRYPTED_FIELDS
+    (user.identity, decision.message/explanation/limitations/reasoningRef, evidence.explanation/
+    limitations), fail-secure on encryption failure (SQLiteAdapter.ts:110-172).
+  - Test foundation: Backend/HBOS/test/Phase05C-D4.test.ts — 31 tests, PASS (re-verified this audit).
+
+WHAT IS ACTIVE IN PRODUCTION PERSISTENCE:
+  - The commercial runtime constructs the PLAINTEXT store:
+      CommercialRuntimeServer.ts:306-307 -> new SQLitePersistenceStore({ databasePath: HOOSHYAR_DB_PATH ?? data/hooshyar.sqlite })
+    with NO `encryption` configuration.
+  - Backend/HBOS/Product/SQLitePersistenceStore.ts:21-32 stores plaintext JSON in
+    `persistence_records` (tenant_id, key, value_json, updated_at).
+  - `Backend/HBOS/Persistence/SQLiteAdapter.ts` (encryption-capable) is referenced only by its own
+    tests (Phase05C-D4.test.ts, Phase05C-D2.test.ts); it is NOT wired into the runtime.
+  => Production tenant data (decisions/analysis/work items/reports/identity material) is plaintext at rest.
+
+KEY REPRESENTATION / SOURCING:
+  - Root key from `process.env["HOOSHyarOS_ROOT_KEY"]` or config.rootKey; never hard-coded;
+    fails closed with ENCRYPTION_ROOT_KEY_REQUIRED (EncryptionService.ts:142-156).
+  - Per-tenant DEKs wrapped by a KEK and stored in `encryption_keys`; DEKs cached in memory.
+
+APPROVED PRODUCTION KEY-MANAGEMENT ARCHITECTURE: NONE.
+  - Docs/ARCHITECTURE_DECISIONS/ contains only KILO_GOVERNED_OPERATOR_DECISION.md.
+  - Docs/ARCHITECTURE.md has no encryption-at-rest entry.
+  - Phase 05C-D1 design records persistence/encryption/key-management/secrets/backup decisions as
+    HUMAN_APPROVAL required (plans/1787979074910-phase-05c-d1-design.md:518-552).
+  - Phase 05C-E records P1 (audit encryption) EXECUTION: REQUIRES_HUMAN_APPROVAL and lists
+    3 human-approval items (P1, FR2, AA2).
+  - The 05C-D4 encryption foundation was implemented, but the governing critical decisions
+    (persistence technology, encryption model, key management backend, secrets management,
+    backup solution) are still not recorded as human-approved.
+
+OBSERVATION (recorded, NOT implemented): the root-key env var is spelled
+`HOOSHyarOS_ROOT_KEY` (mixed case) in EncryptionService.ts:144/155 and mirrored in its test;
+05C-D1 documents `HOOSHYAR_ENCRYPTION_KEY`. This is a latent naming/contract inconsistency in
+committed foundation code. It is part of the pending key-management decision and was NOT changed.
+
+REPOSITORY-LOCAL GAP INDEPENDENT OF APPROVAL? NO.
+  - The only remaining work is production wiring into the canonical runtime store, which fixes
+    the persistence technology + encryption model + key management + migration + recovery model.
+    Those are exactly the 05C human-approval decisions. Implementing now would invent an
+    unapproved key-management/architecture policy.
+
+B1 CLASSIFICATION: BLOCKED_HUMAN_APPROVAL. ACTIONABLE_NOW = FALSE.
+  canonical owner: 05C change-control decisions -> CommercialRuntimeServer persistence construction
+  exact gap: production `SQLitePersistenceStore` is plaintext and has no encryption gate.
+  dependency: human approval of the 05C critical decisions (encryption model / key management /
+              secrets / backup / persistence).
+  required acceptance evidence when authorized: field-level encrypted-at-rest proof on the real
+    runtime store + no-plaintext assertion + wrong-key fail-secure + rotation + tenant isolation +
+    migration of existing plaintext rows + recovery/backup contract + application acceptance.
+  DELIVERABLE PRODUCED: .kilo/plans/b1-encryption-at-rest-decision-readiness-2026-09-16.md
+
+5. B2 — PAYMENT PROVIDER / BILLING / ENTITLEMENTS
+================================================================================
+WHAT IS IMPLEMENTED:
+  - Only the external-dependency gate: Backend/HBOS/Autonomous/Runtime/ExternalProductionDependencyAudit.ts
+    returns payment-provider-activation = BLOCKED unless HOOSHYAR_PAYMENT_PROVIDER_ACTIVATED === "1";
+    optional HOOSHYAR_PAYMENT_PROVIDER_HEALTH_URL improves evidence; secrets are never returned/logged.
+  - Authorization is RBAC only (CommercialIdentityService roles -> CommercialPermission).
+  - No route consults subscription/plan/entitlement state.
+
+WHAT DOES NOT EXIST (case-insensitive search of tracked *.ts):
+  - subscription / plan / pricing / entitlement / invoice / checkout / webhook models
+  - entitlement engine or fail-closed entitlement enforcement
+  - tenant-scoped subscription/entitlement persistence
+  - provider adapter, webhook handling, billing idempotency, renewal/expiry, billing audit
+  => There is no entitlement gate at all; the fail-closed question is N/A today.
+
+K5 SCOPE STATUS: CONDITIONAL (unchanged).
+  Docs/COMMERCIAL_PRODUCT_COMPLETION_CONTRACT.md:229 conditions the whole layer on
+  "If subscription/billing is part of the approved commercial scope...". No governing artifact
+  confirms that scope. Scope must not be invented.
+
+LOCAL REPAIR POSSIBILITY: a provider-independent plan/entitlement + fail-closed enforcement +
+provider-agnostic webhook boundary WOULD be repository-local, but it is scope-gated and NOT
+dependency-ready. No provider, pricing, plan names, credentials, webhook secrets or commercial
+policy were invented.
+
+B2 CLASSIFICATION: BLOCKED_EXTERNAL (payment-provider activation) + K5 CONDITIONAL (scope-gated).
+  ACTIONABLE_NOW = FALSE.
+  canonical owner: ExternalProductionDependencyAudit (external boundary); K5 for the future repo-local layer.
+  dependency: external provider account/activation AND confirmed approved subscription scope.
+  required acceptance evidence when authorized: plan/entitlement model + fail-closed denial tests +
+    tenant-scoped state + webhook signature/idempotency/replay tests + provider activation evidence.
+  next action: none until scope is confirmed by governing evidence.
+
+6. B3 — CLOUD / DNS / TLS / PRODUCTION DEPLOYMENT
+================================================================================
+WHAT IS IMPLEMENTED LOCALLY:
+  - Local production-like runtime + install path: start-commercial-runtime.ts (HOOSHYAR_HOST/
+    HOOSHYAR_PORT, SIGINT/SIGTERM), CommercialRuntimeServer /health + /api/ready, SQLite persistence
+    (HOOSHYAR_DB_PATH), auth + rate limiting + tenant boundary, request tracing/metrics
+    (RuntimeObservability), and a reproducible Windows install path verified end-to-end (K8).
+  - Deployment contracts/engines: DeploymentContractEngine, DeploymentReadinessEngine,
+    ProductionReadinessEngine (reports externalValidationRequired:true), CloudDeploymentEngine
+    (generic manifest command executor, Backend/AI_Runtime/cloud_deployment.py).
+  - External gate: ExternalProductionDependencyAudit cloud = BLOCKED unless
+    HOOSHYAR_PRODUCTION_CLOUD_READY === "1"; optional HOOSHYAR_PRODUCTION_HEALTH_URL.
+
+WHAT IS TRULY EXTERNAL / ABSENT:
+  - No TLS/HTTPS termination in-repo (CommercialRuntimeServer uses node:http, plain HTTP;
+    127.0.0.1 default; secureCookies optional).
+  - No DNS records/zone configuration.
+  - No Docker/Compose/Kubernetes/Terraform/Ansible/Helm/systemd/reverse-proxy artifacts.
+  - No production cloud resources or credentials; no CI deploy workflow (only build/test workflows).
+  - No production secrets manager contract; code-signing certificate absent (installer NotSigned).
+  - Metrics are in-memory only (no durable observability sink); backup/restore not wired into runtime.
+
+FAIL-CLOSED BEHAVIOUR: verified. Missing cloud flag => BLOCKED; missing payment flag => BLOCKED;
+missing/stale application+acceptance evidence => completion refused (CommercialProductCompletionAudit).
+
+LOCAL REPAIR: no safe, necessary, evidence-backed local deployment knot exists that would not
+fabricate cloud/TLS/DNS evidence or duplicate existing contracts. The existing local install/
+deployment path is already qualified (K8). Remaining items are external provisioning or
+scope-dependent operational enhancements (not B3 blockers).
+
+B3 CLASSIFICATION: BLOCKED_EXTERNAL. ACTIONABLE_NOW = FALSE.
+  canonical owner: external infrastructure / operator boundary.
+  exact gap: reachable production cloud compute, DNS ownership, TLS certificate/termination,
+    production secret management, durable observability sink, code-signing certificate.
+  dependency: external accounts/credentials/resources.
+  required acceptance evidence when authorized: external health URL probe + TLS validation +
+    deploy manifest + rollback/recovery evidence from the real environment.
+  next action: none until external resources are provisioned.
+
+7. B4 — ANDROID
+================================================================================
+WHAT EXISTS (repository truth):
+  android/settings.gradle, android/build.gradle (AGP 8.7.3 apply false),
+  android/app/build.gradle (applicationId ai.hooshyar.client; compileSdk 35; minSdk 23;
+  targetSdk 35; versionName 1.0.0), android/app/src/main/AndroidManifest.xml
+  (INTERNET permission; usesCleartextTraffic=false; launcher MainActivity),
+  android/app/src/main/java/ai/hooshyar/client/MainActivity.java (55-line WebView shell that
+  requires an https:// server URL), android/app/src/main/res/values/styles.xml.
+  => A thin WebView client shell (6 files), structurally coherent but minimal.
+
+BUILD/TEST READINESS:
+  - No gradlew/gradlew.bat and no gradle/ wrapper directory. However the CI workflow
+    .github/workflows/android-release.yml uses gradle/actions/setup-gradle@v4 and runs
+    `gradle :app:assembleDebug --no-daemon` (system Gradle), so the missing wrapper is NOT a CI defect.
+  - No android/app/src/test and no android/app/src/androidTest source sets; no signing config.
+  - scripts/android-product-acceptance.sh performs real device install + launch liveness/foreground checks.
+
+HOST TOOLCHAIN (fresh probe): java=NOT FOUND, javac=NOT FOUND, gradle=NOT FOUND, adb=NOT FOUND,
+ANDROID_HOME="" and ANDROID_SDK_ROOT="". No device.
+
+EXTERNAL/SCOPE:
+  - Docs/Product/PRODUCT_QUALIFICATION_MATRIX.json cell `android-release`
+    (commercial-client / android / build-install-launch-smoke / acceptance) is release-blocking;
+    scripts/cline-runtime-evidence-collector.cjs:53 resolves it to REQUIRES_DEVICE_EXECUTION.
+
+LOCAL REPAIR: no verifiable repository-local Android build/test knot can be produced on this host
+(no JDK/SDK/adb) and no device acceptance can be fabricated. No repository-local build defect was
+proven (the CI build path does not depend on a wrapper). No toolchain was installed.
+
+B4 CLASSIFICATION: BLOCKED_ENVIRONMENT (missing Android toolchain/host + external device).
+  ACTIONABLE_NOW = FALSE. Not a proven coding gap.
+  canonical owner: android/ build pipeline + external device acceptance.
+  dependency: JDK 17 + Gradle/Android SDK host AND an external Android device/emulator.
+  required acceptance evidence when authorized: assembleDebug APK + emulator/device install +
+    launch liveness/foreground (scripts/android-product-acceptance.sh) -> android-acceptance-success.json.
+  next action: none until the toolchain/host and device are available (and native-client scope confirmed).
+
+8. CROSS-CUTTING ARCHITECTURE MAP (impact of findings)
+================================================================================
+- Architecture Freeze V4 / ARCHITECTURE.md : unchanged. No encryption-at-rest entry exists; adding
+  one requires the 05C change-control path (B1). No engine boundary was altered.
+- Reasoning Engine / Governance Engine / Executive / Organizational / Autonomous Operations /
+  Memory / Knowledge / Decision / Assistant / Project Pilot / Reaction / Health Monitor /
+  Engine Registry / Lifecycle Manager / Dependency Manager / Boot System : NOT touched by this
+  audit. No finding maps to an engine implementation gap; B1 maps to the persistence boundary
+  (SQLitePersistenceStore + CommercialRuntimeServer construction), B2 to the commercial boundary,
+  B3 to the external deployment boundary, B4 to the android/ client module, B5 to the build host.
+- Security/privacy : production data at rest is plaintext (B1). RBAC + tenant isolation + rate
+  limiting + request tracing are active and were re-verified. Secret/configuration boundary is
+  documented (05C-D1).
+- Persistence : canonical `Product/SQLitePersistenceStore` (plaintext) vs encryption-capable
+  `Persistence/SQLiteAdapter` (unwired) — the B1 gap.
+- Tenant isolation : active at repository/HTTP boundary; unaffected.
+- Observability : runtime tracing/metrics active; durable sink absent (B3 external/operational).
+- Acceptance/evidence integrity : completion gate remains fail-closed
+  (CommercialProductCompletionAudit); no fabricated evidence; no completion flag changed.
+- Commercial completion gates : unchanged. productComplete remains FALSE.
+
+9. FOCUSED VERIFICATION PERFORMED BY THIS AUDIT
+================================================================================
+jest (runTestsByPath) — 4 suites / 53 tests PASS:
+  Backend/HBOS/test/Phase05C-D4.test.ts
+  Backend/HBOS/Autonomous/Runtime/ExternalProductionDependencyAudit.test.ts
+  Backend/HBOS/test/CommercialAcceptanceBarrier.test.ts
+  Backend/HBOS/test/InstalledProductPackagingRepair.test.ts
+`node scripts/product-platform-assurance.cjs` -> status PASS, 10 qualification cells,
+productComplete false, completionPolicy "runtime + application + acceptance + CI evidence required".
+Host probes: B5 ISCC.exe present; B4 java/javac/gradle/adb absent.
+
+10. CLASSIFICATION SUMMARY
+================================================================================
+| ID | Classification            | Actionable | Dependency                                   |
+|----|---------------------------|------------|----------------------------------------------|
+| B1 | BLOCKED_HUMAN_APPROVAL    | NO         | 05C human approval (encryption/key mgmt/etc.)|
+| B2 | BLOCKED_EXTERNAL (K5 CONDITIONAL) | NO | provider activation + confirmed scope        |
+| B3 | BLOCKED_EXTERNAL          | NO         | cloud/DNS/TLS/secrets/code-signing resources |
+| B4 | BLOCKED_ENVIRONMENT       | NO         | JDK/Gradle/Android SDK host + external device|
+| B5 | AVAILABLE ON THIS HOST (corrected) | n/a | none here; other hosts need Inno Setup 6     |
+
+No status is VERIFIED_COMPLETE, IMPLEMENTATION_GAP (authorized), or NOT_NEEDED beyond K7.
+
+11. SELECTED KNOT
+================================================================================
+DEPENDENCY-READY REPOSITORY-LOCAL IMPLEMENTATION KNOT: NONE.
+No B1–B5 item is dependency-ready without either human approval (B1), confirmed commercial scope
+(B2/K5), external resources (B2/B3), or a missing toolchain/device (B4). Consequently NO engine/
+runtime/test implementation knot was selected or executed, and no new acceptance framework or
+completion flag was created.
+
+MANDATED BOUNDED CORRECTIONS EXECUTED (audit/documentation only, no engine or runtime change):
+  1. B5 document-consistency correction across current sources (Audit Memory §15.1.2 row, ledger,
+     K8 checkpoint) and a superseded banner on the primary B1–B5 readiness artifact.
+  2. B1 decision-readiness artifact
+     .kilo/plans/b1-encryption-at-rest-decision-readiness-2026-09-16.md
+  3. Audit Memory §15.1.1 new current baseline + §15.1.2 historical row.
+
+12. COMPLETION STATES (UNCHANGED — verified no state change)
+================================================================================
+assistantComplete                     : TRUE (functionally)
+canonicalPlatformConstructionComplete : FALSE
+commercialProductRuntimeComplete      : FALSE
+externalProductionDependenciesComplete: FALSE
+productComplete                       : FALSE
+K8 installed-product acceptance       : VERIFIED (preserved, not reopened)
+
+13. REMAINING / NEXT
+================================================================================
+Remaining repository-local implementation knots : 0
+Next dependency-ready knot                       : NONE (K5 CONDITIONAL, K6 BLOCKED, K7 NOT_NEEDED)
+Remaining external blockers                      : B2 payment provider; B3 cloud/DNS/TLS; code-signing cert
+Remaining environment blockers                   : B4 Android toolchain + device
+Remaining human approvals                        : B1 05C encryption-at-rest / key management decisions

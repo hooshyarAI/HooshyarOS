@@ -13,13 +13,13 @@ The daemon owns the continuation loop:
 1. Audit repository state.
 2. Select the next genuinely missing canonical capability.
 3. Preserve Architecture Freeze V4 and the five canonical intelligence engines.
-4. Construct through the repository-native Python implementation worker.
+4. Construct through the canonical Python worker and, when selected by governance, the bounded Kilo/OpenCode execution operator.
 5. Verify Python syntax, autonomous-builder tests, and the full Jest suite.
 6. Repair verification failures through the Python worker.
 7. Finalize the repository change through Git.
 8. Re-audit and continue until the canonical platform backlog is complete or the daemon is genuinely blocked.
 
-No Codex, Copilot, Claude, or other cloud coding CLI is part of this construction path.
+Kilo Code and OpenCode are approved subordinate execution operators under repository governance. Codex, Copilot, Claude and other unapproved external coding agents remain outside the construction path.
 
 ## Design invariant
 

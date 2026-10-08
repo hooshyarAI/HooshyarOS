@@ -1,0 +1,15 @@
+PASS | session established | status=201
+PASS | /api/ready advertises offline-sync
+PASS | runtime serves the real client offline transport | status=200
+PASS | online sync accepted queued work | {"synced":1,"pending":0}
+PASS | server cursor equals the accepted watermark | cursor=9e2ba798f2d7a9772de4f006aa22e07a00a6ea7da5886435dd0434be784096f9
+PASS | network loss reports OFFLINE | status=OFFLINE
+PASS | offline work is retained (not discarded) | pending=1
+PASS | queued work survives a fresh client instance | pending=1
+PASS | reconnect replays retained work | {"synced":1,"pending":0}
+PASS | server cursor advanced after reconnect | cursor=a53018b7d60a89edf95be24dc5d8d5d784f952f966c82b0e9d28efc5a69e5493
+PASS | concurrent device advanced the server cursor | server=2778e60fc4ece3f9d1f9f30a06fe144b6a6dfe72623a1f3197d679a0751fd359
+PASS | conflict detected and resolved server-authoritative | {"id":"offline-1789371887001-e1c237e7dbd6b8","sourceKey":"conflict.csv","baseWatermark":"f56173a5bd91b8d488216d95899a7076dff930f8d503f94be5ca257d10b98934","serverWatermark":"2778e60fc4ece3f9d1f9f30a06fe144b6a6dfe72623a1f3197d679a0751fd359","resolvedWatermark":"1dd30149cc805bd210d2832082614763d14b7492fba546a930316bdfcf17e9e0","resolution":"server-authoritative"}
+PASS | conflict resolution leaves the server cursor authoritative | cursor=1dd30149cc805bd210d2832082614763d14b7492fba546a930316bdfcf17e9e0
+
+ACCEPTANCE_RESULT=PASS failures=0 checks=13

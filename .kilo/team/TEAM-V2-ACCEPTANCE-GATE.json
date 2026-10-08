@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0",
+  "gate_id": "TEAM-V2-ACCEPTANCE",
+  "status": "ARMED",
+  "hold_after_pass": true,
+  "purpose": "Run exactly one clean Team V2 end-to-end acceptance wave before broad continuation.",
+  "required_chain": [
+    "ADMISSION",
+    "RESERVATION",
+    "WORKER",
+    "BRANCH_PRESERVATION",
+    "INDEPENDENT_QC",
+    "PERSISTED_QC",
+    "INTEGRATION",
+    "TARGET_PROMOTION",
+    "MEMORY_CLOSURE"
+  ],
+  "failure_policy": "PRESERVE_AND_DIAGNOSE; NEVER_BLIND_RERUN",
+  "expansion_policy": "NO_BROAD_PRODUCT_CONTINUATION_UNTIL_ACCEPTED"
+}
