@@ -2,31 +2,34 @@
   "schema_version": "1.0",
   "wave_status": "READY",
   "base_mission": ".kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md",
+  "created_from_sha": "21c8ec76d551854372015e88e29f6e829c396354",
   "leases": [
     {
-      "id": "work-0009-team-v2-acceptance",
-      "role": "Team Acceptance Specialist",
-      "focus": "ONE-SHOT TEAM V2 ACCEPTANCE: produce one evidence-backed control-plane acceptance result proving Admission -> Reservation -> Worker -> Branch Preservation -> Independent QC -> Persisted QC -> Integration -> Target Promotion -> Memory Closure. No product implementation, no charter/architecture changes, no reopening accepted F1-F6/CCC/UX work, no changes outside the lease result directory. The acceptance report must explicitly assess the real control-plane hardening now present, including whether a worker result remains recoverable after validation failure, whether QC inspects the actual worker patch, and whether promotion is fail-closed on missing persisted QC.",
+      "id": "work-0010-team-v2-acceptance",
+      "role": "Team V2 Acceptance Specialist",
+      "focus": "ONE-SHOT TEAM V2 ACCEPTANCE AFTER TARGETED CONTROL-PLANE REPAIRS. Prove the complete governed chain Admission -> Reservation -> Worker -> Branch Preservation -> Independent QC -> Persisted QC -> Integration -> Target Promotion -> Memory Closure in one fresh non-duplicate wave. Audit only: no product implementation, no Architecture Freeze V4/V4.1 changes, no accepted F1-F6/CCC/UX reopening, no edits outside this lease evidence root. The audit must specifically verify: QC workspace executes on the happy path; persisted QC uses measured actual-change evidence (patch SHA, patch bytes, changed-file count); Integrator fails closed on missing/negative QC and permits promotion only after persisted QC PASS; legacy continuous auto-dispatch remains disabled; no duplicate worker is spawned; target promotion and registry closure are evidence-linked.",
       "owner": "SPECIALIST_WORKER_POOL",
       "mode": "AUDIT",
       "write_scope": [
-        ".kilo/team/results/work-0009-team-v2-acceptance/"
+        ".kilo/team/results/work-0010-team-v2-acceptance/"
       ],
       "evidence_required": [
         "current_team_control_plane_state",
         "one_coherent_commit",
         "exactly_one_result_report",
-        "worker_branch_or_artifact_provenance",
+        "worker_branch_provenance",
         "independent_qc_adjudication",
-        "integration_and_target_promotion_evidence"
+        "persisted_qc_artifact",
+        "integration_and_target_promotion_evidence",
+        "memory_closure_evidence"
       ],
-      "purpose": "Team V2 end-to-end acceptance gate before broad product continuation.",
+      "purpose": "Final decisive Team V2 end-to-end acceptance after the two reproduced QC control defects were repaired.",
       "blockers": [
         "TEAM_V2_ACCEPTANCE"
       ],
       "test_scope": "TEAM_CONTROL_PLANE_ONLY_NO_PRODUCT_CODE_CHANGE",
       "risk": "P0",
-      "value": "Decides whether autonomous team construction is safe to continue.",
+      "value": "Decides whether Team V2 is reliable enough to continue product construction.",
       "readiness": "READY",
       "estimated_complexity": "LOW_CONTROL_PLANE_ACCEPTANCE"
     }
