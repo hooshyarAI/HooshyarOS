@@ -195,3 +195,35 @@ Once V1 passes:
 - Team Worker becomes the primary throughput path;
 - Single Worker remains the low-capacity fallback/watchdog path.
 
+
+
+## Dynamic wave planning
+
+After a wave is synthesized, the Team Synthesizer must produce:
+
+`.kilo/team/NEXT-WAVE-PLAN.json`
+
+validated against:
+
+`.kilo/team/NEXT-WAVE-PLAN.schema.json`
+
+The next Team Wave must use `NEXT-WAVE-PLAN.json` when `wave_status = READY` and must not fall back to the initial 12 audit leases.
+
+Each dynamic lease contains:
+- id
+- role
+- focus
+- owner
+- mode = AUDIT | IMPLEMENT | REVIEW | VERIFY
+- explicit write_scope
+
+The Orchestrator may create up to 100 leases, but only independent dependency-ready leases are eligible for the current wave.
+
+The plan must prevent:
+- duplicate work already completed;
+- overlapping uncontrolled writes;
+- dependency violations;
+- unauthorized protected-path changes;
+- repeated audit loops.
+
+When no safe next lease exists, the plan must say `COMPLETE` or `BLOCKED` with evidence rather than inventing work.
