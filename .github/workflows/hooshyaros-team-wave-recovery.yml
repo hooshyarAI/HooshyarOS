@@ -1,0 +1,183 @@
+name: HooshyarOS Team Wave Recovery Integrator
+
+on:
+  workflow_run:
+    workflows:
+      - HooshyarOS Autonomous Team Worker
+    types: [completed]
+
+concurrency:
+  group: hooshyaros-autonomous-construction-recovery
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+  actions: read
+
+jobs:
+  recover-controlled-drift:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      TARGET_BRANCH: fix/autonomous-product-factory
+      RUN_ID: ${{ github.event.workflow_run.id }}
+      RUN_NUMBER: ${{ github.event.workflow_run.run_number }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout current target
+        uses: actions/checkout@v6
+        with:
+          ref: fix/autonomous-product-factory
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Inspect failed team wave and verify recovery eligibility
+        id: gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "${TARGET_BRANCH}"
+          TARGET_SHA="$(git rev-parse "origin/${TARGET_BRANCH}")"
+          echo "TARGET_SHA=${TARGET_SHA}" >> "${GITHUB_ENV}"
+
+          JOBS="${RUNNER_TEMP}/jobs.json"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/jobs?per_page=100" > "${JOBS}"
+
+          QC="$(python3 - "${JOBS}" <<'PY'
+          import json,sys
+          data=json.load(open(sys.argv[1],encoding='utf-8'))
+          vals=[j for j in data.get('jobs',[]) if j.get('name')=='quality-control']
+          print(vals[0].get('conclusion','') if vals else '')
+          PY
+          )"
+          test "${QC}" = "success" || {
+            echo "BLOCKED_RECOVERY: previous team wave did not pass independent quality-control"
+            echo "QC_CONCLUSION=${QC}"
+            exit 41
+          }
+
+          mkdir -p "${RUNNER_TEMP}/team-artifacts"
+          gh run download "${RUN_ID}" --repo "${GITHUB_REPOSITORY}" --dir "${RUNNER_TEMP}/team-artifacts"
+
+          python3 - "${RUNNER_TEMP}/team-artifacts" <<'PY'
+          import json, pathlib, sys
+          root=pathlib.Path(sys.argv[1])
+          envs=list(root.rglob('result.json'))
+          found={}
+          for p in envs:
+              try:
+                  obj=json.loads(p.read_text(encoding='utf-8'))
+              except Exception:
+                  continue
+              if 'worker_id' in obj:
+                  found[obj['worker_id']]=obj
+          if not found:
+              raise SystemExit('BLOCKED_RECOVERY: no worker envelopes found')
+          starts={x.get('start_sha') for x in found.values() if x.get('start_sha')}
+          if len(starts)!=1:
+              raise SystemExit('BLOCKED_RECOVERY: worker envelopes do not share one START_SHA')
+          start=next(iter(starts))
+          print(f'RECOVERY_START_SHA={start}')
+          print(f'RECOVERY_ENVELOPES={len(found)}')
+          with open('recovery.env','w',encoding='utf-8') as out:
+              out.write(f'RECOVERY_START_SHA={start}\n')
+              out.write(f'RECOVERY_ENVELOPES={len(found)}\n')
+          PY
+          cat recovery.env >> "${GITHUB_ENV}"
+
+          git diff --name-only "${RECOVERY_START_SHA}...${TARGET_SHA}" > "${RUNNER_TEMP}/target-drift-paths.txt"
+          SAFE='
+          .kilo/team/TEAM-WORKER-V1-PROTOCOL.md
+          Docs/HOOSHYAROS_MASTER_CHARTER.md
+          '
+          while IFS= read -r path; do
+            test -n "${path}" || continue
+            if ! grep -Fxq "${path}" <<< "${SAFE}"; then
+              echo "BLOCKED_RECOVERY: target drift path is not recovery-safe: ${path}"
+              exit 42
+            fi
+          done < "${RUNNER_TEMP}/target-drift-paths.txt"
+
+          echo "RECOVERY_GATE=PASS"
+
+      - name: Checkout recovery base and import successful worker branches
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "${TARGET_BRANCH}"
+          CURRENT="$(git rev-parse "origin/${TARGET_BRANCH}")"
+          test "${CURRENT}" = "${TARGET_SHA}"
+          git checkout -B "recovery/team-${RUN_ID}" "${TARGET_SHA}"
+
+          mapfile -t RESULT_FILES < <(find "${RUNNER_TEMP}/team-artifacts" -name result.json -type f | sort)
+          SUCCESS_COUNT=0
+
+          for file in "${RESULT_FILES[@]}"; do
+            WORKER_ID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["worker_id"])' "${file}")"
+            STATUS="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["status"])' "${file}")"
+            COMMIT="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["commit_sha"])' "${file}")"
+            BRANCH="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["branch"])' "${file}")"
+            START="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["start_sha"])' "${file}")"
+            SCOPE="$(python3 -c 'import json,sys; print(json.dumps(json.load(open(sys.argv[1]))["write_scope"]))' "${file}")"
+
+            test "${START}" = "${RECOVERY_START_SHA}"
+            if test "${STATUS}" != "SUCCESS"; then
+              echo "RECOVERY_SKIP_FAILED_WORKER=${WORKER_ID}"
+              continue
+            fi
+
+            test -n "${COMMIT}"
+            git fetch origin "${BRANCH}"
+            git merge-base --is-ancestor "${RECOVERY_START_SHA}" "${COMMIT}"
+            git merge-base --is-ancestor "${COMMIT}" "origin/${BRANCH}"
+
+            while IFS= read -r path; do
+              test -n "${path}" || continue
+              python3 - "${path}" "${SCOPE}" <<'PY'
+          import json,sys
+          p=sys.argv[1].replace('\\','/').lstrip('./')
+          scopes=json.loads(sys.argv[2])
+          def covered(path,scope):
+              s=scope.replace('\\','/').lstrip('./')
+              if '*' in s:
+                  return path.startswith(s.split('*',1)[0])
+              return path==s.rstrip('/') or path.startswith(s.rstrip('/')+'/')
+          if not any(covered(p,s) for s in scopes):
+              raise SystemExit(f'BLOCKED_RECOVERY: out-of-scope worker path {p}')
+          PY
+            done < <(git diff --name-only "${RECOVERY_START_SHA}...origin/${BRANCH}")
+
+            git cherry-pick "${COMMIT}"
+            SUCCESS_COUNT=$((SUCCESS_COUNT+1))
+            echo "RECOVERED_WORKER=${WORKER_ID} ${COMMIT}"
+          done
+
+          test "${SUCCESS_COUNT}" -gt 0
+          echo "RECOVERED_SUCCESS_COUNT=${SUCCESS_COUNT}"
+          git diff --check "${RECOVERY_START_SHA}...HEAD" -- . ':(exclude)*.md' ':(exclude)*.markdown'
+          git status --short
+
+      - name: Reconcile target and promote recovered worker evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "${TARGET_BRANCH}"
+          CURRENT="$(git rev-parse "origin/${TARGET_BRANCH}")"
+          test "${CURRENT}" = "${TARGET_SHA}" || {
+            echo "BLOCKED_RECOVERY: target changed again during recovery"
+            exit 43
+          }
+          HEAD_SHA="$(git rev-parse HEAD)"
+          git push origin "${HEAD_SHA}:refs/heads/${TARGET_BRANCH}"
+          echo "RECOVERY_PROMOTED=${HEAD_SHA}"
+
+      - name: Publish recovery status
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/122/comments" \
+            -f body="HooshyarOS Team Wave Recovery #${RUN_NUMBER}: controlled target-drift recovery completed or blocked. Inspect Run ${RUN_ID} for RECOVERY_GATE and recovered worker evidence."
+          true
