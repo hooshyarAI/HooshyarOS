@@ -109,3 +109,17 @@ INTERRUPTED_STAGE = POST-RECOVERY / ARCHITECTURE + AUDIT RECONCILIATION (2026-10
 NEXT_REQUIRED_STATE = EXECUTE_RECONCILIATION_BEFORE_GENERIC_BACKLOG
 CONTROL_PLANE_FIX_REQUIRED = TRUE
 CONTROL_PLANE_NOTE = Prior worker run created 550739d1 but promotion failed because opencode-worker.log remained in the worktree. Temporary logs must live outside the repository worktree and remote promotion must verify committed state.
+
+
+## TEAM EXECUTION STATE
+
+TEAM_WORKER_V1 = READY_MANUAL
+TEAM_MODE = AUDIT_PARALLEL
+TEAM_INITIAL_POOL = 12
+TEAM_SCALE_TARGET = 100
+TEAM_PROTOCOL = .kilo/team/TEAM-WORKER-V1-PROTOCOL.md
+TEAM_MANIFEST = .kilo/team/TEAM-WORKER-V1.json
+
+The first team wave may parallelize the independent audit dimensions of the interrupted reconciliation because the active first objective explicitly forbids product implementation at this stage. The team must keep evidence isolated per worker and use a separate integration/QC gate.
+
+After the reconciliation is complete, implementation waves may be parallelized only from an evidence-backed dependency/write-scope graph. Parallelism must never be used to bypass the one-capability/one-owner/one-coherent-commit rule.
