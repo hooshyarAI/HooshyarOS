@@ -1,0 +1,282 @@
+name: HooshyarOS Team Promotion Recovery
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: "Previously QC-passed Team Worker run to recover"
+        required: false
+        default: "37779956878"
+        type: string
+      recovery_work_commit:
+        description: "Previously executed WORK-0004 recovery commit"
+        required: false
+        default: "305466ccb12c962cf8d37ee70bbfad16a855d8cb"
+        type: string
+
+concurrency:
+  group: hooshyaros-team-promotion-recovery
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+  actions: read
+
+jobs:
+  recover-and-synthesize:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    env:
+      TARGET_BRANCH: fix/autonomous-product-factory
+      START_SHA: 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b
+      SOURCE_RUN_ID: ${{ inputs.source_run_id || '37779956878' }}
+      RECOVERY_WORK_COMMIT: ${{ inputs.recovery_work_commit || '305466ccb12c962cf8d37ee70bbfad16a855d8cb' }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+
+    steps:
+      - name: Checkout current target
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify source run and recovery evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "RECOVERY_SOURCE_RUN=${SOURCE_RUN_ID}"
+          echo "RECOVERY_WORK_COMMIT=${RECOVERY_WORK_COMMIT}"
+
+          python3 - "${SOURCE_RUN_ID}" <<'PY'
+          import json, os, subprocess, sys
+          run_id=sys.argv[1]
+          raw=subprocess.check_output(
+              ["gh","api",f"repos/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{run_id}/jobs?per_page=100"],
+              text=True
+          )
+          jobs=json.loads(raw).get("jobs",[])
+          by_name={j["name"]:j for j in jobs}
+          qc=by_name.get("quality-control")
+          w4=next((j for n,j in by_name.items() if "work-0004-wave10-recovery" in n),None)
+          if not qc or qc.get("conclusion") != "success":
+              raise SystemExit("BLOCKED: source run has no independently successful quality-control job")
+          if not w4 or w4.get("conclusion") != "success":
+              raise SystemExit("BLOCKED: source run has no successful WORK-0004 recovery evidence")
+          print("SOURCE_RUN_QC=PASS")
+          print("SOURCE_RUN_WORK_0004=PASS")
+          PY
+
+          git fetch origin "${TARGET_BRANCH}"
+          CURRENT_TARGET_SHA="$(git rev-parse "origin/${TARGET_BRANCH}")"
+          git cat-file -e "${RECOVERY_WORK_COMMIT}^{commit}"
+          git merge-base --is-ancestor "${START_SHA}" "${RECOVERY_WORK_COMMIT}"
+
+          CHANGED="$(git diff-tree --no-commit-id --name-only -r "${RECOVERY_WORK_COMMIT}")"
+          test "${CHANGED}" = ".kilo/team/results/work-0004-wave10-recovery/result.md" || {
+            echo "BLOCKED: recovery commit changed unexpected paths"
+            printf '%s\n' "${CHANGED}"
+            exit 31
+          }
+
+          echo "CURRENT_TARGET_SHA=${CURRENT_TARGET_SHA}"
+          echo "RECOVERY_COMMIT_SCOPE=PASS"
+
+      - name: Promote only the previously QC-passed WORK-0004 evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          CURRENT_TARGET_SHA="$(git rev-parse "origin/${TARGET_BRANCH}")"
+          if git merge-base --is-ancestor "${RECOVERY_WORK_COMMIT}" "${CURRENT_TARGET_SHA}"; then
+            echo "WORK_0004_ALREADY_PROMOTED=TRUE"
+          else
+            git cherry-pick "${RECOVERY_WORK_COMMIT}"
+            echo "WORK_0004_RECOVERY_CHERRY_PICKED=TRUE"
+          fi
+
+          git fetch origin "${TARGET_BRANCH}"
+          LATEST_TARGET_SHA="$(git rev-parse "origin/${TARGET_BRANCH}")"
+          git merge-base --is-ancestor "${CURRENT_TARGET_SHA}" "${LATEST_TARGET_SHA}"
+          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
+          echo "RECOVERY_PROMOTED_SHA=$(git rev-parse HEAD)"
+
+      - name: Install OpenCode
+        shell: bash
+        run: |
+          set -euo pipefail
+          install_ok=0
+          for attempt in 1 2 3; do
+            echo "RECOVERY_OPENCODE_INSTALL_ATTEMPT=${attempt}"
+            if curl -fsSL https://opencode.ai/install | bash && "$HOME/.opencode/bin/opencode" --version; then
+              install_ok=1
+              break
+            fi
+            test "${attempt}" -lt 3 && sleep 5
+          done
+          test "${install_ok}" -eq 1 || {
+            echo "BLOCKED_EXTERNAL: OpenCode installation failed for recovery synthesis"
+            exit 40
+          }
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+
+      - name: Build safe synthesis candidate pool
+        shell: bash
+        run: |
+          set -euo pipefail
+          CANDIDATES="opencode/space-bunny-free|opencode/muse-spark-1.3-contributor-free|opencode/fledge-alpha-free"
+          echo "SYNTH_MODEL_CANDIDATES=${CANDIDATES}" >> "$GITHUB_ENV"
+          echo "SYNTH_MODEL_CANDIDATES=${CANDIDATES}"
+
+      - name: Synthesize reconciled next governed plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROMPT="${RUNNER_TEMP}/recovery-synthesis.md"
+          cat > "${PROMPT}" <<'EOF'
+          You are the governed HooshyarOS Mission Director/Orchestrator recovery synthesizer.
+
+          This is RECOVERY, not a new product-development wave.
+
+          Inspect:
+          - Docs/HOOSHYAROS_MASTER_CHARTER.md
+          - Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md
+          - Docs/ARCHITECTURE.md
+          - Docs/OPENCODE_EXECUTION_OPERATOR_CONTRACT.md
+          - .kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md
+          - .kilo/team/TEAM-ORGANIZATION-V2.json
+          - .kilo/team/TEAM-ORGANIZATION-V2-PROTOCOL.md
+          - .kilo/team/memory/mission-state.json
+          - .kilo/team/memory/work-registry.json
+          - .kilo/team/memory/evidence-registry.json
+          - .kilo/team/memory/decision-registry.json
+          - .kilo/team/memory/defect-registry.json
+          - .kilo/team/memory/blocker-registry.json
+          - .kilo/team/memory/commit-registry.json
+          - .kilo/team/memory/wave-history.json
+          - .kilo/team/results/work-0003-memory-backfill/result.md
+          - .kilo/team/results/work-0004-wave10-recovery/result.md
+          - .kilo/team/results/work-0005-next-capability/result.md
+          - .kilo/team/NEXT-WAVE-PLAN.schema.json
+
+          Facts already established:
+          - WORK-0003 and WORK-0005 evidence were integrated by the prior recovery run.
+          - WORK-0004 previously executed and independently QC-passed; this recovery promotes only that existing evidence.
+          - Do not re-run WORK-0003, WORK-0004, WORK-0005 merely because their old plan entry remains.
+          - Treat old NEXT-WAVE-PLAN entries as stale planning input when they conflict with current work-registry state.
+          - No accepted F1-F6/CCC/UX work may be reopened without current regression/invalidation evidence.
+          - Architecture Freeze V4/V4.1 is immutable.
+          - No new product engine.
+
+          Your job:
+          1. Reconcile current work-registry status against the newly promoted target state.
+          2. Identify any memory/status reconciliation that is genuinely required before new product work.
+          3. Create a finite dependency-aware NEXT-WAVE-PLAN containing only genuinely READY, non-duplicate work.
+          4. Never create a lease for work whose Work Registry status/readiness or dependencies are not actually satisfied.
+          5. Never create another lease for a work item with an unresolved prior execution attempt.
+          6. Prefer a Memory Editor reconciliation lease when promotion changed the authoritative state but the ledgers still need evidence-backed status reconciliation.
+          7. Only after the memory/control state is genuinely READY should a product implementation lease be planned.
+          8. Update ONLY:
+             - .kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md
+             - .kilo/team/NEXT-WAVE-PLAN.json
+          9. Do not edit the memory ledgers in this synthesis step.
+          10. Create exactly one synthesis commit containing exactly those two files.
+          11. Evidence-backed reasoning only; preserve uncertainty explicitly.
+
+          The result must be a conservative, executable governed plan, not an optimistic plan.
+          Stop after the synthesis commit.
+          EOF
+
+          IFS='|' read -r -a CANDIDATES <<< "${SYNTH_MODEL_CANDIDATES}"
+          status=1
+          LOG="${RUNNER_TEMP}/recovery-synth.log"
+          : > "${LOG}"
+
+          for candidate in "${CANDIDATES[@]}"; do
+            echo "RECOVERY_SYNTH_MODEL_ATTEMPT=${candidate}" | tee -a "${LOG}"
+            if timeout --signal=TERM --kill-after=30s 20m opencode run --auto --model "${candidate}" "$(cat "${PROMPT}")" 2>&1 | tee -a "${LOG}"; then
+              echo "RECOVERY_SYNTH_MODEL_SELECTED=${candidate}" | tee -a "${LOG}"
+              status=0
+              break
+            fi
+          done
+          test "${status}" -eq 0 || {
+            tail -120 "${LOG}" || true
+            exit 41
+          }
+
+      - name: Validate and promote synthesis
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="$(git rev-list --max-parents=0 HEAD >/dev/null 2>&1 && git rev-parse HEAD^ || true)"
+          CURRENT_TARGET_SHA="$(git rev-parse "origin/${TARGET_BRANCH}")"
+          AHEAD="$(git rev-list --count "${CURRENT_TARGET_SHA}..HEAD")"
+          test "${AHEAD}" -eq 1 || {
+            echo "BLOCKED: recovery synthesis must create exactly one commit on top of current target"
+            exit 42
+          }
+
+          CHANGED="$(git diff --name-only "${CURRENT_TARGET_SHA}...HEAD")"
+          EXPECTED=$'.kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md\n.kilo/team/NEXT-WAVE-PLAN.json'
+          test "${CHANGED}" = "${EXPECTED}" || {
+            echo "BLOCKED: synthesis changed paths are not exactly mission + plan"
+            printf '%s\n' "${CHANGED}"
+            exit 43
+          }
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          plan=json.loads(Path(".kilo/team/NEXT-WAVE-PLAN.json").read_text(encoding="utf-8"))
+          mission=Path(".kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md").read_text(encoding="utf-8")
+          status=plan.get("wave_status")
+          leases=plan.get("leases",[])
+          if plan.get("schema_version") != "1.0":
+              raise SystemExit("BLOCKED: invalid plan schema")
+          if status not in {"READY","BLOCKED","COMPLETE","NOT_READY"}:
+              raise SystemExit("BLOCKED: invalid wave status")
+          ids=set()
+          for lease in leases:
+              for key in ("id","role","focus","owner","mode","write_scope"):
+                  if not lease.get(key):
+                      raise SystemExit(f"BLOCKED: missing {key} in lease")
+              if lease["id"] in ids:
+                  raise SystemExit(f"BLOCKED: duplicate lease {lease['id']}")
+              ids.add(lease["id"])
+              if lease["mode"] not in {"AUDIT","IMPLEMENT","REVIEW","VERIFY"}:
+                  raise SystemExit(f"BLOCKED: invalid mode {lease['mode']}")
+              root=f".kilo/team/results/{lease['id']}/"
+              if root not in lease["write_scope"]:
+                  raise SystemExit(f"BLOCKED: missing evidence root for {lease['id']}")
+          if status == "READY":
+              if "MISSION_STATUS = ACTIVE" not in mission or "CONTINUE_ALLOWED = TRUE" not in mission:
+                  raise SystemExit("BLOCKED: mission continuation state inconsistent with READY plan")
+              if not leases:
+                  raise SystemExit("BLOCKED: READY plan has no leases")
+          print(f"RECOVERY_NEXT_WAVE_STATUS={status}")
+          print(f"RECOVERY_NEXT_WAVE_LEASES={len(leases)}")
+          PY
+
+          git fetch origin "${TARGET_BRANCH}"
+          NOW_TARGET="$(git rev-parse "origin/${TARGET_BRANCH}")"
+          test "${NOW_TARGET}" = "${CURRENT_TARGET_SHA}" || {
+            echo "BLOCKED: target changed during synthesis"
+            exit 44
+          }
+          git merge-base --is-ancestor "${CURRENT_TARGET_SHA}" HEAD
+          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
+
+      - name: Publish recovery evidence
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          STATUS="$(python3 -c 'import json; print(json.load(open(".kilo/team/NEXT-WAVE-PLAN.json"))["wave_status"])' 2>/dev/null || echo UNKNOWN)"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/122/comments"             -f body="HooshyarOS Promotion Recovery: source_run=${SOURCE_RUN_ID}; work_0004_commit=${RECOVERY_WORK_COMMIT}; synthesis_status=${STATUS}; no WORK-0003/0004/0005 re-execution authorized by this recovery path."
+          true
