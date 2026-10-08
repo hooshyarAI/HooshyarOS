@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 "use strict";
 const { execFileSync } = require("node:child_process");
+const { evaluateGate } = require("./lib/team-v2-gate.cjs");
+const { validateWork, workIdFromLeaseId } = require("./lib/team-v2-admission.cjs");
 
 const TARGET_BRANCH = process.env.TARGET_BRANCH || "fix/autonomous-product-factory";
 const WORKER_WORKFLOW_ID = process.env.TEAM_WORKER_WORKFLOW_ID || "378094136";
@@ -24,16 +26,27 @@ function overlaps(a, b) {
   return Boolean(aa && bb) && (aa === bb || aa.startsWith(`${bb}/`) || bb.startsWith(`${aa}/`));
 }
 
-function admissionViolations({ gate, plan, registry }) {
+function admissionViolations({ gate, plan, registry, authorization = null, acceptanceWorkId = null, acceptanceLeaseId = null, targetSha = null, planSha256 = null, now = null }) {
   const violations = [];
   if (!gate || typeof gate !== "object") {
     violations.push({ code: "GATE_MISSING", detail: "acceptance gate missing/invalid" });
+  } else if (gate.gate_id !== "TEAM-V2-ACCEPTANCE") {
+    violations.push({ code: "GATE_ID_INVALID", detail: "unexpected gate id" });
   } else {
-    if (gate.gate_id !== "TEAM-V2-ACCEPTANCE") {
-      violations.push({ code: "GATE_ID_INVALID", detail: `gate_id=${String(gate.gate_id)}` });
-    }
-    if (gate.status === "ARMED" && gate.hold_after_pass === true) {
-      violations.push({ code: "ACCEPTANCE_HOLD", detail: "status=ARMED and hold_after_pass=true" });
+    const gateDecision = evaluateGate(
+      gate,
+      authorization,
+      {
+        workId: acceptanceWorkId || null,
+        leaseId: acceptanceLeaseId || null,
+        targetBranch: TARGET_BRANCH,
+        targetSha: targetSha || null,
+        planSha256: planSha256 || null,
+        now
+      }
+    );
+    if (gateDecision.decision === "REFUSE") {
+      violations.push(...gateDecision.violations);
     }
   }
 
@@ -157,7 +170,22 @@ if (require.main === module) {
   const gate = readRepoJson(".kilo/team/TEAM-V2-ACCEPTANCE-GATE.json");
   const plan = readRepoJson(".kilo/team/NEXT-WAVE-PLAN.json");
   const registry = readRepoJson(".kilo/team/memory/work-registry.json");
-  const violations = admissionViolations({ gate, plan, registry });
+  const acceptanceLease = Array.isArray(plan.leases) && plan.leases.length === 1 ? plan.leases[0] : null;
+  const acceptanceWorkId = acceptanceLease ? workIdFromLeaseId(acceptanceLease.id) : null;
+  const authorizationPath = process.env.TEAM_ACCEPTANCE_AUTHORIZATION_PATH || "";
+  let authorization = null;
+  if (authorizationPath) authorization = readRepoJson(authorizationPath);
+  const violations = admissionViolations({
+    gate,
+    plan,
+    registry,
+    authorization,
+    acceptanceWorkId,
+    acceptanceLeaseId: acceptanceLease?.id || null,
+    targetSha: process.env.TEAM_TARGET_SHA || null,
+    planSha256: process.env.TEAM_PLAN_SHA256 || null,
+    now: new Date().toISOString()
+  });
 
   console.log(`TEAM_DISPATCH_AUTHORITY_PLAN=${plan.wave_status}`);
   console.log(`TEAM_DISPATCH_AUTHORITY_GATE=${gate.status}`);
