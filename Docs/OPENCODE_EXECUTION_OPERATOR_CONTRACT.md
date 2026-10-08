@@ -154,7 +154,23 @@ No blind retry loops.
 
 A failed repair leaves the run BLOCKED with failure evidence preserved.
 
-## 10. Free-only model policy
+## Adaptive Free-Model Selection
+
+OpenCode remains **free-only**, but it is not fixed to a single model. At the start of every worker run, the outer control-plane must refresh the OpenCode model catalog and build a ranked candidate set from models that are both available/authenticated and genuinely zero-cost on effective input/output/reasoning charges.
+
+Ranking must prefer:
+- reasoning capability;
+- tool calling;
+- structured output;
+- larger context and output capacity;
+- current/recent catalog metadata;
+- known repository/task fitness where evidence exists.
+
+The highest-ranked eligible candidate is selected for the current Micro-Stage. If it fails technically before yielding a usable governed result, the controller may try the next ranked free candidate in the same run, preserving the failed attempt evidence. No automatic paid fallback is permitted.
+
+When no eligible free candidate is available, the run must enter `BLOCKED_FREE_MODEL_UNAVAILABLE`.
+
+
 
 Automatic construction uses free models only.
 
