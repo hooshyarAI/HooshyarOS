@@ -350,7 +350,7 @@
     {
       "id": "WORK-0009",
       "title": "work-0009-team-v2-acceptance",
-      "status": "READY",
+      "status": "FAILED",
       "mode": "AUDIT",
       "priority": "P1",
       "owner": "SPECIALIST_WORKER_POOL",
@@ -368,7 +368,7 @@
       "test_scope": "TEAM_CONTROL_PLANE_ONLY_NO_PRODUCT_CODE_CHANGE",
       "risk": "P0",
       "value": "Decides whether autonomous team construction is safe to continue.",
-      "readiness": "READY",
+      "readiness": "NOT_READY",
       "estimated_complexity": "LOW_CONTROL_PLANE_ACCEPTANCE",
       "write_scope": [
         ".kilo/team/results/work-0009-team-v2-acceptance/"
@@ -383,12 +383,23 @@
       "execution_attempts": [
         {
           "run_id": 37816306137,
-          "state": "RESERVED_EXECUTING",
-          "promoted": false,
-          "commit": null,
-          "start_sha": "6e8678fd145ef90f335800b0f7cc1b39b6e79a96",
           "lease_id": "work-0009-team-v2-acceptance",
-          "reserved_at": "2026-10-08T17:26:00.626749+00:00"
+          "state": "EXECUTED_UNPROMOTED",
+          "qc": "BLOCKED_BY_CONTROL_PLANE_DEFECT",
+          "promoted": false,
+          "commit": "924d33d32fcff7b7d642a28bcbe487bafd5bf194",
+          "branch": "opencode/team-work-0009-team-v2-acceptance-37816306137",
+          "start_sha": "bd63f6db1f767b58b0585a41fbb4377257674673",
+          "evidence_artifact_id": 11567523050,
+          "evidence_artifact_digest": "sha256:85cd5c5447536c90c9bc6289440bcc3680c4b37e4c085cdf68168daf61975dcc",
+          "qc_artifact_id": 11567642197,
+          "qc_artifact_digest": "sha256:f0a95e8f652caa9aba6e5b3cfa27aafd82cd2a7495eb0900df0bdd77506eab7b",
+          "failure": "F1 NameError: subprocess missing in QC workspace; F2 SyntaxError in persisted-QC integration gate.",
+          "repair_main_commits": [
+            "c19875f1b4bc87fa182d124e594773181a5cf7c8",
+            "7fdd58fb015b00924018e269f0dd325c7b1fc05b"
+          ],
+          "note": "Worker execution, validation and branch preservation succeeded. No QC acceptance or promotion occurred. Remote worker branch exists and must not be re-dispatched as WORK-0009."
         }
       ],
       "reservations": [
@@ -396,11 +407,25 @@
           "run_id": 37816306137,
           "lease_id": "work-0009-team-v2-acceptance",
           "start_sha": "6e8678fd145ef90f335800b0f7cc1b39b6e79a96",
-          "state": "EXECUTING",
-          "planned_branch": "opencode/team-work-0009-team-v2-acceptance-37816306137"
+          "state": "RELEASED_FAILED_CONTROL_PLANE",
+          "planned_branch": "opencode/team-work-0009-team-v2-acceptance-37816306137",
+          "released_at": "2026-10-08T17:33:10Z"
         }
       ],
-      "last_state_change_by": "TEAM_MANAGER_RESERVATION_37816306137"
+      "last_state_change_by": "TEAM-MANAGER-RECONCILIATION-RUN-37816306137",
+      "governance_state": "EXECUTED_UNPROMOTED",
+      "failure_reconciliation": {
+        "run_id": 37816306137,
+        "classification": "CONTROL_PLANE_DEFECT_NOT_WORKER_FAILURE",
+        "worker_execution": "PASS",
+        "validator": "PASS",
+        "branch_preservation": "PASS",
+        "qc_workspace": "FAIL_F1",
+        "persisted_qc_gate": "BLOCKED_F2",
+        "targeted_repairs_applied": true,
+        "duplicate_dispatch": "FORBIDDEN",
+        "next_action": "WORK-0010 fresh acceptance wave"
+      }
     }
   ],
   "backfill_required_scope": {
@@ -431,8 +456,9 @@
     ]
   },
   "registry_reconciliation": {
-    "last_reconciled_run": 37799429283,
+    "last_reconciled_run": 37816306137,
     "principle": "EXECUTED_BUT_UNPROMOTED_ATTEMPTS_ARE_REGISTERED_AND_BLOCK_DUPLICATE_REDISPATCH",
-    "acceptance_wave": "WORK-0009"
+    "acceptance_wave": "WORK-0009",
+    "acceptance_recovery": "WORK-0009 failed closed on control-plane defects; WORK-0010 is a fresh non-duplicate acceptance lease after targeted repairs."
   }
 }
