@@ -4,6 +4,7 @@ on:
   workflow_run:
     workflows:
       - HooshyarOS Continuous OpenCode Worker
+      - HooshyarOS Autonomous Team Worker
     types: [completed]
 
 permissions:
@@ -35,12 +36,14 @@ jobs:
           CONCLUSION="${{ github.event.workflow_run.conclusion }}"
           HEAD_SHA="${{ github.event.workflow_run.head_sha }}"
           RUN_URL="${{ github.event.workflow_run.html_url }}"
+          WORKFLOW_NAME="${{ github.event.workflow_run.name }}"
 
           {
             echo "HOOSHYAROS_WORKER_STOPPED=TRUE"
             echo "RUN_ID=${RUN_ID}"
             echo "RUN_NUMBER=${RUN_NUMBER}"
             echo "CONCLUSION=${CONCLUSION}"
+            echo "WORKFLOW_NAME=${WORKFLOW_NAME}"
             echo "HEAD_SHA=${HEAD_SHA}"
             echo "RUN_URL=${RUN_URL}"
           } >> "${GITHUB_ENV}"
@@ -48,6 +51,7 @@ jobs:
           cat > "${RUNNER_TEMP}/stop-report.txt" <<EOF
 HooshyarOS Autonomous Worker متوقف شد.
 
+Workflow: ${WORKFLOW_NAME}
 Run: #${RUN_NUMBER}
 Conclusion: ${CONCLUSION}
 Run ID: ${RUN_ID}
