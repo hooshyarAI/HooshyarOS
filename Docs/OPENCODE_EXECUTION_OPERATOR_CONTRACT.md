@@ -360,3 +360,15 @@ Never claim complete merely because the model finished its turn.
 This contract supplements, and never replaces, the Master Charter, Governance Charter, Architecture Freeze, Commercial Product Completion Contract or existing engine/test contracts.
 
 A future change to this contract requires the same evidence-backed governance discipline as any other construction-method change.
+
+
+### Dynamic Team-Wave Contract
+
+When Team Worker mode is active:
+- `.kilo/team/NEXT-WAVE-PLAN.json` is the preferred source of worker leases when its `wave_status = READY`.
+- The Team Orchestrator must never repeat the initial audit manifest merely because it is available.
+- Each lease must be dependency-ready and have an explicit non-overlapping write scope.
+- The Team Worker may execute AUDIT, IMPLEMENT, REVIEW or VERIFY mode only when the active mission and lease permit it.
+- The Team Synthesizer must create the next governed plan after each successful wave, or explicitly mark the team wave COMPLETE/BLOCKED.
+- No automatic continuation is allowed from a stale or invalid lease plan.
+- Team scaling is capacity-controlled; worker count may increase only when measured throughput and quality support it.
