@@ -224,6 +224,15 @@ jobs:
           }
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
 
+      - name: Preflight OpenCode CLI for model qualification
+        shell: bash
+        run: |
+          set -euo pipefail
+          opencode run --help > "${RUNNER_TEMP}/qualification-run-help.txt" 2>&1
+          grep -q -- "--model" "${RUNNER_TEMP}/qualification-run-help.txt"
+          grep -q -- "--agent" "${RUNNER_TEMP}/qualification-run-help.txt"
+          grep -q -- "--auto" "${RUNNER_TEMP}/qualification-run-help.txt"
+          echo "Model qualification CLI preflight: PASS"
       - name: Qualify top free models empirically
         id: qualify
         shell: bash
@@ -572,7 +581,42 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -f "${WRITE_ROOT}result.md"
+          REPORT="${WRITE_ROOT}result.md"
+          test -f "${REPORT}"
+          REPORT_BYTES="$(wc -c < "${REPORT}")"
+          test "${REPORT_BYTES}" -ge 1200 || {
+            echo "BLOCKED: evidence report too small (${REPORT_BYTES} bytes)"
+            exit 21
+          }
+          python3 - "${REPORT}" <<'PY'
+          import re, sys
+          from pathlib import Path
+          p=Path(sys.argv[1])
+          text=p.read_text(encoding="utf-8", errors="replace")
+          required=["STATUS","SCOPE","CURRENT_EVIDENCE","FINDINGS","DEPENDENCIES","RISKS","OVERLAPS","RECOMMENDED_NEXT_MICRO_STAGE","VERIFICATION_METHOD","PROVENANCE"]
+          sections={}
+          for m in re.finditer(r"^# ([A-Z0-9_]+)\s*$", text, re.M):
+              sections[m.group(1)]=m.end()
+          missing=[x for x in required if x not in sections]
+          if missing:
+              raise SystemExit("BLOCKED: missing report sections: "+", ".join(missing))
+          for name in ("CURRENT_EVIDENCE","FINDINGS","PROVENANCE"):
+              starts=[m.end() for m in re.finditer(rf"^# {re.escape(name)}\s*$",text,re.M)]
+              if not starts:
+                  raise SystemExit(f"BLOCKED: section {name} missing")
+              idx=starts[0]
+              nxt=re.search(r"^# [A-Z0-9_]+\s*$",text[idx:],re.M)
+              body=text[idx: idx+(nxt.start() if nxt else len(text))].strip()
+              if len(body)<120:
+                  raise SystemExit(f"BLOCKED: section {name} lacks substantive evidence")
+          status=re.search(r"^# STATUS\s*\n+(.+)$",text,re.M)
+          if not status or not status.group(1).strip():
+              raise SystemExit("BLOCKED: STATUS is empty")
+          if re.search(r"\b(TODO|TBD|FILL ME|PLACEHOLDER)\b",text,re.I):
+              raise SystemExit("BLOCKED: placeholder text remains in evidence report")
+          if not re.search(r"(?:\.tsx?|\.ts|\.js|\.json|\.md|\.yml|\.yaml|\.github/|\.kilo/|Backend/|Docs/|web/)", text):
+              raise SystemExit("BLOCKED: PROVENANCE contains no repository path")
+          PY
           test -z "$(git status --porcelain)" || {
             echo "BLOCKED: uncommitted changes remain after worker commit"
             exit 21
