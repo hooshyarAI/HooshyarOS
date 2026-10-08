@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "next_id": "COMMIT-0007",
+  "next_id": "COMMIT-0013",
   "items": [
     {
       "id": "COMMIT-0001",
@@ -37,6 +37,42 @@
       "sha": "82d63f9534de7d8dac15869cd3b996a9d5ccb8a5",
       "purpose": "supersede stale queued team waves safely via concurrency cancellation",
       "status": "MAIN_CONTROL_PLANE"
+    },
+    {
+      "id": "COMMIT-0007",
+      "sha": "215f8c80ad8ce9c0401aa10fd4a5a29f28246922",
+      "purpose": "V2 wave gated on active organization and memory state",
+      "status": "RECENT_CONTROL_PLANE"
+    },
+    {
+      "id": "COMMIT-0008",
+      "sha": "314e6b885b0f5c809a6ec3c94e1d6fa0af219a19",
+      "purpose": "dynamic leases bound to permanent WORK-#### records",
+      "status": "RECENT_CONTROL_PLANE"
+    },
+    {
+      "id": "COMMIT-0009",
+      "sha": "729c00cb86126bfb8172f961aea40164fbd82352",
+      "purpose": "worker V2 memory-context gate",
+      "status": "RECENT_CONTROL_PLANE"
+    },
+    {
+      "id": "COMMIT-0010",
+      "sha": "dec57432935475b417c2bb233e19e8028b87d04e",
+      "purpose": "V2 memory and anti-duplication rules injected into worker prompts",
+      "status": "RECENT_CONTROL_PLANE"
+    },
+    {
+      "id": "COMMIT-0011",
+      "sha": "9151fe4dbe85f9fbda0a3a7555a2206fb2e92461",
+      "purpose": "synthesis bound to V2 memory and anti-duplication state",
+      "status": "RECENT_CONTROL_PLANE"
+    },
+    {
+      "id": "COMMIT-0012",
+      "sha": "00d0688294277cb8135a5271ef508703ffa64040",
+      "purpose": "WORK-0006 pre-gate team performance baseline",
+      "status": "RECENT_CONTROL_PLANE"
     }
   ]
 }
