@@ -431,7 +431,7 @@ jobs:
               role = str(lease.get("role","")).upper()
               focus = str(lease.get("focus","")).upper()
               owner = str(lease.get("owner","")).upper()
-              text = f"{role} {focus} {owner}"
+              text = role + " " + focus + " " + owner
               if "MEMORY" in text or "EDITOR" in owner: return "MEMORY"
               if "QC" in text or "EVALUATOR" in owner: return "QC"
               if "REPAIR" in text: return "REPAIR"
@@ -442,6 +442,13 @@ jobs:
               if "AUDIT" in text: return "AUDIT"
               return str(lease.get("mode","")).upper()
 
+          def resolved_task_class(lease):
+              derived = task_class_for(lease)
+              explicit = str(lease.get("task_class","")).upper()
+              if explicit and explicit != derived:
+                  raise SystemExit("BLOCKED: task_class mismatch for " + str(lease.get("id")) + ": " + explicit + " != " + derived)
+              return explicit or derived
+
           matrix = {
               "include": [
                   {
@@ -450,7 +457,7 @@ jobs:
                       "focus": x["focus"],
                       "owner": x["owner"],
                       "mode": x["mode"],
-                      "task_class": task_class_for(x),
+                      "task_class": resolved_task_class(x),
                       "write_scope_json": json.dumps(x["write_scope"], ensure_ascii=False, separators=(",", ":")),
                       "write_root": f".kilo/team/results/{x['id']}/"
                   }
@@ -863,10 +870,10 @@ jobs:
           with open(os.environ["GITHUB_ENV"],"a",encoding="utf-8") as out:
               out.write("MODEL_CANDIDATES="+"|".join(models)+"\n")
               out.write("SELECTED_MODEL="+models[0]+"\n")
-              out.write("MODEL_ROUTING_TASK_CLASS="+mode+"\n")
+              out.write("MODEL_ROUTING_TASK_CLASS="+task_class+"\n")
               out.write("ROUTE_PLAN_JSON="+json.dumps(route,ensure_ascii=False,separators=(",",":"))+"\n")
           print("MODEL_SELECTION_STATUS=LEASE_SPECIFIC")
-          print("MODEL_ROUTING_TASK_CLASS="+mode)
+          print("MODEL_ROUTING_TASK_CLASS="+task_class)
           print("MODEL_SELECTED_FOR_WORKER="+models[0])
           print("MODEL_CANDIDATES="+"|".join(models))
           PY
