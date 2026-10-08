@@ -30,4 +30,5 @@ const drift = { ...auth, consumed: false, bindings: { ...auth.bindings, target_s
 assert.equal(evaluateGate(gate, drift, ctx).code, "AUTHORIZATION_BINDING_MISMATCH");
 
 assert.equal(evaluateGate({ gate_id: "TEAM-V2-ACCEPTANCE", status: "RELEASED", hold_after_pass: false }, null, ctx).decision, "ALLOW_NORMAL");
+assert.equal(evaluateGate({ gate_id: "TEAM-V2-ACCEPTANCE", status: "UNKNOWN", hold_after_pass: false }, null, ctx).code, "GATE_STATE_INVALID");
 console.log("TEAM_V2_GATE_TEST=PASS");
