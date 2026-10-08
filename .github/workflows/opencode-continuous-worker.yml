@@ -175,8 +175,11 @@ jobs:
           PY
 
           cat "${RUNNER_TEMP}/model-selection.env" | tee -a "${GITHUB_ENV}"
-          test "${MODEL_SELECTION_STATUS:-}" = "OK"
-          echo "Adaptive free-model policy selected: ${SELECTED_MODEL}"
+          MODEL_SELECTION_STATUS_LOCAL="$(sed -n 's/^MODEL_SELECTION_STATUS=//p' "${RUNNER_TEMP}/model-selection.env" | head -1)"
+          SELECTED_MODEL_LOCAL="$(sed -n 's/^SELECTED_MODEL=//p' "${RUNNER_TEMP}/model-selection.env" | head -1)"
+          test "${MODEL_SELECTION_STATUS_LOCAL}" = "OK"
+          test -n "${SELECTED_MODEL_LOCAL}"
+          echo "Adaptive free-model policy selected: ${SELECTED_MODEL_LOCAL}"
 
       - name: Install repository dependencies
         shell: bash
