@@ -148,6 +148,18 @@ jobs:
                   raise SystemExit(f"BLOCKED: duplicate lease id {lid}")
               seen_ids.add(lid)
 
+              import re
+              match = re.match(r"^work-([0-9]{4})(?:-|$)", lid)
+              if not match:
+                  raise SystemExit(f"BLOCKED: V2 lease {lid} lacks stable WORK-#### identity")
+              work_id = f"WORK-{match.group(1)}"
+              work_items = [x for x in work_registry.get("items", []) if x.get("id") == work_id]
+              if len(work_items) != 1:
+                  raise SystemExit(f"BLOCKED: V2 lease {lid} has no unique Work Registry record {work_id}")
+              work_status = str(work_items[0].get("status", "")).upper()
+              if work_status in {"CLOSED", "MEMORIZED", "PROMOTED", "DUPLICATE", "SUPERSEDED"}:
+                  raise SystemExit(f"BLOCKED: V2 lease {lid} targets terminal work {work_id}:{work_status}")
+
               scope = [str(x) for x in lease["write_scope"]]
               result_root = f".kilo/team/results/{lid}/"
               if result_root not in scope:
