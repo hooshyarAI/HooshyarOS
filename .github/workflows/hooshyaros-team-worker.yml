@@ -373,8 +373,6 @@ jobs:
           ))
           PY
           tee -a "${GITHUB_ENV}" < "${RUNNER_TEMP}/model-selection.env"
-
-          tee -a "${GITHUB_ENV}" < "${RUNNER_TEMP}/model-selection.env"
           SELECTED_MODEL="$(sed -n 's/^SELECTED_MODEL=//p' "${RUNNER_TEMP}/model-selection.env" | head -1)"
           test -n "${SELECTED_MODEL}"
           echo "MODEL_SELECTED_FOR_WORKER=${SELECTED_MODEL}"
