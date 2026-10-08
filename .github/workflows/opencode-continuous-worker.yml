@@ -8,7 +8,7 @@ on:
         required: false
         type: string
       legacy_recovery_ack:
-        description: "Required explicit acknowledgement for legacy recovery; this path is not Team V2"
+        description: "Acknowledgement: EXPLICIT_LEGACY_RECOVERY or CONTROL_PLANE_REPAIR"
         required: true
         default: "DENY"
         type: string
@@ -24,7 +24,7 @@ permissions:
 
 jobs:
   continuous-worker:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.legacy_recovery_ack == 'EXPLICIT_LEGACY_RECOVERY' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.legacy_recovery_ack == 'EXPLICIT_LEGACY_RECOVERY' || inputs.legacy_recovery_ack == 'CONTROL_PLANE_REPAIR') }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
@@ -32,6 +32,7 @@ jobs:
       MODEL_POLICY: adaptive-free
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPAIR_MODE: ${{ inputs.legacy_recovery_ack == 'CONTROL_PLANE_REPAIR' }}
 
     steps:
       - name: Checkout current target branch
@@ -99,13 +100,7 @@ jobs:
               cost = m.get("cost") or {}
               direct_costs = [v for v in cost.values() if isinstance(v, (int, float))] if isinstance(cost, dict) else []
               explicit_free = bool(direct_costs) and all(v == 0 for v in direct_costs)
-              name = mid.split("/", 1)[1] if "/" in mid else mid
-              named_free = (
-                  mid == "opencode/big-pickle"
-                  or name.lower().endswith("-free")
-                  or "-free-" in name.lower()
-              )
-              if not (explicit_free or named_free):
+              if not explicit_free:
                   continue
 
               reasoning = m.get("reasoning") is True or caps.get("reasoning") is True
@@ -197,6 +192,24 @@ jobs:
         run: |
           set -euo pipefail
           PROMPT_FILE="${RUNNER_TEMP}/opencode-continuous-prompt.md"
+          if test "${REPAIR_MODE}" = "true"; then
+            cat > "${PROMPT_FILE}" <<'REPAIR_PROMPT'
+          You are the HooshyarOS CONTROL-PLANE REPAIR specialist.
+
+          This is a bootstrap repair-only lane. Acceptance Gate MUST remain ARMED with hold_after_pass=true.
+          Do not dispatch Team Worker. Do not change product code, F1-F6, CCC, UX, ingestion, customer data, secrets, or Architecture Freeze V4/V4.1.
+
+          Read the current repository and Team V2 authorities. Repair only the control-plane defects already identified in Issue #122:
+          1) deterministic task_class mapping: PLAN, AUDIT, IMPLEMENT, REPAIR, REVIEW, VERIFY, QC, MEMORY. Role/focus determines it; mode is fallback only.
+          2) authoritative free-model qualification only: non-empty numeric cost metadata and every cost exactly zero; fresh catalog; task-specific probe; correctness-first ranking; provider diversity; bounded candidate failover; persisted attempts/failure reasons. Model names never prove free.
+          3) Work Registry authoritative anti-duplication lineage; unresolved unpromoted attempts block redispatch; concurrent admission of the same Work yields at most one reservation, with deterministic regression/race coverage.
+          4) persist task_class in runtime evidence and prevent self-selection of another task.
+          5) all Team Worker dispatch ingress paths use the common Dispatch Authority; recovery/continuation must not directly dispatch the Worker.
+
+          Allowed paths ONLY: .github/workflows/hooshyaros-team-worker.yml, .github/workflows/team-dispatch-authority.yml, .github/workflows/team-command-dispatcher.yml, .github/workflows/team-wave-continuation.yml, .github/workflows/hooshyaros-team-wave-recovery.yml, scripts/team-v2-dispatch-authority.cjs, scripts/team-v2-dispatch-authority.test.cjs, scripts/team-v2-*.test.cjs
+          Do not modify TEAM-V2-ACCEPTANCE-GATE.json. Do not release its hold. Inspect actual code, make minimal root repairs, add focused tests, run them, verify gate remains held, create exactly ONE coherent commit, then stop.
+          REPAIR_PROMPT
+          else
           cat > "${PROMPT_FILE}" <<'PROMPT'
           You are OpenCode, the governed remote execution operator for HooshyarOS.
 
@@ -242,7 +255,8 @@ jobs:
 
           Return one of:
           ADVANCED / RECONCILED / BLOCKED / NO_SAFE_WORK / BLOCKED_FREE_MODEL_UNAVAILABLE.
-          PROMPT
+
+          fi
 
           OPENCODE_LOG="${RUNNER_TEMP}/opencode-worker.log"
           : > "${OPENCODE_LOG}"
@@ -278,6 +292,28 @@ jobs:
           git diff --name-only "origin/${TARGET_BRANCH}...HEAD" > changed-paths.txt
           echo "Changed paths:"
           cat changed-paths.txt
+          if test "${REPAIR_MODE}" = "true"; then
+            ALLOWED_CONTROL=".github/workflows/hooshyaros-team-worker.yml
+.github/workflows/team-dispatch-authority.yml
+.github/workflows/team-command-dispatcher.yml
+.github/workflows/team-wave-continuation.yml
+.github/workflows/hooshyaros-team-wave-recovery.yml
+scripts/team-v2-dispatch-authority.cjs
+scripts/team-v2-dispatch-authority.test.cjs"
+            while IFS= read -r path; do
+              test -n "${path}" || continue
+              grep -Fxq "${path}" <<< "${ALLOWED_CONTROL}" || { echo "BLOCKED: repair changed non-control-plane path ${path}"; exit 21; }
+            done < changed-paths.txt
+            python3 - <<'PY'
+          import json
+          from pathlib import Path
+          g=json.loads(Path(".kilo/team/TEAM-V2-ACCEPTANCE-GATE.json").read_text(encoding="utf-8"))
+          if g.get("status")!="ARMED" or g.get("hold_after_pass") is not True:
+              raise SystemExit("BLOCKED: acceptance gate changed")
+          print("REPAIR_GATE_HELD=TRUE")
+          PY
+            echo "REPAIR_SCOPE_FIREWALL=PASS"
+          else
 
           if grep -Eq '^(AGENTS\.md|AUTONOMOUS_MISSION\.md|Docs/ARCHITECTURE\.md|Docs/HOOSHYAROS_MASTER_CHARTER\.md|Docs/HOOSHYAROS_GOVERNANCE_CHARTER\.md|Docs/HOOSHYAROS_TOOLCHAIN_OPTIMIZATION_LAW\.md|Docs/HOOSHYAROS_FINAL_DECISIONS_REGISTER\.md|Assistant/SYSTEM_PROMPT\.md|Docs/ARCHITECTURE_DECISIONS/|\.github/|package\.json$|package-lock\.json$|npm-shrinkwrap\.json$|\.env|.*\.pem$|.*\.key$|.*\.p12$)' changed-paths.txt; then
             echo "BLOCKED: protected/control-plane path changed"
