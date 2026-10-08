@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "next_id": "BLOCKER-0002",
+  "next_id": "BLOCKER-0003",
   "items": [
     {
       "id": "BLOCKER-0001",
@@ -12,6 +12,35 @@
       ],
       "evidence": "Team Wave 10 integrate failure + recovery workflow",
       "safe_unblock": "controlled recovery verifies drift paths and imports only independently QC-passed worker results"
+    },
+    {
+      "id": "BLOCKER-0002",
+      "title": "GitHub Actions runner queue blocks WAVE-0011 Team Worker start",
+      "status": "BLOCKED_INFRASTRUCTURE_QUEUE",
+      "severity": "P0",
+      "affected_work": [
+        "WORK-0003",
+        "WORK-0004",
+        "WORK-0005",
+        "WORK-0006"
+      ],
+      "evidence": {
+        "team_run": 37759400053,
+        "team_status": "pending",
+        "team_jobs": "prepare queued",
+        "other_live_runs": [
+          "37759380907",
+          "37759380906",
+          "37759380882",
+          "37759380935",
+          "37759380909",
+          "37759380914",
+          "37759380937"
+        ]
+      },
+      "root_cause": "No worker job has been allocated to Team Run #15 while multiple repository workflows are simultaneously queued.",
+      "safe_unblock": "allow GitHub Actions runner scheduling to release the Team Worker; do not launch stale duplicate waves",
+      "rule": "No product completion, failure or retry inference from queued state."
     }
   ]
 }
