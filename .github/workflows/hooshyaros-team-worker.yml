@@ -1708,20 +1708,17 @@ jobs:
           git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
           echo "SYNTHESIS_PROMOTED=$(git rev-parse HEAD)"
 
-      - name: Continue next governed team wave
+      - name: Publish continuation decision only
         if: ${{ success() }}
         shell: bash
         run: |
           set -euo pipefail
           PLAN=.kilo/team/NEXT-WAVE-PLAN.json
           MISSION=.kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md
-          if test -f "${PLAN}" && grep -q '"wave_status": "READY"' "${PLAN}" && grep -Fxq 'MISSION_STATUS = ACTIVE' "${MISSION}" && grep -Fxq 'CONTINUE_ALLOWED = TRUE' "${MISSION}"; then
-            echo "TEAM_CONTINUE=TRUE"
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/workflows/hooshyaros-team-worker.yml/dispatches" \
-              -f ref=main \
-              -f 'inputs[reason]=Automatic continuation of active governed team wave'
+          if test -f "${PLAN}" && grep -q '"wave_status": "READY"' "${PLAN}" && grep -Fxq 'MISSION_STATUS = ACTIVE' "${MISSION}" && grep -q 'CONTINUE_ALLOWED = TRUE' "${MISSION}"; then
+            echo "TEAM_CONTINUE_READY=TRUE"
           else
-            echo "TEAM_CONTINUE=FALSE"
+            echo "TEAM_CONTINUE_READY=FALSE"
           fi
 
       - name: Publish team wave summary
