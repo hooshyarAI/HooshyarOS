@@ -75,7 +75,7 @@ PYRUN
         shell: bash
         run: |
           set -euo pipefail
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/workflows/${TEAM_WORKER_WORKFLOW_ID}/dispatches"             -f ref=fix/autonomous-product-factory             -f 'inputs[max_parallel]=12'             -f 'inputs[reason]=manager bootstrap recovery after queue storm'
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/workflows/${TEAM_WORKER_WORKFLOW_ID}/dispatches"             -f ref=fix/autonomous-product-factory
           echo "TEAM_WORKER_DISPATCH=SUCCESS"
 
       - name: Manager — Record evidence
