@@ -11,7 +11,8 @@
       "priority": "P0",
       "owner": "MISSION_DIRECTOR",
       "dependencies": [
-        "WORK-0002_CONTROL_PLANE_SAFETY"
+        "TEAM_ORGANIZATION_V2_ACTIVE",
+        "CONTROL_PLANE_SAFE"
       ],
       "evidence_required": [
         "current_repository_state",
@@ -24,7 +25,7 @@
     {
       "id": "WORK-0002",
       "title": "Team Organization V2 Operationalization",
-      "status": "ACTIVE",
+      "status": "COMPLETED",
       "mode": "CONSTRUCTION_PROCESS",
       "priority": "P0",
       "owner": "MEMORY_EDITOR",
@@ -41,7 +42,7 @@
     {
       "id": "WORK-0003",
       "title": "Legacy Work and Evidence Backfill",
-      "status": "PLANNED",
+      "status": "READY",
       "mode": "RECONCILIATION",
       "priority": "P0",
       "owner": "PLANNER",
