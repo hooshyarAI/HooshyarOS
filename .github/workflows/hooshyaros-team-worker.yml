@@ -351,7 +351,7 @@ jobs:
         with:
           name: team-result-${{ matrix.id }}
           path: |
-            ${{ runner.temp }}/team-result/result.json
+            ${{ runner.temp }}/team-result/
             ${{ runner.temp }}/opencode-team-${{ matrix.id }}.log
           if-no-files-found: warn
 
