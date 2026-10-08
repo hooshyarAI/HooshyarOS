@@ -1183,7 +1183,7 @@ jobs:
           test "${#RESULT_FILES[@]}" -gt 0
 
           python3 - "${EXPECTED}" "${RUNNER_TEMP}/team-results" <<'PY'
-          import json, pathlib, shutil, sys
+          import json, pathlib, shutil, sys, subprocess
 
           expected=json.loads(sys.argv[1])
           root=pathlib.Path(sys.argv[2])
@@ -1355,11 +1355,37 @@ jobs:
           if test -f "${RUNNER_TEMP}/team-semantic-qc.log" && grep -q "QC_DECISION=PASS" "${RUNNER_TEMP}/team-semantic-qc.log" && ! grep -q "QC_DECISION=FAIL" "${RUNNER_TEMP}/team-semantic-qc.log"; then DECISION="PASS"; fi
           export DECISION
           python3 - <<PY
-          import json, pathlib, os
+          import hashlib, json, pathlib, os
           log=pathlib.Path("${RUNNER_TEMP}/team-semantic-qc.log")
           content=log.read_text(encoding="utf-8",errors="replace") if log.exists() else ""
+          expected=json.loads("""${LEASE_IDS}""")
+          inspections={}
+          all_inspected=True
+          for wid in expected:
+              patch_path=pathlib.Path(".kilo/team/results")/wid/"worker.patch"
+              changed_path=pathlib.Path(".kilo/team/results")/wid/"changed-files.txt"
+              entry={"patch_sha256":"","patch_bytes":0,"changed_file_count":0,"actual_change_inspected":False}
+              if patch_path.is_file() and changed_path.is_file():
+                  data=patch_path.read_bytes()
+                  changed=[x.strip() for x in changed_path.read_text(encoding="utf-8",errors="replace").splitlines() if x.strip()]
+                  entry["patch_sha256"]=hashlib.sha256(data).hexdigest()
+                  entry["patch_bytes"]=len(data)
+                  entry["changed_file_count"]=len(changed)
+                  entry["actual_change_inspected"]=bool(entry["patch_sha256"]) and entry["patch_bytes"] > 0 and entry["changed_file_count"] > 0
+              inspections[wid]=entry
+              all_inspected = all_inspected and entry["actual_change_inspected"]
+          measured_decision = "PASS" if os.environ.get("DECISION")=="PASS" and all_inspected else "FAIL"
           reasons=[x.strip() for x in content.splitlines()[-80:] if x.strip() and not x.startswith(("QC_MODEL_ATTEMPT=","QC_DECISION="))]
-          obj={"schema_version":"1.0","run_id":int("${{ github.run_id }}"),"decision":os.environ.get("DECISION","FAIL"),"lease_ids":json.loads("""${LEASE_IDS}"""),"independence":"SEPARATE_QC_JOB_AND_SESSION","actual_change_inspected":True,"reasons":reasons[-20:]}
+          obj={
+            "schema_version":"1.0",
+            "run_id":int("${{ github.run_id }}"),
+            "decision":measured_decision,
+            "lease_ids":expected,
+            "independence":"SEPARATE_QC_JOB_AND_SESSION",
+            "actual_change_inspected":all_inspected,
+            "lease_inspections":inspections,
+            "reasons":reasons[-20:]
+          }
           out=pathlib.Path("${RUNNER_TEMP}/team-qc-adjudication")
           out.mkdir(parents=True,exist_ok=True)
           (out/"qc-result.json").write_text(json.dumps(obj,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
@@ -1416,7 +1442,7 @@ jobs:
           import json,sys
           obj=json.load(open(sys.argv[1],encoding="utf-8"))
           if obj.get("decision")!="PASS":
-              raise SystemExit(f"BLOCKED: persisted QC decision is {obj.get("decision")}")
+              raise SystemExit(f"BLOCKED: persisted QC decision is {obj.get('decision')}")
           if not obj.get("actual_change_inspected"):
               raise SystemExit("BLOCKED: QC did not inspect actual worker changes")
           print("PERSISTED_QC=PASS")
