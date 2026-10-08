@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "next_id": "COMMIT-0006",
+  "next_id": "COMMIT-0007",
   "items": [
     {
       "id": "COMMIT-0001",
@@ -31,6 +31,12 @@
       "sha": "9a1f10a57088ae9dc410248dc65562d8252c4aec",
       "purpose": "recovery synthesis / automatic continuation",
       "status": "INTEGRATED"
+    },
+    {
+      "id": "COMMIT-0006",
+      "sha": "82d63f9534de7d8dac15869cd3b996a9d5ccb8a5",
+      "purpose": "supersede stale queued team waves safely via concurrency cancellation",
+      "status": "MAIN_CONTROL_PLANE"
     }
   ]
 }
