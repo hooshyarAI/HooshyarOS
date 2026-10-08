@@ -5,6 +5,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: hooshyaros-final-product-factory-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   windows-product-factory:
     runs-on: windows-latest
