@@ -6,7 +6,7 @@ on:
       max_parallel:
         description: "Maximum concurrent workers for this wave"
         required: false
-        default: "12"
+        default: "8"
         type: string
       reason:
         description: "Reason for the team wave"
@@ -97,6 +97,113 @@ jobs:
           echo "QUEUE_GOVERNOR_STATUS=EXECUTED"
           echo "QUEUE_GOVERNOR_SCOPE=.kilo/team/COMMANDS/TEAM-QUEUE-RUNNER-GOVERNOR.md"
 
+      - name: Team Manager — Governed Plan Admission
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+          from pathlib import Path
+
+          target="fix/autonomous-product-factory"
+          subprocess.check_call(["git","fetch","origin",target])
+          base=subprocess.check_output(["git","rev-parse",f"origin/{target}"],text=True).strip()
+
+          plan_path=Path(".kilo/team/NEXT-WAVE-PLAN.json")
+          registry_path=Path(".kilo/team/memory/work-registry.json")
+          plan=json.loads(plan_path.read_text(encoding="utf-8"))
+          registry=json.loads(registry_path.read_text(encoding="utf-8"))
+
+          if plan.get("wave_status") != "READY":
+              raise SystemExit("BLOCKED: plan is not READY")
+
+          items=registry.setdefault("items",[])
+          by_id={str(x.get("id")):x for x in items}
+          next_id=str(registry.get("next_id",""))
+          admitted=[]
+
+          for lease in plan.get("leases",[]):
+              lid=str(lease.get("id",""))
+              m=re.match(r"^work-([0-9]{4})(?:-|$)",lid)
+              if not m:
+                  raise SystemExit(f"BLOCKED: invalid governed lease identity {lid}")
+              work_id=f"WORK-{m.group(1)}"
+
+              existing=by_id.get(work_id)
+              if existing:
+                  status=str(existing.get("status","")).upper()
+                  if status not in {"READY","ACTIVE","EXECUTING","VERIFYING","CHECKPOINTED","COMPLETED","VERIFIED","PROMOTED","MEMORIZED","CLOSED"}:
+                      raise SystemExit(f"BLOCKED: existing {work_id} has invalid status {status}")
+                  print(f"ADMISSION_EXISTING={work_id} status={status}")
+                  continue
+
+              if next_id != work_id:
+                  raise SystemExit(
+                      f"BLOCKED: undispatched lease {lid} requires next_id={work_id}, "
+                      f"registry.next_id={next_id}"
+                  )
+
+              scope=[str(x) for x in (lease.get("write_scope") or [])]
+              record={
+                  "id": work_id,
+                  "title": str(lease.get("title",lid)),
+                  "status": "READY",
+                  "mode": str(lease.get("mode","REVIEW")),
+                  "priority": str(lease.get("priority","P1")),
+                  "owner": str(lease.get("owner","UNKNOWN")),
+                  "dependencies": [str(x) for x in (lease.get("dependencies") or [])],
+                  "evidence_required": [str(x) for x in (lease.get("evidence_required") or [])],
+                  "purpose": str(lease.get("purpose",lease.get("focus",""))),
+                  "blockers": [],
+                  "test_scope": str(lease.get("test_scope","GOVERNED_LEASE_VERIFICATION")),
+                  "risk": str(lease.get("risk","P1")),
+                  "value": str(lease.get("value","UNKNOWN_NOT_DERIVABLE_FROM_REPOSITORY")),
+                  "readiness": "READY",
+                  "estimated_complexity": str(lease.get("estimated_complexity","UNKNOWN_NOT_DERIVABLE_FROM_REPOSITORY")),
+                  "write_scope": scope,
+                  "admission": {
+                      "source": "NEXT-WAVE-PLAN",
+                      "lease_id": lid,
+                      "run_id": int(os.environ["GITHUB_RUN_ID"]),
+                      "start_sha": base,
+                      "state": "ADMITTED_BEFORE_DISPATCH"
+                  },
+                  "execution_attempts": []
+              }
+              items.append(record)
+              by_id[work_id]=record
+              numeric=int(m.group(1))
+              next_id=f"WORK-{numeric+1:04d}"
+              registry["next_id"]=next_id
+              admitted.append(work_id)
+
+          if not admitted:
+              print("PLAN_ADMISSION=NO_NEW_WORK_IDS")
+              raise SystemExit(0)
+
+          registry_path.write_text(
+              json.dumps(registry,ensure_ascii=False,indent=2)+"\n",
+              encoding="utf-8"
+          )
+
+          subprocess.check_call(["git","config","user.name","github-actions[bot]"])
+          subprocess.check_call(["git","config","user.email","41898282+github-actions[bot]@users.noreply.github.com"])
+          subprocess.check_call(["git","add",str(registry_path)])
+          subprocess.check_call(["git","commit","-m",f"governance(team): admit governed plan before dispatch ({",".join(admitted)})"])
+
+          subprocess.check_call(["git","fetch","origin",target])
+          current=subprocess.check_output(["git","rev-parse",f"origin/{target}"],text=True).strip()
+          if current != base:
+              raise SystemExit(f"BLOCKED: target changed during plan admission (base={base}, current={current})")
+          subprocess.check_call(["git","push","origin",f"HEAD:refs/heads/{target}"])
+          print("PLAN_ADMISSION=COMMITTED_AND_PUSHED")
+          print("PLAN_ADMITTED_IDS="+",".join(admitted))
+          PY
       - name: Capture immutable target state
         id: state
         shell: bash
@@ -161,7 +268,7 @@ jobs:
           print(f"V1_SPECIALIST_CATALOG_SIZE={len(json.loads(manifest_path.read_text(encoding='utf-8')).get('workers', []))}")
           print("V1_SPECIALIST_CATALOG_IS_ACTIVE_WORKER_COUNT=FALSE")
 
-          requested = int(os.environ.get("REQUESTED_MAX_PARALLEL") or 12)
+          requested = int(os.environ.get("REQUESTED_MAX_PARALLEL") or 8)
           requested = max(1, min(requested, 100))
 
           protected = [
