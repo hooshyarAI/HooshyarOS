@@ -56,7 +56,7 @@ jobs:
               st=r.get("status")
               if st not in {"queued","pending","in_progress","waiting","requested","action_required"}: continue
               legacy_hit=r.get("name") in legacy and r.get("head_branch") in {"main","fix/autonomous-product-factory"}
-              team_hit=str(r.get("workflow_id"))==tw
+              team_hit=str(r.get("workflow_id"))==tw and r.get("head_branch")!="fix/autonomous-product-factory"
               if legacy_hit or team_hit: print(r["id"])
           PY
           n=0
@@ -72,7 +72,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/workflows/${TEAM_WORKER_WORKFLOW_ID}/dispatches"             -f ref=main             -f 'inputs[max_parallel]=12'             -f 'inputs[reason]=manager bootstrap recovery after queue storm'
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/workflows/${TEAM_WORKER_WORKFLOW_ID}/dispatches"             -f ref=fix/autonomous-product-factory             -f 'inputs[max_parallel]=12'             -f 'inputs[reason]=manager bootstrap recovery after queue storm'
           echo "TEAM_WORKER_DISPATCH=SUCCESS"
 
       - name: Manager — Record evidence
