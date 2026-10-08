@@ -5,38 +5,43 @@
   "created_from_sha": "e564682ad02df31adc458995d4232128c7fa0fd3",
   "leases": [
     {
-      "id": "team-org-02-memory-backfill",
+      "id": "work-0003-memory-backfill",
       "role": "Memory & Editor",
       "focus": "Backfill and reconcile organizational ledgers from repository evidence; preserve unknowns and stale states; no product implementation.",
       "owner": "MEMORY_EDITOR",
       "mode": "AUDIT",
       "write_scope": [
         ".kilo/team/memory/**",
-        ".kilo/team/results/team-org-02-memory-backfill/"
+        ".kilo/team/results/work-0003-memory-backfill/"
       ]
     },
     {
-      "id": "wave-10-recovery-reconciliation",
+      "id": "work-0004-wave10-recovery",
       "role": "Recovery Reconciliation",
       "focus": "Reconcile Wave 10 worker evidence, controlled target drift and recovery outcome; do not repeat accepted audit work without current regression/invalidation evidence.",
       "owner": "INTEGRATOR",
       "mode": "REVIEW",
       "write_scope": [
-        ".kilo/team/results/wave-10-recovery-reconciliation/**",
-        ".kilo/team/results/wave-10-recovery-reconciliation/"
+        ".kilo/team/results/work-0004-wave10-recovery/**",
+        ".kilo/team/results/work-0004-wave10-recovery/"
       ]
     },
     {
-      "id": "next-capability-reconciliation",
+      "id": "work-0005-next-capability",
       "role": "Planner",
       "focus": "Derive the next genuinely missing capability from current evidence, dependency graph and V2 memory; do not implement product code during reconciliation.",
       "owner": "PLANNER",
       "mode": "REVIEW",
       "write_scope": [
-        ".kilo/team/results/next-capability-reconciliation/**",
-        ".kilo/team/results/next-capability-reconciliation/"
+        ".kilo/team/results/work-0005-next-capability/**",
+        ".kilo/team/results/work-0005-next-capability/"
       ]
     }
   ],
-  "control_note": "V2 bootstrap wave: memory backfill + Wave 10 recovery reconciliation + next-capability reconciliation. No product implementation."
+  "control_note": "V2 bootstrap wave dispatched after stable-ID reconciliation; no product implementation.",
+  "work_ids": [
+    "WORK-0003",
+    "WORK-0004",
+    "WORK-0005"
+  ]
 }
