@@ -13,7 +13,7 @@ on:
     types: [created]
 
 concurrency:
-  group: hooshyaros-opencode-continuous-worker
+  group: hooshyaros-autonomous-construction
   cancel-in-progress: false
 
 permissions:
