@@ -17,7 +17,7 @@ on:
     types: [created]
 
 concurrency:
-  group: hooshyaros-team-construction
+  group: hooshyaros-autonomous-construction
   cancel-in-progress: false
 
 permissions:
