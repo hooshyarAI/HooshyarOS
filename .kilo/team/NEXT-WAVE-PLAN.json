@@ -4,7 +4,7 @@
   "base_mission": ".kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md",
   "leases": [
     {
-      "id": "WORK-0011",
+      "id": "work-0011",
       "title": "Team V2 Memory and Evidence Reconciliation",
       "status": "READY",
       "mode": "AUDIT",
@@ -36,7 +36,12 @@
       ],
       "focus": "Reconcile only facts proven by repository evidence after W10 QC: (1) register the repaired F1/F2 control-plane defects and their repair commits; (2) add W10 evidence and its independent QC rejection to evidence memory without claiming acceptance; (3) reconcile stale WAVE-0011 / mission-state / unpromoted-attempt counts to current known facts, preserving prior values as historical; (4) re-scope BLOCKER-0005 using currently verifiable worker refs and do not close it; (5) preserve BLOCKER-0004 lineage divergence as OPEN/UNDECIDED; (6) explicitly supersede the false Wave 10 claims in WORK-0006 PRE-GATE-BASELINE.md with a correction section while preserving the original text; (7) do not promote any product or worker code; (8) do not modify .github/**, Architecture Freeze V4/V4.1, product code, tests, or accepted F1-F6/CCC/UX work. The result must make the next acceptance wave capable of judging the team without historical contradictions masquerading as current truth.",
       "estimated_complexity": "MEDIUM_MEMORY_RECONCILIATION",
-      "role": "Team V2 Memory & Evidence Reconciliation"
+      "role": "Team V2 Memory & Evidence Reconciliation",
+      "contract_correction": {
+        "run_id": 37820648260,
+        "root_cause": "Plan lease identity used WORK-0011 uppercase; Orchestrator contract requires work-#### lowercase.",
+        "worker_started": false
+      }
     }
   ]
 }
