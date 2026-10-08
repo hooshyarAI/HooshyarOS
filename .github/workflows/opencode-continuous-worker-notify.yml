@@ -63,6 +63,9 @@ jobs:
           elif latest.get("status") in ("queued","pending","waiting","requested") and age_minutes >= 30:
               alert = True
               alert_type = "STALLED"
+          elif latest.get("status") == "in_progress" and age_minutes >= 80:
+              alert = True
+              alert_type = "LONG_RUNNING"
 
           state = {
               "run_id": latest["id"],
@@ -124,6 +127,9 @@ jobs:
           if kind=="STOPPED":
               opening="HooshyarOS Team Worker متوقف شد."
               cause=f"Conclusion: {s['conclusion']}"
+          elif kind=="LONG_RUNNING":
+              opening="HooshyarOS Team Worker اجرای طولانی دارد و به آستانه هشدار نزدیک شده است."
+              cause=f"Current status: {s['status']}; age: {s['age_minutes']} minutes"
           else:
               opening="HooshyarOS Team Worker بیش از ۳۰ دقیقه در صف مانده است."
               cause=f"Current status: {s['status']}; age: {s['age_minutes']} minutes"
