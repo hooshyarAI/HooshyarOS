@@ -1217,20 +1217,20 @@ jobs:
                   dest.parent.mkdir(parents=True, exist_ok=True)
                   shutil.copy2(report, dest)
 
-               if obj["status"]=="SUCCESS":
-                   branch=obj.get("branch","")
-                   commit=obj.get("commit_sha","")
-                   start=obj.get("start_sha","")
-                   if not branch or not commit or not start:
-                       raise SystemExit(f"QC_FAIL: {wid} missing branch/commit/start provenance")
-                   subprocess.check_call(["git","fetch","origin",branch])
-                   subprocess.check_call(["git","merge-base","--is-ancestor",start,commit])
-                   patch=subprocess.check_output(["git","diff",f"{start}...origin/{branch}"],text=True)
-                   patch_path=repo / ".kilo" / "team" / "results" / wid / "worker.patch"
-                   patch_path.parent.mkdir(parents=True, exist_ok=True)
-                   patch_path.write_text(patch,encoding="utf-8")
-                   changed=subprocess.check_output(["git","diff","--name-only",f"{start}...origin/{branch}"],text=True)
-                   (patch_path.parent/"changed-files.txt").write_text(changed,encoding="utf-8")
+              if obj["status"]=="SUCCESS":
+                  branch=obj.get("branch","")
+                  commit=obj.get("commit_sha","")
+                  start=obj.get("start_sha","")
+                  if not branch or not commit or not start:
+                      raise SystemExit(f"QC_FAIL: {wid} missing branch/commit/start provenance")
+                  subprocess.check_call(["git","fetch","origin",branch])
+                  subprocess.check_call(["git","merge-base","--is-ancestor",start,commit])
+                  patch=subprocess.check_output(["git","diff",f"{start}...origin/{branch}"],text=True)
+                  patch_path=repo / ".kilo" / "team" / "results" / wid / "worker.patch"
+                  patch_path.parent.mkdir(parents=True, exist_ok=True)
+                  patch_path.write_text(patch,encoding="utf-8")
+                  changed=subprocess.check_output(["git","diff","--name-only",f"{start}...origin/{branch}"],text=True)
+                  (patch_path.parent/"changed-files.txt").write_text(changed,encoding="utf-8")
 
           if success == 0:
               raise SystemExit("QC_FAIL: zero successful workers")
