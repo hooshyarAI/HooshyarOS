@@ -7,8 +7,8 @@
   "team_org_work": "WORK-0002",
   "team_org_version": "V2",
   "team_status": "ACTIVE",
-  "current_wave": "WAVE-0010",
-  "current_wave_state": "RECOVERY_REVIEW_REQUIRED",
+  "current_wave": "WAVE-0011",
+  "current_wave_state": "READY_FOR_DISPATCH",
   "first_objective": "POST-RECOVERY / ARCHITECTURE + AUDIT RECONCILIATION",
   "next_state": "BACKFILL_MEMORY_THEN_REPLAN",
   "protected_rules": [
@@ -17,5 +17,7 @@
     "No blind retries",
     "No weakened tests",
     "No fabricated evidence"
-  ]
+  ],
+  "memory_backfill_work": "WORK-0003",
+  "last_control_plane_commit": "aac4f83c2d6e59f8b09e317c341588882bb86bfd"
 }
