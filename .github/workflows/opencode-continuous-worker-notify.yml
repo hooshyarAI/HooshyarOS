@@ -1,11 +1,8 @@
-name: HooshyarOS Worker Stop Notification
+name: HooshyarOS Team Watchdog
 
 on:
-  workflow_run:
-    workflows:
-      - HooshyarOS Continuous OpenCode Worker
-      - HooshyarOS Autonomous Team Worker
-    types: [completed]
+  schedule:
+    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -13,103 +10,176 @@ permissions:
   issues: write
 
 jobs:
-  notify-stop:
-    if: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion != 'success' && github.event.workflow_run.conclusion != 'skipped' }}
+  watchdog:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
     env:
       CONTROL_ISSUE: "122"
-      CONTROL_TITLE: "HooshyarOS Continuous Worker Control"
-      TARGET_BRANCH: "fix/autonomous-product-factory"
-      RESTART_COMMAND: "/opencode-team-run"
       ALERT_EMAIL: ${{ secrets.HOOSHYAROS_ALERT_EMAIL }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       RESEND_FROM_EMAIL: ${{ secrets.HOOSHYAROS_ALERT_FROM }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
     steps:
-      - name: Build stop report
-        id: report
+      - name: Inspect latest team runs
         shell: bash
         run: |
           set -euo pipefail
 
-          RUN_ID="${{ github.event.workflow_run.id }}"
-          RUN_NUMBER="${{ github.event.workflow_run.run_number }}"
-          CONCLUSION="${{ github.event.workflow_run.conclusion }}"
-          HEAD_SHA="${{ github.event.workflow_run.head_sha }}"
-          RUN_URL="${{ github.event.workflow_run.html_url }}"
-          WORKFLOW_NAME="${{ github.event.workflow_run.name }}"
+          python3 - <<'PY'
+          import json, os, subprocess, time
+          from datetime import datetime, timezone
 
-          {
-            echo "HOOSHYAROS_WORKER_STOPPED=TRUE"
-            echo "RUN_ID=${RUN_ID}"
-            echo "RUN_NUMBER=${RUN_NUMBER}"
-            echo "CONCLUSION=${CONCLUSION}"
-            echo "WORKFLOW_NAME=${WORKFLOW_NAME}"
-            echo "HEAD_SHA=${HEAD_SHA}"
-            echo "RUN_URL=${RUN_URL}"
-          } >> "${GITHUB_ENV}"
+          raw = subprocess.check_output([
+              "gh","api",
+              "repos/hooshyarAI/HooshyarOS/actions/runs?per_page=100"
+          ], text=True)
+          runs = json.loads(raw)["workflow_runs"]
 
-          cat > "${RUNNER_TEMP}/stop-report.txt" <<EOF
-HooshyarOS Autonomous Worker متوقف شد.
+          team = [
+              r for r in runs
+              if r.get("name") == "HooshyarOS Autonomous Team Worker"
+              and r.get("path") == ".github/workflows/hooshyaros-team-worker.yml"
+          ]
 
-Workflow: ${WORKFLOW_NAME}
-Run: #${RUN_NUMBER}
-Conclusion: ${CONCLUSION}
-Run ID: ${RUN_ID}
-Head SHA: ${HEAD_SHA}
-Target branch: ${TARGET_BRANCH}
+          if not team:
+              print("WATCHDOG_STATE=NO_TEAM_RUN")
+              raise SystemExit(0)
 
-جزئیات اجرا:
-${RUN_URL}
+          team.sort(key=lambda r: r.get("created_at") or "", reverse=True)
+          latest = team[0]
 
-علت دقیق توقف را در همان Run و بخش Failed/Cancelled steps بررسی کنید.
+          created = datetime.fromisoformat(latest["created_at"].replace("Z","+00:00"))
+          age_minutes = (datetime.now(timezone.utc)-created).total_seconds()/60.0
 
-برای ادامه دستی کارمند:
-در Issue #${CONTROL_ISSUE} با عنوان "${CONTROL_TITLE}" یک کامنت جدید ایجاد کنید که ابتدای آن دقیقاً این باشد:
- ${RESTART_COMMAND}
+          alert = False
+          alert_type = ""
 
-این اعلان نباید خودش کارمند را دوباره اجرا کند؛ شروع مجدد فقط با فرمان دستی بالا انجام می‌شود.
-EOF
+          if latest.get("status") == "completed" and latest.get("conclusion") not in ("success","skipped","neutral"):
+              alert = True
+              alert_type = "STOPPED"
+          elif latest.get("status") in ("queued","pending","waiting","requested") and age_minutes >= 30:
+              alert = True
+              alert_type = "STALLED"
 
-      - name: Notify control issue
+          state = {
+              "run_id": latest["id"],
+              "run_number": latest["run_number"],
+              "status": latest.get("status"),
+              "conclusion": latest.get("conclusion"),
+              "created_at": latest.get("created_at"),
+              "age_minutes": round(age_minutes,1),
+              "html_url": latest.get("html_url"),
+              "head_sha": latest.get("head_sha"),
+              "alert": alert,
+              "alert_type": alert_type
+          }
+
+          open(os.environ["GITHUB_ENV"],"a").write(
+              "WATCHDOG_RUN="+json.dumps(state,separators=(",",":"))+"\n"
+          )
+          print(json.dumps(state,indent=2))
+          PY
+
+      - name: Deduplicate watchdog alert
+        if: ${{ env.WATCHDOG_RUN != '' }}
         shell: bash
         run: |
           set -euo pipefail
+          python3 - <<'PY'
+          import json, os, subprocess
 
-          BODY="$(cat "${RUNNER_TEMP}/stop-report.txt")"
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${CONTROL_ISSUE}/comments" \
-            -f body="${BODY}"
+          state=json.loads(os.environ["WATCHDOG_RUN"])
+          if not state["alert"]:
+              print("ALERT_NEEDED=FALSE")
+              open(os.environ["GITHUB_ENV"],"a").write("ALERT_NEEDED=FALSE\n")
+              raise SystemExit(0)
+
+          comments=subprocess.check_output([
+              "gh","api",
+              "repos/hooshyarAI/HooshyarOS/issues/122/comments?per_page=100"
+          ], text=True)
+          marker=f"Run #{state['run_number']} ({state['run_id']})"
+          already=marker in comments
+
+          print(f"ALERT_NEEDED={'FALSE' if already else 'TRUE'}")
+          open(os.environ["GITHUB_ENV"],"a").write(
+              f"ALERT_NEEDED={'FALSE' if already else 'TRUE'}\n"
+          )
+          PY
+
+      - name: Publish watchdog alert to control issue
+        if: ${{ env.ALERT_NEEDED == 'TRUE' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, subprocess
+
+          s=json.loads(os.environ["WATCHDOG_RUN"])
+          kind=s["alert_type"]
+
+          if kind=="STOPPED":
+              opening="HooshyarOS Team Worker متوقف شد."
+              cause=f"Conclusion: {s['conclusion']}"
+          else:
+              opening="HooshyarOS Team Worker بیش از ۳۰ دقیقه در صف مانده است."
+              cause=f"Current status: {s['status']}; age: {s['age_minutes']} minutes"
+
+          body=f"""{opening}
+
+Run #{s['run_number']} ({s['run_id']})
+{cause}
+Target branch: fix/autonomous-product-factory
+Head SHA: {s['head_sha']}
+
+Run:
+{s['html_url']}
+
+برای شروع مجدد کنترل‌شده:
+`/opencode-team-run`
+
+این هشدار فقط بعد از تشخیص واقعی توقف/گیرکردن ایجاد می‌شود و خودش Run جدید ایجاد نمی‌کند.
+"""
+          subprocess.run([
+              "gh","api","--method","POST",
+              "repos/hooshyarAI/HooshyarOS/issues/122/comments",
+              "-f",f"body={body}"
+          ],check=True)
+          open(os.environ["RUNNER_TEMP"]+"/watchdog-body.txt","w",encoding="utf-8").write(body)
+          PY
 
       - name: Send direct email when configured
-        if: ${{ env.RESEND_API_KEY != '' && env.ALERT_EMAIL != '' && env.RESEND_FROM_EMAIL != '' }}
+        if: ${{ env.ALERT_NEEDED == 'TRUE' && env.RESEND_API_KEY != '' && env.ALERT_EMAIL != '' && env.RESEND_FROM_EMAIL != '' }}
         continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
+          BODY="$(cat "${RUNNER_TEMP}/watchdog-body.txt")"
+          python3 - <<'PY'
+          import json, os, subprocess
+          body=open(os.environ["RUNNER_TEMP"]+"/watchdog-body.txt",encoding="utf-8").read()
+          state=json.loads(os.environ["WATCHDOG_RUN"])
+          subject=f"HooshyarOS — Team Worker {state['alert_type']} — Run #{state['run_number']}"
+          payload=json.dumps({
+              "from":os.environ["RESEND_FROM_EMAIL"],
+              "to":[os.environ["ALERT_EMAIL"]],
+              "subject":subject,
+              "text":body
+          })
+          subprocess.run([
+              "curl","-fsS","https://api.resend.com/emails",
+              "-H","Authorization: Bearer "+os.environ["RESEND_API_KEY"],
+              "-H","Content-Type: application/json",
+              "--data",payload
+          ],check=True)
+          PY
 
-          SUBJECT="HooshyarOS — تیم/کارمند خودکار متوقف شد (Run #${RUN_NUMBER})"
-          BODY="$(cat "${RUNNER_TEMP}/stop-report.txt")"
-
-          payload="$(jq -n \
-            --arg from "${RESEND_FROM_EMAIL}" \
-            --arg to "${ALERT_EMAIL}" \
-            --arg subject "${SUBJECT}" \
-            --arg text "${BODY}" \
-            '{from:$from,to:[$to],subject:$subject,text:$text}')"
-
-          curl -fsS https://api.resend.com/emails \
-            -H "Authorization: Bearer ${RESEND_API_KEY}" \
-            -H "Content-Type: application/json" \
-            --data "${payload}"
-
-      - name: Record notification mode
+      - name: Final watchdog state
         if: always()
         shell: bash
         run: |
-          if test -n "${RESEND_API_KEY}" && test -n "${ALERT_EMAIL}" && test -n "${RESEND_FROM_EMAIL}"; then
-            echo "DIRECT_EMAIL=CONFIGURED"
-          else
-            echo "DIRECT_EMAIL=NOT_CONFIGURED"
-            echo "GitHub control-issue notification remains the active stop-alert fallback."
-          fi
+          echo "WATCHDOG_RUN=${WATCHDOG_RUN:-unknown}"
+          echo "ALERT_NEEDED=${ALERT_NEEDED:-unknown}"
