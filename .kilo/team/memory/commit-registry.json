@@ -1,84 +1,1843 @@
 {
   "schema_version": "1.0",
-  "next_id": "COMMIT-0014",
+  "next_id": "COMMIT-0146",
   "items": [
     {
       "id": "COMMIT-0001",
       "sha": "41d8c5f8",
       "purpose": "F6 ROA/ROE average-balance repair",
-      "status": "ACCEPTED"
+      "status": "ACCEPTED",
+      "lineage_verification": {
+        "resolves": true,
+        "ancestor_of_HEAD": true,
+        "ancestor_of_origin_main": false
+      },
+      "lineage_verified_by": "work-0003-memory-backfill-37788700120",
+      "lineage_reverified_note": "Re-derived in run 37788700120; identical to run 37779956878 for this SHA."
     },
     {
       "id": "COMMIT-0002",
       "sha": "61f94d1a13bbf12f39014406b275b2f7fea0bf6d",
       "purpose": "team diff gate: strict code, Markdown whitespace warning",
-      "status": "INTEGRATED"
+      "status": "INTEGRATED",
+      "lineage_verification": {
+        "resolves": true,
+        "ancestor_of_HEAD": false,
+        "ancestor_of_origin_main": true
+      },
+      "lineage_verified_by": "work-0003-memory-backfill-37788700120",
+      "lineage_reverified_note": "Re-derived in run 37788700120; identical to run 37779956878 for this SHA."
     },
     {
       "id": "COMMIT-0003",
       "sha": "21718a64754498f6cbdabd926bd08ecdb2d8b464",
       "purpose": "immediate per-worker stop alerting",
-      "status": "INTEGRATED"
+      "status": "INTEGRATED",
+      "lineage_verification": {
+        "resolves": true,
+        "ancestor_of_HEAD": false,
+        "ancestor_of_origin_main": true
+      },
+      "lineage_verified_by": "work-0003-memory-backfill-37788700120",
+      "lineage_reverified_note": "Re-derived in run 37788700120; identical to run 37779956878 for this SHA."
     },
     {
       "id": "COMMIT-0004",
       "sha": "3535384c958f52163fa33b6897727dfd288e587c",
       "purpose": "controlled target-drift recovery",
-      "status": "INTEGRATED"
+      "status": "INTEGRATED",
+      "lineage_verification": {
+        "resolves": true,
+        "ancestor_of_HEAD": false,
+        "ancestor_of_origin_main": true
+      },
+      "lineage_verified_by": "work-0003-memory-backfill-37788700120",
+      "lineage_reverified_note": "Re-derived in run 37788700120; identical to run 37779956878 for this SHA."
     },
     {
       "id": "COMMIT-0005",
       "sha": "9a1f10a57088ae9dc410248dc65562d8252c4aec",
       "purpose": "recovery synthesis / automatic continuation",
-      "status": "INTEGRATED"
+      "status": "INTEGRATED",
+      "lineage_verification": {
+        "resolves": true,
+        "ancestor_of_HEAD": false,
+        "ancestor_of_origin_main": true
+      },
+      "lineage_verified_by": "work-0003-memory-backfill-37788700120",
+      "lineage_reverified_note": "Re-derived in run 37788700120; identical to run 37779956878 for this SHA."
     },
     {
       "id": "COMMIT-0006",
       "sha": "82d63f9534de7d8dac15869cd3b996a9d5ccb8a5",
       "purpose": "supersede stale queued team waves safely via concurrency cancellation",
-      "status": "MAIN_CONTROL_PLANE"
+      "status": "MAIN_CONTROL_PLANE",
+      "lineage_verification": {
+        "resolves": true,
+        "ancestor_of_HEAD": false,
+        "ancestor_of_origin_main": true
+      },
+      "lineage_verified_by": "work-0003-memory-backfill-37788700120",
+      "lineage_reverified_note": "Re-derived in run 37788700120; identical to run 37779956878 for this SHA."
     },
     {
       "id": "COMMIT-0007",
       "sha": "215f8c80ad8ce9c0401aa10fd4a5a29f28246922",
       "purpose": "V2 wave gated on active organization and memory state",
-      "status": "RECENT_CONTROL_PLANE"
+      "status": "RECENT_CONTROL_PLANE",
+      "lineage_verification": {
+        "resolves": true,
+        "ancestor_of_HEAD": false,
+        "ancestor_of_origin_main": true
+      },
+      "lineage_verified_by": "work-0003-memory-backfill-37788700120",
+      "lineage_reverified_note": "Re-derived in run 37788700120; identical to run 37779956878 for this SHA."
     },
     {
       "id": "COMMIT-0008",
       "sha": "314e6b885b0f5c809a6ec3c94e1d6fa0af219a19",
       "purpose": "dynamic leases bound to permanent WORK-#### records",
-      "status": "RECENT_CONTROL_PLANE"
+      "status": "RECENT_CONTROL_PLANE",
+      "lineage_verification": {
+        "resolves": true,
+        "ancestor_of_HEAD": false,
+        "ancestor_of_origin_main": true
+      },
+      "lineage_verified_by": "work-0003-memory-backfill-37788700120",
+      "lineage_reverified_note": "Re-derived in run 37788700120; identical to run 37779956878 for this SHA."
     },
     {
       "id": "COMMIT-0009",
       "sha": "729c00cb86126bfb8172f961aea40164fbd82352",
       "purpose": "worker V2 memory-context gate",
-      "status": "RECENT_CONTROL_PLANE"
+      "status": "RECENT_CONTROL_PLANE",
+      "lineage_verification": {
+        "resolves": true,
+        "ancestor_of_HEAD": false,
+        "ancestor_of_origin_main": true
+      },
+      "lineage_verified_by": "work-0003-memory-backfill-37788700120",
+      "lineage_reverified_note": "Re-derived in run 37788700120; identical to run 37779956878 for this SHA."
     },
     {
       "id": "COMMIT-0010",
       "sha": "dec57432935475b417c2bb233e19e8028b87d04e",
       "purpose": "V2 memory and anti-duplication rules injected into worker prompts",
-      "status": "RECENT_CONTROL_PLANE"
+      "status": "RECENT_CONTROL_PLANE",
+      "lineage_verification": {
+        "resolves": true,
+        "ancestor_of_HEAD": false,
+        "ancestor_of_origin_main": true
+      },
+      "lineage_verified_by": "work-0003-memory-backfill-37788700120",
+      "lineage_reverified_note": "Re-derived in run 37788700120; identical to run 37779956878 for this SHA."
     },
     {
       "id": "COMMIT-0011",
       "sha": "9151fe4dbe85f9fbda0a3a7555a2206fb2e92461",
       "purpose": "synthesis bound to V2 memory and anti-duplication state",
-      "status": "RECENT_CONTROL_PLANE"
+      "status": "RECENT_CONTROL_PLANE",
+      "lineage_verification": {
+        "resolves": true,
+        "ancestor_of_HEAD": false,
+        "ancestor_of_origin_main": true
+      },
+      "lineage_verified_by": "work-0003-memory-backfill-37788700120",
+      "lineage_reverified_note": "Re-derived in run 37788700120; identical to run 37779956878 for this SHA."
     },
     {
       "id": "COMMIT-0012",
       "sha": "00d0688294277cb8135a5271ef508703ffa64040",
       "purpose": "WORK-0006 pre-gate team performance baseline",
-      "status": "RECENT_CONTROL_PLANE"
+      "status": "RECENT_CONTROL_PLANE",
+      "lineage_verification": {
+        "resolves": true,
+        "ancestor_of_HEAD": true,
+        "ancestor_of_origin_main": false
+      },
+      "lineage_verified_by": "work-0003-memory-backfill-37788700120",
+      "lineage_reverified_note": "Re-derived in run 37788700120; identical to run 37779956878 for this SHA."
     },
     {
       "id": "COMMIT-0013",
       "sha": "2d1038d38eed952fd84e448a7c0dca58735d71c2",
       "purpose": "CI queue-storm prevention for Final Product Factory; concurrency plus duplicate trigger-path reduction",
-      "status": "INTEGRATED_CONTROL"
+      "status": "INTEGRATED_CONTROL",
+      "lineage_verification": {
+        "resolves": true,
+        "ancestor_of_HEAD": true,
+        "ancestor_of_origin_main": false
+      },
+      "lineage_verified_by": "work-0003-memory-backfill-37788700120",
+      "lineage_reverified_note": "Re-derived in run 37788700120; identical to run 37779956878 for this SHA."
+    },
+    {
+      "id": "COMMIT-0014",
+      "sha": "3ebeaa1d1e19eecad98201ff56666f1db778de06",
+      "purpose": "governance(team): register autonomous construction organization V2",
+      "date": "2026-10-08T12:52:07+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0015",
+      "sha": "996402fb19b530c93fea4e862f0b1ee427ea08fe",
+      "purpose": "governance(team): activate organization V2 memory-governed continuation",
+      "date": "2026-10-08T12:52:11+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0016",
+      "sha": "d742b291b08cc2295a8e054173c8e67b5053aa43",
+      "purpose": "governance(team): establish organization V2 TEAM-ORGANIZATION-V2.json",
+      "date": "2026-10-08T12:52:48+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0017",
+      "sha": "7f808ce1d9a8dc51d52c2a7ddb117656572a9c4a",
+      "purpose": "governance(team): establish organization V2 TEAM-ORGANIZATION-V2-PROTOCOL.md",
+      "date": "2026-10-08T12:52:51+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0018",
+      "sha": "99779692d97f3510c5b44f71778996723b1f7eb9",
+      "purpose": "governance(team): establish organization V2 README.md",
+      "date": "2026-10-08T12:52:53+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0019",
+      "sha": "146eaa039075785f47f8c72f44001ff5b2cd6b5e",
+      "purpose": "governance(team): establish organization V2 mission-state.json",
+      "date": "2026-10-08T12:52:56+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0020",
+      "sha": "f6943b809b6b4fa3da64e9a66a04718acb93ac0b",
+      "purpose": "governance(team): establish organization V2 work-registry.json",
+      "date": "2026-10-08T12:52:58+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0021",
+      "sha": "89026a6973b8e83612a627b7c389f025ff16ef72",
+      "purpose": "governance(team): establish organization V2 evidence-registry.json",
+      "date": "2026-10-08T12:53:00+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0022",
+      "sha": "56f3f60d3e92ff2e092f83c7201cfa39d0e58865",
+      "purpose": "governance(team): establish organization V2 decision-registry.json",
+      "date": "2026-10-08T12:53:03+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0023",
+      "sha": "f4a988792ec98f6501316f9b30fc3a5d78541d4c",
+      "purpose": "governance(team): establish organization V2 defect-registry.json",
+      "date": "2026-10-08T12:53:06+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0024",
+      "sha": "9d5979b8621a879b446bbd923e35704e6fecaa99",
+      "purpose": "governance(team): establish organization V2 blocker-registry.json",
+      "date": "2026-10-08T12:53:08+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0025",
+      "sha": "c86a80d5b14626489b65a83dfc185b5ffb072b18",
+      "purpose": "governance(team): establish organization V2 commit-registry.json",
+      "date": "2026-10-08T12:53:11+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0026",
+      "sha": "76815bdbdb56b9efafab5131d082b4b5a1f913f4",
+      "purpose": "governance(team): establish organization V2 wave-history.json",
+      "date": "2026-10-08T12:53:13+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0027",
+      "sha": "2c2832b5eb5009e75988edceac8acc79e356c5c4",
+      "purpose": "governance(team): correct V2 registry dependencies and advance memory migration",
+      "date": "2026-10-08T12:53:40+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0028",
+      "sha": "afa1d6d2da93ee8309b5fa1b095921cc9cee538b",
+      "purpose": "governance(team): bind V1 execution to Team Organization V2 overlay",
+      "date": "2026-10-08T12:53:44+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0029",
+      "sha": "b309f6a944378129bd2d7e8e5378b64242cde273",
+      "purpose": "governance(team): bind active mission to organization V2 control state",
+      "date": "2026-10-08T12:53:47+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0030",
+      "sha": "e564682ad02df31adc458995d4232128c7fa0fd3",
+      "purpose": "governance(team): bootstrap V2 memory and reconciliation next wave",
+      "date": "2026-10-08T12:53:50+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0031",
+      "sha": "3228702a95c84b39ba407ade5810c9b641b73012",
+      "purpose": "governance(team): validate V2 bootstrap wave lease evidence scopes",
+      "date": "2026-10-08T12:54:09+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0032",
+      "sha": "28ef7dd10bb27b06fd01ed28ca79b456865b382f",
+      "purpose": "governance(team): link V2 wave leases to stable work IDs",
+      "date": "2026-10-08T12:54:57+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0033",
+      "sha": "aac4f83c2d6e59f8b09e317c341588882bb86bfd",
+      "purpose": "governance(team): bind READY leases to permanent Work Registry IDs",
+      "date": "2026-10-08T12:55:13+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0034",
+      "sha": "332d798a0e4fbe32d0a431b7d0801a45944ddebd",
+      "purpose": "governance(team): persist V2 dispatch state",
+      "date": "2026-10-08T12:55:16+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0035",
+      "sha": "3963a506eba5302272a1cd944850136a974fcada",
+      "purpose": "governance(team): persist V2 ready-wave continuation state",
+      "date": "2026-10-08T12:55:20+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0036",
+      "sha": "56de8e99845c07d755b688c006c68978324b5090",
+      "purpose": "governance(team): register post-team performance and remaining-stage repair gates",
+      "date": "2026-10-08T13:14:35+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0037",
+      "sha": "bbff9dfc613103efd540bd3abbd32ffd77b4cad2",
+      "purpose": "governance(team): add post-V2 performance audit and remaining-stage repair command",
+      "date": "2026-10-08T13:14:57+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0038",
+      "sha": "b410e04e57172177e4acdac9146300e5e4c90009",
+      "purpose": "governance(team): reconcile mission memory and stage post-team performance gate",
+      "date": "2026-10-08T13:15:35+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0039",
+      "sha": "7276363d83701b1e07d1fa91f20bbf72541d058d",
+      "purpose": "memory(team): record queue-control repair evidence",
+      "date": "2026-10-08T13:21:04+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0040",
+      "sha": "e9063b1d041aa9f2d942a3a6b5ceccd949656567",
+      "purpose": "memory(team): persist WAVE-0011 queued state",
+      "date": "2026-10-08T13:21:08+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0041",
+      "sha": "74c009a7aa26a59020964ac6693c03d01ee84ab9",
+      "purpose": "memory(team): persist truthful V2 run state",
+      "date": "2026-10-08T13:21:18+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0042",
+      "sha": "dbe94490428c28f043c638a729ff7d8af523cfc3",
+      "purpose": "memory(team): persist WAVE-0011 queued state",
+      "date": "2026-10-08T13:21:26+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0043",
+      "sha": "3ef823d4d814cb71a954649a625437329608a5c0",
+      "purpose": "memory(team): record queue-control repair evidence",
+      "date": "2026-10-08T13:21:35+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0044",
+      "sha": "7eab8cf5a6da2917c71b2147275168e554440b1f",
+      "purpose": "memory(team): record current GitHub Actions queue blocker",
+      "date": "2026-10-08T13:23:50+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0045",
+      "sha": "37dedb883846a0175095deee8ff45f2f886d752f",
+      "purpose": "memory(team): persist V2 enforcement history",
+      "date": "2026-10-08T13:32:42+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0046",
+      "sha": "bcbebccfe845b79befb19f320f91ed2ac47ead37",
+      "purpose": "memory(team): reconcile mission state to Team Run #16",
+      "date": "2026-10-08T13:37:19+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0047",
+      "sha": "fd9549d748951a2c0b27f8644baa0033bc0ec136",
+      "purpose": "memory(team): refresh runner-queue blocker evidence for Run #16",
+      "date": "2026-10-08T13:37:33+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0048",
+      "sha": "6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "purpose": "memory(team): register CI queue-storm control commit",
+      "date": "2026-10-08T13:40:01+03:30",
+      "status": "REGISTERED_IN_LINEAGE_NOT_INDEPENDENTLY_ADJUDICATED",
+      "lineage": "START_SHA_LINEAGE",
+      "in_start_sha_lineage": true,
+      "derived_from": "git rev-list 3ebeaa1d~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "COMMIT-0049",
+      "sha": "7010e238868826b1518e6c7218401f70c7ed1137",
+      "purpose": "Wave 10 audit lease: benchmark-123",
+      "date": "2026-10-08T07:49:15Z",
+      "status": "WORKER_COMMIT_NOT_PROMOTED",
+      "lineage": "WAVE10_WORKER_BRANCH",
+      "in_start_sha_lineage": false,
+      "derived_from": "git for-each-ref refs/remotes/origin/opencode/team-*-37743827267",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "result_paths": [
+        ".kilo/team/results/benchmark-123/result.md"
+      ],
+      "parent_start_sha": "04119244e326f498db21f81f0509dd8374e10cf5",
+      "remote_ref": "origin/opencode/team-benchmark-123-37743827267",
+      "linked_blocker": "BLOCKER-0003"
+    },
+    {
+      "id": "COMMIT-0050",
+      "sha": "8fd2327919829622f6d5fe903e7cdbd2440a09a2",
+      "purpose": "Wave 10 audit lease: chart-gate",
+      "date": "2026-10-08T07:41:21Z",
+      "status": "WORKER_COMMIT_NOT_PROMOTED",
+      "lineage": "WAVE10_WORKER_BRANCH",
+      "in_start_sha_lineage": false,
+      "derived_from": "git for-each-ref refs/remotes/origin/opencode/team-*-37743827267",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "result_paths": [
+        ".kilo/team/results/chart-gate/result.md"
+      ],
+      "parent_start_sha": "04119244e326f498db21f81f0509dd8374e10cf5",
+      "remote_ref": "origin/opencode/team-chart-gate-37743827267",
+      "linked_blocker": "BLOCKER-0003"
+    },
+    {
+      "id": "COMMIT-0051",
+      "sha": "1f9d025ad7fb0a0a2b1ff9c56e51c2cd412e7bbb",
+      "purpose": "Wave 10 audit lease: commercial-acceptance",
+      "date": "2026-10-08T07:52:08Z",
+      "status": "WORKER_COMMIT_NOT_PROMOTED",
+      "lineage": "WAVE10_WORKER_BRANCH",
+      "in_start_sha_lineage": false,
+      "derived_from": "git for-each-ref refs/remotes/origin/opencode/team-*-37743827267",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "result_paths": [
+        ".kilo/team/results/commercial-acceptance/result.md"
+      ],
+      "parent_start_sha": "04119244e326f498db21f81f0509dd8374e10cf5",
+      "remote_ref": "origin/opencode/team-commercial-acceptance-37743827267",
+      "linked_blocker": "BLOCKER-0003"
+    },
+    {
+      "id": "COMMIT-0052",
+      "sha": "cf797986ff38b701707e12b8fa9f6cceac87bb13",
+      "purpose": "Wave 10 audit lease: information-flow",
+      "date": "2026-10-08T07:42:38Z",
+      "status": "WORKER_COMMIT_NOT_PROMOTED",
+      "lineage": "WAVE10_WORKER_BRANCH",
+      "in_start_sha_lineage": false,
+      "derived_from": "git for-each-ref refs/remotes/origin/opencode/team-*-37743827267",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "result_paths": [
+        ".kilo/team/results/information-flow/result.md"
+      ],
+      "parent_start_sha": "04119244e326f498db21f81f0509dd8374e10cf5",
+      "remote_ref": "origin/opencode/team-information-flow-37743827267",
+      "linked_blocker": "BLOCKER-0003"
+    },
+    {
+      "id": "COMMIT-0053",
+      "sha": "654d17abda0e5da73a0040cfac061068fabe4493",
+      "purpose": "Wave 10 audit lease: intelligence-brain",
+      "date": "2026-10-08T07:39:28Z",
+      "status": "WORKER_COMMIT_NOT_PROMOTED",
+      "lineage": "WAVE10_WORKER_BRANCH",
+      "in_start_sha_lineage": false,
+      "derived_from": "git for-each-ref refs/remotes/origin/opencode/team-*-37743827267",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "result_paths": [
+        ".kilo/team/results/intelligence-brain/result.md"
+      ],
+      "parent_start_sha": "04119244e326f498db21f81f0509dd8374e10cf5",
+      "remote_ref": "origin/opencode/team-intelligence-brain-37743827267",
+      "linked_blocker": "BLOCKER-0003"
+    },
+    {
+      "id": "COMMIT-0054",
+      "sha": "f14bcdeb0267a5af62ec47284452f2ad001e928b",
+      "purpose": "Wave 10 audit lease: open-source-leverage",
+      "date": "2026-10-08T07:37:42Z",
+      "status": "WORKER_COMMIT_NOT_PROMOTED",
+      "lineage": "WAVE10_WORKER_BRANCH",
+      "in_start_sha_lineage": false,
+      "derived_from": "git for-each-ref refs/remotes/origin/opencode/team-*-37743827267",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "result_paths": [
+        ".kilo/team/results/open-source-leverage/result.md"
+      ],
+      "parent_start_sha": "04119244e326f498db21f81f0509dd8374e10cf5",
+      "remote_ref": "origin/opencode/team-open-source-leverage-37743827267",
+      "linked_blocker": "BLOCKER-0003"
+    },
+    {
+      "id": "COMMIT-0055",
+      "sha": "5d2baf0ac169ae12f6c62cd3e4cf6133a097446e",
+      "purpose": "Wave 10 audit lease: performance-management",
+      "date": "2026-10-08T07:36:01Z",
+      "status": "WORKER_COMMIT_NOT_PROMOTED",
+      "lineage": "WAVE10_WORKER_BRANCH",
+      "in_start_sha_lineage": false,
+      "derived_from": "git for-each-ref refs/remotes/origin/opencode/team-*-37743827267",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "result_paths": [
+        ".kilo/team/results/performance-management/result.md"
+      ],
+      "parent_start_sha": "04119244e326f498db21f81f0509dd8374e10cf5",
+      "remote_ref": "origin/opencode/team-performance-management-37743827267",
+      "linked_blocker": "BLOCKER-0003"
+    },
+    {
+      "id": "COMMIT-0056",
+      "sha": "d173e70f9cebb4aa6597ade5b880c0647487322f",
+      "purpose": "Wave 10 audit lease: process-architecture",
+      "date": "2026-10-08T07:35:30Z",
+      "status": "WORKER_COMMIT_NOT_PROMOTED",
+      "lineage": "WAVE10_WORKER_BRANCH",
+      "in_start_sha_lineage": false,
+      "derived_from": "git for-each-ref refs/remotes/origin/opencode/team-*-37743827267",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "result_paths": [
+        ".kilo/team/results/process-architecture/result.md"
+      ],
+      "parent_start_sha": "04119244e326f498db21f81f0509dd8374e10cf5",
+      "remote_ref": "origin/opencode/team-process-architecture-37743827267",
+      "linked_blocker": "BLOCKER-0003"
+    },
+    {
+      "id": "COMMIT-0057",
+      "sha": "50dc9967975f83b7c49a39c8f470aa4c44458d8b",
+      "purpose": "Wave 10 audit lease: quality-harness",
+      "date": "2026-10-08T07:38:36Z",
+      "status": "WORKER_COMMIT_NOT_PROMOTED",
+      "lineage": "WAVE10_WORKER_BRANCH",
+      "in_start_sha_lineage": false,
+      "derived_from": "git for-each-ref refs/remotes/origin/opencode/team-*-37743827267",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "result_paths": [
+        ".kilo/team/results/quality-harness/result.md"
+      ],
+      "parent_start_sha": "04119244e326f498db21f81f0509dd8374e10cf5",
+      "remote_ref": "origin/opencode/team-quality-harness-37743827267",
+      "linked_blocker": "BLOCKER-0003"
+    },
+    {
+      "id": "COMMIT-0058",
+      "sha": "9f22218e379ff9c0ad99103a1b7e21b1e35ee1d5",
+      "purpose": "Wave 10 audit lease: reconciliation",
+      "date": "2026-10-08T07:35:06Z",
+      "status": "WORKER_COMMIT_NOT_PROMOTED",
+      "lineage": "WAVE10_WORKER_BRANCH",
+      "in_start_sha_lineage": false,
+      "derived_from": "git for-each-ref refs/remotes/origin/opencode/team-*-37743827267",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "result_paths": [
+        ".kilo/team/results/reconciliation/result.md"
+      ],
+      "parent_start_sha": "04119244e326f498db21f81f0509dd8374e10cf5",
+      "remote_ref": "origin/opencode/team-reconciliation-37743827267",
+      "linked_blocker": "BLOCKER-0003"
+    },
+    {
+      "id": "COMMIT-0059",
+      "sha": "e226ad2de36f0030910dae9ccc3dc07f1714ce4c",
+      "purpose": "Wave 10 audit lease: report-presentation",
+      "date": "2026-10-08T07:36:51Z",
+      "status": "WORKER_COMMIT_NOT_PROMOTED",
+      "lineage": "WAVE10_WORKER_BRANCH",
+      "in_start_sha_lineage": false,
+      "derived_from": "git for-each-ref refs/remotes/origin/opencode/team-*-37743827267",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "result_paths": [
+        ".kilo/team/results/report-presentation/result.md"
+      ],
+      "parent_start_sha": "04119244e326f498db21f81f0509dd8374e10cf5",
+      "remote_ref": "origin/opencode/team-report-presentation-37743827267",
+      "linked_blocker": "BLOCKER-0003"
+    },
+    {
+      "id": "COMMIT-0060",
+      "sha": "c64c4d9ce4e22716f9718c38171314a5bb4ccd0e",
+      "purpose": "Add android product acceptance regression test",
+      "date": "2026-09-19T07:03:06Z",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0061",
+      "sha": "11c20bcc1fc4b88e5c8c98ccdca8ea88ec4f18c6",
+      "purpose": "Revert test file push to main",
+      "date": "2026-09-19T07:04:11Z",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0062",
+      "sha": "082e8a8d2b8461c1c252b42fcff0078d05aa70c6",
+      "purpose": "test(opencode): add isolated GitHub smoke-test workflow",
+      "date": "2026-10-08T00:32:53+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0063",
+      "sha": "9e804907c5662e33c60da88160ca2eb2bef82ff9",
+      "purpose": "test(opencode): use stable Zen smoke-test model",
+      "date": "2026-10-08T01:01:18+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0064",
+      "sha": "eb674c050fbecb19afcabf1776a28332278c7968",
+      "purpose": "test(opencode): use free Zen smoke-test model",
+      "date": "2026-10-08T01:16:05+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0065",
+      "sha": "400ca14cd68df4ff9f552b282964850f4529138d",
+      "purpose": "experiment(opencode): add bounded sandbox write smoke test",
+      "date": "2026-10-08T01:20:09+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0066",
+      "sha": "c060eb02083cdfdc4e2be8f00f12189ed2f7e7b8",
+      "purpose": "fix(opencode): preserve GitHub credentials for sandbox push",
+      "date": "2026-10-08T01:24:14+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0067",
+      "sha": "376c2055213da42d9c3918adb516f53e60e981a7",
+      "purpose": "feat(opencode): add governed continuous remote worker",
+      "date": "2026-10-08T01:43:18+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0068",
+      "sha": "d1d99e93d13235a2548a7be854fcec79302ed46b",
+      "purpose": "fix(opencode): harden continuous worker prompt and git gates",
+      "date": "2026-10-08T01:43:37+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0069",
+      "sha": "9248cd794758816f54b4af2c00c71c23d52aace3",
+      "purpose": "feat(opencode): add controlled immediate worker trigger",
+      "date": "2026-10-08T01:43:51+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0070",
+      "sha": "c23a1dbf27887e867ebf85d4f9b66644d307c516",
+      "purpose": "test(opencode): trigger controlled worker self-test",
+      "date": "2026-10-08T01:44:21+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0071",
+      "sha": "2b426fce4ee8e3a3360c4dd8e02cdcc2fc0e048a",
+      "purpose": "fix(opencode): validate installed CLI through absolute path",
+      "date": "2026-10-08T01:44:53+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0072",
+      "sha": "fa03c6af60080c912bb11774d86c3b764b8b5cfd",
+      "purpose": "chore(opencode): remove temporary push self-test trigger",
+      "date": "2026-10-08T01:45:20+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0073",
+      "sha": "da6e1112d2ebcf3b64f8ff34837c9ea4177b4947",
+      "purpose": "chore(opencode): remove completed smoke-test workflow",
+      "date": "2026-10-08T01:46:06+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0074",
+      "sha": "52d7d2d05730ad1f88d771cbf7b3d9b555c9230e",
+      "purpose": "chore(opencode): remove completed smoke-test workflow",
+      "date": "2026-10-08T01:46:09+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0075",
+      "sha": "129f39f98bbfd84bdad65c4d51487c59ce8a2086",
+      "purpose": "chore(opencode): bind worker to active mission and continue safely",
+      "date": "2026-10-08T07:57:01+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0076",
+      "sha": "c0a65b3b5a6d388423d10848028d5ae35ad36763",
+      "purpose": "fix(opencode): repair governed mission continuation workflow",
+      "date": "2026-10-08T07:57:26+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0077",
+      "sha": "7d587f66ea2c407aae8e871a8a539f9f18b728fe",
+      "purpose": "feat(opencode): adaptively select and fail over across free models",
+      "date": "2026-10-08T08:10:04+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0078",
+      "sha": "ac8ffdaf343891f1a2223b33f5954e9316398eea",
+      "purpose": "control(worker): harden restart command and adaptive-run timeout",
+      "date": "2026-10-08T08:16:46+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0079",
+      "sha": "aa9c1ef43bf7878437416646d4f61e4fce9d3aff",
+      "purpose": "control(worker): add independent stop notification watchdog",
+      "date": "2026-10-08T08:16:59+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0080",
+      "sha": "00ebd5004096c7b1051a99bd0211c636150668ab",
+      "purpose": "team(worker): add 12-seat isolated parallel autonomous team",
+      "date": "2026-10-08T08:26:26+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0081",
+      "sha": "c5dcd110da522d745b74469f0b951e56258389ce",
+      "purpose": "control(worker): serialize single and team construction lanes",
+      "date": "2026-10-08T08:26:31+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0082",
+      "sha": "4efabeef5f9cf55377b615f34e84ae5d7ffa3621",
+      "purpose": "team(worker): preserve per-worker result artifacts",
+      "date": "2026-10-08T08:27:12+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0083",
+      "sha": "fa7926da1ecf36004c6580e76a1c7fe164fbb62c",
+      "purpose": "control(worker): extend stop notifications to team workflow",
+      "date": "2026-10-08T08:27:18+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0084",
+      "sha": "c3008bc6682e91bfec6e0b940ceceee3c02b6f1b",
+      "purpose": "control(worker): fix free model eligibility and catalog parsing",
+      "date": "2026-10-08T08:29:52+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0085",
+      "sha": "367d7297d63df96c027434ce5e3ec8c82b7cd67e",
+      "purpose": "control(team): fix free model eligibility and catalog parsing",
+      "date": "2026-10-08T08:29:56+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0086",
+      "sha": "31ebbdb7c6bda95d99be1fcc86520229b0196ffa",
+      "purpose": "control(worker): isolate single-run trigger from team command",
+      "date": "2026-10-08T08:30:24+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0087",
+      "sha": "a624534ded4c1960f15272716a3b11f8994884a7",
+      "purpose": "control(worker): yield active mission continuation to team mode",
+      "date": "2026-10-08T08:30:55+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0088",
+      "sha": "2bb0ad5d1b84fe3d7123e58449c31b5d5370eb0a",
+      "purpose": "team(worker): harden parallel QC integration synthesis and continuation",
+      "date": "2026-10-08T10:29:15+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0089",
+      "sha": "f59c6692eda68b67ca4e933e5bbd75057d31430d",
+      "purpose": "team(worker): isolate synthesis and preserve worker reports for QC",
+      "date": "2026-10-08T10:29:40+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0090",
+      "sha": "3c58c7414e5ab416c83f227f08f6fe49265f2581",
+      "purpose": "team(worker): add dynamic orchestration semantic QC and autonomous continuation",
+      "date": "2026-10-08T10:32:30+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0091",
+      "sha": "8987be1fd6352c86d4a2e32b45211ec092106c89",
+      "purpose": "control(worker): make stop notifier workflow-run only and team-aware",
+      "date": "2026-10-08T10:33:35+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0092",
+      "sha": "5f2bc4d977fbc4ef5b48c719206db0f33bac55ae",
+      "purpose": "control(worker): make single worker explicit recovery-only",
+      "date": "2026-10-08T10:35:52+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0093",
+      "sha": "fd70842dc1790d6bd31cfd06659726eeb53d3afc",
+      "purpose": "control(team): isolate team concurrency lane from legacy recovery runs",
+      "date": "2026-10-08T10:37:15+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0094",
+      "sha": "5e1f06512d7736cd4aa331bf3c33b5fa1817a91d",
+      "purpose": "control(worker): isolate single recovery concurrency lane",
+      "date": "2026-10-08T10:37:18+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0095",
+      "sha": "8c6b8963d7ec74e938b99d8b0aa1e8450e1806ea",
+      "purpose": "control(worker): replace unreliable stop trigger with scheduled watchdog",
+      "date": "2026-10-08T10:37:58+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0096",
+      "sha": "9851ed53d1aa5887431d5dcae1ed23bdf572b17c",
+      "purpose": "control(team): harden OpenCode model metadata parsing",
+      "date": "2026-10-08T10:51:27+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0097",
+      "sha": "f3d743088742f47f596f49073466886ec437e64e",
+      "purpose": "control(worker): harden OpenCode model metadata parsing",
+      "date": "2026-10-08T10:51:30+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0098",
+      "sha": "02a73f7727397561e28cd7c9f3267471c4e9755e",
+      "purpose": "control(team): serialize team and single construction lanes",
+      "date": "2026-10-08T10:51:43+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0099",
+      "sha": "41b8a614e0b2ae6bcf5ce4d7483975d5dcd016f3",
+      "purpose": "control(team): replace model selector with schema-aligned parser",
+      "date": "2026-10-08T10:52:39+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0100",
+      "sha": "4ff018e84fcde64cf2bf28e4854c4243ed89c2f7",
+      "purpose": "control(team): harden QC free-model selector",
+      "date": "2026-10-08T10:52:43+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0101",
+      "sha": "1e55d3eaf35bde481ef46eabf2cbe7c3d28d5fea",
+      "purpose": "control(team): harden synthesis free-model selector",
+      "date": "2026-10-08T10:52:47+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0102",
+      "sha": "9da0ef55282176ba98f5c39b040063eaa027391c",
+      "purpose": "control(worker): replace broken model selector with schema-aligned parser",
+      "date": "2026-10-08T10:52:51+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0103",
+      "sha": "e2cc5c8a3161bb22ce622683b1214cbb35256e60",
+      "purpose": "control(team): make QC consume artifact reports and remove duplicate env write",
+      "date": "2026-10-08T10:53:50+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0104",
+      "sha": "f7c044c24068a1db0f84737bdbf18509d1076126",
+      "purpose": "control(team): fix model state handoff and bounded OpenCode install",
+      "date": "2026-10-08T10:56:06+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0105",
+      "sha": "cb5f6bc1077505bb1fd2c25b01f460989bbc83b6",
+      "purpose": "control(worker): fix model state handoff and bounded OpenCode install",
+      "date": "2026-10-08T10:56:10+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0106",
+      "sha": "1c97adc32f70d86e4550fb6df350b95eb8cc9fe5",
+      "purpose": "control(team): align worker timeout with four-model fallback budget",
+      "date": "2026-10-08T10:56:55+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0107",
+      "sha": "d2557367d404c6fee516a89c8fb9d4db3408ac7d",
+      "purpose": "control(team): remove unsupported OpenCode standalone flag and preflight CLI",
+      "date": "2026-10-08T10:57:38+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0108",
+      "sha": "629ef38f3dd259867c2167d8e21c47a0ed0c68e0",
+      "purpose": "control(team): capture OpenCode CLI help from stdout and stderr",
+      "date": "2026-10-08T11:00:01+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0109",
+      "sha": "c12985b37043d4a65e4d9bd35bdcab2a84d0e831",
+      "purpose": "control(team): remove duplicate model environment export",
+      "date": "2026-10-08T11:01:48+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0110",
+      "sha": "d8669e52579f0f0ee009d3ee1037fe925ab29792",
+      "purpose": "control(team): alert on long-running worker waves before timeout",
+      "date": "2026-10-08T11:03:04+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0111",
+      "sha": "cebe6db470d1e98f0059928ed785b9be21b27757",
+      "purpose": "control(team): add empirical free-model qualification gate",
+      "date": "2026-10-08T11:04:15+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0112",
+      "sha": "ee616fcda00201af4a30375acbf464ec8558f904",
+      "purpose": "control(team): correct model qualification dependency graph",
+      "date": "2026-10-08T11:04:41+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0113",
+      "sha": "63a35d09e5956ab1dc7a41fce71d9e416bc60936",
+      "purpose": "control(team): fix empirical model probe executable path",
+      "date": "2026-10-08T11:05:23+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0114",
+      "sha": "f5f98caf74d7d4c061764340bcd77b23c6eca49f",
+      "purpose": "control(team): harden QC and synthesis with qualified role-diverse models",
+      "date": "2026-10-08T11:06:36+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0115",
+      "sha": "3cd59b19bb10332ad20cd4e994cb497ac134ad24",
+      "purpose": "control(team): strengthen evidence report false-green gate",
+      "date": "2026-10-08T11:09:23+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0116",
+      "sha": "61f94d1a13bbf12f39014406b275b2f7fea0bf6d",
+      "purpose": "control(team): keep code diff gate strict while tolerating markdown report whitespace",
+      "date": "2026-10-08T11:14:18+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0117",
+      "sha": "21718a64754498f6cbdabd926bd08ecdb2d8b464",
+      "purpose": "control(team): alert immediately when an individual worker stops",
+      "date": "2026-10-08T11:15:40+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0118",
+      "sha": "3535384c958f52163fa33b6897727dfd288e587c",
+      "purpose": "control(team): add evidence-preserving recovery for controlled target drift",
+      "date": "2026-10-08T11:18:09+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0119",
+      "sha": "ba70d9dabf84ccba1b33db9d0e5eeb17c7dd6b0a",
+      "purpose": "control(team): avoid false alerts for skipped worker jobs",
+      "date": "2026-10-08T11:18:29+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0120",
+      "sha": "9a1f10a57088ae9dc410248dc65562d8252c4aec",
+      "purpose": "control(team): make controlled-drift recovery continue through synthesis",
+      "date": "2026-10-08T11:19:39+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0121",
+      "sha": "82d63f9534de7d8dac15869cd3b996a9d5ccb8a5",
+      "purpose": "control(team): supersede stale queued waves safely",
+      "date": "2026-10-08T13:20:02+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0122",
+      "sha": "215f8c80ad8ce9c0401aa10fd4a5a29f28246922",
+      "purpose": "control(team): gate V2 wave on organization and memory state",
+      "date": "2026-10-08T13:30:45+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0123",
+      "sha": "314e6b885b0f5c809a6ec3c94e1d6fa0af219a19",
+      "purpose": "control(team): bind dynamic leases to permanent work registry IDs",
+      "date": "2026-10-08T13:30:57+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0124",
+      "sha": "729c00cb86126bfb8172f961aea40164fbd82352",
+      "purpose": "control(team): bind each worker to V2 memory context",
+      "date": "2026-10-08T13:31:11+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0125",
+      "sha": "dec57432935475b417c2bb233e19e8028b87d04e",
+      "purpose": "control(team): inject V2 memory and anti-duplication rules into workers",
+      "date": "2026-10-08T13:31:25+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0126",
+      "sha": "9151fe4dbe85f9fbda0a3a7555a2206fb2e92461",
+      "purpose": "control(team): bind synthesis to V2 memory and anti-duplication state",
+      "date": "2026-10-08T13:31:40+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0127",
+      "sha": "c6676993ef2107a774cf14c947dc83cb0ac3f8e1",
+      "purpose": "control(team): assign queue and runner governance to team manager",
+      "date": "2026-10-08T13:59:56+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0128",
+      "sha": "d14553cef65bfde5f66a2bca529d9294698cedeb",
+      "purpose": "control(team): empower manager to govern Actions queue and runners",
+      "date": "2026-10-08T14:00:07+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0129",
+      "sha": "01ab0d59579b6c196dd6753d667ddbc63767cd51",
+      "purpose": "fix(team): route governed worker to explicit Ubuntu runner pool",
+      "date": "2026-10-08T14:24:30+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0130",
+      "sha": "6766e80976e72cd419298e33bcc908fa0cd402d2",
+      "purpose": "control(team): add independent queue bootstrap manager",
+      "date": "2026-10-08T14:26:32+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0131",
+      "sha": "1fca304b50fae67eda9928de4d85815763cd7056",
+      "purpose": "fix(team): make queue bootstrap event-driven",
+      "date": "2026-10-08T14:27:20+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0132",
+      "sha": "b72cb22ed5e4863c3b66b4c1b09307edb8eff043",
+      "purpose": "fix(team): preserve target Team V2 branch during queue bootstrap",
+      "date": "2026-10-08T15:28:01+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0133",
+      "sha": "89c80913f45213ad1e08c14a434366033ca10126",
+      "purpose": "fix(team): stop bootstrap event storm and target governed branch",
+      "date": "2026-10-08T15:28:36+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0134",
+      "sha": "d3765999e6435fca082e48bbc57ae152331dded1",
+      "purpose": "fix(team): make queue recovery target active runs only",
+      "date": "2026-10-08T15:32:03+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0135",
+      "sha": "850c76115d6f24b14c01fcd070070f81294c8055",
+      "purpose": "fix(team): self-bootstrap updated queue governor",
+      "date": "2026-10-08T15:33:31+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0136",
+      "sha": "c62b2d28bd79215d213efb69c6efeb80b18fd229",
+      "purpose": "fix(team): correct queue governor repository env handling",
+      "date": "2026-10-08T15:34:13+03:30",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0137",
+      "sha": "c45ca6d5110c417fcf68e2101f01636a1ce7c84a",
+      "purpose": "fix(team): simplify governed Team V2 dispatch",
+      "date": "2026-10-08T08:06:51-04:00",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0138",
+      "sha": "fdd289c22e252243d85e660f6ed2997f50b89b62",
+      "purpose": "fix(team): align worker model candidate contract",
+      "date": "2026-10-08T08:23:38-04:00",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0139",
+      "sha": "0bfe3eae515f58168b230d28895676353e3ba889",
+      "purpose": "control(team): add workflow-level stop escalation alert",
+      "date": "2026-10-08T08:52:59-04:00",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0140",
+      "sha": "509ce84cc31d9ccfab1aae8a31d8d6bd17af1a8b",
+      "purpose": "WORK-0003 prior unpromoted attempt (memory backfill, run 37776552275)",
+      "date": "2026-10-08T12:34:24Z",
+      "status": "UNPROMOTED_SUPERSEDED_BY_THIS_LEASE",
+      "lineage": "PRIOR_TEAM_RUN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git branch -r --contains 509ce84cc31d9ccfab1aae8a31d8d6bd17af1a8b",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "result_paths": [
+        ".kilo/team/results/work-0003-memory-backfill/result.md"
+      ],
+      "remote_ref": "origin/opencode/team-work-0003-memory-backfill-37776552275",
+      "duplicate_guard": "SAME_WORK_ID_WORK-0003_SAME_LEASE_SAME_START_SHA",
+      "reuse_decision": "EVIDENCE_REUSED_AND_INDEPENDENTLY_RE_VERIFIED"
+    },
+    {
+      "id": "COMMIT-0141",
+      "sha": "ba49094f6fe445deaec20e01d73b172c05935807",
+      "purpose": "WORK-0004 prior unpromoted attempt (Wave 10 recovery reconciliation)",
+      "date": "2026-10-08T12:30:59Z",
+      "status": "UNPROMOTED_OTHER_LEASE_NOT_IN_SCOPE_HERE",
+      "lineage": "PRIOR_TEAM_RUN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git branch -r --contains ba49094f6fe445deaec20e01d73b172c05935807",
+      "recorded_by": "work-0003-memory-backfill-37779956878",
+      "result_paths": [
+        ".kilo/team/results/work-0004-wave10-recovery/result.md"
+      ],
+      "remote_ref": "origin/opencode/team-work-0004-wave10-recovery-37776552275",
+      "owner_of_reconciliation": "WORK-0004_INTEGRATOR"
+    },
+    {
+      "sha": "d90d8e115c49b1e6d50e621d6066bfa191a01a49",
+      "purpose": "fix(team): configure integration git identity before cherry-pick",
+      "date": "2026-10-08 09:58:36 -0400",
+      "status": "REGISTERED_DIVERGENT_LINEAGE_NOT_PROMOTED_HERE",
+      "lineage": "ORIGIN_MAIN",
+      "in_start_sha_lineage": false,
+      "derived_from": "git rev-list HEAD..origin/main",
+      "recorded_by": "work-0003-memory-backfill-37788700120",
+      "linked_blocker": "BLOCKER-0004",
+      "corroborates": "EVIDENCE-0020",
+      "corroboration_note": "Divergent-lineage commit that corroborates the unpromoted WORK-0004 root-cause claim (missing git committer identity). Recorded as corroboration only; not applied as a memory correction (DECISION-0012).",
+      "id": "COMMIT-0142"
+    },
+    {
+      "sha": "3b8b97d0660b251d29c56d60753ffcbcfa01febe",
+      "purpose": "memory(team): backfill V2 ledgers and install the duplicate-lease guard",
+      "date": "2026-10-08 13:01:16 +0000",
+      "status": "UNPROMOTED_SUPERSEDED_WITHOUT_QC",
+      "lineage": "UNPROMOTED_TEAM_RUN",
+      "in_start_sha_lineage": false,
+      "promoted_to_this_branch": false,
+      "derived_from": "git for-each-ref refs/remotes/origin/opencode/team-work-0003-memory-backfill-37779956878",
+      "recorded_by": "work-0003-memory-backfill-37788700120",
+      "result_paths": [
+        ".kilo/team/memory/README.md",
+        ".kilo/team/memory/blocker-registry.json",
+        ".kilo/team/memory/commit-registry.json",
+        ".kilo/team/memory/decision-registry.json",
+        ".kilo/team/memory/defect-registry.json",
+        ".kilo/team/memory/evidence-registry.json",
+        ".kilo/team/memory/mission-state.json",
+        ".kilo/team/memory/wave-history.json",
+        ".kilo/team/memory/work-registry.json",
+        ".kilo/team/results/work-0003-memory-backfill/result.md"
+      ],
+      "remote_ref": "origin/opencode/team-work-0003-memory-backfill-37779956878",
+      "lease": "work-0003",
+      "run_id": "37779956878",
+      "owner_of_reconciliation": "WORK-0003_MEM",
+      "duplicate_guard": "SAME_WORK_ID_WORK-0003_SAME_LEASE_SAME_START_SHA",
+      "reuse_decision": "EVIDENCE_REUSED_AND_INDEPENDENTLY_RE_VERIFIED",
+      "id": "COMMIT-0143"
+    },
+    {
+      "sha": "305466ccb12c962cf8d37ee70bbfad16a855d8cb",
+      "purpose": "audit(team): reconcile Wave 10 recovery evidence and supersede orphaned attempt",
+      "date": "2026-10-08 12:59:28 +0000",
+      "status": "UNPROMOTED_SIBLING_LEASE_NOT_QC_ADJUDICATED",
+      "lineage": "UNPROMOTED_TEAM_RUN",
+      "in_start_sha_lineage": false,
+      "promoted_to_this_branch": false,
+      "derived_from": "git for-each-ref refs/remotes/origin/opencode/team-work-0004-wave10-recovery-37779956878",
+      "recorded_by": "work-0003-memory-backfill-37788700120",
+      "result_paths": [
+        ".kilo/team/results/work-0004-wave10-recovery/result.md"
+      ],
+      "remote_ref": "origin/opencode/team-work-0004-wave10-recovery-37779956878",
+      "lease": "work-0004",
+      "run_id": "37779956878",
+      "owner_of_reconciliation": "WORK-0004_INTEGRATOR",
+      "id": "COMMIT-0144"
+    },
+    {
+      "sha": "7fe96e2a28d8b62b175efec3fd9233e4a657a6b2",
+      "purpose": "audit(team): reconcile next genuinely missing capability for WORK-0005",
+      "date": "2026-10-08 13:08:36 +0000",
+      "status": "UNPROMOTED_SIBLING_LEASE_NOT_QC_ADJUDICATED",
+      "lineage": "UNPROMOTED_TEAM_RUN",
+      "in_start_sha_lineage": false,
+      "promoted_to_this_branch": false,
+      "derived_from": "git for-each-ref refs/remotes/origin/opencode/team-work-0005-next-capability-37779956878",
+      "recorded_by": "work-0003-memory-backfill-37788700120",
+      "result_paths": [
+        ".kilo/team/results/work-0005-next-capability/result.md"
+      ],
+      "remote_ref": "origin/opencode/team-work-0005-next-capability-37779956878",
+      "lease": "work-0005",
+      "run_id": "37779956878",
+      "owner_of_reconciliation": "WORK-0005_PLANNER",
+      "id": "COMMIT-0145"
     }
-  ]
+  ],
+  "backfill_state": {
+    "backfill_rule": "EVIDENCE_FROM_REPOSITORY_ONLY_NEVER_RECOLLECTION",
+    "backfill_source": "git object database reachable from this branch and its remotes",
+    "recorded_by": "work-0003-memory-backfill-37788700120",
+    "records": 145,
+    "lineage_split": {
+      "ORIGIN_MAIN": 81,
+      "START_SHA_LINEAGE": 35,
+      "WAVE10_WORKER_BRANCH": 11,
+      "PRIOR_TEAM_RUN": 5,
+      "PRE_EXISTING": 13
+    },
+    "all_shas_resolve": true,
+    "note": "Every SHA is machine-verified with git cat-file -e at record time. No SHA is hand-typed."
+  },
+  "backfill_required": true,
+  "backfill_required_scope": {
+    "team_domain": false,
+    "product_era": true,
+    "product_era_note": "The pre-V2 product-era history (1541 commits reachable from HEAD, 60 .kilo/evidence artifacts) is NOT reconstructed by this lease and remains explicitly unknown."
+  }
 }
