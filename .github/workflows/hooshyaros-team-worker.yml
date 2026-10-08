@@ -139,38 +139,27 @@ jobs:
           if not work_registry.get("items"):
               raise SystemExit("BLOCKED: V2 Work Registry is empty")
 
-          if next_plan.exists():
-              plan = json.loads(next_plan.read_text(encoding="utf-8"))
-              status = plan.get("wave_status")
-              if status == "READY":
-                  leases = plan.get("leases", [])
-                  source = "NEXT-WAVE-PLAN"
-              elif status in ("COMPLETE", "BLOCKED"):
-                  print(f"TEAM_WAVE_STATUS={status}")
-                  raise SystemExit(18)
-              else:
-                  leases = []
-                  source = "INITIAL-MANIFEST"
+          if not next_plan.exists():
+              raise SystemExit("BLOCKED: Team Organization V2 is ACTIVE but NEXT-WAVE-PLAN.json is missing; do not fall back to the legacy 12-worker pool")
+
+          plan = json.loads(next_plan.read_text(encoding="utf-8"))
+          status = plan.get("wave_status")
+          if status == "READY":
+              leases = plan.get("leases", [])
+              source = "NEXT-WAVE-PLAN"
+          elif status in ("COMPLETE", "BLOCKED"):
+              print(f"TEAM_WAVE_STATUS={status}")
+              raise SystemExit(18)
           else:
-              leases = []
-              source = "INITIAL-MANIFEST"
+              print(f"TEAM_WAVE_STATUS={status}")
+              raise SystemExit("BLOCKED: V2 plan is not READY; no legacy-worker fallback is permitted")
 
           if not leases:
-              manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-              leases = [
-                  {
-                      "id": w["id"],
-                      "role": w["role"],
-                      "focus": w["focus"],
-                      "owner": w["owner"],
-                      "mode": "AUDIT",
-                      "write_scope": [f".kilo/team/results/{w['id']}/"]
-                  }
-                  for w in manifest["workers"]
-              ]
+              raise SystemExit("BLOCKED: V2 READY plan has no eligible governed worker leases")
 
-          if not leases:
-              raise SystemExit("BLOCKED: no eligible governed worker lease exists")
+          print("TEAM_POOL_MODE=V2_DYNAMIC_READY_LEASES_ONLY")
+          print(f"V1_SPECIALIST_CATALOG_SIZE={len(json.loads(manifest_path.read_text(encoding='utf-8')).get('workers', []))}")
+          print("V1_SPECIALIST_CATALOG_IS_ACTIVE_WORKER_COUNT=FALSE")
 
           requested = int(os.environ.get("REQUESTED_MAX_PARALLEL") or 12)
           requested = max(1, min(requested, 100))
