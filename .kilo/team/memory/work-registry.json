@@ -323,7 +323,29 @@
         "start_sha": "23d96b7a64b59322931d3254078aa444c6fe37b4",
         "state": "ADMITTED_BEFORE_DISPATCH"
       },
-      "execution_attempts": []
+      "execution_attempts": [
+        {
+          "run_id": 37799429283,
+          "state": "EXECUTED_UNPROMOTED",
+          "qc": "NOT_PERFORMED",
+          "promoted": false,
+          "commit": "b18fd2ed4efb966fe461271cea78c9cbb9ade7d8",
+          "branch": "opencode/team-work-0008-wave11-promotion-reconciliation-37799429283",
+          "start_sha": "d036262b4cccae5847403174349c7acc11a7b175",
+          "evidence_artifact_id": 11560443316,
+          "evidence_artifact_digest": "sha256:6e93f40439fcfc872b8bf3ceeb233a28453f351401290032d433d4de4ed0dc32",
+          "note": "Worker committed a coherent memory-only result, but outer validation rejected the report due a false-positive placeholder regex. The isolated branch was not pushed; GitHub cannot currently resolve the commit SHA. Preserve the artifact as evidence; do not infer promotion or success."
+        }
+      ],
+      "governance_state": "EXECUTED_UNPROMOTED_ARTIFACT_ONLY",
+      "last_state_change_by": "TEAM-MANAGER-RECONCILIATION-RUN-37799429283",
+      "failure_reconciliation": {
+        "run_id": 37799429283,
+        "root_cause": "OUTER_VALIDATOR_FALSE_POSITIVE_ON_LEGITIMATE_WORD_PLACEHOLDER",
+        "validator_fix_on_main": "COMPLETED",
+        "commit_recovery": "UNAVAILABLE_FROM_GITHUB",
+        "duplicate_dispatch": "FORBIDDEN"
+      }
     }
   ],
   "backfill_required_scope": {
@@ -352,5 +374,10 @@
         "commit": "3b8b97d0660b251d29c56d60753ffcbcfa01febe"
       }
     ]
+  },
+  "registry_reconciliation": {
+    "last_reconciled_run": 37799429283,
+    "principle": "EXECUTED_BUT_UNPROMOTED_ATTEMPTS_ARE_REGISTERED_AND_BLOCK_DUPLICATE_REDISPATCH",
+    "acceptance_wave": "WORK-0009"
   }
 }
