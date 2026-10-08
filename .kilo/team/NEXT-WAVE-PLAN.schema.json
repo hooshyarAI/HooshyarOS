@@ -39,6 +39,7 @@
           "focus",
           "owner",
           "mode",
+          "task_class",
           "write_scope"
         ],
         "properties": {
@@ -64,6 +65,18 @@
               "IMPLEMENT",
               "REVIEW",
               "VERIFY"
+            ]
+          },
+          "task_class": {
+            "enum": [
+              "PLAN",
+              "AUDIT",
+              "IMPLEMENT",
+              "REPAIR",
+              "REVIEW",
+              "VERIFY",
+              "QC",
+              "MEMORY"
             ]
           },
           "write_scope": {
