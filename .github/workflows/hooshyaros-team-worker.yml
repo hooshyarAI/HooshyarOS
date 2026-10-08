@@ -555,6 +555,7 @@ jobs:
           You are one member of the governed HooshyarOS autonomous team.
 
           WORKER_ID = ${WORKER_ID}
+          WORK_ID = ${WORK_ID}
           ROLE = ${WORKER_ROLE}
           OWNER_ENGINE = ${OWNER_ENGINE}
           MODE = ${WORKER_MODE}
@@ -562,6 +563,8 @@ jobs:
           START_SHA = ${START_SHA}
           WRITE_ROOT = ${WRITE_ROOT}
           WRITE_SCOPE = ${WRITE_SCOPE_JSON}
+          TEAM_ORGANIZATION_VERSION = V2
+          TEAM_MEMORY_ROOT = .kilo/team/memory/
 
           AUTHORITIES:
           1. Docs/HOOSHYAROS_MASTER_CHARTER.md
@@ -573,7 +576,24 @@ jobs:
           7. AGENTS.md
           8. .kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md
           9. .kilo/team/TEAM-WORKER-V1-PROTOCOL.md
-          10. .kilo/team/NEXT-WAVE-PLAN.schema.json
+          10. .kilo/team/TEAM-ORGANIZATION-V2.json
+          11. .kilo/team/TEAM-ORGANIZATION-V2-PROTOCOL.md
+          12. .kilo/team/memory/mission-state.json
+          13. .kilo/team/memory/work-registry.json
+          14. .kilo/team/memory/evidence-registry.json
+          15. .kilo/team/memory/decision-registry.json
+          16. .kilo/team/memory/defect-registry.json
+          17. .kilo/team/memory/blocker-registry.json
+          18. .kilo/team/memory/commit-registry.json
+          19. .kilo/team/memory/wave-history.json
+          20. .kilo/team/NEXT-WAVE-PLAN.schema.json
+
+          V2 MEMORY RULE:
+          - Reconstruct the current work state from .kilo/team/memory before acting.
+          - Treat the Work Registry as the anti-duplication gate.
+          - Do not repeat DONE/VERIFIED/ACCEPTED/SUPERSEDED/DUPLICATE work without current regression or invalidation evidence.
+          - Preserve stale and failed evidence; never edit memory to make an outcome appear successful.
+          - Record contradictions explicitly as findings/overlaps.
 
           CORE RULE:
           Execute ONLY the leased focus and ONLY within WRITE_SCOPE.
