@@ -29,7 +29,7 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-22.04
     outputs:
-      start_sha: ${{ steps.state.outputs.start_sha }}
+      start_sha: ${{ steps.final_state.outputs.start_sha }}
       matrix: ${{ steps.pool.outputs.matrix }}
       max_parallel: ${{ steps.pool.outputs.max_parallel }}
       lease_ids: ${{ steps.pool.outputs.lease_ids }}
@@ -452,7 +452,81 @@ jobs:
           for x in active:
               print(f"LEASE={x['id']} mode={x['mode']} owner={x['owner']}")
           PY
+      - name: Team Manager — Reserve admitted leases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_SHA: ${{ steps.state.outputs.start_sha }}
+          LEASE_IDS: ${{ steps.pool.outputs.lease_ids }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+          from datetime import datetime, timezone
+          from pathlib import Path
 
+          target="fix/autonomous-product-factory"
+          base=os.environ["BASE_SHA"]
+          lease_ids=json.loads(os.environ["LEASE_IDS"])
+          registry_path=Path(".kilo/team/memory/work-registry.json")
+          registry=json.loads(registry_path.read_text(encoding="utf-8"))
+          by_id={str(x.get("id")):x for x in registry.get("items",[])}
+          run_id=int(os.environ["GITHUB_RUN_ID"])
+
+          for lid in lease_ids:
+              m=re.match(r"^work-([0-9]{4})(?:-|$)",str(lid))
+              if not m: raise SystemExit(f"BLOCKED: invalid lease id {lid}")
+              work_id=f"WORK-{m.group(1)}"
+              item=by_id.get(work_id)
+              if not item: raise SystemExit(f"BLOCKED: reservation missing {work_id}")
+              if str(item.get("status","" )).upper()!="READY" or str(item.get("readiness","" )).upper()!="READY":
+                  raise SystemExit(f"BLOCKED: reservation requires READY {work_id}")
+              reservations=item.setdefault("reservations",[])
+              if any(int(x.get("run_id",-1))==run_id and str(x.get("state","" )).upper()=="EXECUTING" for x in reservations):
+                  print(f"RESERVATION_EXISTING={work_id}")
+                  continue
+              attempts=item.setdefault("execution_attempts",[])
+              if any(int(x.get("run_id",-1))==run_id for x in attempts):
+                  raise SystemExit(f"BLOCKED: execution attempt already exists for {work_id} in run {run_id}")
+              attempts.append({
+                  "run_id":run_id, "state":"RESERVED_EXECUTING", "promoted":False,
+                  "commit":None, "start_sha":base, "lease_id":str(lid),
+                  "reserved_at":datetime.now(timezone.utc).isoformat()
+              })
+              reservations.append({
+                  "run_id":run_id, "lease_id":str(lid), "start_sha":base,
+                  "state":"EXECUTING", "planned_branch":f"opencode/team-{lid}-{run_id}"
+              })
+              item["reservations"]=reservations
+              item["last_state_change_by"]=f"TEAM_MANAGER_RESERVATION_{run_id}"
+
+          registry_path.write_text(json.dumps(registry,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+          subprocess.check_call(["git","config","user.name","github-actions[bot]"])
+          subprocess.check_call(["git","config","user.email","41898282+github-actions[bot]@users.noreply.github.com"])
+          subprocess.check_call(["git","add",str(registry_path)])
+          subprocess.check_call(["git","commit","-m",f"governance(team): reserve execution leases for run {run_id}"])
+          subprocess.check_call(["git","fetch","origin",target])
+          current=subprocess.check_output(["git","rev-parse",f"origin/{target}"],text=True).strip()
+          if current!=base:
+              raise SystemExit(f"BLOCKED: target changed during lease reservation (base={base}, current={current})")
+          subprocess.check_call(["git","push","origin",f"HEAD:refs/heads/{target}"])
+          print("LEASE_RESERVATION=COMMITTED_AND_PUSHED")
+          print("LEASE_RESERVATION_RUN="+str(run_id))
+          print("LEASE_RESERVATION_IDS="+",".join(map(str,lease_ids)))
+          PY
+
+      - name: Capture final immutable execution state
+        id: final_state
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin fix/autonomous-product-factory
+          START_SHA="$(git rev-parse origin/fix/autonomous-product-factory)"
+          echo "start_sha=${START_SHA}" >> "${GITHUB_OUTPUT}"
+          echo "TEAM_START_SHA=${START_SHA}"
   model-qualification:
     needs: prepare
     if: ${{ needs.prepare.result == 'success' }}
@@ -1250,6 +1324,7 @@ jobs:
           set -euo pipefail
           mapfile -t RESULTS < <(find "${RUNNER_TEMP}/team-results" -name result.json -type f | sort)
           SUCCESS_COUNT=0
+          : > "${RUNNER_TEMP}/integrated-workers.txt"
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -1291,8 +1366,42 @@ jobs:
 
             git cherry-pick "${COMMIT}"
             SUCCESS_COUNT=$((SUCCESS_COUNT+1))
+            printf "%s\t%s\n" "${WORKER_ID}" "${COMMIT}" >> "${RUNNER_TEMP}/integrated-workers.txt"
             echo "INTEGRATED=${WORKER_ID} ${COMMIT}"
           done
+
+          python3 - "${RUNNER_TEMP}/integrated-workers.txt" <<PY
+          import json,sys,re
+          from datetime import datetime, timezone
+          from pathlib import Path
+          registry_path=Path(".kilo/team/memory/work-registry.json")
+          registry=json.loads(registry_path.read_text(encoding="utf-8"))
+          by_id={str(x.get("id")):x for x in registry.get("items",[])}
+          run_id=int("${{ github.run_id }}")
+          rows=[line.rstrip("\n").split("\t",1) for line in open(sys.argv[1],encoding="utf-8") if line.strip()]
+          for worker_id,commit in rows:
+              m=re.match(r"^work-([0-9]{4})(?:-|$)",worker_id)
+              if not m: raise SystemExit(f"BLOCKED: invalid integrated worker id {worker_id}")
+              work_id=f"WORK-{m.group(1)}"
+              item=by_id.get(work_id)
+              if not item: raise SystemExit(f"BLOCKED: promoted worker has no registry row {work_id}")
+              attempts=item.get("execution_attempts",[])
+              matches=[a for a in attempts if int(a.get("run_id",-1))==run_id and str(a.get("state","")).upper()=="RESERVED_EXECUTING"]
+              if len(matches)!=1: raise SystemExit(f"BLOCKED: promotion reservation missing/ambiguous for {work_id}")
+              a=matches[0]
+              a.update({"promoted":True,"state":"PROMOTED","promoted_commit":commit,"promotion_run_id":run_id,"promoted_at":datetime.now(timezone.utc).isoformat()})
+              item["status"]="PROMOTED"
+              item["readiness"]="PROMOTED"
+              item["last_state_change_by"]=f"TEAM_INTEGRATOR_PROMOTION_{run_id}"
+              for r in item.get("reservations",[]):
+                  if int(r.get("run_id",-1))==run_id and str(r.get("lease_id"))==worker_id:
+                      r["state"]="PROMOTED"; r["promoted_commit"]=commit
+          registry_path.write_text(json.dumps(registry,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
+          print("PROMOTED_LEASE_STATE=FINALIZED")
+          PY
+
+          git add ".kilo/team/memory/work-registry.json"
+          git commit -m "governance(team): finalize promoted lease registry state"
 
           echo "SUCCESS_COUNT=${SUCCESS_COUNT}"
           test "${SUCCESS_COUNT}" -gt 0
