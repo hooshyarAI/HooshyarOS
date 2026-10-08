@@ -319,6 +319,7 @@ scripts/team-v2-dispatch-authority.test.cjs"
             echo "BLOCKED: protected/control-plane path changed"
             exit 21
           fi
+          fi
 
       - name: Reconcile target and fast-forward promote
         shell: bash
