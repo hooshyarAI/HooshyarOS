@@ -76,6 +76,13 @@ jobs:
               raise SystemExit('FORBIDDEN_MODE_AUTHORITY=' + ','.join(bad))
           print('WORKER_ROUTE_CONTRACT=PASS')
           PY
+      - name: Acceptance signing key presence
+        env:
+          SIGNING_SECRET: ${{ secrets.TEAM_AUTHORIZATION_SIGNING_SECRET }}
+        run: |
+          set -euo pipefail
+          if test -n "${SIGNING_SECRET}"; then echo "ACCEPTANCE_SIGNING_SECRET_PRESENT=TRUE"; else echo "ACCEPTANCE_SIGNING_SECRET_PRESENT=FALSE"; fi
+
       - name: Acceptance gate invariant
         run: |
           set -euo pipefail
