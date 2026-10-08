@@ -33,9 +33,9 @@ jobs:
           set -euo pipefail
           echo "BOOTSTRAP_RUN_ID=${GITHUB_RUN_ID}"
           python3 - <<'PY' > "${RUNNER_TEMP}/workflows.txt"
-import json, subprocess
+import json, subprocess, os
 legacy={"Final Product Factory","Final Product Factory Trigger","Autonomous CI Repair","Autonomous Builder","Autonomous Builder Audit","Autonomous Builder Verification","Autonomous Builder Validation","HooshyarOS Validation","Hooshyar Validation","HooshyarOS CI","HooshyarOS Release Artifacts","Android Release Verification","Autonomous Platform Construction","Autonomous Continuation Validation","HooshyarOS Autonomous Continuation Validation","Web Product Acceptance"}
-raw=subprocess.check_output(["gh","api","repos/${GITHUB_REPOSITORY}/actions/workflows?per_page=100"],text=True)
+raw=subprocess.check_output(["gh","api",f"repos/{os.environ[\"GITHUB_REPOSITORY\"]}/actions/workflows?per_page=100"],text=True)
 data=json.loads(raw)
 for w in data.get("workflows",[]):
     if w.get("name") in legacy or str(w.get("id"))=="378094136":
