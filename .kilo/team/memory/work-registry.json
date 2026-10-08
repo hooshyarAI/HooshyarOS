@@ -508,6 +508,7 @@
       "mode": "AUDIT",
       "priority": "P0",
       "owner": "MEMORY_EDITOR",
+      "task_class": "MEMORY",
       "dependencies": [],
       "evidence_required": [
         "reconciled_defect_registry",
