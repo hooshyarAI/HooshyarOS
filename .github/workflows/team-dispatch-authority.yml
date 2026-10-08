@@ -16,6 +16,9 @@ permissions:
 jobs:
   authorize-and-dispatch:
     runs-on: ubuntu-slim
+    concurrency:
+      group: hooshyaros-team-dispatch-authority
+      cancel-in-progress: false
     timeout-minutes: 10
     env:
       GH_TOKEN: ${{ github.token }}
