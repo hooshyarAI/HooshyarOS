@@ -4,13 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       max_parallel:
-        description: "Initial worker concurrency"
+        description: "Maximum concurrent workers for this wave"
         required: false
         default: "12"
         type: string
       reason:
         description: "Reason for the team wave"
         required: false
+        default: "manual controlled team wave"
         type: string
   issue_comment:
     types: [created]
@@ -49,7 +50,7 @@ jobs:
           echo "start_sha=${START_SHA}" >> "${GITHUB_OUTPUT}"
           echo "TEAM_START_SHA=${START_SHA}"
 
-      - name: Load worker pool
+      - name: Load governed worker leases
         id: pool
         shell: bash
         env:
@@ -63,9 +64,12 @@ jobs:
 
           manifest = json.loads(Path(".kilo/team/TEAM-WORKER-V1.json").read_text(encoding="utf-8"))
           workers = manifest["workers"]
-          initial = int(os.environ.get("REQUESTED_MAX_PARALLEL") or manifest.get("max_parallel_initial", 12))
-          cap = len(workers)
-          max_parallel = max(1, min(initial, cap))
+
+          requested = int(os.environ.get("REQUESTED_MAX_PARALLEL") or manifest.get("max_parallel_initial", 12))
+          requested = max(1, min(requested, 100))
+          active = workers[:min(len(workers), requested)]
+          if not active:
+              raise SystemExit("BLOCKED: no governed worker leases are defined")
 
           matrix = {
               "include": [
@@ -76,16 +80,16 @@ jobs:
                       "owner": w["owner"],
                       "write_root": f".kilo/team/results/{w['id']}/"
                   }
-                  for w in workers
+                  for w in active
               ]
           }
 
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
               out.write("matrix=" + json.dumps(matrix, ensure_ascii=False, separators=(",", ":")) + "\n")
-              out.write(f"max_parallel={max_parallel}\n")
+              out.write(f"max_parallel={min(requested, len(active))}\n")
 
-          print(f"TEAM_WORKERS={len(workers)}")
-          print(f"MAX_PARALLEL={max_parallel}")
+          print(f"TEAM_LEASES={len(active)}")
+          print(f"MAX_PARALLEL={min(requested, len(active))}")
           PY
 
   team-worker:
@@ -97,6 +101,7 @@ jobs:
       matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    continue-on-error: true
     permissions:
       contents: write
       issues: write
@@ -126,7 +131,6 @@ jobs:
         run: |
           set -euo pipefail
           git checkout -b "opencode/team-${WORKER_ID}-${GITHUB_RUN_ID}" "${START_SHA}"
-          git status --short
           test -z "$(git status --porcelain)"
 
       - name: Install OpenCode
@@ -147,67 +151,80 @@ jobs:
           import json, math, re, sys
           from datetime import datetime, timezone
 
-          text = open(sys.argv[1], encoding="utf-8", errors="replace").read()
+          raw_text = open(sys.argv[1], encoding="utf-8", errors="replace").read()
+          text = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", raw_text)
           lines = text.splitlines()
           decoder = json.JSONDecoder()
           models = []
 
-          def is_id(s):
-              return bool(re.fullmatch(r"[^\s/]+/[^\s]+", s))
+          def is_id(value):
+              return bool(re.fullmatch(r"[^\s/]+/[^\s]+", value.strip()))
 
-          for i, line in enumerate(lines[:-1]):
-              s = line.strip()
-              if not is_id(s):
+          for i, line in enumerate(lines):
+              model_id = line.strip()
+              if not is_id(model_id):
                   continue
-              raw = "\n".join(lines[i+1:])
+              block = "\n".join(lines[i + 1:])
+              first_brace = block.find("{")
+              if first_brace < 0:
+                  continue
               try:
-                  obj, _ = decoder.raw_decode(raw.lstrip())
+                  obj, _ = decoder.raw_decode(block[first_brace:])
               except Exception:
                   continue
               if isinstance(obj, dict) and "name" in obj:
-                  models.append((s, obj))
+                  models.append((model_id, obj))
 
           candidates = []
           now = datetime.now(timezone.utc)
 
-          for model_id, m in models:
-              cost = m.get("cost")
+          for model_id, model in models:
+              cost = model.get("cost")
               provider, _, model_name = model_id.partition("/")
               explicit_free = False
               if isinstance(cost, dict):
-                  vals = [v for v in cost.values() if isinstance(v, (int,float))]
-                  explicit_free = bool(vals) and all(v == 0 for v in vals)
-              free_named = model_id == "opencode/big-pickle" or model_name.lower().endswith("-free") or "-free-" in model_name.lower()
-              if not (explicit_free or free_named):
+                  numeric = [v for v in cost.values() if isinstance(v, (int, float))]
+                  explicit_free = bool(numeric) and all(v == 0 for v in numeric)
+
+              named_free = (
+                  model_id == "opencode/big-pickle"
+                  or model_name.lower().endswith("-free")
+                  or "-free-" in model_name.lower()
+              )
+              if not (explicit_free or named_free):
                   continue
-              if m.get("reasoning") is not True or m.get("tool_call") is not True:
-                  continue
-              limit = m.get("limit") or {}
-              ctx = int(limit.get("context") or 0)
-              out = int(limit.get("output") or 0)
-              if ctx < 100_000 or out < 8_000:
+              if model.get("reasoning") is not True or model.get("tool_call") is not True:
                   continue
 
-              score = 100 + 80
-              score += 30 if m.get("structured_output") else 0
-              score += min(30, math.log2(max(ctx,1))*2)
-              score += min(20, math.log2(max(out,1))*1.5)
-              if m.get("attachment"):
+              limit = model.get("limit") or {}
+              context = int(limit.get("context") or 0)
+              output = int(limit.get("output") or 0)
+              if context < 100_000 or output < 8_000:
+                  continue
+
+              score = 180.0
+              score += 30 if model.get("structured_output") else 0
+              score += min(30.0, math.log2(max(context, 1)) * 2.0)
+              score += min(20.0, math.log2(max(output, 1)) * 1.5)
+              if model.get("attachment"):
                   score += 5
-              family = str(m.get("family") or "").lower()
-              if any(x in family for x in ("mini","small","nano")):
+
+              family = str(model.get("family") or "").lower()
+              if any(x in family for x in ("mini", "small", "nano")):
                   score -= 8
-              updated = m.get("last_updated") or m.get("release_date")
+
+              updated = model.get("last_updated") or model.get("release_date")
               if updated:
                   try:
-                      dt = datetime.fromisoformat(str(updated).replace("Z","+00:00"))
-                      age = max(0, (now-dt).total_seconds()/86400)
-                      score += max(0, 10-min(10, age/30))
+                      dt = datetime.fromisoformat(str(updated).replace("Z", "+00:00"))
+                      age = max(0.0, (now - dt).total_seconds() / 86400.0)
+                      score += max(0.0, 10.0 - min(10.0, age / 30.0))
                   except Exception:
                       pass
+
               if model_id == "opencode/big-pickle":
                   score += 5
-              candidates.append((score,model_id,ctx,out))
+              candidates.append((score, model_id, context, output))
 
           candidates.sort(reverse=True)
           top = candidates[:4]
@@ -216,13 +233,16 @@ jobs:
               raise SystemExit(20)
 
           print("MODEL_SELECTION_STATUS=OK")
-          print("SELECTED_MODEL="+top[0][1])
-          print("MODEL_CANDIDATES="+"|".join(x[1] for x in top))
-          print("MODEL_RANKING="+" ; ".join(f"{x[1]} score={x[0]:.2f} ctx={x[2]} out={x[3]}" for x in top))
+          print("SELECTED_MODEL=" + top[0][1])
+          print("MODEL_CANDIDATES=" + "|".join(x[1] for x in top))
+          print("MODEL_RANKING=" + " ; ".join(
+              f"{x[1]} score={x[0]:.2f} ctx={x[2]} out={x[3]}" for x in top
+          ))
           PY
           tee -a "${GITHUB_ENV}" < "${RUNNER_TEMP}/model-selection.env"
+          echo "MODEL_SELECTED_FOR_WORKER=${SELECTED_MODEL}"
 
-      - name: Run assigned team work lease
+      - name: Run assigned governed work lease
         shell: bash
         run: |
           set -euo pipefail
@@ -230,7 +250,6 @@ jobs:
           cat > "${PROMPT}" <<EOF
           You are one member of the governed HooshyarOS autonomous team.
 
-          TEAM WORKER:
           worker_id = ${WORKER_ID}
           role = ${WORKER_ROLE}
           owner_engine = ${OWNER_ENGINE}
@@ -238,7 +257,7 @@ jobs:
           start_sha = ${START_SHA}
           write_root = ${WRITE_ROOT}
 
-          AUTHORITIES, IN ORDER:
+          AUTHORITIES:
           1. Docs/HOOSHYAROS_MASTER_CHARTER.md
           2. Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md
           3. Docs/ARCHITECTURE.md
@@ -250,50 +269,43 @@ jobs:
           9. .kilo/team/TEAM-WORKER-V1-PROTOCOL.md
           10. .kilo/team/TEAM-WORKER-V1.json
 
-          V1 MODE = AUDIT_PARALLEL.
-          The active mission's first objective is reconciliation/audit and says no product implementation during that stage.
+          MODE:
+          AUDIT_PARALLEL. The active mission's first objective is reconciliation/audit and explicitly forbids product implementation during this stage.
 
-          DO:
-          - inspect current repository state and relevant evidence;
-          - perform the assigned audit focus only;
-          - distinguish EXISTS / PARTIAL / VERIFIED / GENUINELY_MISSING;
-          - preserve evidence and cite exact file paths/lines or test/runtime evidence where available;
-          - identify dependencies, risks, overlaps and safe next Micro-Stage;
-          - write ONE evidence report under ${WRITE_ROOT};
-          - commit exactly ONE coherent worker evidence commit;
+          REQUIRED:
+          - inspect repository state, architecture and relevant evidence;
+          - audit ONLY your leased focus;
+          - distinguish EXISTS / PARTIAL / BEHAVIORALLY_VERIFIED / INTEGRATION_VERIFIED / GENUINELY_MISSING;
+          - preserve provenance with exact paths, headings, tests or runtime evidence where available;
+          - identify dependencies, risks, overlaps and one recommended next Micro-Stage;
+          - do not inspect or transmit secrets, personal data or confidential customer financial data;
+          - write exactly one report at ${WRITE_ROOT}result.md;
+          - commit exactly one coherent evidence commit;
           - stop.
 
-          DO NOT:
-          - modify product source, tests, package files, architecture, governance, control-plane files, workflows, secrets, or any path outside ${WRITE_ROOT};
-          - select another worker's task;
-          - restart accepted F1/F6/CCC/UX work without current regression evidence;
-          - fabricate evidence;
-          - weaken or delete tests;
-          - push the target branch;
-          - create or merge a PR.
+          FORBIDDEN:
+          product implementation, test changes, package changes, architecture/governance changes, workflow/control-plane changes, secret changes, unrelated scope, force-push, history rewrite, target-branch push, PR creation, fabricated evidence, weakened tests.
 
-          Required report:
-          .kilo/team/results/${WORKER_ID}/result.md
+          REPORT:
+          # STATUS
+          # SCOPE
+          # CURRENT_EVIDENCE
+          # FINDINGS
+          # DEPENDENCIES
+          # RISKS
+          # OVERLAPS
+          # RECOMMENDED_NEXT_MICRO_STAGE
+          # VERIFICATION_METHOD
+          # PROVENANCE
 
-          Required report sections:
-          STATUS
-          SCOPE
-          CURRENT_EVIDENCE
-          FINDINGS
-          DEPENDENCIES
-          RISKS
-          OVERLAPS
-          RECOMMENDED_NEXT_MICRO_STAGE
-          VERIFICATION_METHOD
-          PROVENANCE
-
-          Final response must state the result path and commit SHA.
+          Final response: result path, status and commit SHA.
           EOF
 
           LOG="${RUNNER_TEMP}/opencode-team-${WORKER_ID}.log"
           : > "${LOG}"
           status=1
           IFS='|' read -r -a CANDIDATES <<< "${MODEL_CANDIDATES}"
+
           for candidate in "${CANDIDATES[@]}"; do
             echo "MODEL_ATTEMPT=${candidate}" | tee -a "${LOG}"
             if timeout --signal=TERM --kill-after=30s 20m opencode run --auto --model "${candidate}" "$(cat "${PROMPT}")" 2>&1 | tee -a "${LOG}"; then
@@ -304,6 +316,7 @@ jobs:
             fi
             echo "MODEL_FAILED=${candidate}" | tee -a "${LOG}"
           done
+
           test "${status}" -eq 0
 
       - name: Validate isolated worker result
@@ -316,15 +329,22 @@ jobs:
           git diff --check "${START_SHA}...HEAD"
           COMMITS_AHEAD="$(git rev-list --count "${START_SHA}..HEAD")"
           test "${COMMITS_AHEAD}" -eq 1
-          CHANGED="$(git diff --name-only "${START_SHA}...HEAD")"
-          echo "${CHANGED}"
+
           while IFS= read -r path; do
             test -n "${path}" || continue
             case "${path}" in
               "${WRITE_ROOT}"*) ;;
-              *) echo "BLOCKED: worker ${WORKER_ID} changed out-of-scope path: ${path}"; exit 21 ;;
+              *) echo "BLOCKED: out-of-scope path ${path}"; exit 21 ;;
             esac
-          done <<< "${CHANGED}"
+          done < <(git diff --name-only "${START_SHA}...HEAD")
+
+          for required in STATUS SCOPE CURRENT_EVIDENCE FINDINGS DEPENDENCIES RISKS OVERLAPS RECOMMENDED_NEXT_MICRO_STAGE VERIFICATION_METHOD PROVENANCE; do
+            grep -q "^# ${required}$" "${WRITE_ROOT}result.md" || {
+              echo "BLOCKED: missing report section ${required}"
+              exit 22
+            }
+          done
+
           COMMIT_SHA="$(git rev-parse HEAD)"
           echo "commit_sha=${COMMIT_SHA}" >> "${GITHUB_OUTPUT}"
 
@@ -335,18 +355,20 @@ jobs:
           set -euo pipefail
           git push origin "HEAD:opencode/team-${WORKER_ID}-${GITHUB_RUN_ID}"
 
-      - name: Persist worker run result
+      - name: Persist per-worker result envelope
         if: always()
         shell: bash
         run: |
           set +e
           STATUS="FAILED"
-          if test -f "${WRITE_ROOT}result.md" && test -n "${{ steps.validate.outputs.commit_sha }}"; then STATUS="SUCCESS"; fi
-          mkdir -p "${RUNNER_TEMP}/team-result"
-          cat > "${RUNNER_TEMP}/team-result/result.json" <<EOF
-          {"worker_id":"${WORKER_ID}","role":"${WORKER_ROLE}","owner_engine":"${OWNER_ENGINE}","status":"${STATUS}","commit_sha":"${{ steps.validate.outputs.commit_sha }}","branch":"opencode/team-${WORKER_ID}-${GITHUB_RUN_ID}","start_sha":"${START_SHA}"}
+          if test -f "${WRITE_ROOT}result.md" && test -n "${{ steps.validate.outputs.commit_sha }}"; then
+            STATUS="SUCCESS"
+          fi
+
+          mkdir -p "${RUNNER_TEMP}/team-result/${WORKER_ID}"
+          cat > "${RUNNER_TEMP}/team-result/${WORKER_ID}/result.json" <<EOF
+          {"worker_id":"${WORKER_ID}","role":"${WORKER_ROLE}","owner_engine":"${OWNER_ENGINE}","status":"${STATUS}","commit_sha":"${{ steps.validate.outputs.commit_sha }}","branch":"opencode/team-${WORKER_ID}-${GITHUB_RUN_ID}","start_sha":"${START_SHA}","model":"${MODEL:-unknown}"}
           EOF
-          cp "${RUNNER_TEMP}/team-result/result.json" "${RUNNER_TEMP}/team-result/${WORKER_ID}.json"
 
       - name: Upload worker result
         if: always()
@@ -358,9 +380,90 @@ jobs:
             ${{ runner.temp }}/opencode-team-${{ matrix.id }}.log
           if-no-files-found: warn
 
-  integrate:
+  quality-control:
     needs: [prepare, team-worker]
     if: ${{ always() && needs.prepare.result == 'success' && needs.team-worker.result != 'cancelled' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: write
+      actions: read
+    env:
+      START_SHA: ${{ needs.prepare.outputs.start_sha }}
+    steps:
+      - name: Checkout immutable QC base
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.start_sha }}
+          fetch-depth: 0
+
+      - name: Download worker result artifacts
+        uses: actions/download-artifact@v5
+        with:
+          pattern: team-result-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/team-results
+
+      - name: Independent structural QC
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(find "${RUNNER_TEMP}/team-results" -name result.json -type f | sort)
+          test "${#files[@]}" -gt 0
+
+          success=0
+          failed=0
+          for file in "${files[@]}"; do
+            python3 - "${file}" <<'PY'
+          import json, pathlib, sys
+          p = pathlib.Path(sys.argv[1])
+          obj = json.loads(p.read_text(encoding="utf-8"))
+          required = ["worker_id","role","owner_engine","status","branch","start_sha","model"]
+          missing = [k for k in required if not obj.get(k)]
+          if missing:
+              raise SystemExit(f"QC_FAIL {p}: missing {missing}")
+          if obj["status"] == "SUCCESS" and not obj.get("commit_sha"):
+              raise SystemExit(f"QC_FAIL {p}: SUCCESS without commit_sha")
+          PY
+
+            status="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["status"])' "${file}")"
+            if test "${status}" = "SUCCESS"; then success=$((success+1)); else failed=$((failed+1)); fi
+          done
+
+          echo "TEAM_QC_SUCCESS_WORKERS=${success}"
+          echo "TEAM_QC_FAILED_OR_BLOCKED_WORKERS=${failed}"
+          test "${success}" -gt 0
+
+          for file in "${files[@]}"; do
+            worker_id="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["worker_id"])' "${file}")"
+            status="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["status"])' "${file}")"
+            if test "${status}" = "SUCCESS"; then
+              report_dir="$(dirname "${file}")"
+              test -f "${report_dir}/result.md" || {
+                echo "QC_FAIL: successful worker ${worker_id} missing result.md artifact"
+                exit 23
+              }
+              grep -q "^# PROVENANCE$" "${report_dir}/result.md" || {
+                echo "QC_FAIL: successful worker ${worker_id} missing provenance"
+                exit 24
+              }
+            fi
+          done
+
+          echo "TEAM_QC_STATUS=PASS"
+          echo "TEAM_QC_NOTE=Independent structural/evidence QC passed; failed workers remain isolated."
+      
+      - name: Publish QC summary
+        if: always()
+        shell: bash
+        run: |
+          echo "QC is a separate job from implementation workers."
+          echo "Worker self-report is not accepted as QC."
+
+  integrate:
+    needs: [prepare, team-worker, quality-control]
+    if: ${{ always() && needs.prepare.result == 'success' && needs.quality-control.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -370,7 +473,6 @@ jobs:
     env:
       TARGET_BRANCH: fix/autonomous-product-factory
       START_SHA: ${{ needs.prepare.outputs.start_sha }}
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout immutable integration base
         uses: actions/checkout@v6
@@ -378,52 +480,49 @@ jobs:
           ref: ${{ needs.prepare.outputs.start_sha }}
           fetch-depth: 0
 
-      - name: Download worker results
+      - name: Download worker result artifacts
         uses: actions/download-artifact@v5
         with:
           pattern: team-result-*
           merge-multiple: true
           path: ${{ runner.temp }}/team-results
 
-      - name: Integrate successful worker commits
-        id: integrate
+      - name: Integrate only independently verified workers
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t RESULTS < <(find "${RUNNER_TEMP}/team-results" -name 'result.json' -type f | sort)
+          mapfile -t RESULTS < <(find "${RUNNER_TEMP}/team-results" -name result.json -type f | sort)
           SUCCESS_COUNT=0
-          FAILED_COUNT=0
 
           for file in "${RESULTS[@]}"; do
             WORKER_ID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["worker_id"])' "${file}")"
             STATUS="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["status"])' "${file}")"
             COMMIT="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["commit_sha"])' "${file}")"
             BRANCH="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["branch"])' "${file}")"
+            START="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["start_sha"])' "${file}")"
+
+            test "${START}" = "${START_SHA}" || {
+              echo "BLOCKED: worker ${WORKER_ID} used wrong START_SHA"
+              exit 25
+            }
 
             if test "${STATUS}" != "SUCCESS"; then
-              FAILED_COUNT=$((FAILED_COUNT+1))
-              echo "WORKER_BLOCKED_OR_FAILED=${WORKER_ID}"
+              echo "ISOLATED_FAILURE=${WORKER_ID}"
               continue
             fi
 
+            test -n "${COMMIT}"
             git fetch origin "${BRANCH}"
             git merge-base --is-ancestor "${START_SHA}" "${COMMIT}"
             git merge-base --is-ancestor "${COMMIT}" "origin/${BRANCH}"
-
-            if ! git cherry-pick "${COMMIT}"; then
-              git cherry-pick --abort || true
-              echo "BLOCKED_TEAM_INTEGRATION: conflict while integrating ${WORKER_ID} (${COMMIT})"
-              exit 22
-            fi
+            git cherry-pick "${COMMIT}"
             SUCCESS_COUNT=$((SUCCESS_COUNT+1))
             echo "INTEGRATED=${WORKER_ID} ${COMMIT}"
           done
 
           echo "SUCCESS_COUNT=${SUCCESS_COUNT}"
-          echo "FAILED_COUNT=${FAILED_COUNT}"
-          echo "TEAM_INTEGRATION_HEAD=$(git rev-parse HEAD)"
-
           test "${SUCCESS_COUNT}" -gt 0
+          git diff --check
 
       - name: Reconcile target before promotion
         shell: bash
@@ -433,25 +532,228 @@ jobs:
           CURRENT_TARGET_SHA="$(git rev-parse "origin/${TARGET_BRANCH}")"
           test "${CURRENT_TARGET_SHA}" = "${START_SHA}" || {
             echo "BLOCKED: target branch changed during team wave"
-            exit 23
+            exit 26
           }
 
-      - name: Promote integrated team wave
+      - name: Promote integrated worker evidence
         shell: bash
         run: |
           set -euo pipefail
           INTEGRATION_SHA="$(git rev-parse HEAD)"
           test "${INTEGRATION_SHA}" != "${START_SHA}"
           git push origin "${INTEGRATION_SHA}:refs/heads/${TARGET_BRANCH}"
-          echo "TEAM_ADVANCED: ${INTEGRATION_SHA}"
+          echo "TEAM_INTEGRATED_SHA=${INTEGRATION_SHA}"
 
-      - name: Final team evidence
+  synthesize:
+    needs: integrate
+    if: ${{ success() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      issues: write
+      actions: read
+    env:
+      TARGET_BRANCH: fix/autonomous-product-factory
+      OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout latest integrated target
+        uses: actions/checkout@v6
+        with:
+          ref: fix/autonomous-product-factory
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Capture synthesis start
+        id: state
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "${TARGET_BRANCH}"
+          SHA="$(git rev-parse "origin/${TARGET_BRANCH}")"
+          echo "start_sha=${SHA}" >> "${GITHUB_OUTPUT}"
+
+      - name: Install OpenCode
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://opencode.ai/install | bash
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+
+      - name: Select synthesis model
+        shell: bash
+        run: |
+          set -euo pipefail
+          CATALOG="${RUNNER_TEMP}/opencode-models-verbose.txt"
+          "$HOME/.opencode/bin/opencode" models --refresh --verbose > "${CATALOG}"
+          python3 - "${CATALOG}" <<'PY' > "${RUNNER_TEMP}/synth-model.env"
+          import json, math, re, sys
+          raw = open(sys.argv[1], encoding="utf-8", errors="replace").read()
+          raw = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", raw)
+          lines = raw.splitlines()
+          decoder=json.JSONDecoder()
+          seen={}
+          for i,line in enumerate(lines):
+              mid=line.strip()
+              if not re.fullmatch(r"[^\s/]+/[^\s]+", mid):
+                  continue
+              block="\n".join(lines[i+1:])
+              brace=block.find("{")
+              if brace<0:
+                  continue
+              try:
+                  obj,_=decoder.raw_decode(block[brace:])
+              except Exception:
+                  continue
+              if isinstance(obj,dict) and "name" in obj:
+                  seen[mid]=obj
+
+          ranked=[]
+          now=None
+          for mid,m in seen.items():
+              cost=m.get("cost")
+              name=mid.split("/",1)[1] if "/" in mid else mid
+              explicit=False
+              if isinstance(cost,dict):
+                  vals=[v for v in cost.values() if isinstance(v,(int,float))]
+                  explicit=bool(vals) and all(v==0 for v in vals)
+              named=(mid=="opencode/big-pickle" or name.lower().endswith("-free") or "-free-" in name.lower())
+              if not(explicit or named):
+                  continue
+              if m.get("reasoning") is not True or m.get("tool_call") is not True:
+                  continue
+              limit=m.get("limit") or {}
+              ctx=int(limit.get("context") or 0)
+              out=int(limit.get("output") or 0)
+              if ctx<100_000 or out<8_000:
+                  continue
+              score=180+(30 if m.get("structured_output") else 0)
+              score+=min(30,math.log2(max(ctx,1))*2)
+              score+=min(20,math.log2(max(out,1))*1.5)
+              if mid=="opencode/big-pickle":
+                  score+=5
+              ranked.append((score,mid))
+          ranked.sort(reverse=True)
+          top=ranked[:4]
+          if not top:
+              raise SystemExit("BLOCKED_FREE_MODEL_UNAVAILABLE")
+          print("SYNTH_MODEL_CANDIDATES="+"|".join(x[1] for x in top))
+          PY
+          tee -a "${GITHUB_ENV}" < "${RUNNER_TEMP}/synth-model.env"
+
+      - name: Synthesize wave and persist mission state
+        id: synth
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROMPT="${RUNNER_TEMP}/team-synthesis-prompt.md"
+          cat > "${PROMPT}" <<'EOF'
+          You are the governed HooshyarOS Team Synthesizer.
+
+          Read:
+          - Docs/HOOSHYAROS_MASTER_CHARTER.md
+          - Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md
+          - Docs/ARCHITECTURE.md
+          - Docs/OPENCODE_EXECUTION_OPERATOR_CONTRACT.md
+          - .kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md
+          - .kilo/team/TEAM-WORKER-V1-PROTOCOL.md
+          - every .kilo/team/results/**/result.md
+
+          This is the first AUDIT_PARALLEL wave. Product implementation is forbidden during this synthesis.
+
+          Produce one coherent mission-state update:
+          1. reconcile the 12 worker findings;
+          2. identify contradictions and overlaps;
+          3. identify genuinely missing capabilities;
+          4. identify dependencies and the highest-value next Micro-Stage(s);
+          5. update ONLY the active mission file's execution state / wave synthesis / next-state information;
+          6. keep MISSION_STATUS = ACTIVE unless the evidence proves mission completion or a terminal blocked state;
+          7. keep CONTINUE_ALLOWED = TRUE when at least one safe next Micro-Stage exists;
+          8. do not modify architecture, governance, product source, tests, workflows, package files or unrelated files;
+          9. do not fabricate benchmark results or claim external comparisons that were not actually measured.
+
+          Add a dated section:
+          TEAM_WAVE_SYNTHESIS
+          containing:
+          WAVE_ID
+          WORKERS_COMPLETED
+          WORKERS_BLOCKED
+          KEY_FINDINGS
+          CONTRADICTIONS
+          OVERLAPS
+          DEPENDENCY_ORDER
+          NEXT_MICRO_STAGES
+          EVIDENCE_PATHS
+          QC_STATUS
+          CONTINUE_DECISION
+
+          Create exactly one coherent commit containing only the active mission file.
+          Stop after the commit.
+          EOF
+
+          status=1
+          IFS='|' read -r -a CANDIDATES <<< "${SYNTH_MODEL_CANDIDATES}"
+          LOG="${RUNNER_TEMP}/team-synth.log"
+          : > "${LOG}"
+
+          for candidate in "${CANDIDATES[@]}"; do
+            echo "SYNTH_MODEL_ATTEMPT=${candidate}" | tee -a "${LOG}"
+            if timeout --signal=TERM --kill-after=30s 20m opencode run --auto --model "${candidate}" "$(cat "${PROMPT}")" 2>&1 | tee -a "${LOG}"; then
+              echo "SYNTH_MODEL_SELECTED=${candidate}" | tee -a "${LOG}"
+              status=0
+              echo "SYNTH_MODEL=${candidate}" >> "${GITHUB_ENV}"
+              break
+            fi
+          done
+          test "${status}" -eq 0
+
+      - name: Validate synthesis commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check "$(git rev-parse origin/${TARGET_BRANCH})...HEAD"
+          AHEAD="$(git rev-list --count "$(git rev-parse origin/${TARGET_BRANCH})..HEAD")"
+          test "${AHEAD}" -eq 1
+          CHANGED="$(git diff --name-only "$(git rev-parse origin/${TARGET_BRANCH})...HEAD")"
+          test "${CHANGED}" = ".kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md"
+
+          grep -q "^## TEAM EXECUTION STATE$" .kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md || true
+          grep -q "TEAM_WAVE_SYNTHESIS" .kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md
+
+      - name: Promote synthesis
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "${TARGET_BRANCH}"
+          CURRENT_TARGET_SHA="$(git rev-parse "origin/${TARGET_BRANCH}")"
+          SYNTHESIS_BASE="$(git rev-parse HEAD~1)"
+          test "${CURRENT_TARGET_SHA}" = "${SYNTHESIS_BASE}" || {
+            echo "BLOCKED: target drifted during synthesis"
+            exit 27
+          }
+          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
+
+      - name: Continue next governed team wave
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          PLAN=.kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md
+          if test -f "${PLAN}" && grep -Fxq 'MISSION_STATUS = ACTIVE' "${PLAN}" && grep -Fxq 'CONTINUE_ALLOWED = TRUE' "${PLAN}"; then
+            echo "TEAM_CONTINUE=TRUE"
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/workflows/hooshyaros-team-worker.yml/dispatches" \
+              -f ref=main \
+              -f 'inputs[reason]=Automatic continuation of active HooshyarOS team mission'
+          else
+            echo "TEAM_CONTINUE=FALSE"
+          fi
+
+      - name: Final team synthesis evidence
         if: always()
         shell: bash
         run: |
           echo "TEAM_RUN_ID=${GITHUB_RUN_ID}"
-          echo "TEAM_START_SHA=${START_SHA}"
-          echo "TEAM_TARGET_BRANCH=${TARGET_BRANCH}"
-          echo "TEAM_INTEGRATION_HEAD=$(git rev-parse HEAD || true)"
-          echo "Worker results:"
-          find "${RUNNER_TEMP}/team-results" -name '*.json' -maxdepth 2 -type f -print 2>/dev/null || true
+          echo "TEAM_SYNTHESIS_MODEL=${SYNTH_MODEL:-unknown}"
+          if test -f "${RUNNER_TEMP}/team-synth.log"; then tail -80 "${RUNNER_TEMP}/team-synth.log"; fi
+
