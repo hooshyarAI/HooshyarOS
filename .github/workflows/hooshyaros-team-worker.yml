@@ -183,8 +183,8 @@ jobs:
           PY
 
   model-qualification:
-    needs: [prepare, model-qualification]
-    if: ${{ needs.prepare.result == 'success' && needs.model-qualification.result == 'success' }}
+    needs: prepare
+    if: ${{ needs.prepare.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -375,8 +375,8 @@ jobs:
           echo "QUALIFIED_SELECTED=${SELECTED}"
 
   team-worker:
-    needs: prepare
-    if: ${{ needs.prepare.result == 'success' }}
+    needs: [prepare, model-qualification]
+    if: ${{ needs.prepare.result == 'success' && needs.model-qualification.result == 'success' }}
     strategy:
       fail-fast: false
       max-parallel: ${{ fromJSON(needs.prepare.outputs.max_parallel) }}
