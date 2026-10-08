@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "next_id": "WORK-0010",
+  "next_id": "WORK-0011",
   "backfill_required": true,
   "items": [
     {
@@ -426,6 +426,43 @@
         "duplicate_dispatch": "FORBIDDEN",
         "next_action": "WORK-0010 fresh acceptance wave"
       }
+    },
+    {
+      "id": "WORK-0010",
+      "title": "work-0010-team-v2-acceptance",
+      "status": "READY",
+      "mode": "AUDIT",
+      "priority": "P1",
+      "owner": "SPECIALIST_WORKER_POOL",
+      "dependencies": [],
+      "evidence_required": [
+        "current_team_control_plane_state",
+        "one_coherent_commit",
+        "exactly_one_result_report",
+        "worker_branch_provenance",
+        "independent_qc_adjudication",
+        "persisted_qc_artifact",
+        "integration_and_target_promotion_evidence",
+        "memory_closure_evidence"
+      ],
+      "purpose": "Final decisive Team V2 end-to-end acceptance after the two reproduced QC control defects were repaired.",
+      "blockers": [],
+      "test_scope": "TEAM_CONTROL_PLANE_ONLY_NO_PRODUCT_CODE_CHANGE",
+      "risk": "P0",
+      "value": "Decides whether Team V2 is reliable enough to continue product construction.",
+      "readiness": "READY",
+      "estimated_complexity": "LOW_CONTROL_PLANE_ACCEPTANCE",
+      "write_scope": [
+        ".kilo/team/results/work-0010-team-v2-acceptance/"
+      ],
+      "admission": {
+        "source": "NEXT-WAVE-PLAN",
+        "lease_id": "work-0010-team-v2-acceptance",
+        "run_id": 37818114064,
+        "start_sha": "52b537826dbfc3ac7a512e2126a161db4808cbb8",
+        "state": "ADMITTED_BEFORE_DISPATCH"
+      },
+      "execution_attempts": []
     }
   ],
   "backfill_required_scope": {
