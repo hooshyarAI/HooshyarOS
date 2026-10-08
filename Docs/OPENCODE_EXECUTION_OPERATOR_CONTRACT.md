@@ -83,6 +83,12 @@ Do not invent a parallel backlog. Use the repository's canonical roadmap, missio
 
 When no safe knot exists, report NO_SAFE_WORK or BLOCKED with evidence and stop.
 
+## Active Master Mission Priority
+
+When `.kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md` exists and `MISSION_STATUS = ACTIVE`, it is the authoritative operating context for OpenCode. The worker MUST execute the next unfinished Micro-Stage from that active mission before selecting unrelated generic backlog work. Generic backlog selection resumes only after the active mission reaches `MISSION_COMPLETE` or an evidence-backed terminal `BLOCKED` state with no independent safe Micro-Stage.
+
+The one-knot rule remains per Micro-Stage/run: one real capability, one owner, one coherent knot, one verified commit. The master mission may span multiple autonomous runs. Successful promotion authorizes automatic continuation without human approval, and the mission state/checkpoint must be updated so a later run resumes from the latest trusted state.
+
 ## 6. Permitted autonomous actions
 
 Without per-stage human approval, OpenCode may perform routine actions inside the active knot contract:
