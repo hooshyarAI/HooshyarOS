@@ -2,7 +2,7 @@
 "use strict";
 const { execFileSync } = require("node:child_process");
 const { evaluateGate } = require("./lib/team-v2-gate.cjs");
-const { validateWork, workIdFromLeaseId } = require("./lib/team-v2-admission.cjs");
+const { validateWork } = require("./lib/team-v2-admission.cjs");
 const { validateAuthorization } = require("./lib/team-v2-authorization.cjs");
 const { reservationId, reservationRef } = require("./lib/team-v2-reservation.cjs");
 const crypto = require("node:crypto");
