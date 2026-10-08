@@ -50,9 +50,11 @@ function validateAuthorization(auth, ctx) {
   if (scope.max_worker_reservations !== 1) violations.push({ code: "AUTHORIZATION_MAX_WORKERS_INVALID", detail: "must be exactly 1" });
   if (scope.work_id !== ctx.workId) violations.push({ code: "AUTHORIZATION_WORK_MISMATCH", detail: String(scope.work_id) + " != " + String(ctx.workId) });
   if (scope.lease_id !== ctx.leaseId) violations.push({ code: "AUTHORIZATION_LEASE_MISMATCH", detail: String(scope.lease_id) + " != " + String(ctx.leaseId) });
+  if (scope.task_class !== ctx.taskClass) violations.push({ code: "AUTHORIZATION_TASK_CLASS_MISMATCH", detail: String(scope.task_class) + " != " + String(ctx.taskClass) });
   if (bindings.target_branch !== ctx.targetBranch) violations.push({ code: "AUTHORIZATION_TARGET_BRANCH_MISMATCH", detail: String(bindings.target_branch) + " != " + String(ctx.targetBranch) });
   if (bindings.target_sha !== ctx.targetSha) violations.push({ code: "AUTHORIZATION_TARGET_SHA_MISMATCH", detail: "target SHA differs from snapshot" });
   if (bindings.plan_sha256 !== ctx.planSha256) violations.push({ code: "AUTHORIZATION_PLAN_HASH_MISMATCH", detail: "plan hash differs from snapshot" });
+  if (bindings.lease_sha256 !== ctx.leaseSha256) violations.push({ code: "AUTHORIZATION_LEASE_HASH_MISMATCH", detail: "lease hash differs from snapshot" });
   if (auth.consumed === true) violations.push({ code: "AUTHORIZATION_ALREADY_CONSUMED", detail: String(auth.authorization_id) });
 
   const notAfter = Date.parse(String(auth.expiry?.not_after || ""));
