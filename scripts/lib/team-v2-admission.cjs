@@ -17,6 +17,24 @@ function overlaps(a, b) {
   return Boolean(aa && bb) && (aa === bb || aa.startsWith(`${bb}/`) || bb.startsWith(`${aa}/`));
 }
 
+function deriveTaskClass(lease) {
+  const role = String(lease?.role || "").toUpperCase();
+  const focus = String(lease?.focus || "").toUpperCase();
+  const owner = String(lease?.owner || "").toUpperCase();
+  const text = role + " " + focus + " " + owner;
+  if (text.includes("MEMORY") || owner.includes("EDITOR")) return "MEMORY";
+  if (text.includes("QC") || owner.includes("EVALUATOR")) return "QC";
+  if (text.includes("REPAIR")) return "REPAIR";
+  if (text.includes("PLAN") || owner.includes("PLANNER")) return "PLAN";
+  if (text.includes("VERIFY")) return "VERIFY";
+  if (text.includes("REVIEW")) return "REVIEW";
+  if (text.includes("IMPLEMENT") || text.includes("BUILD")) return "IMPLEMENT";
+  if (text.includes("AUDIT")) return "AUDIT";
+  return "";
+}
+
+
+
 function validateWork({ plan, registry, workId, leaseId }) {
   const violations = [];
   if (!plan || plan.wave_status !== "READY" || !Array.isArray(plan.leases)) {
@@ -41,8 +59,11 @@ function validateWork({ plan, registry, workId, leaseId }) {
     violations.push({ code: "LEASE_ID_WORK_ID_MISMATCH", detail: `${lease.id} -> ${derived} expected ${workId}` });
   }
   const taskClass = String(lease.task_class || "").toUpperCase();
+  const derivedTaskClass = deriveTaskClass(lease);
   if (!["PLAN","AUDIT","IMPLEMENT","REPAIR","REVIEW","VERIFY","QC","MEMORY"].includes(taskClass)) {
     violations.push({ code: "TASK_CLASS_INVALID", detail: String(lease.task_class || "") });
+  } else if (derivedTaskClass && taskClass !== derivedTaskClass) {
+    violations.push({ code: "TASK_CLASS_MISMATCH", detail: lease.id + ": explicit=" + taskClass + " derived=" + derivedTaskClass });
   }
   if (!VALID_MODES.has(String(lease.mode || ""))) {
     violations.push({ code: "LEASE_MODE_INVALID", detail: String(lease.mode || "") });
@@ -85,4 +106,4 @@ function validateWork({ plan, registry, workId, leaseId }) {
   return violations;
 }
 
-module.exports = { validateWork, workIdFromLeaseId, overlaps, TERMINAL_ATTEMPT_STATES };
+module.exports = { validateWork, workIdFromLeaseId, overlaps, deriveTaskClass, TERMINAL_ATTEMPT_STATES };
