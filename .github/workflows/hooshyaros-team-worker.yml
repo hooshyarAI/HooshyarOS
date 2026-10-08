@@ -13,6 +13,14 @@ on:
         required: false
         default: "manual controlled team wave"
         type: string
+      reservation_id:
+        description: "Authority-issued reservation ID; required for any worker execution"
+        required: true
+        type: string
+      reservation_ref:
+        description: "Authority-issued reservation ref; must exist before execution"
+        required: true
+        type: string
 
 concurrency:
   group: hooshyaros-autonomous-construction
@@ -41,6 +49,33 @@ jobs:
           ref: fix/autonomous-product-factory
           fetch-depth: 0
 
+      - name: Verify authoritative reservation before worker preparation
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "${TEAM_RESERVATION_ID}" || { echo "BLOCKED: reservation_id is required"; exit 16; }
+          test -n "${TEAM_RESERVATION_REF}" || { echo "BLOCKED: reservation_ref is required"; exit 16; }
+          python3 -c '
+          import json, os, subprocess, re
+          rid=os.environ["TEAM_RESERVATION_ID"].strip()
+          ref=os.environ["TEAM_RESERVATION_REF"].strip()
+          if not re.fullmatch(r"[a-f0-9]{64}", rid):
+              raise SystemExit("BLOCKED: invalid reservation_id format")
+          if not re.fullmatch(r"team-v2/active/WORK-[0-9]{4}", ref):
+              raise SystemExit("BLOCKED: invalid reservation_ref")
+          repo=os.environ["GITHUB_REPOSITORY"]
+          raw=subprocess.check_output(["gh","api","repos/"+repo+"/git/ref/"+ref],text=True)
+          obj=json.loads(raw)
+          sha=str(obj.get("object",{}).get("sha",""))
+          if not re.fullmatch(r"[0-9a-f]{40}",sha):
+              raise SystemExit("BLOCKED: authoritative reservation ref is invalid")
+          print("TEAM_RESERVATION_REF=FOUND")
+          print("TEAM_RESERVATION_SHA="+sha)
+          with open(os.environ["GITHUB_ENV"],"a",encoding="utf-8") as out:
+              out.write("TEAM_RESERVATION_SHA="+sha+"\n")
+          '
       - name: Team Manager — Queue and Runner Governor
         shell: bash
         env:
@@ -773,6 +808,8 @@ jobs:
       MODEL_POLICY: adaptive-free
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TEAM_RESERVATION_ID: ${{ inputs.reservation_id }}
+      TEAM_RESERVATION_REF: ${{ inputs.reservation_ref }}
 
     steps:
       - name: Checkout immutable worker base
