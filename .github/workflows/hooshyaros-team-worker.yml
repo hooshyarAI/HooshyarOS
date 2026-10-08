@@ -523,10 +523,7 @@ jobs:
           test -n "${TEAM_RESERVATION_REF}"
           python3 - <<'PY'
           import json, os, re, subprocess
-          from pathlib import Path
-          from datetime import datetime, timezone
 
-          target="fix/autonomous-product-factory"
           base=os.environ["BASE_SHA"]
           rid=os.environ["TEAM_RESERVATION_ID"].strip()
           ref=os.environ["TEAM_RESERVATION_REF"].strip()
@@ -553,43 +550,12 @@ jobs:
           except subprocess.CalledProcessError:
               raise SystemExit("BLOCKED: reservation already claimed; duplicate worker refused")
 
-          registry_path=Path(".kilo/team/memory/work-registry.json")
-          registry=json.loads(registry_path.read_text(encoding="utf-8"))
-          by_id={str(x.get("id")):x for x in registry.get("items",[])}
-          item=by_id.get(work_id)
-          if not item: raise SystemExit("BLOCKED: Work Registry item missing " + work_id)
-          if str(item.get("status","" )).upper()!="READY" or str(item.get("readiness","" )).upper()!="READY":
-              raise SystemExit("BLOCKED: claimed work is no longer READY " + work_id)
-          attempts=item.setdefault("execution_attempts",[])
-          run_id=int(os.environ["GITHUB_RUN_ID"])
-          if any(int(a.get("run_id",-1))==run_id for a in attempts):
-              raise SystemExit("BLOCKED: execution attempt already recorded for this run")
-          attempts.append({
-              "run_id":run_id, "state":"RESERVED_EXECUTING", "promoted":False,
-              "commit":None, "start_sha":base, "lease_id":lid,
-              "reservation_id":rid, "claim_ref":claim_ref,
-              "reserved_at":datetime.now(timezone.utc).isoformat()
-          })
-          reservations=item.setdefault("reservations",[])
-          reservations.append({
-              "run_id":run_id, "lease_id":lid, "start_sha":base,
-              "state":"EXECUTING", "reservation_id":rid, "claim_ref":claim_ref,
-              "planned_branch":"opencode/team-"+lid+"-"+str(run_id)
-          })
-          item["last_state_change_by"]="TEAM_WORKER_CLAIM_"+str(run_id)
-          registry_path.write_text(json.dumps(registry,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
-          subprocess.check_call(["git","config","user.name","github-actions[bot]"])
-          subprocess.check_call(["git","config","user.email","41898282+github-actions[bot]@users.noreply.github.com"])
-          subprocess.check_call(["git","add",str(registry_path)])
-          subprocess.check_call(["git","commit","-m","governance(team): claim authority reservation for run "+str(run_id)])
-          subprocess.check_call(["git","fetch","origin",target])
-          current=subprocess.check_output(["git","rev-parse","origin/"+target],text=True).strip()
-          if current!=base:
-              raise SystemExit("BLOCKED: target changed after reservation claim; evidence preserved")
-          subprocess.check_call(["git","push","origin","HEAD:refs/heads/"+target])
-          print("RESERVATION_CLAIM=COMMITTED_AND_PUSHED")
-          print("RESERVATION_CLAIM_RUN="+str(run_id))
+          print("RESERVATION_CLAIM=ATOMIC_REF_CREATED")
+          print("RESERVATION_CLAIM_RUN="+str(os.environ["GITHUB_RUN_ID"]))
           print("RESERVATION_CLAIM_WORK="+work_id)
+          print("RESERVATION_CLAIM_REF="+claim_ref)
+          with open(os.environ["GITHUB_ENV"],"a",encoding="utf-8") as out:
+              out.write("TEAM_CLAIM_REF="+claim_ref+"\n")
           PY
       - name: Capture final immutable execution state
         id: final_state
