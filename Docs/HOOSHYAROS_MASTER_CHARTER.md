@@ -1308,3 +1308,26 @@ The approved first implementation is documented in:
 The initial V1 mode is **AUDIT_PARALLEL** because the active master mission's first objective requires reconciliation before product implementation. Future implementation waves may use the same team mechanism only after their Micro-Stage dependency and write-scope graph is evidence-backed.
 
 The existing single-worker path remains the recovery fallback until the team implementation completes its first controlled wave.
+
+
+### 6.9 Empirical Free-Model Qualification Law — PERMANENT
+
+Adaptive free-model selection must not rely on catalog metadata alone when a bounded empirical check is practical.
+
+Before releasing a worker wave, the construction control plane should:
+**DISCOVER → FILTER → RANK → QUALIFY → RELEASE → FALLBACK**
+
+Qualification must use a harmless non-customer, non-secret probe that verifies the selected model can actually execute the required OpenCode task shape. Models that fail the probe are excluded from that wave's candidate set.
+
+Worker-level fallback remains mandatory because a generic qualification probe cannot guarantee task-specific success.
+
+Qualification evidence must record:
+- catalog revision;
+- eligible model set;
+- prefilter ranking;
+- probe result;
+- selected model;
+- fallback candidates;
+- failure evidence.
+
+Qualification never grants a model architecture, governance, product, security or completion authority.
