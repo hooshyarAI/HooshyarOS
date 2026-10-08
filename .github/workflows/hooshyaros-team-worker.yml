@@ -589,10 +589,13 @@ jobs:
           test "${#RESULT_FILES[@]}" -gt 0
 
           python3 - "${EXPECTED}" "${RUNNER_TEMP}/team-results" <<'PY'
-          import json, pathlib, sys
+          import json, pathlib, shutil, sys
+
           expected=json.loads(sys.argv[1])
           root=pathlib.Path(sys.argv[2])
+          repo=pathlib.Path(".")
           found={}
+
           for p in root.rglob("result.json"):
               obj=json.loads(p.read_text(encoding="utf-8"))
               found[obj["worker_id"]]=obj
@@ -606,15 +609,24 @@ jobs:
           print(f"QC_SUCCESS={success}")
           print(f"QC_FAILED={len(found)-success}")
 
+          for wid,obj in found.items():
+              worker_dir=next((p.parent for p in root.rglob("result.json") if p.parent.name == wid), None)
+              report=worker_dir / "result.md" if worker_dir else None
+
+              if obj["status"]=="SUCCESS" and not obj.get("commit_sha"):
+                  raise SystemExit(f"QC_FAIL: {wid} SUCCESS without commit_sha")
+              if obj["status"]=="SUCCESS" and (report is None or not report.is_file()):
+                  raise SystemExit(f"QC_FAIL: successful worker {wid} missing report artifact")
+
+              if report and report.is_file():
+                  dest=repo / ".kilo" / "team" / "results" / wid / "result.md"
+                  dest.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copy2(report, dest)
+
           if success == 0:
               raise SystemExit("QC_FAIL: zero successful workers")
 
-          for wid,obj in found.items():
-              if obj["status"]=="SUCCESS" and not obj.get("commit_sha"):
-                  raise SystemExit(f"QC_FAIL: {wid} SUCCESS without commit_sha")
-              report = next((p for p in root.rglob("result.md") if p.parent.name == wid), None)
-              if obj["status"]=="SUCCESS" and report is None:
-                  raise SystemExit(f"QC_FAIL: successful worker {wid} missing report artifact")
+          print(f"QC_WORKSPACE_REPORTS={success}")
           PY
 
       - name: Install OpenCode for independent semantic QC
@@ -695,8 +707,6 @@ jobs:
 
           print("QC_MODEL_CANDIDATES=" + "|".join(x[1] for x in top))
           PY
-          tee -a "${GITHUB_ENV}" < "${RUNNER_TEMP}/qc-model.env"
-
           tee -a "${GITHUB_ENV}" < "${RUNNER_TEMP}/qc-model.env"
 
       - name: Independent semantic QC
