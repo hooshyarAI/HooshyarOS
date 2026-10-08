@@ -1194,6 +1194,8 @@ jobs:
             "mode":"${WORKER_MODE}","task_class":"${MODEL_ROUTING_TASK_CLASS:-${WORKER_MODE}}",
             "status":"${STATUS}","commit_sha":"${{ steps.preserve_worker.outputs.commit_sha }}",
             "branch":"opencode/team-${WORKER_ID}-${GITHUB_RUN_ID}","start_sha":"${START_SHA}",
+            "reservation_id":"${TEAM_RESERVATION_ID}","reservation_ref":"${TEAM_RESERVATION_REF}",
+            "claim_ref":"${TEAM_CLAIM_REF:-unknown}",
             "model":"${MODEL:-unknown}","route_plan":json.loads(r''' ${ROUTE_PLAN_JSON:-[]} '''.strip() or "[]"),
             "model_attempts":attempts,"write_scope":json.loads(r''' ${WRITE_SCOPE_JSON} ''')
           }
