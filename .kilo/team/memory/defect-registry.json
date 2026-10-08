@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "next_id": "DEFECT-0002",
+  "items": [
+    {
+      "id": "DEFECT-0001",
+      "title": "Wave 10 architecture-governance Markdown trailing whitespace",
+      "status": "VERIFIED",
+      "severity": "P2",
+      "fix_work": "control-plane diff gate repair",
+      "verification_work": "Wave 10 validation",
+      "closure": "CONTROLLED / NOT PRODUCT DEFECT",
+      "evidence": "Team Wave 10 run 37743827267"
+    }
+  ]
+}
