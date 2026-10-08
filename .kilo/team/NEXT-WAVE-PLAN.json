@@ -4,7 +4,7 @@
   "base_mission": ".kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md",
   "leases": [
     {
-      "id": "work-0011",
+      "id": "work-0011-team-v2-memory-reconciliation",
       "title": "Team V2 Memory and Evidence Reconciliation",
       "status": "READY",
       "mode": "AUDIT",
@@ -38,9 +38,10 @@
       "estimated_complexity": "MEDIUM_MEMORY_RECONCILIATION",
       "role": "Team V2 Memory & Evidence Reconciliation",
       "contract_correction": {
-        "run_id": 37820648260,
-        "root_cause": "Plan lease identity used WORK-0011 uppercase; Orchestrator contract requires work-#### lowercase.",
-        "worker_started": false
+        "run_id": 37821016567,
+        "root_cause": "After identity normalization, evidence root still reflected the prior lease id contract.",
+        "worker_started": false,
+        "repair": "Use full governed lease id consistently in lease id and evidence root."
       }
     }
   ]
