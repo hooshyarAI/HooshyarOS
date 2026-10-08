@@ -1,0 +1,163 @@
+{
+  "schema_version": "2.0",
+  "status": "ACTIVE",
+  "organization_id": "PROGRAM-0001",
+  "team_name": "HooshyarOS Autonomous Construction Team",
+  "product_engine": false,
+  "execution_substrate": ".kilo/team/TEAM-WORKER-V1.json",
+  "memory_root": ".kilo/team/memory/",
+  "stable_id_policy": "PERMANENT_NON_RECYCLING",
+  "roles": [
+    {
+      "id": "director",
+      "name": "MISSION_DIRECTOR",
+      "authority": "mission priority, conflict resolution, capacity, governed continuation",
+      "boundary": "cannot override architecture, governance or evidence"
+    },
+    {
+      "id": "planner",
+      "name": "PLANNER",
+      "authority": "work packages, dependencies, readiness, leases, next-wave plan"
+    },
+    {
+      "id": "editor",
+      "name": "MEMORY_EDITOR",
+      "authority": "deduplication, stale/superseded evidence control, traceability, reports"
+    },
+    {
+      "id": "orchestrator",
+      "name": "ORCHESTRATOR",
+      "authority": "dispatch READY dependency-satisfied leases"
+    },
+    {
+      "id": "specialists",
+      "name": "SPECIALIST_WORKER_POOL",
+      "authority": "bounded leased execution"
+    },
+    {
+      "id": "qc",
+      "name": "QC",
+      "authority": "independent verification"
+    },
+    {
+      "id": "integrator",
+      "name": "INTEGRATOR",
+      "authority": "sole team promotion authority"
+    },
+    {
+      "id": "watchdog",
+      "name": "WATCHDOG",
+      "authority": "failure, stall, timeout and blocker observation/alerting"
+    },
+    {
+      "id": "reporting",
+      "name": "REPORTING",
+      "authority": "evidence-backed executive and technical reports"
+    }
+  ],
+  "role_mapping": {
+    "director": "governed continuation gates",
+    "planner": "dependency-aware synthesis / next-wave planning",
+    "editor": "persistent ledgers / reconciliation / authoritative reports",
+    "orchestrator": "existing Team Worker control plane",
+    "specialists": "isolated V1 workers",
+    "qc": "independent semantic + structural QC",
+    "integrator": "deterministic integration + controlled recovery",
+    "watchdog": "existing stop/stall/failure notification layer",
+    "reporting": "mission/wave/report artifacts"
+  },
+  "stable_ids": [
+    "MISSION-####",
+    "PROGRAM-####",
+    "WAVE-####",
+    "WORK-####",
+    "DECISION-####",
+    "EVIDENCE-####",
+    "BLOCKER-####",
+    "DEFECT-####",
+    "COMMIT-####",
+    "REPORT-####",
+    "RECOVERY-####"
+  ],
+  "work_lifecycle": [
+    "DISCOVERED",
+    "REGISTERED",
+    "PLANNED",
+    "READY",
+    "LEASED",
+    "EXECUTING",
+    "VERIFYING",
+    "QC",
+    "INTEGRATING",
+    "PROMOTED",
+    "MEMORIZED",
+    "CLOSED"
+  ],
+  "failure_lifecycle": [
+    "EXECUTING",
+    "BLOCKED",
+    "DIAGNOSING",
+    "REPAIRED",
+    "REVERIFYING"
+  ],
+  "duplicate_lifecycle": [
+    "DISCOVERED",
+    "DUPLICATE",
+    "LINKED",
+    "CLOSED"
+  ],
+  "dispatch_gate": [
+    "READY",
+    "NOT_DUPLICATE",
+    "DEPENDENCIES_SATISFIED",
+    "PROTECTED_BOUNDARY_CLEAR",
+    "VERIFICATION_EXECUTABLE"
+  ],
+  "evidence_status": [
+    "OBSERVED",
+    "REPRODUCED",
+    "VERIFIED",
+    "INTEGRATION_VERIFIED",
+    "ACCEPTED",
+    "STALE",
+    "SUPERSEDED",
+    "INVALID"
+  ],
+  "anti_dup_states": [
+    "EXISTS",
+    "DONE",
+    "VERIFIED",
+    "IN_PROGRESS",
+    "BLOCKED",
+    "SUPERSEDED",
+    "DUPLICATE",
+    "REGRESSION"
+  ],
+  "metrics": [
+    "CORRECT_THROUGHPUT",
+    "EVIDENCE_QUALITY",
+    "DUPLICATE_WORK_RATE",
+    "REGRESSION_RATE",
+    "FALSE_GREEN_RATE",
+    "WORKER_FAILURE_RECOVERY_RATE",
+    "MTTR",
+    "QC_ACCEPTANCE_RATE",
+    "INTEGRATION_CONFLICT_RATE",
+    "REAL_PRODUCT_ADVANCEMENT",
+    "BLOCKED_WORK_AGE",
+    "DECISION_REUSE_RATE",
+    "MEMORY_ACCURACY"
+  ],
+  "implementation_sequence": [
+    "TEAM-ORG-01",
+    "TEAM-ORG-02",
+    "TEAM-ORG-03",
+    "TEAM-ORG-04",
+    "TEAM-ORG-05",
+    "TEAM-ORG-06",
+    "TEAM-ORG-07",
+    "TEAM-ORG-08",
+    "TEAM-ORG-09",
+    "TEAM-ORG-10"
+  ]
+}
