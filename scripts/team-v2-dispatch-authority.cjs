@@ -159,8 +159,8 @@ function admissionViolations({ gate, plan, registry, authorization = null, accep
 function ghJson(args) {
   return JSON.parse(execFileSync("gh", ["api", ...args], { encoding: "utf8" }));
 }
-function readRepoJson(path) {
-  const obj = ghJson(["repos/" + REPOSITORY + "/contents/" + path + "?ref=" + encodeURIComponent(TARGET_BRANCH)]);
+function readRepoJson(path, ref = TARGET_BRANCH) {
+  const obj = ghJson(["repos/" + REPOSITORY + "/contents/" + path + "?ref=" + encodeURIComponent(ref)]);
   return JSON.parse(Buffer.from(String(obj.content).replace(/\n/g, ""), "base64").toString("utf8"));
 }
 function readTargetSha() {
@@ -224,7 +224,7 @@ if (require.main === module) {
   const authorizationId = String(process.env.TEAM_ACCEPTANCE_AUTHORIZATION_ID || "").trim();
   const authorizationPath = authorizationId ? "control-plane/authorizations/" + authorizationId + ".json" : "";
   let authorization = null;
-  if (authorizationPath) authorization = readRepoJson(authorizationPath);
+  if (authorizationPath) authorization = readRepoJson(authorizationPath, "main");
   const violations = admissionViolations({
     gate,
     plan,
