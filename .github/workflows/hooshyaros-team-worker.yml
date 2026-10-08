@@ -1159,6 +1159,16 @@ jobs:
           - Docs/OPENCODE_EXECUTION_OPERATOR_CONTRACT.md
           - .kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md
           - .kilo/team/TEAM-WORKER-V1-PROTOCOL.md
+          - .kilo/team/TEAM-ORGANIZATION-V2.json
+          - .kilo/team/TEAM-ORGANIZATION-V2-PROTOCOL.md
+          - .kilo/team/memory/mission-state.json
+          - .kilo/team/memory/work-registry.json
+          - .kilo/team/memory/evidence-registry.json
+          - .kilo/team/memory/decision-registry.json
+          - .kilo/team/memory/defect-registry.json
+          - .kilo/team/memory/blocker-registry.json
+          - .kilo/team/memory/commit-registry.json
+          - .kilo/team/memory/wave-history.json
           - .kilo/team/NEXT-WAVE-PLAN.schema.json
           - every .kilo/team/results/*/result.md
 
@@ -1168,9 +1178,10 @@ jobs:
           1. Reconcile all worker reports against the current repository.
           2. Preserve contradictions and explicitly resolve or mark them BLOCKED.
           3. Identify work that is already completed; never reassign it as new work.
-          4. Derive the next dependency-ready Micro-Stage(s).
-          5. Build .kilo/team/NEXT-WAVE-PLAN.json using the schema.
-          6. Each lease must have:
+          4. Reconcile every candidate lease against .kilo/team/memory/work-registry.json and reject duplicate/terminal work.
+          5. Derive the next dependency-ready Micro-Stage(s).
+          6. Build .kilo/team/NEXT-WAVE-PLAN.json using the schema.
+          7. Each lease must have:
              id, role, focus, owner, mode, write_scope.
           7. Each lease write_scope MUST include its own .kilo/team/results/<id>/ evidence root.
           8. Implementation leases must specify the exact product files/directories they are allowed to modify.
