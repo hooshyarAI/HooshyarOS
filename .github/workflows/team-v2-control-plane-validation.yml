@@ -78,9 +78,11 @@ jobs:
       - name: Acceptance gate invariant
         run: |
           set -euo pipefail
+          git fetch origin fix/autonomous-product-factory
           python3 - <<'PY'
-          import json
-          gate=json.load(open('.kilo/team/TEAM-V2-ACCEPTANCE-GATE.json',encoding='utf-8'))
+          import json, subprocess
+          raw=subprocess.check_output(['git','show','origin/fix/autonomous-product-factory:.kilo/team/TEAM-V2-ACCEPTANCE-GATE.json'],text=True)
+          gate=json.loads(raw)
           if gate.get('status')!='ARMED' or gate.get('hold_after_pass') is not True:
               raise SystemExit('ACCEPTANCE_GATE_INVARIANT_FAILED')
           print('ACCEPTANCE_GATE=ARMED_HOLD')
