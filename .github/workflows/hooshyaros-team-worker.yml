@@ -6,7 +6,7 @@ on:
       max_parallel:
         description: "Maximum concurrent workers for this wave"
         required: false
-        default: "8"
+        default: "1"
         type: string
       reason:
         description: "Reason for the team wave"
@@ -536,11 +536,13 @@ jobs:
     outputs:
       candidates: ${{ steps.qualify.outputs.candidates }}
       selected: ${{ steps.qualify.outputs.selected }}
+      route_plans: ${{ steps.qualify.outputs.route_plans }}
     permissions:
       contents: read
       actions: read
     env:
       START_SHA: ${{ needs.prepare.outputs.start_sha }}
+      LEASE_MATRIX_JSON: ${{ needs.prepare.outputs.matrix }}
       OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
 
     steps:
@@ -579,155 +581,140 @@ jobs:
           grep -q -- "--agent" "${RUNNER_TEMP}/qualification-run-help.txt"
           grep -q -- "--auto" "${RUNNER_TEMP}/qualification-run-help.txt"
           echo "Model qualification CLI preflight: PASS"
-      - name: Qualify top free models empirically
+      - name: Qualify free models per lease task class
         id: qualify
         shell: bash
         run: |
           set -euo pipefail
           CATALOG="${RUNNER_TEMP}/opencode-models-verbose.txt"
-          "$HOME/.opencode/bin/opencode" models --refresh --verbose > "${CATALOG}" 2>&1
+          ROUTING="${RUNNER_TEMP}/qualified-model-routing.env"
+          "\$HOME/.opencode/bin/opencode" models --refresh --verbose > "${CATALOG}" 2>&1
 
-          python3 - "${CATALOG}" "${RUNNER_TEMP}/qualified-models.env" <<'PY'
+          python3 - "${CATALOG}" "${ROUTING}" "${LEASE_MATRIX_JSON}" <<'PY'
           import json, math, os, re, subprocess, sys, time
-          from datetime import datetime, timezone
-
-          catalog=sys.argv[1]
+          catalog_path=sys.argv[1]
           out_file=sys.argv[2]
-          raw=open(catalog,encoding="utf-8",errors="replace").read()
-          raw=re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]","",raw)
+          matrix=json.loads(sys.argv[3])
+          raw=open(catalog_path,encoding="utf-8",errors="replace").read()
+          raw=re.sub(r"\\x1b\\[[0-?]*[ -/]*[@-~]","",raw)
           lines=raw.splitlines()
           decoder=json.JSONDecoder()
           models={}
-
-          def is_id(v):
-              return bool(re.fullmatch(r"[^\s/]+/[^\s]+",v.strip()))
-
+          def is_id(v): return bool(re.fullmatch(r"[^\\s/]+/[^\\s]+",v.strip()))
           for i,line in enumerate(lines):
               mid=line.strip()
-              if not is_id(mid) or i+1>=len(lines):
-                  continue
-              block="\n".join(lines[i+1:]).lstrip()
+              if not is_id(mid): continue
+              block="\\n".join(lines[i+1:]).lstrip()
               brace=block.find("{")
-              if brace<0:
-                  continue
-              try:
-                  obj,_=decoder.raw_decode(block[brace:])
-              except Exception:
-                  continue
-              if isinstance(obj,dict):
-                  models[mid]=obj
+              if brace<0: continue
+              try: obj,_=decoder.raw_decode(block[brace:])
+              except Exception: continue
+              if isinstance(obj,dict): models[mid]=obj
 
-          ranked=[]
+          modes=[]
+          for item in (matrix.get("include") or []):
+              mode=str(item.get("mode","")).upper()
+              if mode not in {"AUDIT","IMPLEMENT","REVIEW","VERIFY"}:
+                  raise SystemExit(f"BLOCKED: unsupported lease mode for routing: {mode}")
+              if mode not in modes: modes.append(mode)
+
+          def authoritatively_free(m):
+              cost=m.get("cost")
+              if not isinstance(cost,dict) or not cost: return False
+              vals=list(cost.values())
+              return all(isinstance(v,(int,float)) and not isinstance(v,bool) and v==0 for v in vals)
+
+          def provider(mid): return mid.split("/",1)[0] if "/" in mid else mid
+
+          def score(mid,m):
+              caps=m.get("capabilities") or {}
+              lim=m.get("limit") or {}
+              reasoning=m.get("reasoning") is True or caps.get("reasoning") is True
+              tool=m.get("tool_call") is True or caps.get("toolcall") is True or caps.get("tool_call") is True
+              ctx=int(lim.get("context") or 0); out=int(lim.get("output") or 0)
+              structured=m.get("structured_output") is True or caps.get("structured_output") is True
+              return (100 + (35 if reasoning else 0) + (30 if tool else 0) +
+                      (20 if structured else 0) +
+                      min(40.0,max(0.0,math.log2(max(ctx,1)/100000))*8.0) +
+                      min(35.0,max(0.0,math.log2(max(out,1)/8000))*5.0))
+
+          eligible=[]
           for mid,m in models.items():
               caps=m.get("capabilities") or {}
-              cost=m.get("cost") or {}
-              vals=[v for v in cost.values() if isinstance(v,(int,float))] if isinstance(cost,dict) else []
-              explicit_free=bool(vals) and all(v==0 for v in vals)
-              name=mid.split("/",1)[1] if "/" in mid else mid
-              named_free=(mid=="opencode/big-pickle" or name.lower().endswith("-free") or "-free-" in name.lower())
-              if not (explicit_free or named_free):
-                  continue
-              reasoning=m.get("reasoning") is True or caps.get("reasoning") is True
-              tool_call=m.get("tool_call") is True or caps.get("toolcall") is True or caps.get("tool_call") is True
-              if not reasoning or not tool_call:
-                  continue
               lim=m.get("limit") or {}
-              ctx=int(lim.get("context") or 0)
-              out=int(lim.get("output") or 0)
-              if ctx<100_000 or out<8_000:
-                  continue
-              structured=m.get("structured_output") is True or caps.get("structured_output") is True
-              attachment=m.get("attachment") is True or caps.get("attachment") is True
-
-              score=150.0
-              score += 40.0 if reasoning else 0.0
-              score += 35.0 if tool_call else 0.0
-              score += 25.0 if structured else 0.0
-              score += min(55.0, max(0.0, math.log2(max(ctx,1)/100_000))*16.0)
-              score += min(50.0, max(0.0, math.log2(max(out,1)/8_000))*12.0)
-              score += 8.0 if attachment else 0.0
-              family=str(m.get("family") or "").lower()
-              if any(x in family for x in ("mini","small","nano")):
-                  score-=10.0
-              updated=m.get("last_updated") or m.get("release_date")
-              if updated:
-                  try:
-                      dt=datetime.fromisoformat(str(updated).replace("Z","+00:00"))
-                      age=max(0.0,(datetime.now(timezone.utc)-dt).total_seconds()/86400.0)
-                      score += max(0.0,8.0-min(8.0,age/30.0))
-                  except Exception:
-                      pass
-              if mid=="opencode/big-pickle":
-                  score+=3.0
-              ranked.append((score,mid,ctx,out))
-
-          ranked.sort(reverse=True)
-          top=ranked[:4]
-          if not top:
-              raise SystemExit("BLOCKED_FREE_MODEL_UNAVAILABLE")
+              reasoning=m.get("reasoning") is True or caps.get("reasoning") is True
+              tool=m.get("tool_call") is True or caps.get("toolcall") is True or caps.get("tool_call") is True
+              ctx=int(lim.get("context") or 0); out=int(lim.get("output") or 0)
+              if authoritatively_free(m) and reasoning and tool and ctx>=32000 and out>=4000:
+                  eligible.append((score(mid,m),mid,ctx,out))
 
           print(f"MODEL_CATALOG_PARSED={len(models)}")
-          print(f"MODEL_FREE_ELIGIBLE={len(ranked)}")
-          print("MODEL_PREFILTER="+"|".join(x[1] for x in top))
+          print(f"MODEL_FREE_ELIGIBLE={len(eligible)}")
+          if not eligible: raise SystemExit("BLOCKED_FREE_MODEL_UNAVAILABLE")
 
-          probe_prompt=(
-              "You are participating in a harmless model qualification probe for an autonomous software "
-              "construction team. Do not modify files or external systems. Analyze this fictional task: "
-              "a service receives revenue=100 and cost=60, next period revenue=110 and cost=75. "
-              "Return exactly these lines first: MODEL_PROBE=PASS, MODE=REASONING, "
-              "DELTA_REVENUE=10, DELTA_COST=15, RISK=margin_pressure, then one concise recommendation."
-          )
+          probes={
+            "AUDIT":"You qualify for AUDIT work. Do not modify files. A=100, B=120, C is the signed source and says 100. Return exactly: TASK_PROBE=PASS, TASK=AUDIT, CONTRADICTION=TRUE, AUTHORITY=C, VALUE=100.",
+            "IMPLEMENT":"You qualify for IMPLEMENT work. Do not modify files. A defect is in F and regression test T exists. Return exactly: TASK_PROBE=PASS, TASK=IMPLEMENT, MINIMAL_CHANGE=TRUE, TEST=T, SCOPE=BOUNDED.",
+            "REVIEW":"You qualify for REVIEW/QC work. Do not modify files. Worker claims a file was changed but patch does not contain it. Return exactly: TASK_PROBE=PASS, TASK=REVIEW, FALSE_GREEN=TRUE, CHECK=ACTUAL_PATCH.",
+            "VERIFY":"You qualify for VERIFY work. Do not modify files. Test is green but ran from a different commit than START_SHA. Return exactly: TASK_PROBE=PASS, TASK=VERIFY, VALID=FALSE, ACTION=REVERIFY."
+          }
 
-          passed=[]
-          failures=[]
-          for score,mid,ctx,out in top:
-              start=time.monotonic()
-              log=os.path.join(os.environ["RUNNER_TEMP"], "probe-"+re.sub(r"[^A-Za-z0-9_.-]+","_",mid)+".log")
-              cmd=[
-                  os.path.join(os.environ["HOME"], ".opencode", "bin", "opencode"),"run","--auto","--agent","plan",
-                  "--model",mid,probe_prompt
-              ]
-              try:
-                  proc=subprocess.run(cmd,text=True,capture_output=True,timeout=110)
-                  combined=(proc.stdout or "")+"\n"+(proc.stderr or "")
-                  ok=proc.returncode==0 and "MODEL_PROBE=PASS" in combined and "DELTA_REVENUE=10" in combined and "DELTA_COST=15" in combined
-                  open(log,"w",encoding="utf-8").write(combined)
-                  elapsed=time.monotonic()-start
-              except Exception as e:
-                  ok=False
-                  elapsed=time.monotonic()-start
-                  open(log,"w",encoding="utf-8").write(str(e))
+          routes={}; union=[]; seen=set()
+          for mode in modes:
+              passed=[]
+              for base,mid,ctx,out in sorted(eligible,reverse=True)[:4]:
+                  start=time.monotonic()
+                  try:
+                      proc=subprocess.run([
+                          os.path.join(os.environ["HOME"],".opencode","bin","opencode"),
+                          "run","--auto","--agent","plan","--model",mid,probes[mode]
+                      ],text=True,capture_output=True,timeout=110)
+                      combined=(proc.stdout or "")+"\\n"+(proc.stderr or "")
+                      ok=proc.returncode==0 and "TASK_PROBE=PASS" in combined and f"TASK={mode}" in combined
+                  except Exception:
+                      ok=False
+                  elapsed=round(time.monotonic()-start,2)
+                  if ok:
+                      passed.append((base,-elapsed,mid,provider(mid),ctx,out))
+                      print(f"MODEL_PROBE_PASS={mode}:{mid} elapsed={elapsed:.2f}")
+                  else:
+                      print(f"MODEL_PROBE_FAIL={mode}:{mid} elapsed={elapsed:.2f}")
+              if not passed:
+                  raise SystemExit(f"BLOCKED_FREE_MODEL_UNAVAILABLE:{mode}")
+              passed.sort(reverse=True)
+              chosen=[]; providers=set()
+              for row in passed:
+                  if row[3] not in providers:
+                      chosen.append(row); providers.add(row[3])
+                  if len(chosen)==3: break
+              for row in passed:
+                  if len(chosen)==3: break
+                  if row not in chosen: chosen.append(row)
+              route=[{"rank":i+1,"model":r[2],"provider":r[3],"qualification":"PASS","task_class":mode,
+                      "probe_elapsed_s":round(-r[1],2),"context":r[4],"output":r[5]} for i,r in enumerate(chosen)]
+              routes[mode]=route
+              for r in chosen:
+                  if r[2] not in seen:
+                      seen.add(r[2]); union.append(r[2])
+              print("MODEL_ROUTE_PLAN="+mode+":"+"|".join(x["model"] for x in route))
 
-              if ok:
-                  passed.append((score, -elapsed, mid, ctx, out))
-                  print(f"MODEL_PROBE_PASS={mid} elapsed={elapsed:.2f}")
-              else:
-                  failures.append((mid,round(elapsed,2)))
-                  print(f"MODEL_PROBE_FAIL={mid} elapsed={elapsed:.2f}")
-
-          passed.sort(reverse=True)
-          if not passed:
-              print("MODEL_PROBE_STATUS=BLOCKED_FREE_MODEL_UNAVAILABLE")
-              raise SystemExit("No free model passed qualification probe")
-
-          candidates="|".join(x[2] for x in passed)
-          selected=passed[0][2]
-          ranking=" ; ".join(f"{x[2]} score={x[0]:.2f} probe_elapsed={-x[1]:.2f} ctx={x[3]} out={x[4]}" for x in passed)
-
-          with open(out_file,"w",encoding="utf-8") as f:
-              f.write("QUALIFIED_MODELS="+candidates+"\n")
-              f.write("QUALIFIED_SELECTED="+selected+"\n")
-              f.write("QUALIFIED_RANKING="+ranking+"\n")
-              f.write("QUALIFIED_FAILURES="+json.dumps(failures,ensure_ascii=False)+"\n")
+          compact=json.dumps(routes,ensure_ascii=False,separators=(",",":"))
+          selected=routes[modes[0]][0]["model"]
+          open(out_file,"w",encoding="utf-8").write("QUALIFIED_MODELS="+"|".join(union)+"\\nQUALIFIED_SELECTED="+selected+"\\nQUALIFIED_ROUTE_PLANS="+compact+"\\n")
+          print("MODEL_ROUTING_POLICY=LEASE_TASK_CLASS")
+          print("MODEL_ROUTING_NO_NAMED_FREE_HEURISTIC=TRUE")
           PY
 
-          cat "${RUNNER_TEMP}/qualified-models.env" >> "${GITHUB_ENV}"
-          CANDIDATES="$(sed -n 's/^QUALIFIED_MODELS=//p' "${RUNNER_TEMP}/qualified-models.env")"
-          SELECTED="$(sed -n 's/^QUALIFIED_SELECTED=//p' "${RUNNER_TEMP}/qualified-models.env")"
+          cat "${ROUTING}" >> "\$GITHUB_ENV"
+          CANDIDATES="\$(sed -n 's/^QUALIFIED_MODELS=//p' "${ROUTING}")"
+          SELECTED="\$(sed -n 's/^QUALIFIED_SELECTED=//p' "${ROUTING}")"
+          ROUTE_PLANS="\$(sed -n 's/^QUALIFIED_ROUTE_PLANS=//p' "${ROUTING}")"
+          test -n "${CANDIDATES}" && test -n "${SELECTED}" && test -n "${ROUTE_PLANS}"
           echo "candidates=${CANDIDATES}" >> "${GITHUB_OUTPUT}"
           echo "selected=${SELECTED}" >> "${GITHUB_OUTPUT}"
-          echo "QUALIFIED_MODELS=${CANDIDATES}"
-          echo "QUALIFIED_SELECTED=${SELECTED}"
+          echo "route_plans=${ROUTE_PLANS}" >> "${GITHUB_OUTPUT}"
+          echo "QUALIFIED_ROUTE_PLANS=${ROUTE_PLANS}"
+
 
   team-worker:
     needs: [prepare, model-qualification]
@@ -834,20 +821,31 @@ jobs:
           }
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
 
-      - name: Load qualified free-model candidates
+      - name: Bind lease-specific qualified free-model route
         shell: bash
         env:
-          QUALIFIED_CANDIDATES: ${{ needs.model-qualification.outputs.candidates }}
-          QUALIFIED_SELECTED: ${{ needs.model-qualification.outputs.selected }}
+          ROUTE_PLANS: ${{ needs.model-qualification.outputs.route_plans }}
+          WORK_MODE: ${{ matrix.mode }}
         run: |
           set -euo pipefail
-          test -n "${QUALIFIED_CANDIDATES}"
-          test -n "${QUALIFIED_SELECTED}"
-          echo "MODEL_CANDIDATES=${QUALIFIED_CANDIDATES}" >> "${GITHUB_ENV}"
-          echo "SELECTED_MODEL=${QUALIFIED_SELECTED}" >> "${GITHUB_ENV}"
-          echo "MODEL_SELECTION_STATUS=QUALIFIED"
-          echo "MODEL_SELECTED_FOR_WORKER=${QUALIFIED_SELECTED}"
-          echo "MODEL_CANDIDATES=${QUALIFIED_CANDIDATES}"
+          test -n "${ROUTE_PLANS}"
+          python3 - <<'PY'
+          import json,os
+          mode=os.environ["WORK_MODE"].upper()
+          plans=json.loads(os.environ["ROUTE_PLANS"])
+          route=plans.get(mode) or []
+          if not route: raise SystemExit(f"BLOCKED_FREE_MODEL_UNAVAILABLE: no qualified route for {mode}")
+          models=[x["model"] for x in route]
+          with open(os.environ["GITHUB_ENV"],"a",encoding="utf-8") as out:
+              out.write("MODEL_CANDIDATES="+"|".join(models)+"\n")
+              out.write("SELECTED_MODEL="+models[0]+"\n")
+              out.write("MODEL_ROUTING_TASK_CLASS="+mode+"\n")
+              out.write("ROUTE_PLAN_JSON="+json.dumps(route,ensure_ascii=False,separators=(",",":"))+"\n")
+          print("MODEL_SELECTION_STATUS=LEASE_SPECIFIC")
+          print("MODEL_ROUTING_TASK_CLASS="+mode)
+          print("MODEL_SELECTED_FOR_WORKER="+models[0])
+          print("MODEL_CANDIDATES="+"|".join(models))
+          PY
 
       - name: Preflight OpenCode CLI contract
         shell: bash
@@ -1118,23 +1116,33 @@ jobs:
           if test -f "${WRITE_ROOT}result.md" && test -n "${{ steps.validate.outputs.commit_sha }}"; then STATUS="SUCCESS"; fi
           mkdir -p "${RUNNER_TEMP}/team-result/${WORKER_ID}"
           cp -f "${WRITE_ROOT}result.md" "${RUNNER_TEMP}/team-result/${WORKER_ID}/result.md" 2>/dev/null || true
-
+          LOG="${RUNNER_TEMP}/opencode-team-${WORKER_ID}.log"
           python3 - "${RUNNER_TEMP}/team-result/${WORKER_ID}/result.json" <<PY
-          import json,sys
+          import json,pathlib,sys
+          log=pathlib.Path("${LOG}")
+          attempts=[]
+          for line in (log.read_text(encoding="utf-8",errors="replace").splitlines() if log.exists() else []):
+              if line.startswith("MODEL_ATTEMPT="):
+                  attempts.append({"model":line.split("=",1)[1],"result":"ATTEMPTED"})
+              elif line.startswith("MODEL_FAILED="):
+                  m=line.split("=",1)[1]
+                  for a in reversed(attempts):
+                      if a["model"]==m and a["result"]=="ATTEMPTED": a["result"]="FAILED"; break
+              elif line.startswith("MODEL_SELECTED="):
+                  m=line.split("=",1)[1]
+                  for a in reversed(attempts):
+                      if a["model"]==m: a["result"]="SELECTED"; break
           result={
-            "worker_id":"${WORKER_ID}",
-            "role":"${WORKER_ROLE}",
-            "owner_engine":"${OWNER_ENGINE}",
-            "mode":"${WORKER_MODE}",
-            "status":"${STATUS}",
-            "commit_sha":"${{ steps.preserve_worker.outputs.commit_sha }}",
-            "branch":"opencode/team-${WORKER_ID}-${GITHUB_RUN_ID}",
-            "start_sha":"${START_SHA}",
-            "model":"${MODEL:-unknown}",
-            "write_scope":json.loads('''${WRITE_SCOPE_JSON}''')
+            "worker_id":"${WORKER_ID}","role":"${WORKER_ROLE}","owner_engine":"${OWNER_ENGINE}",
+            "mode":"${WORKER_MODE}","task_class":"${MODEL_ROUTING_TASK_CLASS:-${WORKER_MODE}}",
+            "status":"${STATUS}","commit_sha":"${{ steps.preserve_worker.outputs.commit_sha }}",
+            "branch":"opencode/team-${WORKER_ID}-${GITHUB_RUN_ID}","start_sha":"${START_SHA}",
+            "model":"${MODEL:-unknown}","route_plan":json.loads(r''' ${ROUTE_PLAN_JSON:-[]} '''.strip() or "[]"),
+            "model_attempts":attempts,"write_scope":json.loads(r''' ${WRITE_SCOPE_JSON} ''')
           }
-          open(sys.argv[1],"w",encoding="utf-8").write(json.dumps(result,ensure_ascii=False))
+          open(sys.argv[1],"w",encoding="utf-8").write(json.dumps(result,ensure_ascii=False,indent=2))
           PY
+
 
       - name: Upload worker result
         if: always()
