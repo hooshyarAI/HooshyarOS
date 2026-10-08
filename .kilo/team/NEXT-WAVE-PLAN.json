@@ -1,0 +1,38 @@
+{
+  "schema_version": "1.0",
+  "wave_status": "READY",
+  "base_mission": ".kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md",
+  "created_from_sha": "76ba54614e00b05b72b7759afb99d277ba180d0b",
+  "leases": [
+    {
+      "id": "team-org-02-memory-backfill",
+      "role": "Memory & Editor",
+      "focus": "Backfill and reconcile organizational ledgers from repository evidence; preserve unknowns and stale states; no product implementation.",
+      "owner": "MEMORY_EDITOR",
+      "mode": "AUDIT",
+      "write_scope": [
+        ".kilo/team/memory/**"
+      ]
+    },
+    {
+      "id": "wave-10-recovery-reconciliation",
+      "role": "Recovery Reconciliation",
+      "focus": "Reconcile Wave 10 worker evidence, controlled target drift and recovery outcome; do not repeat accepted audit work without current regression/invalidation evidence.",
+      "owner": "INTEGRATOR",
+      "mode": "REVIEW",
+      "write_scope": [
+        ".kilo/team/results/wave-10-recovery-reconciliation/**"
+      ]
+    },
+    {
+      "id": "next-capability-reconciliation",
+      "role": "Planner",
+      "focus": "Derive the next genuinely missing capability from current evidence, dependency graph and V2 memory; do not implement product code during reconciliation.",
+      "owner": "PLANNER",
+      "mode": "REVIEW",
+      "write_scope": [
+        ".kilo/team/results/next-capability-reconciliation/**"
+      ]
+    }
+  ]
+}
