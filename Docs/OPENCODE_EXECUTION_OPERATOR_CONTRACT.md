@@ -231,6 +231,64 @@ A successful promotion makes the next run eligible to continue. A blocked run pr
 
 No routine human comment or approval is required for continuation.
 
+
+## 13A. Autonomous Team Worker Mode
+
+OpenCode may operate as one member of the governed HooshyarOS autonomous team.
+
+Team execution does not change OpenCode's authority. Each worker remains a replaceable execution operator and must obey the same Master Charter, Governance Charter, Architecture Freeze V4/V4.1 and this contract.
+
+Team protocol:
+1. ORCHESTRATE — identify independently executable Micro-Stages.
+2. LEASE — assign one explicit Work Lease to each worker.
+3. ISOLATE — use a separate branch/worktree from the same immutable START_SHA.
+4. EXECUTE — perform only the leased knot.
+5. VERIFY — run focused verification and create evidence.
+6. COMMIT — create one coherent worker commit.
+7. INTEGRATE — a separate team integrator collects verified worker commits.
+8. QC — independent quality/evidence checks.
+9. PROMOTE — only after target-drift and scope gates pass.
+10. REPLAN — continue with the next eligible wave.
+
+Initial controlled pool size is 12. Capacity may be increased to 25, 50 or 100 only when evidence supports the increase.
+
+Workers must not share working trees or directly promote competing changes to the target branch.
+
+### V1 Team Mode
+
+The first team wave is `AUDIT_PARALLEL`. Workers produce isolated evidence only under:
+
+`.kilo/team/results/<worker-id>/`
+
+This is intentional: the active master mission currently requires reconciliation/audit before product implementation.
+
+V1 workers must not modify:
+- product source;
+- tests;
+- architecture/governance documents;
+- package manifests;
+- GitHub workflows;
+- secrets;
+- deployment configuration;
+- any path outside their leased result root.
+
+Future implementation waves may relax the write scope only when the lease contains explicit, non-overlapping product paths and the active mission permits implementation.
+
+### Team Failure Semantics
+
+A worker failure is isolated when its dependencies are independent. The team continues eligible safe workers while preserving failure evidence.
+
+Team-level BLOCKED conditions include:
+- target branch drift;
+- unresolved integration conflict;
+- scope firewall violation;
+- missing mandatory verification;
+- architecture/governance contradiction;
+- unavailable free-model capacity for required work.
+
+The team must never convert a failed worker into synthetic success merely because other workers succeeded.
+
+
 ## 14. Git promotion policy
 
 Worker branches use:
