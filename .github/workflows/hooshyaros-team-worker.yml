@@ -935,6 +935,8 @@ jobs:
           - run proportional verification;
           - create ONE coherent commit for this lease;
           - write exactly ONE evidence report at ${WRITE_ROOT}result.md;
+          - do not modify the current lease's execution_attempts, reservations, promoted flags, or promotion metadata; Integrator exclusively owns promotion closure;
+          - Memory & Editor may reconcile factual memory/status fields for prior work, but the current lease reservation/promotion state is Manager/Integrator-owned;
           - stop after the committed Micro-Stage.
 
           REPORT SECTIONS:
