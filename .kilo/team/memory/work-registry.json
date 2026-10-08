@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "next_id": "WORK-0009",
+  "next_id": "WORK-0010",
   "backfill_required": true,
   "items": [
     {
@@ -346,6 +346,41 @@
         "commit_recovery": "UNAVAILABLE_FROM_GITHUB",
         "duplicate_dispatch": "FORBIDDEN"
       }
+    },
+    {
+      "id": "WORK-0009",
+      "title": "work-0009-team-v2-acceptance",
+      "status": "READY",
+      "mode": "AUDIT",
+      "priority": "P1",
+      "owner": "SPECIALIST_WORKER_POOL",
+      "dependencies": [],
+      "evidence_required": [
+        "current_team_control_plane_state",
+        "one_coherent_commit",
+        "exactly_one_result_report",
+        "worker_branch_or_artifact_provenance",
+        "independent_qc_adjudication",
+        "integration_and_target_promotion_evidence"
+      ],
+      "purpose": "Team V2 end-to-end acceptance gate before broad product continuation.",
+      "blockers": [],
+      "test_scope": "TEAM_CONTROL_PLANE_ONLY_NO_PRODUCT_CODE_CHANGE",
+      "risk": "P0",
+      "value": "Decides whether autonomous team construction is safe to continue.",
+      "readiness": "READY",
+      "estimated_complexity": "LOW_CONTROL_PLANE_ACCEPTANCE",
+      "write_scope": [
+        ".kilo/team/results/work-0009-team-v2-acceptance/"
+      ],
+      "admission": {
+        "source": "NEXT-WAVE-PLAN",
+        "lease_id": "work-0009-team-v2-acceptance",
+        "run_id": 37816306137,
+        "start_sha": "04da2f5257854ba3d732e503ec3e489daf4c037a",
+        "state": "ADMITTED_BEFORE_DISPATCH"
+      },
+      "execution_attempts": []
     }
   ],
   "backfill_required_scope": {
