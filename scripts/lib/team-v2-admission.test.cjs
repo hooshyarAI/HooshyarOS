@@ -8,6 +8,7 @@ const lease = {
   focus: "memory reconciliation",
   owner: "MEMORY_EDITOR",
   mode: "AUDIT",
+  task_class: "MEMORY",
   write_scope: [".kilo/team/memory/", ".kilo/team/results/work-0011-team-v2-memory-reconciliation/"],
   dependencies: []
 };
@@ -35,6 +36,10 @@ assert.ok(validateWork(unresolved).some(x => x.code === "UNRESOLVED_PRIOR_ATTEMP
 const badReadiness = structuredClone(base);
 badReadiness.registry.items[0].readiness = "";
 assert.ok(validateWork(badReadiness).some(x => x.code === "REGISTRY_NOT_READY"));
+
+const invalidTaskClass = structuredClone(base);
+invalidTaskClass.plan.leases[0].task_class = "AUDIT";
+assert.ok(validateWork(invalidTaskClass).some(x => x.code === "TASK_CLASS_INVALID"));
 
 const mismatch = structuredClone(base);
 mismatch.workId = "WORK-0010";
