@@ -200,9 +200,42 @@ jobs:
               work_items = [x for x in work_registry.get("items", []) if x.get("id") == work_id]
               if len(work_items) != 1:
                   raise SystemExit(f"BLOCKED: V2 lease {lid} has no unique Work Registry record {work_id}")
-              work_status = str(work_items[0].get("status", "")).upper()
-              if work_status in {"CLOSED", "MEMORIZED", "PROMOTED", "DUPLICATE", "SUPERSEDED"}:
-                  raise SystemExit(f"BLOCKED: V2 lease {lid} targets terminal work {work_id}:{work_status}")
+              work_item = work_items[0]
+              work_status = str(work_item.get("status", "")).upper()
+              work_readiness = str(work_item.get("readiness", "")).upper()
+
+              # V2 dispatch is fail-closed: only explicitly READY work may execute.
+              if work_status != "READY" or work_readiness != "READY":
+                  raise SystemExit(
+                      f"BLOCKED: V2 lease {lid} is not dispatch-ready in Work Registry "
+                      f"(status={work_status}, readiness={work_readiness})"
+                  )
+
+              registry_by_id = {str(x.get("id")): x for x in work_registry.get("items", [])}
+              satisfied_statuses = {"COMPLETED", "VERIFIED", "PROMOTED", "MEMORIZED", "CLOSED"}
+              for dep in work_item.get("dependencies", []) or []:
+                  if str(dep).startswith("WORK-"):
+                      dep_item = registry_by_id.get(str(dep))
+                      if not dep_item:
+                          raise SystemExit(f"BLOCKED: V2 lease {lid} missing dependency record {dep}")
+                      dep_status = str(dep_item.get("status", "")).upper()
+                      if dep_status not in satisfied_statuses:
+                          raise SystemExit(
+                              f"BLOCKED: V2 lease {lid} dependency {dep} is not satisfied "
+                              f"(status={dep_status})"
+                          )
+
+              attempts = work_item.get("execution_attempts", []) or []
+              unresolved_attempts = [
+                  a for a in attempts
+                  if not bool(a.get("promoted"))
+                  and str(a.get("state", "")).upper() not in {"SUPERSEDED", "DUPLICATE", "INVALID"}
+              ]
+              if unresolved_attempts:
+                  raise SystemExit(
+                      f"BLOCKED: V2 lease {lid} has unresolved prior execution attempts; "
+                      f"recover/QC/promote existing evidence before re-dispatch"
+                  )
 
               scope = [str(x) for x in lease["write_scope"]]
               result_root = f".kilo/team/results/{lid}/"
@@ -910,6 +943,11 @@ jobs:
 
           if success == 0:
               raise SystemExit("QC_FAIL: zero successful workers")
+          if success != len(found):
+              raise SystemExit(
+                  "QC_FAIL: fail-closed wave policy — one or more leased workers failed; "
+                  "recover/reverify the failed lease before team integration"
+              )
 
           print(f"QC_WORKSPACE_REPORTS={success}")
           PY
@@ -1173,13 +1211,17 @@ jobs:
           test -n "${QUALIFIED_CANDIDATES}"
           IFS='|' read -r -a MODELS <<< "${QUALIFIED_CANDIDATES}"
           COUNT="${#MODELS[@]}"
-          if test "${COUNT}" -gt 2; then
-            SYNTH_CANDIDATES="${MODELS[2]}|${MODELS[3]}|${MODELS[0]}|${MODELS[1]}"
-          elif test "${COUNT}" -gt 1; then
-            SYNTH_CANDIDATES="${MODELS[1]}|${MODELS[0]}"
-          else
-            SYNTH_CANDIDATES="${QUALIFIED_CANDIDATES}"
-          fi
+          SYNTH_CANDIDATES=""
+          for idx in 2 3 0 1; do
+            if test "${idx}" -lt "${COUNT}"; then
+              if test -z "${SYNTH_CANDIDATES}"; then
+                SYNTH_CANDIDATES="${MODELS[idx]}"
+              else
+                SYNTH_CANDIDATES="${SYNTH_CANDIDATES}|${MODELS[idx]}"
+              fi
+            fi
+          done
+          test -n "${SYNTH_CANDIDATES}"
           echo "SYNTH_MODEL_CANDIDATES=${SYNTH_CANDIDATES}" >> "${GITHUB_ENV}"
           echo "SYNTH_MODEL_POLICY=qualified-pool-role-diversity"
           echo "SYNTH_MODEL_CANDIDATES=${SYNTH_CANDIDATES}"
