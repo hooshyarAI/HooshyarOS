@@ -236,9 +236,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl -fsSL https://opencode.ai/install | bash
+          install_ok=0
+          for attempt in 1 2; do
+            echo "OPENCODE_INSTALL_ATTEMPT=${attempt}"
+            if curl -fsSL https://opencode.ai/install | bash && "$HOME/.opencode/bin/opencode" --version; then
+              install_ok=1
+              break
+            fi
+            echo "OPENCODE_INSTALL_FAILED_ATTEMPT=${attempt}"
+            if test "$attempt" -lt 2; then
+              sleep 5
+            fi
+          done
+          test "$install_ok" -eq 1 || {
+            echo "BLOCKED_EXTERNAL: OpenCode installation/version verification failed after bounded retry"
+            exit 40
+          }
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
-          "$HOME/.opencode/bin/opencode" --version
 
       - name: Select best available free model
         shell: bash
@@ -361,6 +375,8 @@ jobs:
           tee -a "${GITHUB_ENV}" < "${RUNNER_TEMP}/model-selection.env"
 
           tee -a "${GITHUB_ENV}" < "${RUNNER_TEMP}/model-selection.env"
+          SELECTED_MODEL="$(sed -n 's/^SELECTED_MODEL=//p' "${RUNNER_TEMP}/model-selection.env" | head -1)"
+          test -n "${SELECTED_MODEL}"
           echo "MODEL_SELECTED_FOR_WORKER=${SELECTED_MODEL}"
 
       - name: Run assigned governed work lease
