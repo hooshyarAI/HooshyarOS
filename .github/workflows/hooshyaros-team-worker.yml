@@ -622,7 +622,10 @@ jobs:
             exit 21
           }
 
-          git diff --check "${START_SHA}...HEAD"
+          git diff --check "${START_SHA}...HEAD" -- . ':(exclude)*.md' ':(exclude)*.markdown'
+          if ! git diff --check "${START_SHA}...HEAD" -- '*.md' '*.markdown'; then
+            echo "WARNING: evidence Markdown contains formatting whitespace; semantic evidence remains subject to content/QC gates."
+          fi
           AHEAD="$(git rev-list --count "${START_SHA}..HEAD")"
           test "${AHEAD}" -eq 1 || {
             echo "BLOCKED: worker commit count = ${AHEAD}, expected 1"
