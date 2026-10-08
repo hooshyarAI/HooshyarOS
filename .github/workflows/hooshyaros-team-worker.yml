@@ -13,8 +13,6 @@ on:
         required: false
         default: "manual controlled team wave"
         type: string
-  issue_comment:
-    types: [created]
 
 concurrency:
   group: hooshyaros-autonomous-construction
@@ -28,7 +26,7 @@ permissions:
 
 jobs:
   prepare:
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'issue_comment' && github.event.issue.pull_request == null && github.event.issue.number == 122 && startsWith(github.event.comment.body, '/opencode-team-run')) }}
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-22.04
     outputs:
       start_sha: ${{ steps.state.outputs.start_sha }}
