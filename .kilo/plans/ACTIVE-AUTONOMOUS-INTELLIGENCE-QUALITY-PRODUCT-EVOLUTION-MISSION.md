@@ -161,7 +161,7 @@ STABLE_IDS = MISSION-####, PROGRAM-####, WAVE-####, WORK-####, DECISION-####, EV
 CURRENT_PROGRAM = PROGRAM-0001
 CURRENT_MISSION = MISSION-0001
 CURRENT_PRIMARY_WORK = WORK-0001
-CURRENT_TEAM_ORG_WORK = WORK-0002
+CURRENT_TEAM_ORG_WORK = WORK-0002 (COMPLETED)
 
 WORK-0001:
   TITLE = Post-Recovery / Architecture + Audit Reconciliation
@@ -172,17 +172,18 @@ WORK-0001:
 
 WORK-0002:
   TITLE = Team Organization V2 Operationalization
-  STATUS = ACTIVE
+  STATUS = COMPLETED
   MODE = CONSTRUCTION_PROCESS
   PRIORITY = P0
   DEPENDENCY = WORK-0001_CONTROL_PLANE_SAFETY + EXISTING_TEAM_WORKER_V1
   SCOPE = .kilo/team/memory/** + TEAM ORGANIZATION V2 CONTROL DOCUMENTATION
   RULE = NO_NEW_PRODUCT_ENGINE
+  COMPLETION = Team Organization V2 manifest/protocol/memory/control binding persisted
 
 CURRENT_WAVE:
-  WAVE_ID = WAVE-0010
-  STATE = RECOVERY_REVIEW_REQUIRED
-  NOTE = Independent QC completed; original Integrator failed on controlled target drift; recovery path is evidence-preserving.
+  WAVE_ID = WAVE-0011
+  STATE = READY_FOR_DISPATCH
+  NOTE = V2 bootstrap wave is the active continuation; Wave 10 recovery remains preserved as WORK-0004 evidence.
 
 
 ## TEAM CONTROL STATE — V2 BINDING
@@ -199,3 +200,18 @@ NO_DUPLICATE_ACCEPTED_AUDITS = TRUE
 NEXT_WAVE_SOURCE = .kilo/team/NEXT-WAVE-PLAN.json
 
 CURRENT_WAVE_STATE = WAVE-0011_READY_FOR_DISPATCH
+
+
+## POST-TEAM PERFORMANCE GATE
+
+WORK-0006 = Team V2 Performance Evaluation Gate
+STATUS = PLANNED
+PRECONDITION = WAVE-0011 CLOSED + INDEPENDENT QC PASS + INTEGRATION/PROMOTION VERIFIED
+
+WORK-0007 = Remaining Stages Governed Audit / Edit / Repair
+STATUS = PLANNED
+PRECONDITION = WORK-0006 ACCEPTED OR ACCEPTED_WITH_CONTROLLED_GAPS
+
+COMMAND = .kilo/team/COMMANDS/POST-TEAM-V2-PERFORMANCE-AUDIT-EDIT-REPAIR.md
+
+No remaining-stage product repair may begin before WORK-0006 passes its gate.
