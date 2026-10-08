@@ -2,19 +2,33 @@
   "schema_version": "1.0",
   "wave_status": "READY",
   "base_mission": ".kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md",
-  "created_from_sha": "e8730ccb95eace9c268019b5b60e3b01f808f164",
   "leases": [
     {
-      "id": "work-0008-wave11-promotion-reconciliation",
-      "role": "Memory & Editor",
-      "focus": "RECOVERY RECONCILIATION, NOT PRODUCT DEVELOPMENT. Refresh of the rev-1 admission at e8730ccb; not a second dispatch. work-0008 has ZERO execution attempts (no WORK-0008 row in work-registry.json, no work-0008 worker ref exists) - verified by git for-each-ref and by work-registry next_id=WORK-0008 unused - so it is undispatched plan text, not duplicate governed work. Do NOT create a new work id for this purpose and do NOT dispatch it twice. MANDATORY FIRST ACT: register this lease as WORK-0008 in work-registry.json with mode AUDIT, owner MEMORY_EDITOR, dependencies satisfied and status READY before any other edit; if that registration cannot be made truthfully, STOP and report BLOCKED rather than proceeding. Then reconcile against the promoted target state measured at e8730ccb, preserving every prior value and recording provenance: (1) WORK-0003 status/readiness, the three execution_attempts promoted flags, the PENDING_THIS_LEASE_COMMIT placeholder, and the fourth_dispatch_rule whose REFUSE condition is now met and is therefore mis-gating; (2) WORK-0004 and WORK-0005 status/readiness plus attempts, so neither can ever be re-leased as duplicate governed work; (3) BLOCKER-0005 - RE-SCOPE, do not close: unpromoted_team_worker_branches is 7 not 5 (added team-work-0003-memory-backfill-37788700120 @ 94fb1c2a and team-work-0005-next-capability-37788700120 @ bbeb2c08, both orphaned duplicates of content already on this lineage), promotions_performed 0 / qc_adjudications_found 0 are stale as to content, and the root cause must be restated to include that the only working promotion path (.github/workflows/team-promotion-recovery.yml, origin/main only, workflow_dispatch, hardcoded TARGET_BRANCH=fix/autonomous-product-factory, START_SHA=6c9d4da5, single-path, hardcoded to the WORK-0004 result) does not exist on this lineage at all - no .github/workflows/*team* path exists at 99542164, 04119244, 6c9d4da5, e8730ccb, 7010e238 or 94fb1c2a, while all five team workflows exist only on origin/main; the orphan refs are unretired and the wave-recovery path is still broken, so OPEN stands; (4) BLOCKER-0004 and DEFECT-0002 lineage counts - origin/main is now 704d42ff, 85 ahead (was 84), this lineage 668 ahead (was 667), origin/main still has zero .kilo/team/memory and zero .kilo/team/results paths, 9151fe4d is an ancestor of origin/main but still not of HEAD, merge-base is still 99542164 - canonical_lineage stays UNDECIDED and the missing-dispatch-substrate fact from (3) must be recorded as an addition to the blocker, not as a lineage decision; (5) mission-state.truth_note (asserts no governed V2 worker result has been promoted or QC-adjudicated), mission-state.next_state, mission-state.target_lineage.origin_main_tip (d90d8e11 -> 704d42ff), and wave-history WAVE-0011 promotion_state / unpromoted_worker_results (5 -> 7) / current.status, all now false or stale as to promotion; (6) DEFECT-0008 fix_work (WORK-0004_INTEGRATOR_PROMOTION_AND_QC is partly discharged) and the memory/README.md backfill-attempt, five-stranded-results and not-promoted-or-accepted claims. DO NOT re-title BLOCKER-0001 or accept the missing-git-committer-identity root cause: DECISION-0012 reserves attribution to INTEGRATOR/MISSION_DIRECTOR. Record EVIDENCE-0020 as now independently corroborated - origin/main commit d90d8e11 'fix(team): configure integration git identity before cherry-pick' inserts git config user.name/user.email at lines 1088-1089 of hooshyaros-team-worker.yml ahead of git cherry-pick at line 1126, so WORK-0004 finding F-2 is REPAIRED ON ORIGIN/MAIN ONLY and must be marked stale as to origin/main - and open the BLOCKER-0001 adjudication rather than asserting it. Record that F-3 is still live at 704d42ff (hooshyaros-team-wave-recovery.yml line 88 cat recovery.env >> $GITHUB_ENV still precedes line 90's use of RECOVERY_START_SHA in the same set -euo pipefail step). DO NOT upgrade any evidence record to ACCEPTED: WORK-0004's QC pass is control-plane-asserted by the promotion path but has no persisted artifact (the same class as WORK-0004 F-7), and WORK-0003/WORK-0005 payloads are promoted without any observed QC adjudication. Record that which mechanism performed each promotion is an ASSUMPTION from hardcoded workflow defaults and commit authors, not observed provenance. Record EVIDENCE-0021 as admissible planning input while noting product.impact-measurement evidence binding stays BARRED by the WORK-0006 gate and mission line 217. Register the work-0008 plan admission itself so a second dispatch is detectable. DO NOT edit .github/**, Docs/**, Assistant/**, package.json, product code, Architecture Freeze V4/V4.1, any charter, or any test. DO NOT merge, rebase, move a branch, force-push, delete evidence, or name the canonical lineage (DECISION-0007). Produce exactly one result report under its own evidence root and one coherent commit.",
-      "owner": "MEMORY_EDITOR",
+      "id": "work-0009-team-v2-acceptance",
+      "role": "Team Acceptance Specialist",
+      "focus": "ONE-SHOT TEAM V2 ACCEPTANCE: produce one evidence-backed control-plane acceptance result proving Admission -> Reservation -> Worker -> Branch Preservation -> Independent QC -> Persisted QC -> Integration -> Target Promotion -> Memory Closure. No product implementation, no charter/architecture changes, no reopening accepted F1-F6/CCC/UX work, no changes outside the lease result directory. The acceptance report must explicitly assess the real control-plane hardening now present, including whether a worker result remains recoverable after validation failure, whether QC inspects the actual worker patch, and whether promotion is fail-closed on missing persisted QC.",
+      "owner": "SPECIALIST_WORKER_POOL",
       "mode": "AUDIT",
       "write_scope": [
-        ".kilo/team/memory/**",
-        ".kilo/team/results/work-0008-wave11-promotion-reconciliation/",
-        ".kilo/team/results/work-0008-wave11-promotion-reconciliation/**"
-      ]
+        ".kilo/team/results/work-0009-team-v2-acceptance/"
+      ],
+      "evidence_required": [
+        "current_team_control_plane_state",
+        "one_coherent_commit",
+        "exactly_one_result_report",
+        "worker_branch_or_artifact_provenance",
+        "independent_qc_adjudication",
+        "integration_and_target_promotion_evidence"
+      ],
+      "purpose": "Team V2 end-to-end acceptance gate before broad product continuation.",
+      "blockers": [
+        "TEAM_V2_ACCEPTANCE"
+      ],
+      "test_scope": "TEAM_CONTROL_PLANE_ONLY_NO_PRODUCT_CODE_CHANGE",
+      "risk": "P0",
+      "value": "Decides whether autonomous team construction is safe to continue.",
+      "readiness": "READY",
+      "estimated_complexity": "LOW_CONTROL_PLANE_ACCEPTANCE"
     }
   ]
 }
