@@ -1058,6 +1058,10 @@ jobs:
           mapfile -t RESULTS < <(find "${RUNNER_TEMP}/team-results" -name result.json -type f | sort)
           SUCCESS_COUNT=0
 
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          echo "INTEGRATION_GIT_IDENTITY_CONFIGURED=TRUE"
+
           for file in "${RESULTS[@]}"; do
             WORKER_ID="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["worker_id"])' "${file}")"
             STATUS="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["status"])' "${file}")"
