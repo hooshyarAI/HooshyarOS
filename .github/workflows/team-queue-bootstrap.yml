@@ -2,22 +2,6 @@ name: HooshyarOS Team Queue Bootstrap
 
 on:
   workflow_dispatch:
-  workflow_run:
-    workflows:
-      - Final Product Factory
-      - Final Product Factory Trigger
-      - Autonomous CI Repair
-      - Autonomous Builder Audit
-      - Autonomous Builder Verification
-      - Autonomous Builder Validation
-      - HooshyarOS Validation
-      - HooshyarOS CI
-      - HooshyarOS Release Artifacts
-      - Android Release Verification
-      - Autonomous Platform Construction
-      - HooshyarOS Autonomous Continuation Validation
-      - Web Product Acceptance
-    types: [completed]
   issue_comment:
     types: [created]
 
@@ -32,7 +16,7 @@ permissions:
 
 jobs:
   bootstrap:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run' || (github.event_name == 'issue_comment' && github.event.issue.pull_request == null && github.event.issue.number == 122 && startsWith(github.event.comment.body, '/team-queue-bootstrap')) }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'issue_comment' && github.event.issue.pull_request == null && github.event.issue.number == 122 && startsWith(github.event.comment.body, '/team-queue-bootstrap')) }}
     runs-on: ubuntu-slim
     timeout-minutes: 15
     env:
@@ -56,7 +40,7 @@ jobs:
               st=r.get("status")
               if st not in {"queued","pending","in_progress","waiting","requested","action_required"}: continue
               legacy_hit=r.get("name") in legacy and r.get("head_branch") in {"main","fix/autonomous-product-factory"}
-              team_hit=str(r.get("workflow_id"))==tw and r.get("head_branch")!="fix/autonomous-product-factory"
+              team_hit=str(r.get("workflow_id"))==tw and r.get("head_branch")!="fix/autonomous-product-factory" and r.get("head_branch")!="fix/autonomous-product-factory"
               if legacy_hit or team_hit: print(r["id"])
           PY
           n=0
