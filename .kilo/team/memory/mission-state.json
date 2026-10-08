@@ -19,7 +19,7 @@
     "No fabricated evidence"
   ],
   "memory_backfill_work": "WORK-0003",
-  "last_control_plane_commit": "aac4f83c2d6e59f8b09e317c341588882bb86bfd",
-  "current_run_id": 37759400053,
-  "truth_note": "Run #15 exists; prepare is queued. Do not infer worker execution or completion until job evidence exists."
+  "last_control_plane_commit": "9151fe4dbe85f9fbda0a3a7555a2206fb2e92461",
+  "current_run_id": 37760777088,
+  "truth_note": "Run #16 exists on control-plane commit 9151fe4d; prepare is queued with no runner allocated. Do not infer worker execution, QC, integration, promotion, or completion until job evidence exists. GitHub currently reports Actions operational, but this repository has multiple simultaneously queued workflows."
 }
