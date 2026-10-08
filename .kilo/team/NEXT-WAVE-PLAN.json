@@ -2,46 +2,18 @@
   "schema_version": "1.0",
   "wave_status": "READY",
   "base_mission": ".kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md",
-  "created_from_sha": "e564682ad02df31adc458995d4232128c7fa0fd3",
+  "created_from_sha": "266d5ccbc3f7a0b156b0d25d1d313c65c155496a",
   "leases": [
     {
-      "id": "work-0003-memory-backfill",
+      "id": "work-0008-wave11-promotion-reconciliation",
       "role": "Memory & Editor",
-      "focus": "Backfill and reconcile organizational ledgers from repository evidence; preserve unknowns and stale states; no product implementation.",
+      "focus": "RECOVERY RECONCILIATION, NOT PRODUCT DEVELOPMENT. Reconcile the organizational ledgers against the promoted target state at created_from_sha: all three WAVE-0011 lease results (WORK-0003 bd0c7939, WORK-0005 0ab0f063, WORK-0004 266d5ccb) are now present on this lineage, while work-registry WORK-0003/0004/0005, BLOCKER-0004/0005, mission-state.truth_note, wave-history WAVE-0011 promotion_state, DEFECT-0008, EVIDENCE-0020/0021, DECISION-0012/0013 and memory/README.md still assert 'not promoted / not QC-adjudicated'. MANDATORY FIRST ACT: register this lease as WORK-0008 in work-registry.json (next_id is WORK-0008, unused) with mode AUDIT, owner MEMORY_EDITOR, dependencies satisfied and status READY before any other edit; if that registration cannot be made truthfully, STOP and report BLOCKED rather than proceeding. Then reconcile, with prior values preserved and provenance recorded: (1) WORK-0003 status/readiness/execution_attempts promoted flags and the now-satisfied fourth_dispatch_rule REFUSE condition; (2) WORK-0004 and WORK-0005 status/readiness plus their attempts, so neither can be re-leased as duplicate governed work; (3) BLOCKER-0005 promotion/QC counts - RE-SCOPE, do not close: 7 unpromoted worker refs still exist and no governed recovery has ever succeeded; (4) BLOCKER-0004 stale lineage counts - origin/main is now 8be3e4e8, 84 ahead, and still has zero .kilo/team/memory paths, this lineage 667 ahead - canonical_lineage stays UNDECIDED; (5) mission-state.truth_note and next_state, and wave-history WAVE-0011 promotion_state/current status, which are now false; (6) DEFECT-0008 and memory/README.md backfill-promotion claims. DO NOT re-title BLOCKER-0001 or assert the missing-git-committer-identity root cause as accepted: DECISION-0012 reserves attribution to INTEGRATOR/MISSION_DIRECTOR, so record EVIDENCE-0020 as now adjudicable and open that adjudication instead. DO NOT upgrade any evidence record to ACCEPTED: WORK-0004 QC pass is reported, not persisted as an artifact, and WORK-0003 memory content is promoted but not shown to be QC-adjudicated. DO NOT re-run WORK-0003, WORK-0004 or WORK-0005. DO NOT re-open accepted F1/F6/CCC/UX work absent current regression/invalidation evidence. Record that WORK-0006 remains NOT_READY because its registry status is PLANNED/BLOCKED_BY_DEPENDENCIES and its PRE-GATE-BASELINE.md asserts three claims WORK-0004 disproves ('Integrator FAIL due controlled target drift', 'recovery executed and preserved evidence', and the two derived metric rows), which only the WORK-0006 lease may correct; leave that contradiction recorded, not self-corrected. Record that the WORK-0005 selection product.impact-measurement evidence binding is now admissible planning input but remains barred from dispatch by the WORK-0006 gate and mission line 217. No product code, no test, no workflow, no charter, no Architecture Freeze V4/V4.1 change, no merge/rebase/promote/lineage decision. Verification: mechanical ledger assertions in the class of the WORK-0003 verification (ID uniqueness and non-collision, every recorded SHA resolves, every pre-existing status preserved or explicitly superseded with reason, no false promotion/acceptance/QC token introduced, write scope asserted per changed path). Report to .kilo/team/results/work-0008-wave11-promotion-reconciliation/result.md.",
       "owner": "MEMORY_EDITOR",
       "mode": "AUDIT",
       "write_scope": [
         ".kilo/team/memory/**",
-        ".kilo/team/results/work-0003-memory-backfill/"
-      ]
-    },
-    {
-      "id": "work-0004-wave10-recovery",
-      "role": "Recovery Reconciliation",
-      "focus": "Reconcile Wave 10 worker evidence, controlled target drift and recovery outcome; do not repeat accepted audit work without current regression/invalidation evidence.",
-      "owner": "INTEGRATOR",
-      "mode": "REVIEW",
-      "write_scope": [
-        ".kilo/team/results/work-0004-wave10-recovery/**",
-        ".kilo/team/results/work-0004-wave10-recovery/"
-      ]
-    },
-    {
-      "id": "work-0005-next-capability",
-      "role": "Planner",
-      "focus": "Derive the next genuinely missing capability from current evidence, dependency graph and V2 memory; do not implement product code during reconciliation.",
-      "owner": "PLANNER",
-      "mode": "REVIEW",
-      "write_scope": [
-        ".kilo/team/results/work-0005-next-capability/**",
-        ".kilo/team/results/work-0005-next-capability/"
+        ".kilo/team/results/work-0008-wave11-promotion-reconciliation/"
       ]
     }
-  ],
-  "control_note": "V2 bootstrap wave dispatched after stable-ID reconciliation; no product implementation.",
-  "work_ids": [
-    "WORK-0003",
-    "WORK-0004",
-    "WORK-0005"
   ]
 }
