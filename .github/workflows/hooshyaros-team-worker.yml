@@ -182,6 +182,198 @@ jobs:
               print(f"LEASE={x['id']} mode={x['mode']} owner={x['owner']}")
           PY
 
+  model-qualification:
+    needs: [prepare, model-qualification]
+    if: ${{ needs.prepare.result == 'success' && needs.model-qualification.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      candidates: ${{ steps.qualify.outputs.candidates }}
+      selected: ${{ steps.qualify.outputs.selected }}
+    permissions:
+      contents: read
+      actions: read
+    env:
+      START_SHA: ${{ needs.prepare.outputs.start_sha }}
+      OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+
+    steps:
+      - name: Checkout immutable qualification base
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.start_sha }}
+          fetch-depth: 0
+
+      - name: Install OpenCode with bounded recovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          install_ok=0
+          for attempt in 1 2 3; do
+            echo "QUALIFICATION_INSTALL_ATTEMPT=${attempt}"
+            if curl -fsSL https://opencode.ai/install | bash && "$HOME/.opencode/bin/opencode" --version; then
+              install_ok=1
+              break
+            fi
+            echo "QUALIFICATION_INSTALL_FAILED_ATTEMPT=${attempt}"
+            test "${attempt}" -lt 3 && sleep 5
+          done
+          test "${install_ok}" -eq 1 || {
+            echo "BLOCKED_EXTERNAL: OpenCode installation failed in model qualification gate"
+            exit 40
+          }
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+
+      - name: Qualify top free models empirically
+        id: qualify
+        shell: bash
+        run: |
+          set -euo pipefail
+          CATALOG="${RUNNER_TEMP}/opencode-models-verbose.txt"
+          "$HOME/.opencode/bin/opencode" models --refresh --verbose > "${CATALOG}" 2>&1
+
+          python3 - "${CATALOG}" "${RUNNER_TEMP}/qualified-models.env" <<'PY'
+          import json, math, re, subprocess, sys, time
+          from datetime import datetime, timezone
+
+          catalog=sys.argv[1]
+          out_file=sys.argv[2]
+          raw=open(catalog,encoding="utf-8",errors="replace").read()
+          raw=re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]","",raw)
+          lines=raw.splitlines()
+          decoder=json.JSONDecoder()
+          models={}
+
+          def is_id(v):
+              return bool(re.fullmatch(r"[^\s/]+/[^\s]+",v.strip()))
+
+          for i,line in enumerate(lines):
+              mid=line.strip()
+              if not is_id(mid) or i+1>=len(lines):
+                  continue
+              block="\n".join(lines[i+1:]).lstrip()
+              brace=block.find("{")
+              if brace<0:
+                  continue
+              try:
+                  obj,_=decoder.raw_decode(block[brace:])
+              except Exception:
+                  continue
+              if isinstance(obj,dict):
+                  models[mid]=obj
+
+          ranked=[]
+          for mid,m in models.items():
+              caps=m.get("capabilities") or {}
+              cost=m.get("cost") or {}
+              vals=[v for v in cost.values() if isinstance(v,(int,float))] if isinstance(cost,dict) else []
+              explicit_free=bool(vals) and all(v==0 for v in vals)
+              name=mid.split("/",1)[1] if "/" in mid else mid
+              named_free=(mid=="opencode/big-pickle" or name.lower().endswith("-free") or "-free-" in name.lower())
+              if not (explicit_free or named_free):
+                  continue
+              reasoning=m.get("reasoning") is True or caps.get("reasoning") is True
+              tool_call=m.get("tool_call") is True or caps.get("toolcall") is True or caps.get("tool_call") is True
+              if not reasoning or not tool_call:
+                  continue
+              lim=m.get("limit") or {}
+              ctx=int(lim.get("context") or 0)
+              out=int(lim.get("output") or 0)
+              if ctx<100_000 or out<8_000:
+                  continue
+              structured=m.get("structured_output") is True or caps.get("structured_output") is True
+              attachment=m.get("attachment") is True or caps.get("attachment") is True
+
+              score=150.0
+              score += 40.0 if reasoning else 0.0
+              score += 35.0 if tool_call else 0.0
+              score += 25.0 if structured else 0.0
+              score += min(55.0, max(0.0, math.log2(max(ctx,1)/100_000))*16.0)
+              score += min(50.0, max(0.0, math.log2(max(out,1)/8_000))*12.0)
+              score += 8.0 if attachment else 0.0
+              family=str(m.get("family") or "").lower()
+              if any(x in family for x in ("mini","small","nano")):
+                  score-=10.0
+              updated=m.get("last_updated") or m.get("release_date")
+              if updated:
+                  try:
+                      dt=datetime.fromisoformat(str(updated).replace("Z","+00:00"))
+                      age=max(0.0,(datetime.now(timezone.utc)-dt).total_seconds()/86400.0)
+                      score += max(0.0,8.0-min(8.0,age/30.0))
+                  except Exception:
+                      pass
+              if mid=="opencode/big-pickle":
+                  score+=3.0
+              ranked.append((score,mid,ctx,out))
+
+          ranked.sort(reverse=True)
+          top=ranked[:4]
+          if not top:
+              raise SystemExit("BLOCKED_FREE_MODEL_UNAVAILABLE")
+
+          print(f"MODEL_CATALOG_PARSED={len(models)}")
+          print(f"MODEL_FREE_ELIGIBLE={len(ranked)}")
+          print("MODEL_PREFILTER="+"|".join(x[1] for x in top))
+
+          probe_prompt=(
+              "You are participating in a harmless model qualification probe for an autonomous software "
+              "construction team. Do not modify files or external systems. Analyze this fictional task: "
+              "a service receives revenue=100 and cost=60, next period revenue=110 and cost=75. "
+              "Return exactly these lines first: MODEL_PROBE=PASS, MODE=REASONING, "
+              "DELTA_REVENUE=10, DELTA_COST=15, RISK=margin_pressure, then one concise recommendation."
+          )
+
+          passed=[]
+          failures=[]
+          for score,mid,ctx,out in top:
+              start=time.monotonic()
+              log="${RUNNER_TEMP}/probe-"+re.sub(r"[^A-Za-z0-9_.-]+","_",mid)+".log"
+              cmd=[
+                  "$HOME/.opencode/bin/opencode","run","--auto","--agent","plan",
+                  "--model",mid,probe_prompt
+              ]
+              try:
+                  proc=subprocess.run(cmd,text=True,capture_output=True,timeout=110)
+                  combined=(proc.stdout or "")+"\n"+(proc.stderr or "")
+                  ok=proc.returncode==0 and "MODEL_PROBE=PASS" in combined and "DELTA_REVENUE=10" in combined and "DELTA_COST=15" in combined
+                  open(log,"w",encoding="utf-8").write(combined)
+                  elapsed=time.monotonic()-start
+              except Exception as e:
+                  ok=False
+                  elapsed=time.monotonic()-start
+                  open(log,"w",encoding="utf-8").write(str(e))
+
+              if ok:
+                  passed.append((score, -elapsed, mid, ctx, out))
+                  print(f"MODEL_PROBE_PASS={mid} elapsed={elapsed:.2f}")
+              else:
+                  failures.append((mid,round(elapsed,2)))
+                  print(f"MODEL_PROBE_FAIL={mid} elapsed={elapsed:.2f}")
+
+          passed.sort(reverse=True)
+          if not passed:
+              print("MODEL_PROBE_STATUS=BLOCKED_FREE_MODEL_UNAVAILABLE")
+              raise SystemExit("No free model passed qualification probe")
+
+          candidates="|".join(x[2] for x in passed)
+          selected=passed[0][2]
+          ranking=" ; ".join(f"{x[2]} score={x[0]:.2f} probe_elapsed={-x[1]:.2f} ctx={x[3]} out={x[4]}" for x in passed)
+
+          with open(out_file,"w",encoding="utf-8") as f:
+              f.write("QUALIFIED_MODELS="+candidates+"\n")
+              f.write("QUALIFIED_SELECTED="+selected+"\n")
+              f.write("QUALIFIED_RANKING="+ranking+"\n")
+              f.write("QUALIFIED_FAILURES="+json.dumps(failures,ensure_ascii=False)+"\n")
+          PY
+
+          cat "${RUNNER_TEMP}/qualified-models.env" >> "${GITHUB_ENV}"
+          CANDIDATES="$(sed -n 's/^QUALIFIED_MODELS=//p' "${RUNNER_TEMP}/qualified-models.env")"
+          SELECTED="$(sed -n 's/^QUALIFIED_SELECTED=//p' "${RUNNER_TEMP}/qualified-models.env")"
+          echo "candidates=${CANDIDATES}" >> "${GITHUB_OUTPUT}"
+          echo "selected=${SELECTED}" >> "${GITHUB_OUTPUT}"
+          echo "QUALIFIED_MODELS=${CANDIDATES}"
+          echo "QUALIFIED_SELECTED=${SELECTED}"
+
   team-worker:
     needs: prepare
     if: ${{ needs.prepare.result == 'success' }}
@@ -254,128 +446,20 @@ jobs:
           }
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
 
-      - name: Select best available free model
+      - name: Load qualified free-model candidates
         shell: bash
+        env:
+          QUALIFIED_CANDIDATES: ${{ needs.model-qualification.outputs.candidates }}
+          QUALIFIED_SELECTED: ${{ needs.model-qualification.outputs.selected }}
         run: |
           set -euo pipefail
-          CATALOG="${RUNNER_TEMP}/opencode-models-verbose.txt"
-          "$HOME/.opencode/bin/opencode" models --refresh --verbose > "${CATALOG}"
-
-          python3 - "${CATALOG}" "${WORKER_MODE}" <<'PY' > "${RUNNER_TEMP}/model-selection.env"
-          import json, math, re, sys
-          from datetime import datetime, timezone
-
-          raw = open(sys.argv[1], encoding="utf-8", errors="replace").read()
-          mode = sys.argv[2]
-          raw = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", raw)
-          lines = raw.splitlines()
-          decoder = json.JSONDecoder()
-          models = {}
-
-          def is_id(value):
-              return bool(re.fullmatch(r"[^\s/]+/[^\s]+", value.strip()))
-
-          for i, line in enumerate(lines):
-              mid = line.strip()
-              if not is_id(mid) or i + 1 >= len(lines):
-                  continue
-              block = "\n".join(lines[i + 1:]).lstrip()
-              try:
-                  obj, _ = decoder.raw_decode(block)
-              except Exception:
-                  continue
-              if isinstance(obj, dict):
-                  models[mid] = obj
-
-          ranked = []
-          for mid, m in models.items():
-              caps = m.get("capabilities") or {}
-              cost = m.get("cost") or {}
-              direct_costs = [v for v in cost.values() if isinstance(v, (int, float))] if isinstance(cost, dict) else []
-              explicit_free = bool(direct_costs) and all(v == 0 for v in direct_costs)
-              name = mid.split("/", 1)[1] if "/" in mid else mid
-              named_free = (
-                  mid == "opencode/big-pickle"
-                  or name.lower().endswith("-free")
-                  or "-free-" in name.lower()
-              )
-              if not (explicit_free or named_free):
-                  continue
-
-              reasoning = m.get("reasoning") is True or caps.get("reasoning") is True
-              tool_call = (
-                  m.get("tool_call") is True
-                  or caps.get("toolcall") is True
-                  or caps.get("tool_call") is True
-              )
-              if not reasoning or not tool_call:
-                  continue
-
-              limit = m.get("limit") or {}
-              ctx = int(limit.get("context") or 0)
-              out = int(limit.get("output") or 0)
-              if ctx < 100_000 or out < 8_000:
-                  continue
-
-              structured_output = (
-                  m.get("structured_output") is True
-                  or caps.get("structured_output") is True
-              )
-              attachment = (
-                  m.get("attachment") is True
-                  or caps.get("attachment") is True
-              )
-
-              score = 100.0
-              if mode in ("AUDIT", "REVIEW", "VERIFY"):
-                  score += 35.0 if reasoning else 0.0
-                  score += 15.0 if structured_output else 0.0
-              if mode == "IMPLEMENT":
-                  score += 30.0 if tool_call else 0.0
-                  score += 15.0 if attachment else 0.0
-              score += 35.0 if structured_output else 0.0
-              score += min(30.0, math.log2(max(ctx, 1)) * 2.0)
-              score += min(20.0, math.log2(max(out, 1)) * 1.5)
-              if attachment:
-                  score += 5.0
-
-              family = str(m.get("family") or "").lower()
-              if any(x in family for x in ("mini", "small", "nano")):
-                  score -= 8.0
-
-              updated = m.get("last_updated") or m.get("release_date")
-              if updated:
-                  try:
-                      dt = datetime.fromisoformat(str(updated).replace("Z", "+00:00"))
-                      age_days = max(0.0, (datetime.now(timezone.utc) - dt).total_seconds() / 86400.0)
-                      score += max(0.0, 10.0 - min(10.0, age_days / 30.0))
-                  except Exception:
-                      pass
-
-              if mid == "opencode/big-pickle":
-                  score += 5.0
-
-              ranked.append((score, mid, ctx, out))
-
-          ranked.sort(reverse=True)
-          top = ranked[:4]
-          print(f"MODEL_CATALOG_PARSED={len(models)}", file=sys.stderr)
-          print(f"MODEL_FREE_ELIGIBLE={len(ranked)}", file=sys.stderr)
-          if not top:
-              print("MODEL_SELECTION_STATUS=BLOCKED_FREE_MODEL_UNAVAILABLE", file=sys.stderr)
-              raise SystemExit(20)
-
-          print("MODEL_SELECTION_STATUS=OK")
-          print("SELECTED_MODEL=" + top[0][1])
-          print("MODEL_CANDIDATES=" + "|".join(x[1] for x in top))
-          print("MODEL_RANKING=" + " ; ".join(
-              f"{x[1]} score={x[0]:.2f} ctx={x[2]} out={x[3]}" for x in top
-          ))
-          PY
-          tee -a "${GITHUB_ENV}" < "${RUNNER_TEMP}/model-selection.env"
-          SELECTED_MODEL="$(sed -n 's/^SELECTED_MODEL=//p' "${RUNNER_TEMP}/model-selection.env" | head -1)"
-          test -n "${SELECTED_MODEL}"
-          echo "MODEL_SELECTED_FOR_WORKER=${SELECTED_MODEL}"
+          test -n "${QUALIFIED_CANDIDATES}"
+          test -n "${QUALIFIED_SELECTED}"
+          echo "MODEL_CANDIDATES=${QUALIFIED_CANDIDATES}" >> "${GITHUB_ENV}"
+          echo "SELECTED_MODEL=${QUALIFIED_SELECTED}" >> "${GITHUB_ENV}"
+          echo "MODEL_SELECTION_STATUS=QUALIFIED"
+          echo "MODEL_SELECTED_FOR_WORKER=${QUALIFIED_SELECTED}"
+          echo "MODEL_CANDIDATES=${QUALIFIED_CANDIDATES}"
 
       - name: Preflight OpenCode CLI contract
         shell: bash
