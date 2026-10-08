@@ -511,7 +511,7 @@ jobs:
           for x in active:
               print(f"LEASE={x['id']} mode={x['mode']} owner={x['owner']}")
           PY
-      - name: Team Manager — Reserve admitted leases
+      - name: Claim authoritative reservation
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -519,64 +519,78 @@ jobs:
           LEASE_IDS: ${{ steps.pool.outputs.lease_ids }}
         run: |
           set -euo pipefail
+          test -n "${TEAM_RESERVATION_ID}"
+          test -n "${TEAM_RESERVATION_REF}"
           python3 - <<'PY'
-          import json
-          import os
-          import re
-          import subprocess
-          from datetime import datetime, timezone
+          import json, os, re, subprocess
           from pathlib import Path
+          from datetime import datetime, timezone
 
           target="fix/autonomous-product-factory"
           base=os.environ["BASE_SHA"]
+          rid=os.environ["TEAM_RESERVATION_ID"].strip()
+          ref=os.environ["TEAM_RESERVATION_REF"].strip()
           lease_ids=json.loads(os.environ["LEASE_IDS"])
+          if len(lease_ids) != 1:
+              raise SystemExit("BLOCKED: authoritative reservation currently supports exactly one lease")
+          lid=str(lease_ids[0])
+          m=re.match(r"^work-([0-9]{4})(?:-|$)", lid)
+          if not m: raise SystemExit("BLOCKED: invalid governed lease identity " + lid)
+          work_id="WORK-" + m.group(1)
+          if ref != "team-v2/active/" + work_id:
+              raise SystemExit("BLOCKED: reservation_ref does not match selected lease")
+
+          repo=os.environ["GITHUB_REPOSITORY"]
+          raw=subprocess.check_output(["gh","api","repos/"+repo+"/git/ref/"+ref],text=True)
+          obj=json.loads(raw)
+          reservation_sha=str(obj.get("object",{}).get("sha",""))
+          if reservation_sha != base:
+              raise SystemExit("BLOCKED: reservation target SHA != immutable team start SHA")
+
+          claim_ref="refs/team-v2/claims/"+rid
+          try:
+              subprocess.check_output(["gh","api","--method","POST","repos/"+repo+"/git/refs","-f","ref="+claim_ref,"-f","sha="+base],text=True,stderr=subprocess.STDOUT)
+          except subprocess.CalledProcessError:
+              raise SystemExit("BLOCKED: reservation already claimed; duplicate worker refused")
+
           registry_path=Path(".kilo/team/memory/work-registry.json")
           registry=json.loads(registry_path.read_text(encoding="utf-8"))
           by_id={str(x.get("id")):x for x in registry.get("items",[])}
+          item=by_id.get(work_id)
+          if not item: raise SystemExit("BLOCKED: Work Registry item missing " + work_id)
+          if str(item.get("status","" )).upper()!="READY" or str(item.get("readiness","" )).upper()!="READY":
+              raise SystemExit("BLOCKED: claimed work is no longer READY " + work_id)
+          attempts=item.setdefault("execution_attempts",[])
           run_id=int(os.environ["GITHUB_RUN_ID"])
-
-          for lid in lease_ids:
-              m=re.match(r"^work-([0-9]{4})(?:-|$)",str(lid))
-              if not m: raise SystemExit(f"BLOCKED: invalid lease id {lid}")
-              work_id=f"WORK-{m.group(1)}"
-              item=by_id.get(work_id)
-              if not item: raise SystemExit(f"BLOCKED: reservation missing {work_id}")
-              if str(item.get("status","" )).upper()!="READY" or str(item.get("readiness","" )).upper()!="READY":
-                  raise SystemExit(f"BLOCKED: reservation requires READY {work_id}")
-              reservations=item.setdefault("reservations",[])
-              if any(int(x.get("run_id",-1))==run_id and str(x.get("state","" )).upper()=="EXECUTING" for x in reservations):
-                  print(f"RESERVATION_EXISTING={work_id}")
-                  continue
-              attempts=item.setdefault("execution_attempts",[])
-              if any(int(x.get("run_id",-1))==run_id for x in attempts):
-                  raise SystemExit(f"BLOCKED: execution attempt already exists for {work_id} in run {run_id}")
-              attempts.append({
-                  "run_id":run_id, "state":"RESERVED_EXECUTING", "promoted":False,
-                  "commit":None, "start_sha":base, "lease_id":str(lid),
-                  "reserved_at":datetime.now(timezone.utc).isoformat()
-              })
-              reservations.append({
-                  "run_id":run_id, "lease_id":str(lid), "start_sha":base,
-                  "state":"EXECUTING", "planned_branch":f"opencode/team-{lid}-{run_id}"
-              })
-              item["reservations"]=reservations
-              item["last_state_change_by"]=f"TEAM_MANAGER_RESERVATION_{run_id}"
-
+          if any(int(a.get("run_id",-1))==run_id for a in attempts):
+              raise SystemExit("BLOCKED: execution attempt already recorded for this run")
+          attempts.append({
+              "run_id":run_id, "state":"RESERVED_EXECUTING", "promoted":False,
+              "commit":None, "start_sha":base, "lease_id":lid,
+              "reservation_id":rid, "claim_ref":claim_ref,
+              "reserved_at":datetime.now(timezone.utc).isoformat()
+          })
+          reservations=item.setdefault("reservations",[])
+          reservations.append({
+              "run_id":run_id, "lease_id":lid, "start_sha":base,
+              "state":"EXECUTING", "reservation_id":rid, "claim_ref":claim_ref,
+              "planned_branch":"opencode/team-"+lid+"-"+str(run_id)
+          })
+          item["last_state_change_by"]="TEAM_WORKER_CLAIM_"+str(run_id)
           registry_path.write_text(json.dumps(registry,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
           subprocess.check_call(["git","config","user.name","github-actions[bot]"])
           subprocess.check_call(["git","config","user.email","41898282+github-actions[bot]@users.noreply.github.com"])
           subprocess.check_call(["git","add",str(registry_path)])
-          subprocess.check_call(["git","commit","-m",f"governance(team): reserve execution leases for run {run_id}"])
+          subprocess.check_call(["git","commit","-m","governance(team): claim authority reservation for run "+str(run_id)])
           subprocess.check_call(["git","fetch","origin",target])
-          current=subprocess.check_output(["git","rev-parse",f"origin/{target}"],text=True).strip()
+          current=subprocess.check_output(["git","rev-parse","origin/"+target],text=True).strip()
           if current!=base:
-              raise SystemExit(f"BLOCKED: target changed during lease reservation (base={base}, current={current})")
-          subprocess.check_call(["git","push","origin",f"HEAD:refs/heads/{target}"])
-          print("LEASE_RESERVATION=COMMITTED_AND_PUSHED")
-          print("LEASE_RESERVATION_RUN="+str(run_id))
-          print("LEASE_RESERVATION_IDS="+",".join(map(str,lease_ids)))
+              raise SystemExit("BLOCKED: target changed after reservation claim; evidence preserved")
+          subprocess.check_call(["git","push","origin","HEAD:refs/heads/"+target])
+          print("RESERVATION_CLAIM=COMMITTED_AND_PUSHED")
+          print("RESERVATION_CLAIM_RUN="+str(run_id))
+          print("RESERVATION_CLAIM_WORK="+work_id)
           PY
-
       - name: Capture final immutable execution state
         id: final_state
         shell: bash
