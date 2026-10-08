@@ -2,36 +2,40 @@
   "schema_version": "1.0",
   "wave_status": "READY",
   "base_mission": ".kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md",
-  "created_from_sha": "21c8ec76d551854372015e88e29f6e829c396354",
   "leases": [
     {
-      "id": "work-0010-team-v2-acceptance",
-      "role": "Team V2 Acceptance Specialist",
-      "focus": "ONE-SHOT TEAM V2 ACCEPTANCE AFTER TARGETED CONTROL-PLANE REPAIRS. Prove the complete governed chain Admission -> Reservation -> Worker -> Branch Preservation -> Independent QC -> Persisted QC -> Integration -> Target Promotion -> Memory Closure in one fresh non-duplicate wave. Audit only: no product implementation, no Architecture Freeze V4/V4.1 changes, no accepted F1-F6/CCC/UX reopening, no edits outside this lease evidence root. The audit must specifically verify: QC workspace executes on the happy path; persisted QC uses measured actual-change evidence (patch SHA, patch bytes, changed-file count); Integrator fails closed on missing/negative QC and permits promotion only after persisted QC PASS; legacy continuous auto-dispatch remains disabled; no duplicate worker is spawned; target promotion and registry closure are evidence-linked.",
-      "owner": "SPECIALIST_WORKER_POOL",
+      "id": "WORK-0011",
+      "title": "Team V2 Memory and Evidence Reconciliation",
+      "status": "READY",
       "mode": "AUDIT",
-      "write_scope": [
-        ".kilo/team/results/work-0010-team-v2-acceptance/"
+      "priority": "P0",
+      "owner": "MEMORY_EDITOR",
+      "dependencies": [
+        "WORK-0010"
       ],
       "evidence_required": [
-        "current_team_control_plane_state",
+        "reconciled_defect_registry",
+        "reconciled_evidence_registry",
+        "reconciled_blocker_registry",
+        "reconciled_wave_and_mission_state",
+        "historical_baseline_supersession",
         "one_coherent_commit",
-        "exactly_one_result_report",
-        "worker_branch_provenance",
-        "independent_qc_adjudication",
-        "persisted_qc_artifact",
-        "integration_and_target_promotion_evidence",
-        "memory_closure_evidence"
+        "exactly_one_result_report"
       ],
-      "purpose": "Final decisive Team V2 end-to-end acceptance after the two reproduced QC control defects were repaired.",
+      "purpose": "FINAL MEMORY/EVIDENCE RECONCILIATION BEFORE LAST TEAM V2 ACCEPTANCE",
       "blockers": [
         "TEAM_V2_ACCEPTANCE"
       ],
-      "test_scope": "TEAM_CONTROL_PLANE_ONLY_NO_PRODUCT_CODE_CHANGE",
+      "test_scope": "NO_PRODUCT_CODE_CHANGE_MEMORY_AND_EVIDENCE_INTEGRITY_ONLY",
       "risk": "P0",
-      "value": "Decides whether Team V2 is reliable enough to continue product construction.",
-      "readiness": "READY",
-      "estimated_complexity": "LOW_CONTROL_PLANE_ACCEPTANCE"
+      "value": "Remove real false-green contradictions detected by independent QC without rewriting or deleting historical evidence.",
+      "write_scope": [
+        ".kilo/team/memory/",
+        ".kilo/team/results/work-0006-team-performance-evaluation/PRE-GATE-BASELINE.md",
+        ".kilo/team/results/work-0011-team-v2-memory-reconciliation/"
+      ],
+      "focus": "Reconcile only facts proven by repository evidence after W10 QC: (1) register the repaired F1/F2 control-plane defects and their repair commits; (2) add W10 evidence and its independent QC rejection to evidence memory without claiming acceptance; (3) reconcile stale WAVE-0011 / mission-state / unpromoted-attempt counts to current known facts, preserving prior values as historical; (4) re-scope BLOCKER-0005 using currently verifiable worker refs and do not close it; (5) preserve BLOCKER-0004 lineage divergence as OPEN/UNDECIDED; (6) explicitly supersede the false Wave 10 claims in WORK-0006 PRE-GATE-BASELINE.md with a correction section while preserving the original text; (7) do not promote any product or worker code; (8) do not modify .github/**, Architecture Freeze V4/V4.1, product code, tests, or accepted F1-F6/CCC/UX work. The result must make the next acceptance wave capable of judging the team without historical contradictions masquerading as current truth.",
+      "estimated_complexity": "MEDIUM_MEMORY_RECONCILIATION"
     }
   ]
 }
