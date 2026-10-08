@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "next_id": "WORK-0006",
+  "next_id": "WORK-0007",
   "backfill_required": true,
   "items": [
     {
@@ -93,6 +93,59 @@
         "dependency_graph",
         "value_risk_dependency_readiness_speed"
       ]
+    },
+    {
+      "id": "WORK-0006",
+      "title": "Team V2 Performance Evaluation Gate",
+      "status": "PLANNED",
+      "mode": "REVIEW",
+      "priority": "P0",
+      "owner": "MISSION_DIRECTOR",
+      "dependencies": [
+        "WORK-0003",
+        "WORK-0004",
+        "WORK-0005"
+      ],
+      "write_scope": [
+        ".kilo/team/results/work-0006-team-performance-evaluation/"
+      ],
+      "evidence_required": [
+        "wave_execution_summary",
+        "worker_outcomes",
+        "qc_outcome",
+        "integration_outcome",
+        "memory_accuracy",
+        "duplicate_work_rate",
+        "false_green_findings",
+        "blocked_work_age",
+        "recovery_metrics"
+      ],
+      "gate": "DO_NOT_START_REMAINING_STAGE_REPAIRS_UNTIL_TEAM_V2_PERFORMANCE_GATE_IS_ACCEPTED"
+    },
+    {
+      "id": "WORK-0007",
+      "title": "Remaining Stages Governed Audit Edit Repair",
+      "status": "PLANNED",
+      "mode": "AUDIT",
+      "priority": "P1",
+      "owner": "PLANNER",
+      "dependencies": [
+        "WORK-0006"
+      ],
+      "write_scope": [
+        ".kilo/team/results/work-0007-remaining-stage-audit-edit-repair/"
+      ],
+      "evidence_required": [
+        "charter_git_memory_reconciliation",
+        "remaining_gap_inventory",
+        "dedup_matrix",
+        "dependency_graph",
+        "minimal_repair_plan",
+        "focused_verification",
+        "independent_qc",
+        "promotion_evidence"
+      ],
+      "gate": "ONLY_AFTER_WORK-0006_ACCEPTED"
     }
   ]
 }
