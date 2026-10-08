@@ -93,10 +93,25 @@ jobs:
 
           CURRENT_TARGET_SHA="$(git rev-parse "origin/${TARGET_BRANCH}")"
           if git merge-base --is-ancestor "${RECOVERY_WORK_COMMIT}" "${CURRENT_TARGET_SHA}"; then
-            echo "WORK_0004_ALREADY_PROMOTED=TRUE"
+            echo "WORK_0004_COMMIT_ALREADY_ANCESTOR=TRUE"
           else
+            set +e
             git cherry-pick "${RECOVERY_WORK_COMMIT}"
-            echo "WORK_0004_RECOVERY_CHERRY_PICKED=TRUE"
+            pick_status=$?
+            set -e
+            if test "${pick_status}" -eq 0; then
+              echo "WORK_0004_RECOVERY_CHERRY_PICKED=TRUE"
+            else
+              # Idempotent recovery: the exact evidence payload may already be present
+              # even when the original commit is not an ancestor.
+              if git diff --quiet && git diff --cached --quiet && test -f ".kilo/team/results/work-0004-wave10-recovery/result.md"; then
+                git cherry-pick --skip
+                echo "WORK_0004_EVIDENCE_ALREADY_PRESENT=TRUE"
+              else
+                echo "BLOCKED: WORK-0004 recovery cherry-pick failed with non-empty differences"
+                exit "${pick_status}"
+              fi
+            fi
           fi
 
           git fetch origin "${TARGET_BRANCH}"
