@@ -36,4 +36,12 @@ assert.equal(admissionViolations(base()).length, 0);
   const f=base(); f.registry.items[0].execution_attempts=[{state:"EXECUTED_UNPROMOTED",promoted:false}];
   assert.ok(admissionViolations(f).some(v=>v.code==="UNRESOLVED_PRIOR_ATTEMPT"));
 }
+{
+  const f=base();
+  f.plan.wave_status="DRAFT";
+  f.registry.items[0].readiness="";
+  const codes=admissionViolations(f).map(v=>v.code);
+  assert.ok(codes.includes("PLAN_NOT_READY"));
+  assert.ok(codes.includes("REGISTRY_NOT_READY"));
+}
 console.log("TEAM_DISPATCH_AUTHORITY_TEST=PASS");
