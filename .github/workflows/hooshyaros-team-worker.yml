@@ -1110,7 +1110,7 @@ jobs:
 
       - name: Upload worker result
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: team-result-${{ matrix.id }}
           path: |
@@ -1139,7 +1139,7 @@ jobs:
           fetch-depth: 0
 
       - name: Download worker result artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           pattern: team-result-*
           merge-multiple: true
