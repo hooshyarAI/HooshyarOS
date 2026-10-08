@@ -23,9 +23,9 @@ permissions:
 
 jobs:
   continuous-worker:
-    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'issue_comment' && github.event.issue.pull_request == null && github.event.issue.title == 'HooshyarOS Continuous Worker Control' && contains(github.event.comment.body, '/opencode-run')) }}
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'issue_comment' && github.event.issue.pull_request == null && github.event.issue.title == 'HooshyarOS Continuous Worker Control' && startsWith(github.event.comment.body, '/opencode-run')) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     env:
       TARGET_BRANCH: fix/autonomous-product-factory
       MODEL_POLICY: adaptive-free
