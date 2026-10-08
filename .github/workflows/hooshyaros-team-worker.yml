@@ -1268,23 +1268,57 @@ jobs:
           test "${install_ok}" -eq 1
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
 
-      - name: Load qualified QC model pool
+      - name: Bind independent QC model/provider route
         shell: bash
         env:
           QUALIFIED_CANDIDATES: ${{ needs.model-qualification.outputs.candidates }}
+          LEASE_IDS: ${{ needs.prepare.outputs.lease_ids }}
         run: |
           set -euo pipefail
           test -n "${QUALIFIED_CANDIDATES}"
-          if [[ "${QUALIFIED_CANDIDATES}" == *"|"* ]]; then
-            FIRST="${QUALIFIED_CANDIDATES%%|*}"
-            REST="${QUALIFIED_CANDIDATES#*|}"
-            QC_CANDIDATES="${REST}|${FIRST}"
-          else
-            QC_CANDIDATES="${QUALIFIED_CANDIDATES}"
-          fi
-          echo "QC_MODEL_CANDIDATES=${QC_CANDIDATES}" >> "${GITHUB_ENV}"
-          echo "QC_MODEL_POLICY=qualified-pool-role-diversity"
-          echo "QC_MODEL_CANDIDATES=${QC_CANDIDATES}"
+          python3 - "${QUALIFIED_CANDIDATES}" "${LEASE_IDS}" "${RUNNER_TEMP}/team-results" <<'PY'
+          import json, pathlib, sys, os
+
+          candidates=[x for x in sys.argv[1].split("|") if x]
+          expected=json.loads(sys.argv[2])
+          root=pathlib.Path(sys.argv[3])
+
+          worker_models=[]
+          worker_providers=set()
+          for p in root.rglob("result.json"):
+              try:
+                  obj=json.loads(p.read_text(encoding="utf-8"))
+              except Exception:
+                  continue
+              if obj.get("worker_id") not in expected:
+                  continue
+              model=str(obj.get("model") or "")
+              if model:
+                  worker_models.append(model)
+                  worker_providers.add(model.split("/",1)[0] if "/" in model else model)
+
+          preferred=[
+              model for model in candidates
+              if model not in worker_models
+              and (model.split("/",1)[0] if "/" in model else model) not in worker_providers
+          ]
+          fallback=[model for model in candidates if model not in worker_models]
+
+          route=[]
+          for model in preferred+fallback+candidates:
+              if model not in route:
+                  route.append(model)
+
+          if not route:
+              raise SystemExit("BLOCKED_FREE_MODEL_UNAVAILABLE: no independent QC candidate")
+
+          diversity="TRUE" if preferred else "DEGRADED"
+          print("QC_MODEL_PROVIDER_DIVERSITY="+diversity)
+          print("QC_MODEL_CANDIDATES="+"|".join(route[:3]))
+          with open(os.environ["GITHUB_ENV"],"a",encoding="utf-8") as out:
+              out.write("QC_MODEL_CANDIDATES="+"|".join(route[:3])+"\\n")
+          PY
+
 
       - name: Preflight OpenCode CLI for QC
         shell: bash
