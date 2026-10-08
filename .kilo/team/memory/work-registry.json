@@ -549,7 +549,15 @@
           "change": "remove WORK-0010 success dependency; reconciliation consumes its failure evidence",
           "reason": "recovery work must not require failed predecessor to be successful"
         }
-      ]
+      ],
+      "readiness": "READY",
+      "last_state_change_by": "TEAM-V2-ADMISSION-CONTRACT-REPAIR-2026-10-08",
+      "admission_contract_repair": {
+        "issue": "125",
+        "action": "materialize explicit readiness=READY for an already-valid governed lease",
+        "prior_readiness": null,
+        "worker_dispatch_before": false
+      }
     }
   ],
   "backfill_required_scope": {
