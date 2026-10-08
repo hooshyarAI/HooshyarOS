@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "next_id": "WORK-0007",
+  "next_id": "WORK-0008",
   "backfill_required": true,
   "items": [
     {
@@ -20,7 +20,15 @@
         "capability_dependency_evidence_graph",
         "remaining_audit_inventory",
         "next_missing_capability"
-      ]
+      ],
+      "purpose": "Post-Recovery / Architecture + Audit Reconciliation",
+      "blockers": [],
+      "test_scope": "NO_PRODUCT_CODE_CHANGE_MEMORY_INTEGRITY_ONLY",
+      "risk": "P0",
+      "value": "UNKNOWN_NOT_DERIVABLE_FROM_REPOSITORY",
+      "readiness": "ACTIVE",
+      "estimated_complexity": "UNKNOWN_NOT_DERIVABLE_FROM_REPOSITORY",
+      "last_state_change_by": "PRE_EXISTING"
     },
     {
       "id": "WORK-0002",
@@ -37,22 +45,77 @@
         "Docs/HOOSHYAROS_MASTER_CHARTER.md",
         ".kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md"
       ],
-      "rule": "NO_NEW_PRODUCT_ENGINE"
+      "rule": "NO_NEW_PRODUCT_ENGINE",
+      "purpose": "Team Organization V2 Operationalization",
+      "blockers": [],
+      "test_scope": "NO_PRODUCT_CODE_CHANGE_MEMORY_INTEGRITY_ONLY",
+      "risk": "P0",
+      "value": "UNKNOWN_NOT_DERIVABLE_FROM_REPOSITORY",
+      "readiness": "COMPLETED",
+      "estimated_complexity": "UNKNOWN_NOT_DERIVABLE_FROM_REPOSITORY",
+      "last_state_change_by": "PRE_EXISTING"
     },
     {
       "id": "WORK-0003",
       "title": "Legacy Work and Evidence Backfill",
-      "status": "READY",
-      "mode": "RECONCILIATION",
+      "status": "EXECUTED_AWAITING_QC",
+      "mode": "AUDIT",
       "priority": "P0",
-      "owner": "PLANNER",
+      "owner": "MEMORY_EDITOR",
       "dependencies": [
         "WORK-0002"
       ],
       "write_scope": [
-        ".kilo/team/memory/**"
+        ".kilo/team/memory/**",
+        ".kilo/team/results/work-0003-memory-backfill/"
       ],
-      "status_reason": "Created by V2 migration; must derive historical records from repository evidence rather than recollection."
+      "status_reason": "Executed in run 37779956878 against START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b. Evidence report written, ledgers reconciled, one coherent commit created. Independent QC and integrator promotion are NOT performed by this lease and are NOT claimed.",
+      "purpose": "Legacy Work and Evidence Backfill",
+      "blockers": [
+        "BLOCKER-0004"
+      ],
+      "test_scope": "NO_PRODUCT_CODE_CHANGE_MEMORY_INTEGRITY_ONLY",
+      "risk": "P0",
+      "value": "Reconstructs team memory from repository evidence and installs the duplicate-work guard that prevented a third blind re-run of this lease.",
+      "readiness": "EXECUTED",
+      "estimated_complexity": "MEASURED_MEDIUM_MOST_COST_WAS_EVIDENCE_REVERIFICATION_NOT_GENERATION",
+      "last_state_change_by": "work-0003-memory-backfill-37779956878",
+      "previous_owner": "PLANNER",
+      "owner_correction": "work-registry named PLANNER; .kilo/team/NEXT-WAVE-PLAN.json and the executed lease name MEMORY_EDITOR. TEAM-ORGANIZATION-V2-PROTOCOL.md makes MEMORY & EDITOR the single memory-integrity role, and this lease writes only memory. Reconciled to MEMORY_EDITOR with the prior value preserved.",
+      "previous_mode": "RECONCILIATION",
+      "mode_correction": "NEXT-WAVE-PLAN.json lease mode is AUDIT. The prior RECONCILIATION label is retained as previous_mode.",
+      "write_scope_correction": "Prior registry scope omitted the lease result directory that MODE requires. Corrected to the lease write_scope.",
+      "evidence_required": [
+        "ledger_integrity",
+        "provenance_per_record",
+        "unknowns_preserved",
+        "stale_evidence_preserved",
+        "duplicate_attempt_guard",
+        "one_coherent_commit",
+        "exactly_one_result_report"
+      ],
+      "execution_attempts": [
+        {
+          "run_id": "37776552275",
+          "commit": "509ce84cc31d9ccfab1aae8a31d8d6bd17af1a8b",
+          "branch": "origin/opencode/team-work-0003-memory-backfill-37776552275",
+          "state": "EXECUTED_UNPROMOTED",
+          "qc": "NOT_PERFORMED",
+          "promoted": false,
+          "note": "Full backfill committed. Never merged into this lineage. Content reused as evidence and independently re-verified in this run; three of its numeric claims were stale and are corrected here."
+        },
+        {
+          "run_id": "37779956878",
+          "commit": "PENDING_THIS_LEASE_COMMIT",
+          "branch": "opencode/team-work-0003-memory-backfill-37779956878",
+          "state": "EXECUTED_AWAITING_QC",
+          "qc": "NOT_PERFORMED",
+          "promoted": false,
+          "note": "This run. Reconciles the same START_SHA lineage, adds the duplicate-attempt guard, and corrects stale lineage counts."
+        }
+      ],
+      "anti_duplication_state": "REGRESSION_OR_INVALIDATION_NOT_PRESENT_BUT_NOT_DONE_EITHER",
+      "anti_duplication_note": "This lease ran twice. The first run was never promoted or QC-adjudicated, so it was not DONE/VERIFIED/ACCEPTED and did not bar the second run. The repetition itself is now recorded so a third dispatch can see it."
     },
     {
       "id": "WORK-0004",
@@ -72,7 +135,15 @@
         "qc_result",
         "target_drift",
         "recovery_outcome"
-      ]
+      ],
+      "purpose": "Wave 10 Recovery / Integration Reconciliation",
+      "blockers": [],
+      "test_scope": "NO_PRODUCT_CODE_CHANGE_MEMORY_INTEGRITY_ONLY",
+      "risk": "P0",
+      "value": "UNKNOWN_NOT_DERIVABLE_FROM_REPOSITORY",
+      "readiness": "BLOCKED_BY_DEPENDENCIES",
+      "estimated_complexity": "UNKNOWN_NOT_DERIVABLE_FROM_REPOSITORY",
+      "last_state_change_by": "PRE_EXISTING"
     },
     {
       "id": "WORK-0005",
@@ -92,7 +163,15 @@
         "current_audit_inventory",
         "dependency_graph",
         "value_risk_dependency_readiness_speed"
-      ]
+      ],
+      "purpose": "Next Genuinely Missing Capability Reconciliation",
+      "blockers": [],
+      "test_scope": "NO_PRODUCT_CODE_CHANGE_MEMORY_INTEGRITY_ONLY",
+      "risk": "P1",
+      "value": "UNKNOWN_NOT_DERIVABLE_FROM_REPOSITORY",
+      "readiness": "BLOCKED_BY_DEPENDENCIES",
+      "estimated_complexity": "UNKNOWN_NOT_DERIVABLE_FROM_REPOSITORY",
+      "last_state_change_by": "PRE_EXISTING"
     },
     {
       "id": "WORK-0006",
@@ -120,7 +199,15 @@
         "blocked_work_age",
         "recovery_metrics"
       ],
-      "gate": "DO_NOT_START_REMAINING_STAGE_REPAIRS_UNTIL_TEAM_V2_PERFORMANCE_GATE_IS_ACCEPTED"
+      "gate": "DO_NOT_START_REMAINING_STAGE_REPAIRS_UNTIL_TEAM_V2_PERFORMANCE_GATE_IS_ACCEPTED",
+      "purpose": "Team V2 Performance Evaluation Gate",
+      "blockers": [],
+      "test_scope": "NO_PRODUCT_CODE_CHANGE_MEMORY_INTEGRITY_ONLY",
+      "risk": "P0",
+      "value": "UNKNOWN_NOT_DERIVABLE_FROM_REPOSITORY",
+      "readiness": "BLOCKED_BY_DEPENDENCIES",
+      "estimated_complexity": "UNKNOWN_NOT_DERIVABLE_FROM_REPOSITORY",
+      "last_state_change_by": "PRE_EXISTING"
     },
     {
       "id": "WORK-0007",
@@ -145,7 +232,32 @@
         "independent_qc",
         "promotion_evidence"
       ],
-      "gate": "ONLY_AFTER_WORK-0006_ACCEPTED"
+      "gate": "ONLY_AFTER_WORK-0006_ACCEPTED",
+      "purpose": "Remaining Stages Governed Audit Edit Repair",
+      "blockers": [],
+      "test_scope": "NO_PRODUCT_CODE_CHANGE_MEMORY_INTEGRITY_ONLY",
+      "risk": "P1",
+      "value": "UNKNOWN_NOT_DERIVABLE_FROM_REPOSITORY",
+      "readiness": "BLOCKED_BY_DEPENDENCIES",
+      "estimated_complexity": "UNKNOWN_NOT_DERIVABLE_FROM_REPOSITORY",
+      "last_state_change_by": "PRE_EXISTING"
     }
-  ]
+  ],
+  "backfill_required_scope": {
+    "team_domain": false,
+    "product_era": true,
+    "product_era_note": "Pre-V2 product-era work items are not reconstructed. They remain unknown rather than invented.",
+    "work_registry_contract_conformance": "Minimum field set from TEAM-ORGANIZATION-V2-PROTOCOL.md applied; non-derivable fields are explicitly UNKNOWN rather than guessed."
+  },
+  "backfill_state": {
+    "backfill_rule": "EVIDENCE_FROM_REPOSITORY_ONLY_NEVER_RECOLLECTION",
+    "backfill_source": "git object database reachable from this branch and its remotes",
+    "recorded_by": "work-0003-memory-backfill-37779956878",
+    "reused_prior_attempt": {
+      "commit": "509ce84cc31d9ccfab1aae8a31d8d6bd17af1a8b",
+      "run_id": "37776552275",
+      "state": "UNPROMOTED_ATTEMPT_OF_SAME_LEASE",
+      "treatment": "REUSED_AS_EVIDENCE_AND_INDEPENDENTLY_RE_VERIFIED_NOT_BLINDLY_COPIED"
+    }
+  }
 }

@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "next_id": "WAVE-0011",
+  "next_id": "WAVE-0012",
   "waves": [
     {
       "id": "WAVE-0010",
@@ -12,13 +12,105 @@
       "qc": "PASS",
       "integration": "FAIL_DUE_CONTROLLED_TARGET_DRIFT",
       "synthesis": "NOT_RELEASED_FROM_PRIMARY_RUN",
-      "recovery": "EVIDENCE_PRESERVING_RECOVERY_ATTEMPTED"
+      "recovery": "EVIDENCE_PRESERVING_RECOVERY_ATTEMPTED",
+      "lease_reconciliation": {
+        "leases_recorded": 12,
+        "worker_branches_found": 11,
+        "note": "The absent 12th branch is unknown-cause. It is NOT evidence of a failed or successful integration."
+      },
+      "promotion_state": "NOT_PROMOTED_TO_TARGET_BRANCH"
+    },
+    {
+      "id": "WAVE-0011",
+      "status": "EXECUTING_AWAITING_QC_AND_PROMOTION",
+      "source": ".kilo/team/NEXT-WAVE-PLAN.json (created_from_sha e564682ad02df31adc458995d4232128c7fa0fd3, verified ancestor of this branch)",
+      "wave_status_in_plan": "READY",
+      "control_note": "V2 bootstrap wave dispatched after stable-ID reconciliation; no product implementation.",
+      "leases": [
+        {
+          "work_id": "WORK-0003",
+          "lease": "work-0003-memory-backfill",
+          "owner": "MEMORY_EDITOR",
+          "mode": "AUDIT",
+          "run_id": "37779956878",
+          "branch": "opencode/team-work-0003-memory-backfill-37779956878",
+          "state": "EXECUTED_AWAITING_QC"
+        },
+        {
+          "work_id": "WORK-0004",
+          "lease": "work-0004-wave10-recovery",
+          "owner": "INTEGRATOR",
+          "mode": "REVIEW",
+          "run_id": "37776552275",
+          "branch": "opencode/team-work-0004-wave10-recovery-37776552275",
+          "state": "UNPROMOTED_NO_QC"
+        },
+        {
+          "work_id": "WORK-0005",
+          "lease": "work-0005-next-capability",
+          "owner": "PLANNER",
+          "mode": "REVIEW",
+          "run_id": "UNKNOWN_NO_BRANCH_FOUND",
+          "branch": null,
+          "state": "NOT_OBSERVED"
+        }
+      ],
+      "run_attempts": [
+        {
+          "run_id": 37759400053,
+          "state": "SUPERSEDED_OR_UNKNOWN",
+          "reason": "Named as current in wave-history at START_SHA. No surviving job evidence in this repository; outcome is NOT guessed."
+        },
+        {
+          "run_id": 37760777088,
+          "state": "QUEUED_NO_RUNNER_ALLOCATED",
+          "reason": "Named as current in mission-state at START_SHA and recorded in BLOCKER-0002. Team run #16, prepare job queued, no runner allocated."
+        },
+        {
+          "run_id": "37776552275",
+          "state": "EXECUTED_UNPROMOTED",
+          "reason": "Obtained a runner. Produced WORK-0003 and WORK-0004 commits on worker branches. Never QC-adjudicated and never promoted; therefore not DONE, VERIFIED or ACCEPTED."
+        },
+        {
+          "run_id": "37779956878",
+          "state": "EXECUTING",
+          "reason": "This lease. Obtained a runner. Reused and independently re-verified the WORK-0003 prior attempt."
+        }
+      ],
+      "completion_not_claimed": true
     }
   ],
   "current": {
     "id": "WAVE-0011",
-    "run_id": 37759400053,
-    "status": "QUEUED",
-    "note": "Latest governed V2 run accepted; prepare job queued. No worker completion inferred yet."
+    "run_id": "37779956878",
+    "status": "EXECUTING_AWAITING_QC_AND_PROMOTION",
+    "note": "A runner is allocated for this run. Worker execution for this lease happened; independent QC, integration and promotion are NOT performed by this lease and are NOT claimed. No other lease of this wave is claimed to have completed."
+  },
+  "unknown_history": {
+    "ids": [
+      "WAVE-0001",
+      "WAVE-0002",
+      "WAVE-0003",
+      "WAVE-0004",
+      "WAVE-0005",
+      "WAVE-0006",
+      "WAVE-0007",
+      "WAVE-0008",
+      "WAVE-0009"
+    ],
+    "state": "PERMANENTLY_UNKNOWN",
+    "reason": "No repository evidence for these wave identifiers exists at this branch. They are reserved, not reconstructed and not reused.",
+    "recorded_by": "work-0003-memory-backfill-37779956878"
+  },
+  "backfill_state": {
+    "backfill_rule": "EVIDENCE_FROM_REPOSITORY_ONLY_NEVER_RECOLLECTION",
+    "backfill_source": "git object database reachable from this branch and its remotes",
+    "recorded_by": "work-0003-memory-backfill-37779956878",
+    "reused_prior_attempt": {
+      "commit": "509ce84cc31d9ccfab1aae8a31d8d6bd17af1a8b",
+      "run_id": "37776552275",
+      "state": "UNPROMOTED_ATTEMPT_OF_SAME_LEASE",
+      "treatment": "REUSED_AS_EVIDENCE_AND_INDEPENDENTLY_RE_VERIFIED_NOT_BLINDLY_COPIED"
+    }
   }
 }
