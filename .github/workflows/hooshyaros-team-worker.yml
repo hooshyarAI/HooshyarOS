@@ -598,6 +598,13 @@ jobs:
           set -euo pipefail
           git fetch origin fix/autonomous-product-factory
           START_SHA="$(git rev-parse origin/fix/autonomous-product-factory)"
+          test -n "${TEAM_RESERVATION_SHA}" || { echo "BLOCKED: missing authoritative reservation SHA"; exit 17; }
+          test "${TEAM_RESERVATION_SHA}" = "${START_SHA}" || {
+            echo "BLOCKED: reservation SHA does not match immutable team start SHA"
+            echo "RESERVATION_SHA=${TEAM_RESERVATION_SHA}"
+            echo "START_SHA=${START_SHA}"
+            exit 17
+          }
           echo "start_sha=${START_SHA}" >> "${GITHUB_OUTPUT}"
           echo "TEAM_START_SHA=${START_SHA}"
   model-qualification:
