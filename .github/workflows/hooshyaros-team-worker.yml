@@ -787,6 +787,8 @@ jobs:
       START_SHA: ${{ needs.prepare.outputs.start_sha }}
       RESERVATION_ID: ${{ inputs.reservation_id }}
       RESERVATION_REF: ${{ inputs.reservation_ref }}
+      RESERVATION_ID: ${{ inputs.reservation_id }}
+      RESERVATION_REF: ${{ inputs.reservation_ref }}
       WORKER_ID: ${{ matrix.id }}
       WORKER_ROLE: ${{ matrix.role }}
       WORKER_FOCUS: ${{ matrix.focus }}
@@ -1712,8 +1714,23 @@ jobs:
           set -euo pipefail
           INTEGRATION_SHA="$(git rev-parse HEAD)"
           test "${INTEGRATION_SHA}" != "${START_SHA}"
+          git fetch origin "${TARGET_BRANCH}"
+          CURRENT_TARGET_SHA="$(git rev-parse "origin/${TARGET_BRANCH}")"
+          test "${CURRENT_TARGET_SHA}" = "${START_SHA}" || { echo "BLOCKED: target drift before promotion"; exit 32; }
           git push origin "${INTEGRATION_SHA}:refs/heads/${TARGET_BRANCH}"
           echo "TEAM_INTEGRATED_SHA=${INTEGRATION_SHA}"
+
+      - name: Release active reservation after successful promotion
+        if: ${{ success() }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "${RESERVATION_REF}"
+          REF_PATH="${RESERVATION_REF#refs/}"
+          gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/${REF_PATH}"
+          echo "TEAM_ACTIVE_RESERVATION_RELEASED=TRUE"
 
   synthesize:
     needs: [integrate, model-qualification]
