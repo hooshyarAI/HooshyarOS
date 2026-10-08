@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "next_id": "COMMIT-0013",
+  "next_id": "COMMIT-0014",
   "items": [
     {
       "id": "COMMIT-0001",
@@ -73,6 +73,12 @@
       "sha": "00d0688294277cb8135a5271ef508703ffa64040",
       "purpose": "WORK-0006 pre-gate team performance baseline",
       "status": "RECENT_CONTROL_PLANE"
+    },
+    {
+      "id": "COMMIT-0013",
+      "sha": "2d1038d38eed952fd84e448a7c0dca58735d71c2",
+      "purpose": "CI queue-storm prevention for Final Product Factory; concurrency plus duplicate trigger-path reduction",
+      "status": "INTEGRATED_CONTROL"
     }
   ]
 }
