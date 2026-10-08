@@ -237,14 +237,15 @@ if (require.main === module) {
     now: new Date().toISOString()
   });
 
-  if (authorization) {
+  if (authorization || gate.status === "ARMED") {
     const authViolations = validateAuthorization(authorization, {
       workId: acceptanceWorkId,
       leaseId: acceptanceLease?.id || null,
       targetBranch: TARGET_BRANCH,
       targetSha,
       planSha256,
-      now: new Date().toISOString()
+      now: new Date().toISOString(),
+      signatureSecret: process.env.TEAM_AUTHORIZATION_SIGNING_SECRET || ""
     });
     violations.push(...authViolations);
   }
