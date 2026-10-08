@@ -4,8 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       reason:
-        description: "Optional reason for a manual single-worker recovery run"
+        description: "Optional reason for a manual legacy recovery run"
         required: false
+        type: string
+      legacy_recovery_ack:
+        description: "Required explicit acknowledgement for legacy recovery; this path is not Team V2"
+        required: true
+        default: "DENY"
         type: string
 
 concurrency:
@@ -19,7 +24,7 @@ permissions:
 
 jobs:
   continuous-worker:
-    if: ${{ github.event_name == 'workflow_dispatch' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.legacy_recovery_ack == 'EXPLICIT_LEGACY_RECOVERY' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
@@ -303,30 +308,13 @@ jobs:
           git push origin "${WORKER_SHA}:refs/heads/${TARGET_BRANCH}"
           echo "ADVANCED: promoted ${WORKER_SHA} to ${TARGET_BRANCH}"
 
-      - name: Auto-continue active master mission (single-worker fallback only)
+      - name: Legacy recovery — no automatic continuation
         if: success()
         shell: bash
         run: |
           set -euo pipefail
-          PLAN=.kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md
-          TEAM_MANIFEST=.kilo/team/TEAM-WORKER-V1.json
-          TEAM_READY=FALSE
-          if test -f "$TEAM_MANIFEST" && grep -q '"status": "READY_MANUAL"' "$TEAM_MANIFEST"; then
-            TEAM_READY=TRUE
-          fi
-          if test "$TEAM_READY" = "TRUE"; then
-            echo "TEAM_WORKER_V1_READY=TRUE"
-            echo "Single-worker auto-continuation is suppressed while Team Worker V1 is ready."
-            exit 0
-          fi
-          if test -f "$PLAN" && grep -Fxq 'MISSION_STATUS = ACTIVE' "$PLAN" && grep -Fxq 'CONTINUE_ALLOWED = TRUE' "$PLAN"; then
-            echo "ACTIVE_MASTER_MISSION=TRUE"
-            gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/workflows/opencode-continuous-worker.yml/dispatches" \
-              -f ref=main \
-              -f 'inputs[reason]=Automatic continuation of active HooshyarOS master mission'
-          else
-            echo "ACTIVE_MASTER_MISSION=FALSE_OR_STOPPED"
-          fi
+          echo "LEGACY_RECOVERY_AUTO_CONTINUE=DISABLED"
+          echo "LEGACY_RECOVERY_NOTE=This workflow is an explicit manual recovery lane only; Team V2 owns normal execution and continuation."
 
       - name: Final evidence summary
         if: always()
