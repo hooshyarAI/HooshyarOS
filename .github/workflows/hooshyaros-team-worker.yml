@@ -378,6 +378,7 @@ jobs:
           path: |
             ${{ runner.temp }}/team-result/
             ${{ runner.temp }}/opencode-team-${{ matrix.id }}.log
+            ${{ matrix.write_root }}result.md
           if-no-files-found: warn
 
   quality-control:
@@ -574,6 +575,14 @@ jobs:
           SHA="$(git rev-parse "origin/${TARGET_BRANCH}")"
           echo "start_sha=${SHA}" >> "${GITHUB_OUTPUT}"
 
+      - name: Create isolated synthesis branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout -b "opencode/team-synthesis-${GITHUB_RUN_ID}" "${{ steps.state.outputs.start_sha }}"
+          test "$(git rev-parse HEAD)" = "${{ steps.state.outputs.start_sha }}"
+          test -z "$(git status --porcelain)"
+
       - name: Install OpenCode
         shell: bash
         run: |
@@ -712,10 +721,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git diff --check "$(git rev-parse origin/${TARGET_BRANCH})...HEAD"
-          AHEAD="$(git rev-list --count "$(git rev-parse origin/${TARGET_BRANCH})..HEAD")"
+          BASE="${{ steps.state.outputs.start_sha }}"
+          git diff --check "${BASE}...HEAD"
+          AHEAD="$(git rev-list --count "${BASE}..HEAD")"
           test "${AHEAD}" -eq 1
-          CHANGED="$(git diff --name-only "$(git rev-parse origin/${TARGET_BRANCH})...HEAD")"
+          CHANGED="$(git diff --name-only "${BASE}...HEAD")"
           test "${CHANGED}" = ".kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md"
 
           grep -q "^## TEAM EXECUTION STATE$" .kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md || true
