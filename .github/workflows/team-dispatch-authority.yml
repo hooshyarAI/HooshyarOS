@@ -50,3 +50,11 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/team-v2-dispatch-authority.cjs
+
+      - name: Upload authoritative admission evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: team-v2-admission-record
+          path: ${{ runner.temp }}/team-v2-admission/
+          if-no-files-found: ignore
