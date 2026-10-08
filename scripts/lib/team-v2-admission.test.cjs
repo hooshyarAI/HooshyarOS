@@ -39,7 +39,7 @@ assert.ok(validateWork(badReadiness).some(x => x.code === "REGISTRY_NOT_READY"))
 
 const invalidTaskClass = structuredClone(base);
 invalidTaskClass.plan.leases[0].task_class = "AUDIT";
-assert.ok(validateWork(invalidTaskClass).some(x => x.code === "TASK_CLASS_INVALID"));
+assert.ok(validateWork(invalidTaskClass).some(x => x.code === "TASK_CLASS_MISMATCH"));
 
 const mismatch = structuredClone(base);
 mismatch.workId = "WORK-0010";
