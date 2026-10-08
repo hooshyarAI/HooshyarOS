@@ -11,60 +11,75 @@
     {
       "id": "director",
       "name": "MISSION_DIRECTOR",
-      "authority": "mission priority, conflict resolution, capacity, governed continuation",
+      "authority": "mission priority, conflict resolution, capacity and final continuation/stop gates",
       "boundary": "cannot override architecture, governance or evidence"
     },
     {
       "id": "planner",
       "name": "PLANNER",
-      "authority": "work packages, dependencies, readiness, leases, next-wave plan"
+      "authority": "finite work packages, dependency DAG, readiness, leases and next-wave planning",
+      "boundary": "cannot dispatch or promote"
     },
     {
       "id": "editor",
       "name": "MEMORY_EDITOR",
-      "authority": "deduplication, stale/superseded evidence control, traceability, reports"
+      "authority": "canonical memory, deduplication, stale/superseded evidence, traceability and reports",
+      "boundary": "cannot convert failure to success or close its own execution reservation"
+    },
+    {
+      "id": "manager",
+      "name": "TEAM_MANAGER_ADMISSION",
+      "authority": "atomic plan admission, execution reservation, queue governance and state capture",
+      "boundary": "cannot alter worker scope or promote product work"
     },
     {
       "id": "orchestrator",
       "name": "ORCHESTRATOR",
-      "authority": "dispatch READY dependency-satisfied leases"
+      "authority": "bounded dispatch of admitted READY leases",
+      "boundary": "cannot bypass admission, duplication or dependency gates"
     },
     {
       "id": "specialists",
       "name": "SPECIALIST_WORKER_POOL",
-      "authority": "bounded leased execution"
+      "authority": "one lease, one isolated branch, one write scope, one coherent commit",
+      "boundary": "cannot push target branch or modify protected control-plane paths"
     },
     {
       "id": "qc",
-      "name": "QC",
-      "authority": "independent verification"
+      "name": "INDEPENDENT_EVALUATOR_QC",
+      "authority": "separate semantic and structural adjudication using worker artifacts plus actual patch",
+      "boundary": "read-only with respect to product and memory state"
     },
     {
       "id": "integrator",
       "name": "INTEGRATOR",
-      "authority": "sole team promotion authority"
+      "authority": "sole deterministic promotion authority after QC acceptance",
+      "boundary": "must fail closed on missing provenance, QC or target drift"
     },
     {
       "id": "watchdog",
       "name": "WATCHDOG",
-      "authority": "failure, stall, timeout and blocker observation/alerting"
+      "authority": "observe queue, stall, timeout, failure and unresolved-work conditions",
+      "boundary": "alerts/escalates; does not silently rerun"
     },
     {
       "id": "reporting",
       "name": "REPORTING",
-      "authority": "evidence-backed executive and technical reports"
+      "authority": "evidence-backed executive and technical reporting",
+      "boundary": "cannot infer completion from worker prose"
     }
   ],
   "role_mapping": {
-    "director": "governed continuation gates",
-    "planner": "dependency-aware synthesis / next-wave planning",
-    "editor": "persistent ledgers / reconciliation / authoritative reports",
-    "orchestrator": "existing Team Worker control plane",
-    "specialists": "isolated V1 workers",
-    "qc": "independent semantic + structural QC",
-    "integrator": "deterministic integration + controlled recovery",
-    "watchdog": "existing stop/stall/failure notification layer",
-    "reporting": "mission/wave/report artifacts"
+    "director": "mission priority / stop / continuation gates",
+    "planner": "dependency-aware finite lease planning",
+    "editor": "durable memory and evidence reconciliation",
+    "manager": "atomic admission + reservation + queue governance",
+    "orchestrator": "single-wave bounded dispatch",
+    "specialists": "isolated generator/execution lanes",
+    "qc": "independent evaluator of report + actual patch",
+    "integrator": "deterministic integration + target promotion",
+    "watchdog": "failure/stall observability and escalation",
+    "reporting": "durable wave and mission reporting"
   },
   "stable_ids": [
     "MISSION-####",
@@ -159,5 +174,28 @@
     "TEAM-ORG-08",
     "TEAM-ORG-09",
     "TEAM-ORG-10"
-  ]
+  ],
+  "operating_model": {
+    "pattern": "GENERATOR_EVALUATOR_INTEGRATOR",
+    "lanes": [
+      "PLANNING",
+      "EXECUTION",
+      "EVALUATION",
+      "PROMOTION",
+      "MEMORY"
+    ],
+    "execution_isolation": "one lease -> one branch -> one coherent commit",
+    "evaluator_independence": "separate job/session; inspect actual worker diff, not only self-report",
+    "durable_handoff": "remote worker branch + structured artifacts + persisted QC adjudication",
+    "failure_recovery": "preserve -> diagnose -> governed recovery; never blind rerun",
+    "parallelism": "dynamic from dependency-ready non-overlapping leases",
+    "acceptance": "one clean end-to-end wave required before broad remaining product work"
+  },
+  "model_policy": {
+    "planning": "strongest qualified reasoning configuration",
+    "worker": "best qualified candidate for lease mode",
+    "qc": "prefer a different qualified candidate from the worker when available",
+    "fallback": "bounded, explicit and failure-preserving",
+    "deepseek_compatibility": "thinking/tool-use is a model capability; execution authority remains in the harness"
+  }
 }
