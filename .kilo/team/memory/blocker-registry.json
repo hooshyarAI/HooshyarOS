@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "next_id": "BLOCKER-0003",
+  "next_id": "BLOCKER-0005",
   "items": [
     {
       "id": "BLOCKER-0001",
@@ -11,15 +11,29 @@
         "WORK-0001"
       ],
       "evidence": "Team Wave 10 integrate failure + recovery workflow",
-      "safe_unblock": "controlled recovery verifies drift paths and imports only independently QC-passed worker results"
+      "safe_unblock": "controlled recovery verifies drift paths and imports only independently QC-passed worker results",
+      "linked_worker_evidence_commits": [
+        "7010e238868826b1518e6c7218401f70c7ed1137",
+        "8fd2327919829622f6d5fe903e7cdbd2440a09a2",
+        "1f9d025ad7fb0a0a2b1ff9c56e51c2cd412e7bbb",
+        "cf797986ff38b701707e12b8fa9f6cceac87bb13",
+        "654d17abda0e5da73a0040cfac061068fabe4493",
+        "f14bcdeb0267a5af62ec47284452f2ad001e928b",
+        "5d2baf0ac169ae12f6c62cd3e4cf6133a097446e",
+        "d173e70f9cebb4aa6597ade5b880c0647487322f",
+        "50dc9967975f83b7c49a39c8f470aa4c44458d8b",
+        "9f22218e379ff9c0ad99103a1b7e21b1e35ee1d5",
+        "e226ad2de36f0030910dae9ccc3dc07f1714ce4c"
+      ],
+      "impact_on_memory": "All 11 Wave-10 evidence commits are unpromoted, so organizational memory cannot cite target-branch paths for Wave-10 findings. See DEFECT for the evidence-provenance consequence and BLOCKER-0003.",
+      "status_note": "Failure evidence preserved verbatim; status unchanged by this backfill."
     },
     {
       "id": "BLOCKER-0002",
       "title": "GitHub Actions runner queue blocks WAVE-0011 Team Worker start",
-      "status": "BLOCKED_INFRASTRUCTURE_QUEUE",
+      "status": "PARTIALLY_SUPERSEDED",
       "severity": "P0",
       "affected_work": [
-        "WORK-0003",
         "WORK-0004",
         "WORK-0005",
         "WORK-0006"
@@ -53,7 +67,58 @@
       },
       "root_cause": "No runner has been allocated to Team Run #16 while multiple repository workflows are simultaneously queued. GitHub Actions status page currently reports the service operational, so the local repository queue remains the observed blocker.",
       "safe_unblock": "Do not launch additional duplicate Team waves. Preserve Run #16 and let the current scheduler clear the queue; once a runner is allocated, execute the governed V2 wave and require real job evidence.",
-      "rule": "No product completion, failure or retry inference from queued state."
+      "rule": "No product completion, failure or retry inference from queued state.",
+      "later_observation": {
+        "observed_at_sha": "6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+        "observation": "A V2 team run (37776552275) subsequently obtained a runner and is executing lease work-0003-memory-backfill.",
+        "consequence": "WORK-0003 is no longer blocked by the runner queue. WORK-0004, WORK-0005 and WORK-0006 have no execution evidence and remain unproven.",
+        "not_claimed": "This does not prove WAVE-0011 completed, that QC passed, that integration succeeded, or that the other WAVE-0011 leases ran.",
+        "original_evidence_preserved": true
+      },
+      "partially_unblocked_work": [
+        "WORK-0003"
+      ]
+    },
+    {
+      "id": "BLOCKER-0003",
+      "title": "Wave-10 worker evidence is unreachable from organizational memory citations",
+      "status": "OPEN",
+      "severity": "P1",
+      "affected_work": [
+        "WORK-0001",
+        "WORK-0004"
+      ],
+      "first_observed": "2026-10-08",
+      "first_observed_at_sha": "6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "root_cause": "Wave-10 integration failed on controlled target drift (BLOCKER-0001) and the governed promotion of QC-passed worker artifacts has not occurred.",
+      "state": "11 worker commits exist on origin/opencode/team-<worker>-37743827267. None of the 11 result artifacts is present on the target branch. Memory citations are therefore branch-scoped.",
+      "last_governed_action": "Recorded as DEFECT and evidence provenance annotation by lease work-0003-memory-backfill.",
+      "safe_unblock": "WORK-0004 reconciles the 11 QC-passed Wave-10 artifacts and the INTEGRATOR performs controlled promotion; memory citations are then re-pointed at target-branch paths.",
+      "rule": "Never delete or rewrite the Wave-10 findings; only the citation path may change.",
+      "recorded_by": "work-0003-memory-backfill"
+    },
+    {
+      "id": "BLOCKER-0004",
+      "title": "Divergent target lineage makes organizational memory non-authoritative for the other lineage",
+      "status": "OPEN",
+      "severity": "P0",
+      "affected_work": [
+        "WORK-0001",
+        "WORK-0003",
+        "WORK-0004",
+        "WORK-0005",
+        "WORK-0006"
+      ],
+      "first_observed": "2026-10-08",
+      "first_observed_at_sha": "6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "observed_by_lease": "work-0003-memory-backfill",
+      "root_cause": "The control plane has been constructing the governed Team V2 chain on origin/fix/autonomous-product-factory while origin/main continued to receive the team control-plane, queue-governor and runner changes. Neither lineage contains the other.",
+      "state": "START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b is the tip of origin/fix/autonomous-product-factory. origin/main tip is fdd289c22e252243d85e660f6ed2997f50b89b62 and contains no .kilo/team/memory/ tree. Shared merge-base is 99542164a06f15aa4072a52b9debcf75125a358a (2026-08-28).",
+      "last_governed_action": "Recorded by lease work-0003-memory-backfill (run 37776552275) with exact provenance. No merge, rebase, branch move or promotion was attempted; that is INTEGRATOR/MISSION_DIRECTOR authority.",
+      "safe_unblock": "Governed decision naming the canonical target lineage, then a controlled integration of the memory ledgers into that lineage and re-verification of commit-registry provenance there. Until then, memory claims must be read as scoped to the START_SHA lineage.",
+      "rule": "Do not reconcile lineages inside a worker lease, and never delete either lineage's evidence.",
+      "linked_defect": "DEFECT-0005",
+      "corroborates": "BLOCKER-0001"
     }
   ]
 }

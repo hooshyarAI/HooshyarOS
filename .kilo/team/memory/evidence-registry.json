@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "next_id": "EVIDENCE-0006",
-  "backfill_required": true,
+  "next_id": "EVIDENCE-0018",
+  "backfill_required": false,
   "items": [
     {
       "id": "EVIDENCE-0001",
@@ -22,14 +22,22 @@
       "subject": "123.xlsx benchmark audit",
       "status": "VERIFIED",
       "source": ".kilo/team/results/benchmark-123/result.md",
-      "note": "Real benchmark harness gaps were identified; skipped tests and false-green paths were recorded."
+      "note": "Real benchmark harness gaps were identified; skipped tests and false-green paths were recorded.",
+      "promotion_state": "NOT_PROMOTED_TO_TARGET_BRANCH",
+      "source_present_at_start_sha": false,
+      "source_resolvable_at": "origin/opencode/team-benchmark-123-37743827267@7010e238868826b1518e6c7218401f70c7ed1137",
+      "provenance_note": "Cited source path is absent from the target branch at START_SHA because Wave-10 integration never promoted (BLOCKER-0001). Status is preserved as recorded; the promotion state, not the finding, changed."
     },
     {
       "id": "EVIDENCE-0004",
       "subject": "Intelligence-brain audit",
       "status": "VERIFIED",
       "source": ".kilo/team/results/intelligence-brain/result.md",
-      "note": "Causal capabilities exist but runtime composition is the primary gap."
+      "note": "Causal capabilities exist but runtime composition is the primary gap.",
+      "promotion_state": "NOT_PROMOTED_TO_TARGET_BRANCH",
+      "source_present_at_start_sha": false,
+      "source_resolvable_at": "origin/opencode/team-intelligence-brain-37743827267@654d17abda0e5da73a0040cfac061068fabe4493",
+      "provenance_note": "Cited source path is absent from the target branch at START_SHA because Wave-10 integration never promoted (BLOCKER-0001). Status is preserved as recorded; the promotion state, not the finding, changed."
     },
     {
       "id": "EVIDENCE-0005",
@@ -37,6 +45,163 @@
       "status": "ACCEPTED",
       "source": "commit 41d8c5f8 / f6-roa-roe-average-balance-checkpoint-2026-10-06.md",
       "note": "Do not repeat absent regression or invalidation."
+    },
+    {
+      "id": "EVIDENCE-0006",
+      "subject": "Chart presentation contract audit",
+      "status": "VERIFIED",
+      "source": ".kilo/team/results/chart-gate/result.md",
+      "note": "web/result-charts.js is PARTIAL: value and unit-math contracts hold; presentation-truthfulness, technical-leakage, methodology-preservation, accessibility and integration-evidence contracts do not. Two defects are masked by green tests. Rebuild NOT justified (single chart owner).",
+      "linked_wave": "WAVE-0010",
+      "linked_commit": "8fd2327919829622f6d5fe903e7cdbd2440a09a2",
+      "linked_branch": "origin/opencode/team-chart-gate-37743827267",
+      "source_present_at_start_sha": false,
+      "promotion_state": "NOT_PROMOTED_TO_TARGET_BRANCH",
+      "backfilled_by": "work-0003-memory-backfill"
+    },
+    {
+      "id": "EVIDENCE-0007",
+      "subject": "Commercial and application readiness audit",
+      "status": "VERIFIED",
+      "source": ".kilo/team/results/commercial-acceptance/result.md",
+      "note": "CommercialProductCompletionAudit returns contractPresent=true, missingLayers=[], applicationEvidence=PASS/fresh, acceptanceEvidence=PASS/fresh, complete=false solely because evidenceGaps=[external-dependency-blocked]; blockedExternalDependencies=[payment-provider-activation, production-cloud-resources].",
+      "linked_wave": "WAVE-0010",
+      "linked_commit": "1f9d025ad7fb0a0a2b1ff9c56e51c2cd412e7bbb",
+      "linked_branch": "origin/opencode/team-commercial-acceptance-37743827267",
+      "source_present_at_start_sha": false,
+      "promotion_state": "NOT_PROMOTED_TO_TARGET_BRANCH",
+      "backfilled_by": "work-0003-memory-backfill"
+    },
+    {
+      "id": "EVIDENCE-0008",
+      "subject": "Information-flow / catalyst continuity audit",
+      "status": "VERIFIED",
+      "source": ".kilo/team/results/information-flow/result.md",
+      "note": "Audited Chain A (Context->Evidence->Provenance->State->Reasoning->Decision->Action->Outcome->Learning) and Chain B (SENSE->...->ADAPT) against the Organizational Intelligence Engine; out-of-domain items recorded as OVERLAP, not adjudicated.",
+      "linked_wave": "WAVE-0010",
+      "linked_commit": "cf797986ff38b701707e12b8fa9f6cceac87bb13",
+      "linked_branch": "origin/opencode/team-information-flow-37743827267",
+      "source_present_at_start_sha": false,
+      "promotion_state": "NOT_PROMOTED_TO_TARGET_BRANCH",
+      "backfilled_by": "work-0003-memory-backfill"
+    },
+    {
+      "id": "EVIDENCE-0009",
+      "subject": "Capability-provider leverage / licence audit",
+      "status": "VERIFIED",
+      "source": ".kilo/team/results/open-source-leverage/result.md",
+      "note": "Reuse mechanism is real and executable at top level but its governance surface stops at first-order dependencies; one production package inside an admitted provider's closure has no verifiable licence.",
+      "linked_wave": "WAVE-0010",
+      "linked_commit": "f14bcdeb0267a5af62ec47284452f2ad001e928b",
+      "linked_branch": "origin/opencode/team-open-source-leverage-37743827267",
+      "source_present_at_start_sha": false,
+      "promotion_state": "NOT_PROMOTED_TO_TARGET_BRANCH",
+      "backfilled_by": "work-0003-memory-backfill"
+    },
+    {
+      "id": "EVIDENCE-0010",
+      "subject": "Performance-management chain audit",
+      "status": "VERIFIED",
+      "source": ".kilo/team/results/performance-management/result.md",
+      "note": "Chain PARTIAL: 9 of 11 stages exist with behavioural evidence; CHECK-IN is genuinely missing. Four evidence-integrity defects (fabricated default KPIs reported as VERIFIED, non-cryptographic provenance hashes, absent and stale engine documentation) mean no stage may be reported commercially complete.",
+      "linked_wave": "WAVE-0010",
+      "linked_commit": "5d2baf0ac169ae12f6c62cd3e4cf6133a097446e",
+      "linked_branch": "origin/opencode/team-performance-management-37743827267",
+      "source_present_at_start_sha": false,
+      "promotion_state": "NOT_PROMOTED_TO_TARGET_BRANCH",
+      "backfilled_by": "work-0003-memory-backfill"
+    },
+    {
+      "id": "EVIDENCE-0011",
+      "subject": "Process-architecture / Organizational Intelligence boundary audit",
+      "status": "VERIFIED",
+      "source": ".kilo/team/results/process-architecture/result.md",
+      "note": "10-stage chain classified against real owners: ROOT CAUSE and ALTERNATIVES INTEGRATION_VERIFIED; AS-IS, FRICTION MAP and TO-BE PARTIAL (test-only, unwired, non-evidence numbers).",
+      "linked_wave": "WAVE-0010",
+      "linked_commit": "d173e70f9cebb4aa6597ade5b880c0647487322f",
+      "linked_branch": "origin/opencode/team-process-architecture-37743827267",
+      "source_present_at_start_sha": false,
+      "promotion_state": "NOT_PROMOTED_TO_TARGET_BRANCH",
+      "backfilled_by": "work-0003-memory-backfill"
+    },
+    {
+      "id": "EVIDENCE-0012",
+      "subject": "Quality / harness fidelity audit",
+      "status": "VERIFIED",
+      "source": ".kilo/team/results/quality-harness/result.md",
+      "note": "Six findings, two HIGH (P0-class false-green), one HIGH, one MEDIUM, one MEDIUM-LOW latent, one LOW. No test weakened or deleted.",
+      "linked_wave": "WAVE-0010",
+      "linked_commit": "50dc9967975f83b7c49a39c8f470aa4c44458d8b",
+      "linked_branch": "origin/opencode/team-quality-harness-37743827267",
+      "source_present_at_start_sha": false,
+      "promotion_state": "NOT_PROMOTED_TO_TARGET_BRANCH",
+      "backfilled_by": "work-0003-memory-backfill"
+    },
+    {
+      "id": "EVIDENCE-0013",
+      "subject": "Post-recovery repository reconciliation audit",
+      "status": "VERIFIED",
+      "source": ".kilo/team/results/reconciliation/result.md",
+      "note": "13 findings recorded: 3 HIGH, 4 MEDIUM, 1 LOW, 5 VERIFIED/NOT-A-FINDING. No product implementation performed.",
+      "linked_wave": "WAVE-0010",
+      "linked_commit": "9f22218e379ff9c0ad99103a1b7e21b1e35ee1d5",
+      "linked_branch": "origin/opencode/team-reconciliation-37743827267",
+      "source_present_at_start_sha": false,
+      "promotion_state": "NOT_PROMOTED_TO_TARGET_BRANCH",
+      "backfilled_by": "work-0003-memory-backfill"
+    },
+    {
+      "id": "EVIDENCE-0014",
+      "subject": "Report and presentation audit (non-financial Persian disclosure)",
+      "status": "VERIFIED",
+      "source": ".kilo/team/results/report-presentation/result.md",
+      "note": "Worker state ADVANCED, audit complete, no product implementation; commit count for lease = 1.",
+      "linked_wave": "WAVE-0010",
+      "linked_commit": "e226ad2de36f0030910dae9ccc3dc07f1714ce4c",
+      "linked_branch": "origin/opencode/team-report-presentation-37743827267",
+      "source_present_at_start_sha": false,
+      "promotion_state": "NOT_PROMOTED_TO_TARGET_BRANCH",
+      "backfilled_by": "work-0003-memory-backfill"
+    },
+    {
+      "id": "EVIDENCE-0015",
+      "subject": "Wave-10 worker isolation and one-commit-per-lease verification",
+      "status": "VERIFIED",
+      "source": "git for-each-ref refs/remotes/origin/opencode/team-*-37743827267",
+      "note": "FACT: 11 remote worker branches exist for run 37743827267. Each has exactly one commit whose parent is the shared Wave-10 START_SHA 04119244e326f498db21f81f0509dd8374e10cf5, and each writes exactly one file under its own .kilo/team/results/<worker>/ path. Write scopes are disjoint; no collision. No branch exists for the 12th lease, which is consistent with the recorded 11/12 worker success and DEFECT-0001.",
+      "backfilled_by": "work-0003-memory-backfill"
+    },
+    {
+      "id": "EVIDENCE-0016",
+      "subject": "Team Organization V2 control-plane commit chain integrity",
+      "status": "VERIFIED",
+      "source": "git rev-list 3ebeaa1d1e19eecad98201ff56666f1db778de06~1..6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "note": "FACT: 37 commits, linear, no merges, from the V2 activation commit to START_SHA. Every commit-registry SHA (0002-0013) resolves to a real commit in this repository. The chain had not been registered before this backfill.",
+      "backfilled_by": "work-0003-memory-backfill"
+    },
+    {
+      "id": "EVIDENCE-0017",
+      "subject": "Repository contains two divergent team-control-plane lineages at START_SHA",
+      "status": "VERIFIED",
+      "source": "git merge-base --is-ancestor / git rev-list --count / git ls-tree on origin/main",
+      "note": "FACT: the eight memory ledgers exist only on origin/fix/autonomous-product-factory, which is the START_SHA tip; origin/main has no .kilo/team/memory/ tree. merge-base(START_SHA, origin/main) = 99542164a06f15aa4072a52b9debcf75125a358a (2026-08-28). `git rev-list --count START_SHA..origin/main` = 79 and `git rev-list --count origin/main..START_SHA` = 662. Ten of thirteen pre-existing commit-registry SHAs are not ancestors of START_SHA. All figures are reproducible from the cited commands.",
+      "linked_blocker": "BLOCKER-0004",
+      "linked_defect": "DEFECT-0005",
+      "backfilled_by": "work-0003-memory-backfill"
     }
-  ]
+  ],
+  "backfill_state": {
+    "status": "TEAM_DOMAIN_BACKFILLED",
+    "backfilled_by": "work-0003-memory-backfill",
+    "backfilled_at_sha": "6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+    "scope_completed": [
+      "All 11 Wave-10 worker audit reports (run 37743827267) registered with branch-scoped provenance.",
+      "Wave-10 isolation/one-commit-per-lease verification registered.",
+      "V2 control-plane commit-chain integrity registered."
+    ],
+    "scope_remaining": [
+      "Pre-V2 product-era evidence (.kilo/evidence/*.txt|json, 60 artifacts) is NOT itemized in the evidence registry. It predates Team V2 and is not reconstructed here.",
+      "F1/CCC/UX accepted evidence is referenced by DECISION-0004 but only F6 (EVIDENCE-0005) has an individual evidence record."
+    ]
+  }
 }

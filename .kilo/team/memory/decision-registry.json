@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "next_id": "DECISION-0005",
+  "next_id": "DECISION-0010",
   "items": [
     {
       "id": "DECISION-0001",
@@ -25,6 +25,49 @@
       "decision": "Accepted F1/F6/CCC/UX work is not repeated without regression/invalidation evidence",
       "status": "ACTIVE",
       "evidence": "active mission"
+    },
+    {
+      "id": "DECISION-0005",
+      "decision": "Organizational memory backfill is evidence-first: a record is created only from repository-verifiable provenance, and unprovable history is recorded UNKNOWN",
+      "status": "ACTIVE",
+      "evidence": "AGENTS.md epistemic discipline + .kilo/team/memory/README.md BACKFILL_RULE",
+      "recorded_by": [
+        "work-0003-memory-backfill"
+      ]
+    },
+    {
+      "id": "DECISION-0006",
+      "decision": "Wave-10 evidence artifacts are cited with branch-scoped provenance and NOT_PROMOTED promotion state; the absence of those paths on the target branch is recorded as a provenance fact, not as retraction of the findings",
+      "status": "ACTIVE",
+      "evidence": "git refs at START_SHA 6c9d4da5 + BLOCKER-0001",
+      "recorded_by": [
+        "work-0003-memory-backfill"
+      ]
+    },
+    {
+      "id": "DECISION-0007",
+      "decision": "Canonical team memory remains exactly the eight ledgers enumerated by TEAM-ORGANIZATION-V2-PROTOCOL.md; no REPORT-#### or RECOVERY-#### ledger is created, and those stable-ID namespaces remain unused rather than being invented",
+      "status": "ACTIVE",
+      "evidence": "Docs/HOOSHYAROS_MASTER_CHARTER.md + TEAM-ORGANIZATION-V2-PROTOCOL.md Memory ledgers + no-parallel-governance rule",
+      "recorded_by": [
+        "work-0003-memory-backfill"
+      ]
+    },
+    {
+      "id": "DECISION-0008",
+      "decision": "BLOCKER-0002 is only partially superseded: a V2 run obtained a runner afterwards, but WAVE-0011 is not complete and the original queued-run evidence is preserved verbatim",
+      "status": "ACTIVE",
+      "evidence": "branch opencode/team-work-0003-memory-backfill-37776552275 observed at START_SHA",
+      "recorded_by": [
+        "work-0003-memory-backfill"
+      ]
+    },
+    {
+      "id": "DECISION-0009",
+      "decision": "Lineage divergence is recorded as a P0 blocker and defect; this lease does not name a canonical target lineage, does not merge, rebase, move a branch, and does not promote any artifact",
+      "status": "ACTIVE",
+      "evidence": "TEAM-ORGANIZATION-V2-PROTOCOL.md: INTEGRATOR is the only team-level promotion authority; MISSION_DIRECTOR decides conflict handling and cannot redefine evidence. WORK-0003 lease is MODE=AUDIT and its write scope is the memory ledgers plus its own results directory.",
+      "recorded_by": "work-0003-memory-backfill"
     }
   ]
 }

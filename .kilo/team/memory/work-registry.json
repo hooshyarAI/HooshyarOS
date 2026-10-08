@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
-  "next_id": "WORK-0007",
-  "backfill_required": true,
+  "next_id": "WORK-0008",
+  "backfill_required": false,
   "items": [
     {
       "id": "WORK-0001",
@@ -20,7 +20,12 @@
         "capability_dependency_evidence_graph",
         "remaining_audit_inventory",
         "next_missing_capability"
-      ]
+      ],
+      "execution_evidence": {
+        "wave": "WAVE-0010",
+        "observed_on_repository": true,
+        "note": "WAVE-0010 produced 11 evidence-bearing worker commits (run 37743827267) that were never promoted to the target branch. WORK-0001 therefore remains ACTIVE with its integration output unreconciled; see BLOCKER-0001 and BLOCKER-0003."
+      }
     },
     {
       "id": "WORK-0002",
@@ -42,17 +47,49 @@
     {
       "id": "WORK-0003",
       "title": "Legacy Work and Evidence Backfill",
-      "status": "READY",
-      "mode": "RECONCILIATION",
+      "status": "EXECUTED_PENDING_QC",
+      "mode": "AUDIT",
       "priority": "P0",
-      "owner": "PLANNER",
+      "owner": "MEMORY_EDITOR",
       "dependencies": [
         "WORK-0002"
       ],
       "write_scope": [
         ".kilo/team/memory/**"
       ],
-      "status_reason": "Created by V2 migration; must derive historical records from repository evidence rather than recollection."
+      "owner_correction": {
+        "previous_owner": "PLANNER",
+        "current_owner": "MEMORY_EDITOR",
+        "reason": "Contradiction found in backfill: work-registry named PLANNER, while NEXT-WAVE-PLAN.json lease work-0003-memory-backfill and the executed lease both name MEMORY_EDITOR. V2 protocol makes MEMORY & EDITOR the single memory-integrity role, so the registry is reconciled to MEMORY_EDITOR. Recorded, not silently corrected.",
+        "recorded_by": "work-0003-memory-backfill"
+      },
+      "previous_mode": "RECONCILIATION",
+      "lifecycle_state": "QC",
+      "executed_lease": {
+        "lease_id": "work-0003-memory-backfill",
+        "run_id": 37776552275,
+        "branch": "opencode/team-work-0003-memory-backfill-37776552275",
+        "start_sha": "6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+        "mode": "AUDIT",
+        "write_scope": [
+          ".kilo/team/memory/**",
+          ".kilo/team/results/work-0003-memory-backfill/"
+        ],
+        "status_note": "Lease executed, ledgers backfilled, exactly one evidence report written. Independent QC and promotion are the QC/INTEGRATOR authorities and are NOT yet performed."
+      },
+      "evidence_required": [
+        "work_registry_backfill",
+        "evidence_registry_backfill",
+        "decision_registry_backfill",
+        "defect_registry_backfill",
+        "blocker_registry_backfill",
+        "commit_registry_backfill",
+        "wave_history_backfill",
+        "preserved_unknowns_and_stale_states",
+        "explicit_contradiction_records",
+        "json_integrity_validation"
+      ],
+      "status_reason": "Created by V2 migration; historical records are derived from repository evidence, never recollection. Executed under lease work-0003-memory-backfill; awaiting independent QC and integrator promotion."
     },
     {
       "id": "WORK-0004",
@@ -72,7 +109,13 @@
         "qc_result",
         "target_drift",
         "recovery_outcome"
-      ]
+      ],
+      "execution_evidence": {
+        "listed_in_next_wave_plan": true,
+        "observed_on_repository": false,
+        "state": "UNKNOWN",
+        "note": "NEXT-WAVE-PLAN.json lists this lease in WAVE-0011, but no branch, commit or result artifact for lease wave10-recovery exists at START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b. Execution is neither confirmed nor denied; readiness is preserved."
+      }
     },
     {
       "id": "WORK-0005",
@@ -92,7 +135,13 @@
         "current_audit_inventory",
         "dependency_graph",
         "value_risk_dependency_readiness_speed"
-      ]
+      ],
+      "execution_evidence": {
+        "listed_in_next_wave_plan": true,
+        "observed_on_repository": false,
+        "state": "UNKNOWN",
+        "note": "NEXT-WAVE-PLAN.json lists this lease in WAVE-0011, but no branch, commit or result artifact for lease next-capability exists at START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b. Execution is neither confirmed nor denied; readiness is preserved."
+      }
     },
     {
       "id": "WORK-0006",
@@ -147,5 +196,18 @@
       ],
       "gate": "ONLY_AFTER_WORK-0006_ACCEPTED"
     }
-  ]
+  ],
+  "backfill_state": {
+    "status": "TEAM_DOMAIN_BACKFILLED",
+    "backfilled_by": "work-0003-memory-backfill",
+    "backfilled_at_sha": "6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+    "scope_completed": [
+      "WORK-0001 execution evidence linked to WAVE-0010.",
+      "WORK-0003 owner/mode contradiction recorded and reconciled with explicit provenance.",
+      "WORK-0004 / WORK-0005 execution state recorded as UNKNOWN rather than assumed READY-and-running."
+    ],
+    "scope_remaining": [
+      "Pre-V2 product-era work (F1, F6, CCC, UX and the 1541-commit construction history) has no WORK-#### IDs and is not reconstructed. It is referenced by DECISION-0004 as accepted-and-not-to-be-repeated, which is sufficient for anti-duplication."
+    ]
+  }
 }

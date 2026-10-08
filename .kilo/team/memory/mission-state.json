@@ -8,7 +8,7 @@
   "team_org_version": "V2",
   "team_status": "ACTIVE",
   "current_wave": "WAVE-0011",
-  "current_wave_state": "QUEUED",
+  "current_wave_state": "EXECUTING",
   "first_objective": "POST-RECOVERY / ARCHITECTURE + AUDIT RECONCILIATION",
   "next_state": "BACKFILL_MEMORY_THEN_REPLAN",
   "protected_rules": [
@@ -19,7 +19,52 @@
     "No fabricated evidence"
   ],
   "memory_backfill_work": "WORK-0003",
-  "last_control_plane_commit": "9151fe4dbe85f9fbda0a3a7555a2206fb2e92461",
-  "current_run_id": 37760777088,
-  "truth_note": "Run #16 exists on control-plane commit 9151fe4d; prepare is queued with no runner allocated. Do not infer worker execution, QC, integration, promotion, or completion until job evidence exists. GitHub currently reports Actions operational, but this repository has multiple simultaneously queued workflows."
+  "memory_backfill_state": {
+    "status": "TEAM_DOMAIN_BACKFILLED",
+    "executed_by_lease": "work-0003-memory-backfill",
+    "run_id": 37776552275,
+    "at_sha": "6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+    "remaining_scope": "Pre-V2 product-era work and evidence are NOT reconstructed; see backfill_state.scope_remaining in work-registry.json and evidence-registry.json."
+  },
+  "last_control_plane_commit": "6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+  "previous_control_plane_commits": [
+    {
+      "sha": "9151fe4dbe85f9fbda0a3a7555a2206fb2e92461",
+      "superseded_by": "6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "reason": "STALE at backfill time: five control-plane commits followed it (00d06882, 2d1038d3, bcbebccf, fd9549d7, 6c9d4da5)."
+    }
+  ],
+  "current_run_id": 37776552275,
+  "run_id_history": [
+    {
+      "run_id": 37759400053,
+      "state": "SUPERSEDED_OR_UNKNOWN",
+      "note": "Previously recorded in wave-history as the current WAVE-0011 run. No job evidence survives in the repository."
+    },
+    {
+      "run_id": 37760777088,
+      "state": "QUEUED_NO_RUNNER_ALLOCATED",
+      "note": "Run #16 on control-plane commit 9151fe4d. Blocked by BLOCKER-0002; original queued evidence preserved."
+    },
+    {
+      "run_id": 37776552275,
+      "state": "EXECUTING",
+      "note": "Observed executing lease work-0003-memory-backfill on branch opencode/team-work-0003-memory-backfill-37776552275 from START_SHA 6c9d4da5."
+    }
+  ],
+  "truth_note": "WAVE-0011 is EXECUTING, not QUEUED and not complete. Only lease work-0003-memory-backfill (WORK-0003) has observed execution evidence at START_SHA 6c9d4da5. WORK-0004 and WORK-0005 are listed in NEXT-WAVE-PLAN.json but have no repository evidence of execution; their state is UNKNOWN. The organizational memory tree exists only on origin/fix/autonomous-product-factory, not on origin/main, which carries 79 commits absent from START_SHA including a newer team control plane (BLOCKER-0004, DEFECT-0005). Do not infer worker execution for other leases, QC, integration, promotion, or wave completion until job evidence exists. WAVE-0010 (run 37743827267) produced 11 evidence-bearing worker commits that were never promoted to the target branch; those findings are preserved and cited by branch provenance (BLOCKER-0001, BLOCKER-0003).",
+  "target_lineage": {
+    "start_sha": "6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+    "start_sha_branch": "origin/fix/autonomous-product-factory",
+    "start_sha_is_branch_tip": true,
+    "origin_main_tip": "fdd289c22e252243d85e660f6ed2997f50b89b62",
+    "merge_base": "99542164a06f15aa4072a52b9debcf75125a358a",
+    "merge_base_date": "2026-08-28",
+    "commits_on_origin_main_absent_from_start_sha": 79,
+    "commits_on_start_sha_absent_from_origin_main": 662,
+    "memory_ledgers_present_on_origin_main": false,
+    "canonical_lineage": "UNDECIDED",
+    "note": "The canonical target lineage is a governed MISSION_DIRECTOR/INTEGRATOR decision and is deliberately left UNDECIDED by this lease. Until it is decided, every memory claim is scoped to the START_SHA lineage.",
+    "recorded_by": "work-0003-memory-backfill"
+  }
 }

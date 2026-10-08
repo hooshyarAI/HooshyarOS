@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "next_id": "WAVE-0011",
+  "next_id": "WAVE-0012",
   "waves": [
     {
       "id": "WAVE-0010",
@@ -12,13 +12,71 @@
       "qc": "PASS",
       "integration": "FAIL_DUE_CONTROLLED_TARGET_DRIFT",
       "synthesis": "NOT_RELEASED_FROM_PRIMARY_RUN",
-      "recovery": "EVIDENCE_PRESERVING_RECOVERY_ATTEMPTED"
+      "recovery": "EVIDENCE_PRESERVING_RECOVERY_ATTEMPTED",
+      "evidence_artifact_state": "NOT_PROMOTED_TO_TARGET_BRANCH",
+      "evidence_provenance": "11 evidence-bearing commits exist only on origin/opencode/team-<worker>-37743827267; no Wave-10 result artifact is present on the target branch.",
+      "worker_evidence_commits": [
+        "7010e238868826b1518e6c7218401f70c7ed1137",
+        "8fd2327919829622f6d5fe903e7cdbd2440a09a2",
+        "1f9d025ad7fb0a0a2b1ff9c56e51c2cd412e7bbb",
+        "cf797986ff38b701707e12b8fa9f6cceac87bb13",
+        "654d17abda0e5da73a0040cfac061068fabe4493",
+        "f14bcdeb0267a5af62ec47284452f2ad001e928b",
+        "5d2baf0ac169ae12f6c62cd3e4cf6133a097446e",
+        "d173e70f9cebb4aa6597ade5b880c0647487322f",
+        "50dc9967975f83b7c49a39c8f470aa4c44458d8b",
+        "9f22218e379ff9c0ad99103a1b7e21b1e35ee1d5",
+        "e226ad2de36f0030910dae9ccc3dc07f1714ce4c"
+      ],
+      "lease_count_reconciliation": "12 leases recorded; 11 worker branches exist. The 12th lease produced no surviving branch; consistent with DEFECT-0001. Absence of the branch is recorded as UNKNOWN-cause, not as a proven integration outcome."
+    },
+    {
+      "id": "WAVE-0011",
+      "run_id": "37776552275",
+      "status": "EXECUTING",
+      "qc": "NOT_YET_RUN_FOR_THIS_RUN",
+      "integration": "NOT_YET_RUN_FOR_THIS_RUN",
+      "synthesis": "NOT_YET_RUN_FOR_THIS_RUN",
+      "recovery": "NOT_APPLICABLE",
+      "note": "V2 bootstrap wave from NEXT-WAVE-PLAN.json (created_from_sha e564682ad02df31adc458995d4232128c7fa0fd3). FACT: lease work-0003-memory-backfill is executing on branch opencode/team-work-0003-memory-backfill-37776552275 from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b. WORK-0004 and WORK-0005 are listed in the same plan but no repository evidence of their execution exists at START_SHA; their state is UNKNOWN.",
+      "run_attempts": [
+        {
+          "run_id": 37759400053,
+          "state": "SUPERSEDED_OR_UNKNOWN",
+          "note": "Recorded in the previous wave-history current block. No job evidence survives in the repository; outcome UNKNOWN."
+        },
+        {
+          "run_id": 37760777088,
+          "state": "QUEUED_NO_RUNNER_ALLOCATED",
+          "note": "Run #16 on control-plane commit 9151fe4dbe85f9fbda0a3a7555a2206fb2e92461. Blocked by BLOCKER-0002. No worker, QC, integration or completion inferred."
+        },
+        {
+          "run_id": 37776552275,
+          "state": "EXECUTING",
+          "note": "Lease work-0003-memory-backfill observed executing. Wave outcome NOT inferred."
+        }
+      ]
     }
   ],
   "current": {
     "id": "WAVE-0011",
-    "run_id": 37759400053,
-    "status": "QUEUED",
-    "note": "Latest governed V2 run accepted; prepare job queued. No worker completion inferred yet."
+    "run_id": 37776552275,
+    "status": "EXECUTING",
+    "note": "Corrected from stale run_id 37759400053. Current truth: lease work-0003-memory-backfill executes under run 37776552275. WAVE-0011 is NOT complete; no QC, integration, synthesis or promotion evidence exists."
+  },
+  "unknown_history": {
+    "waves": [
+      "WAVE-0001",
+      "WAVE-0002",
+      "WAVE-0003",
+      "WAVE-0004",
+      "WAVE-0005",
+      "WAVE-0006",
+      "WAVE-0007",
+      "WAVE-0008",
+      "WAVE-0009"
+    ],
+    "reason": "No repository evidence at START_SHA identifies or describes waves before WAVE-0010. IDs are permanently reserved; no content is guessed.",
+    "recorded_by": "work-0003-memory-backfill"
   }
 }

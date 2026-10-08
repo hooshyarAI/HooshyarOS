@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "next_id": "DEFECT-0002",
+  "next_id": "DEFECT-0006",
   "items": [
     {
       "id": "DEFECT-0001",
@@ -11,6 +11,54 @@
       "verification_work": "Wave 10 validation",
       "closure": "CONTROLLED / NOT PRODUCT DEFECT",
       "evidence": "Team Wave 10 run 37743827267"
+    },
+    {
+      "id": "DEFECT-0002",
+      "title": "Organizational ledgers were incomplete and mutually contradictory",
+      "status": "REPAIRED_IN_WORK-0003_PENDING_QC",
+      "severity": "P1",
+      "fix_work": "WORK-0003",
+      "verification_work": "JSON integrity validation + independent QC",
+      "closure": "REPAIRED_IN_THIS_LEASE / REQUIRES_QC",
+      "evidence": "Found at START_SHA: commit registry omitted 11 Wave-10 worker commits and all 37 V2 control-plane commits; evidence registry cited 2 of 11 Wave-10 reports only; mission-state and wave-history named two different run IDs for the same current wave; mission-state last_control_plane_commit was 5 commits behind HEAD.",
+      "recorded_by": "work-0003-memory-backfill"
+    },
+    {
+      "id": "DEFECT-0003",
+      "title": "Stable-ID allocation collision in next_id fields",
+      "status": "REPAIRED_IN_WORK-0003_PENDING_QC",
+      "severity": "P2",
+      "fix_work": "WORK-0003",
+      "verification_work": "JSON integrity validation",
+      "closure": "REPAIRED_IN_THIS_LEASE / REQUIRES_QC",
+      "evidence": "work-registry.next_id was WORK-0007 while a WORK-0007 item already existed; wave-history.next_id was WAVE-0011 while WAVE-0011 was in use. Both are corrected to the first unused permanent ID.",
+      "recorded_by": "work-0003-memory-backfill"
+    },
+    {
+      "id": "DEFECT-0004",
+      "title": "Evidence registry cited source paths absent from the target branch",
+      "status": "OPEN_PROVENANCE_DEFECT",
+      "severity": "P1",
+      "fix_work": "WORK-0004",
+      "verification_work": "Integrator promotion of QC-passed Wave-10 artifacts",
+      "closure": "NOT_CLOSED",
+      "evidence": "EVIDENCE-0003 and EVIDENCE-0004 cite .kilo/team/results/benchmark-123/result.md and .kilo/team/results/intelligence-brain/result.md; neither path exists on the target branch at START_SHA. Both are resolvable only on unpromoted worker branches. Root cause is BLOCKER-0001. The findings are preserved; only their promotion state is recorded.",
+      "linked_blocker": "BLOCKER-0001",
+      "recorded_by": "work-0003-memory-backfill"
+    },
+    {
+      "id": "DEFECT-0005",
+      "title": "Organizational memory and the repository target branch are on divergent lineages",
+      "status": "OPEN_P0",
+      "severity": "P0",
+      "fix_work": "WORK-0001",
+      "verification_work": "Governed branch-lineage reconciliation by INTEGRATOR + MISSION_DIRECTOR",
+      "closure": "NOT_CLOSED",
+      "evidence": "FACT at START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b: the eight memory ledgers exist only on origin/fix/autonomous-product-factory (which is the START_SHA tip). origin/main contains no .kilo/team/memory/ directory at all. The two lineages share merge-base 99542164a06f15aa4072a52b9debcf75125a358a (2026-08-28); origin/main carries 79 commits absent from START_SHA and START_SHA carries 662 commits absent from origin/main. Ten of the thirteen pre-existing commit-registry records (COMMIT-0002..COMMIT-0011) resolve only on origin/main, and twelve origin/main team-control-plane commits (c6676993..fdd289c2) post-date the commit mission-state named as the last control-plane commit.",
+      "impact": "Organizational memory describes one lineage while the repository's default branch carries a different, newer control plane. Any completeness or completeness-of-promotion claim made from memory alone is therefore unsafe for the lineage it does not describe.",
+      "linked_blocker": "BLOCKER-0004",
+      "corroborates": "BLOCKER-0001",
+      "recorded_by": "work-0003-memory-backfill"
     }
   ]
 }

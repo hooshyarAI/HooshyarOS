@@ -1,84 +1,1483 @@
 {
   "schema_version": "1.0",
-  "next_id": "COMMIT-0014",
+  "next_id": "COMMIT-0127",
   "items": [
     {
       "id": "COMMIT-0001",
       "sha": "41d8c5f8",
       "purpose": "F6 ROA/ROE average-balance repair",
-      "status": "ACCEPTED"
+      "status": "ACCEPTED",
+      "in_start_sha_lineage": true
     },
     {
       "id": "COMMIT-0002",
       "sha": "61f94d1a13bbf12f39014406b275b2f7fea0bf6d",
       "purpose": "team diff gate: strict code, Markdown whitespace warning",
-      "status": "INTEGRATED"
+      "status": "INTEGRATED",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance_note": "Resolvable in the repository and reachable from origin/main, but NOT an ancestor of START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b. See BLOCKER-0004."
     },
     {
       "id": "COMMIT-0003",
       "sha": "21718a64754498f6cbdabd926bd08ecdb2d8b464",
       "purpose": "immediate per-worker stop alerting",
-      "status": "INTEGRATED"
+      "status": "INTEGRATED",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance_note": "Resolvable in the repository and reachable from origin/main, but NOT an ancestor of START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b. See BLOCKER-0004."
     },
     {
       "id": "COMMIT-0004",
       "sha": "3535384c958f52163fa33b6897727dfd288e587c",
       "purpose": "controlled target-drift recovery",
-      "status": "INTEGRATED"
+      "status": "INTEGRATED",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance_note": "Resolvable in the repository and reachable from origin/main, but NOT an ancestor of START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b. See BLOCKER-0004."
     },
     {
       "id": "COMMIT-0005",
       "sha": "9a1f10a57088ae9dc410248dc65562d8252c4aec",
       "purpose": "recovery synthesis / automatic continuation",
-      "status": "INTEGRATED"
+      "status": "INTEGRATED",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance_note": "Resolvable in the repository and reachable from origin/main, but NOT an ancestor of START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b. See BLOCKER-0004."
     },
     {
       "id": "COMMIT-0006",
       "sha": "82d63f9534de7d8dac15869cd3b996a9d5ccb8a5",
       "purpose": "supersede stale queued team waves safely via concurrency cancellation",
-      "status": "MAIN_CONTROL_PLANE"
+      "status": "MAIN_CONTROL_PLANE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance_note": "Resolvable in the repository and reachable from origin/main, but NOT an ancestor of START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b. See BLOCKER-0004."
     },
     {
       "id": "COMMIT-0007",
       "sha": "215f8c80ad8ce9c0401aa10fd4a5a29f28246922",
       "purpose": "V2 wave gated on active organization and memory state",
-      "status": "RECENT_CONTROL_PLANE"
+      "status": "RECENT_CONTROL_PLANE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance_note": "Resolvable in the repository and reachable from origin/main, but NOT an ancestor of START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b. See BLOCKER-0004."
     },
     {
       "id": "COMMIT-0008",
       "sha": "314e6b885b0f5c809a6ec3c94e1d6fa0af219a19",
       "purpose": "dynamic leases bound to permanent WORK-#### records",
-      "status": "RECENT_CONTROL_PLANE"
+      "status": "RECENT_CONTROL_PLANE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance_note": "Resolvable in the repository and reachable from origin/main, but NOT an ancestor of START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b. See BLOCKER-0004."
     },
     {
       "id": "COMMIT-0009",
       "sha": "729c00cb86126bfb8172f961aea40164fbd82352",
       "purpose": "worker V2 memory-context gate",
-      "status": "RECENT_CONTROL_PLANE"
+      "status": "RECENT_CONTROL_PLANE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance_note": "Resolvable in the repository and reachable from origin/main, but NOT an ancestor of START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b. See BLOCKER-0004."
     },
     {
       "id": "COMMIT-0010",
       "sha": "dec57432935475b417c2bb233e19e8028b87d04e",
       "purpose": "V2 memory and anti-duplication rules injected into worker prompts",
-      "status": "RECENT_CONTROL_PLANE"
+      "status": "RECENT_CONTROL_PLANE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance_note": "Resolvable in the repository and reachable from origin/main, but NOT an ancestor of START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b. See BLOCKER-0004."
     },
     {
       "id": "COMMIT-0011",
       "sha": "9151fe4dbe85f9fbda0a3a7555a2206fb2e92461",
       "purpose": "synthesis bound to V2 memory and anti-duplication state",
-      "status": "RECENT_CONTROL_PLANE"
+      "status": "RECENT_CONTROL_PLANE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance_note": "Resolvable in the repository and reachable from origin/main, but NOT an ancestor of START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b. See BLOCKER-0004."
     },
     {
       "id": "COMMIT-0012",
       "sha": "00d0688294277cb8135a5271ef508703ffa64040",
       "purpose": "WORK-0006 pre-gate team performance baseline",
-      "status": "RECENT_CONTROL_PLANE"
+      "status": "RECENT_CONTROL_PLANE",
+      "in_start_sha_lineage": true
     },
     {
       "id": "COMMIT-0013",
       "sha": "2d1038d38eed952fd84e448a7c0dca58735d71c2",
       "purpose": "CI queue-storm prevention for Final Product Factory; concurrency plus duplicate trigger-path reduction",
-      "status": "INTEGRATED_CONTROL"
+      "status": "INTEGRATED_CONTROL",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0014",
+      "sha": "7010e238868826b1518e6c7218401f70c7ed1137",
+      "purpose": "audit(benchmark-123): reconcile 123.xlsx benchmark evidence truthfulness",
+      "status": "WORKER_EVIDENCE_NOT_PROMOTED",
+      "date": "2026-10-08",
+      "domain": "WORKER_EVIDENCE_WAVE10",
+      "provenance": "origin/opencode/team-benchmark-123-37743827267 (single commit, parent 04119244e326f498db21f81f0509dd8374e10cf5)",
+      "paths": [
+        ".kilo/team/results/benchmark-123/result.md"
+      ],
+      "promotion_state": "NOT_PROMOTED_TO_TARGET_BRANCH",
+      "linked_wave": "WAVE-0010",
+      "linked_blocker": "BLOCKER-0001",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance_note": "Resolvable in the repository and reachable from origin/main, but NOT an ancestor of START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b. See BLOCKER-0004."
+    },
+    {
+      "id": "COMMIT-0015",
+      "sha": "8fd2327919829622f6d5fe903e7cdbd2440a09a2",
+      "purpose": "team(chart-gate): audit chart presentation contract with real-browser evidence",
+      "status": "WORKER_EVIDENCE_NOT_PROMOTED",
+      "date": "2026-10-08",
+      "domain": "WORKER_EVIDENCE_WAVE10",
+      "provenance": "origin/opencode/team-chart-gate-37743827267 (single commit, parent 04119244e326f498db21f81f0509dd8374e10cf5)",
+      "paths": [
+        ".kilo/team/results/chart-gate/result.md"
+      ],
+      "promotion_state": "NOT_PROMOTED_TO_TARGET_BRANCH",
+      "linked_wave": "WAVE-0010",
+      "linked_blocker": "BLOCKER-0001",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance_note": "Resolvable in the repository and reachable from origin/main, but NOT an ancestor of START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b. See BLOCKER-0004."
+    },
+    {
+      "id": "COMMIT-0016",
+      "sha": "1f9d025ad7fb0a0a2b1ff9c56e51c2cd412e7bbb",
+      "purpose": "audit(commercial-acceptance): reconcile runtime/application/commercial completion evidence",
+      "status": "WORKER_EVIDENCE_NOT_PROMOTED",
+      "date": "2026-10-08",
+      "domain": "WORKER_EVIDENCE_WAVE10",
+      "provenance": "origin/opencode/team-commercial-acceptance-37743827267 (single commit, parent 04119244e326f498db21f81f0509dd8374e10cf5)",
+      "paths": [
+        ".kilo/team/results/commercial-acceptance/result.md"
+      ],
+      "promotion_state": "NOT_PROMOTED_TO_TARGET_BRANCH",
+      "linked_wave": "WAVE-0010",
+      "linked_blocker": "BLOCKER-0001",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance_note": "Resolvable in the repository and reachable from origin/main, but NOT an ancestor of START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b. See BLOCKER-0004."
+    },
+    {
+      "id": "COMMIT-0017",
+      "sha": "cf797986ff38b701707e12b8fa9f6cceac87bb13",
+      "purpose": "audit(information-flow): classify context-to-learning continuity at 04119244",
+      "status": "WORKER_EVIDENCE_NOT_PROMOTED",
+      "date": "2026-10-08",
+      "domain": "WORKER_EVIDENCE_WAVE10",
+      "provenance": "origin/opencode/team-information-flow-37743827267 (single commit, parent 04119244e326f498db21f81f0509dd8374e10cf5)",
+      "paths": [
+        ".kilo/team/results/information-flow/result.md"
+      ],
+      "promotion_state": "NOT_PROMOTED_TO_TARGET_BRANCH",
+      "linked_wave": "WAVE-0010",
+      "linked_blocker": "BLOCKER-0001",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance_note": "Resolvable in the repository and reachable from origin/main, but NOT an ancestor of START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b. See BLOCKER-0004."
+    },
+    {
+      "id": "COMMIT-0018",
+      "sha": "654d17abda0e5da73a0040cfac061068fabe4493",
+      "purpose": "audit(intelligence-brain): classify reasoning chain; causal capability is verified but never invoked",
+      "status": "WORKER_EVIDENCE_NOT_PROMOTED",
+      "date": "2026-10-08",
+      "domain": "WORKER_EVIDENCE_WAVE10",
+      "provenance": "origin/opencode/team-intelligence-brain-37743827267 (single commit, parent 04119244e326f498db21f81f0509dd8374e10cf5)",
+      "paths": [
+        ".kilo/team/results/intelligence-brain/result.md"
+      ],
+      "promotion_state": "NOT_PROMOTED_TO_TARGET_BRANCH",
+      "linked_wave": "WAVE-0010",
+      "linked_blocker": "BLOCKER-0001",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance_note": "Resolvable in the repository and reachable from origin/main, but NOT an ancestor of START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b. See BLOCKER-0004."
+    },
+    {
+      "id": "COMMIT-0019",
+      "sha": "f14bcdeb0267a5af62ec47284452f2ad001e928b",
+      "purpose": "audit(capability-provider-leverage): transitive licence/coverage findings",
+      "status": "WORKER_EVIDENCE_NOT_PROMOTED",
+      "date": "2026-10-08",
+      "domain": "WORKER_EVIDENCE_WAVE10",
+      "provenance": "origin/opencode/team-open-source-leverage-37743827267 (single commit, parent 04119244e326f498db21f81f0509dd8374e10cf5)",
+      "paths": [
+        ".kilo/team/results/open-source-leverage/result.md"
+      ],
+      "promotion_state": "NOT_PROMOTED_TO_TARGET_BRANCH",
+      "linked_wave": "WAVE-0010",
+      "linked_blocker": "BLOCKER-0001",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance_note": "Resolvable in the repository and reachable from origin/main, but NOT an ancestor of START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b. See BLOCKER-0004."
+    },
+    {
+      "id": "COMMIT-0020",
+      "sha": "5d2baf0ac169ae12f6c62cd3e4cf6133a097446e",
+      "purpose": "audit(performance-management): reconcile CLARIFY-to-LEARN chain and select governed check-in",
+      "status": "WORKER_EVIDENCE_NOT_PROMOTED",
+      "date": "2026-10-08",
+      "domain": "WORKER_EVIDENCE_WAVE10",
+      "provenance": "origin/opencode/team-performance-management-37743827267 (single commit, parent 04119244e326f498db21f81f0509dd8374e10cf5)",
+      "paths": [
+        ".kilo/team/results/performance-management/result.md"
+      ],
+      "promotion_state": "NOT_PROMOTED_TO_TARGET_BRANCH",
+      "linked_wave": "WAVE-0010",
+      "linked_blocker": "BLOCKER-0001",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance_note": "Resolvable in the repository and reachable from origin/main, but NOT an ancestor of START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b. See BLOCKER-0004."
+    },
+    {
+      "id": "COMMIT-0021",
+      "sha": "d173e70f9cebb4aa6597ade5b880c0647487322f",
+      "purpose": "audit(team): process architecture reconciliation for Organizational Intelligence boundary",
+      "status": "WORKER_EVIDENCE_NOT_PROMOTED",
+      "date": "2026-10-08",
+      "domain": "WORKER_EVIDENCE_WAVE10",
+      "provenance": "origin/opencode/team-process-architecture-37743827267 (single commit, parent 04119244e326f498db21f81f0509dd8374e10cf5)",
+      "paths": [
+        ".kilo/team/results/process-architecture/result.md"
+      ],
+      "promotion_state": "NOT_PROMOTED_TO_TARGET_BRANCH",
+      "linked_wave": "WAVE-0010",
+      "linked_blocker": "BLOCKER-0001",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance_note": "Resolvable in the repository and reachable from origin/main, but NOT an ancestor of START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b. See BLOCKER-0004."
+    },
+    {
+      "id": "COMMIT-0022",
+      "sha": "50dc9967975f83b7c49a39c8f470aa4c44458d8b",
+      "purpose": "quality(team): audit harness fidelity, evidence binding and acceptance proof",
+      "status": "WORKER_EVIDENCE_NOT_PROMOTED",
+      "date": "2026-10-08",
+      "domain": "WORKER_EVIDENCE_WAVE10",
+      "provenance": "origin/opencode/team-quality-harness-37743827267 (single commit, parent 04119244e326f498db21f81f0509dd8374e10cf5)",
+      "paths": [
+        ".kilo/team/results/quality-harness/result.md"
+      ],
+      "promotion_state": "NOT_PROMOTED_TO_TARGET_BRANCH",
+      "linked_wave": "WAVE-0010",
+      "linked_blocker": "BLOCKER-0001",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance_note": "Resolvable in the repository and reachable from origin/main, but NOT an ancestor of START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b. See BLOCKER-0004."
+    },
+    {
+      "id": "COMMIT-0023",
+      "sha": "9f22218e379ff9c0ad99103a1b7e21b1e35ee1d5",
+      "purpose": "audit(reconciliation): post-recovery repository reconciliation evidence",
+      "status": "WORKER_EVIDENCE_NOT_PROMOTED",
+      "date": "2026-10-08",
+      "domain": "WORKER_EVIDENCE_WAVE10",
+      "provenance": "origin/opencode/team-reconciliation-37743827267 (single commit, parent 04119244e326f498db21f81f0509dd8374e10cf5)",
+      "paths": [
+        ".kilo/team/results/reconciliation/result.md"
+      ],
+      "promotion_state": "NOT_PROMOTED_TO_TARGET_BRANCH",
+      "linked_wave": "WAVE-0010",
+      "linked_blocker": "BLOCKER-0001",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance_note": "Resolvable in the repository and reachable from origin/main, but NOT an ancestor of START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b. See BLOCKER-0004."
+    },
+    {
+      "id": "COMMIT-0024",
+      "sha": "e226ad2de36f0030910dae9ccc3dc07f1714ce4c",
+      "purpose": "audit(team/report-presentation): evidence for non-financial Persian disclosure",
+      "status": "WORKER_EVIDENCE_NOT_PROMOTED",
+      "date": "2026-10-08",
+      "domain": "WORKER_EVIDENCE_WAVE10",
+      "provenance": "origin/opencode/team-report-presentation-37743827267 (single commit, parent 04119244e326f498db21f81f0509dd8374e10cf5)",
+      "paths": [
+        ".kilo/team/results/report-presentation/result.md"
+      ],
+      "promotion_state": "NOT_PROMOTED_TO_TARGET_BRANCH",
+      "linked_wave": "WAVE-0010",
+      "linked_blocker": "BLOCKER-0001",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance_note": "Resolvable in the repository and reachable from origin/main, but NOT an ancestor of START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b. See BLOCKER-0004."
+    },
+    {
+      "id": "COMMIT-0025",
+      "sha": "6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "purpose": "memory(team): register CI queue-storm control commit",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0026",
+      "sha": "fd9549d748951a2c0b27f8644baa0033bc0ec136",
+      "purpose": "memory(team): refresh runner-queue blocker evidence for Run #16",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0027",
+      "sha": "bcbebccfe845b79befb19f320f91ed2ac47ead37",
+      "purpose": "memory(team): reconcile mission state to Team Run #16",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0028",
+      "sha": "37dedb883846a0175095deee8ff45f2f886d752f",
+      "purpose": "memory(team): persist V2 enforcement history",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0029",
+      "sha": "7eab8cf5a6da2917c71b2147275168e554440b1f",
+      "purpose": "memory(team): record current GitHub Actions queue blocker",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0030",
+      "sha": "3ef823d4d814cb71a954649a625437329608a5c0",
+      "purpose": "memory(team): record queue-control repair evidence",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0031",
+      "sha": "dbe94490428c28f043c638a729ff7d8af523cfc3",
+      "purpose": "memory(team): persist WAVE-0011 queued state",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0032",
+      "sha": "74c009a7aa26a59020964ac6693c03d01ee84ab9",
+      "purpose": "memory(team): persist truthful V2 run state",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0033",
+      "sha": "e9063b1d041aa9f2d942a3a6b5ceccd949656567",
+      "purpose": "memory(team): persist WAVE-0011 queued state",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0034",
+      "sha": "7276363d83701b1e07d1fa91f20bbf72541d058d",
+      "purpose": "memory(team): record queue-control repair evidence",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0035",
+      "sha": "b410e04e57172177e4acdac9146300e5e4c90009",
+      "purpose": "governance(team): reconcile mission memory and stage post-team performance gate",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0036",
+      "sha": "bbff9dfc613103efd540bd3abbd32ffd77b4cad2",
+      "purpose": "governance(team): add post-V2 performance audit and remaining-stage repair command",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0037",
+      "sha": "56de8e99845c07d755b688c006c68978324b5090",
+      "purpose": "governance(team): register post-team performance and remaining-stage repair gates",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0038",
+      "sha": "3963a506eba5302272a1cd944850136a974fcada",
+      "purpose": "governance(team): persist V2 ready-wave continuation state",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0039",
+      "sha": "332d798a0e4fbe32d0a431b7d0801a45944ddebd",
+      "purpose": "governance(team): persist V2 dispatch state",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0040",
+      "sha": "aac4f83c2d6e59f8b09e317c341588882bb86bfd",
+      "purpose": "governance(team): bind READY leases to permanent Work Registry IDs",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0041",
+      "sha": "28ef7dd10bb27b06fd01ed28ca79b456865b382f",
+      "purpose": "governance(team): link V2 wave leases to stable work IDs",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0042",
+      "sha": "3228702a95c84b39ba407ade5810c9b641b73012",
+      "purpose": "governance(team): validate V2 bootstrap wave lease evidence scopes",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0043",
+      "sha": "e564682ad02df31adc458995d4232128c7fa0fd3",
+      "purpose": "governance(team): bootstrap V2 memory and reconciliation next wave",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0044",
+      "sha": "b309f6a944378129bd2d7e8e5378b64242cde273",
+      "purpose": "governance(team): bind active mission to organization V2 control state",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0045",
+      "sha": "afa1d6d2da93ee8309b5fa1b095921cc9cee538b",
+      "purpose": "governance(team): bind V1 execution to Team Organization V2 overlay",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0046",
+      "sha": "2c2832b5eb5009e75988edceac8acc79e356c5c4",
+      "purpose": "governance(team): correct V2 registry dependencies and advance memory migration",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0047",
+      "sha": "76815bdbdb56b9efafab5131d082b4b5a1f913f4",
+      "purpose": "governance(team): establish organization V2 wave-history.json",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0048",
+      "sha": "c86a80d5b14626489b65a83dfc185b5ffb072b18",
+      "purpose": "governance(team): establish organization V2 commit-registry.json",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0049",
+      "sha": "9d5979b8621a879b446bbd923e35704e6fecaa99",
+      "purpose": "governance(team): establish organization V2 blocker-registry.json",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0050",
+      "sha": "f4a988792ec98f6501316f9b30fc3a5d78541d4c",
+      "purpose": "governance(team): establish organization V2 defect-registry.json",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0051",
+      "sha": "56f3f60d3e92ff2e092f83c7201cfa39d0e58865",
+      "purpose": "governance(team): establish organization V2 decision-registry.json",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0052",
+      "sha": "89026a6973b8e83612a627b7c389f025ff16ef72",
+      "purpose": "governance(team): establish organization V2 evidence-registry.json",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0053",
+      "sha": "f6943b809b6b4fa3da64e9a66a04718acb93ac0b",
+      "purpose": "governance(team): establish organization V2 work-registry.json",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0054",
+      "sha": "146eaa039075785f47f8c72f44001ff5b2cd6b5e",
+      "purpose": "governance(team): establish organization V2 mission-state.json",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0055",
+      "sha": "99779692d97f3510c5b44f71778996723b1f7eb9",
+      "purpose": "governance(team): establish organization V2 README.md",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0056",
+      "sha": "7f808ce1d9a8dc51d52c2a7ddb117656572a9c4a",
+      "purpose": "governance(team): establish organization V2 TEAM-ORGANIZATION-V2-PROTOCOL.md",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0057",
+      "sha": "d742b291b08cc2295a8e054173c8e67b5053aa43",
+      "purpose": "governance(team): establish organization V2 TEAM-ORGANIZATION-V2.json",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0058",
+      "sha": "996402fb19b530c93fea4e862f0b1ee427ea08fe",
+      "purpose": "governance(team): activate organization V2 memory-governed continuation",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0059",
+      "sha": "3ebeaa1d1e19eecad98201ff56666f1db778de06",
+      "purpose": "governance(team): register autonomous construction organization V2",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_ORGANIZATION_V2_CONTROL_PLANE",
+      "provenance": "ancestor of 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b on the target branch",
+      "in_start_sha_lineage": true
+    },
+    {
+      "id": "COMMIT-0060",
+      "sha": "fdd289c22e252243d85e660f6ed2997f50b89b62",
+      "purpose": "fix(team): align worker model candidate contract",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0061",
+      "sha": "c45ca6d5110c417fcf68e2101f01636a1ce7c84a",
+      "purpose": "fix(team): simplify governed Team V2 dispatch",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0062",
+      "sha": "c62b2d28bd79215d213efb69c6efeb80b18fd229",
+      "purpose": "fix(team): correct queue governor repository env handling",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0063",
+      "sha": "850c76115d6f24b14c01fcd070070f81294c8055",
+      "purpose": "fix(team): self-bootstrap updated queue governor",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0064",
+      "sha": "d3765999e6435fca082e48bbc57ae152331dded1",
+      "purpose": "fix(team): make queue recovery target active runs only",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0065",
+      "sha": "89c80913f45213ad1e08c14a434366033ca10126",
+      "purpose": "fix(team): stop bootstrap event storm and target governed branch",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0066",
+      "sha": "b72cb22ed5e4863c3b66b4c1b09307edb8eff043",
+      "purpose": "fix(team): preserve target Team V2 branch during queue bootstrap",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0067",
+      "sha": "1fca304b50fae67eda9928de4d85815763cd7056",
+      "purpose": "fix(team): make queue bootstrap event-driven",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0068",
+      "sha": "6766e80976e72cd419298e33bcc908fa0cd402d2",
+      "purpose": "control(team): add independent queue bootstrap manager",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0069",
+      "sha": "01ab0d59579b6c196dd6753d667ddbc63767cd51",
+      "purpose": "fix(team): route governed worker to explicit Ubuntu runner pool",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0070",
+      "sha": "d14553cef65bfde5f66a2bca529d9294698cedeb",
+      "purpose": "control(team): empower manager to govern Actions queue and runners",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0071",
+      "sha": "c6676993ef2107a774cf14c947dc83cb0ac3f8e1",
+      "purpose": "control(team): assign queue and runner governance to team manager",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0072",
+      "sha": "ba70d9dabf84ccba1b33db9d0e5eeb17c7dd6b0a",
+      "purpose": "control(team): avoid false alerts for skipped worker jobs",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0073",
+      "sha": "3cd59b19bb10332ad20cd4e994cb497ac134ad24",
+      "purpose": "control(team): strengthen evidence report false-green gate",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0074",
+      "sha": "f5f98caf74d7d4c061764340bcd77b23c6eca49f",
+      "purpose": "control(team): harden QC and synthesis with qualified role-diverse models",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0075",
+      "sha": "63a35d09e5956ab1dc7a41fce71d9e416bc60936",
+      "purpose": "control(team): fix empirical model probe executable path",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0076",
+      "sha": "ee616fcda00201af4a30375acbf464ec8558f904",
+      "purpose": "control(team): correct model qualification dependency graph",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0077",
+      "sha": "cebe6db470d1e98f0059928ed785b9be21b27757",
+      "purpose": "control(team): add empirical free-model qualification gate",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0078",
+      "sha": "d8669e52579f0f0ee009d3ee1037fe925ab29792",
+      "purpose": "control(team): alert on long-running worker waves before timeout",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0079",
+      "sha": "c12985b37043d4a65e4d9bd35bdcab2a84d0e831",
+      "purpose": "control(team): remove duplicate model environment export",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0080",
+      "sha": "629ef38f3dd259867c2167d8e21c47a0ed0c68e0",
+      "purpose": "control(team): capture OpenCode CLI help from stdout and stderr",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0081",
+      "sha": "d2557367d404c6fee516a89c8fb9d4db3408ac7d",
+      "purpose": "control(team): remove unsupported OpenCode standalone flag and preflight CLI",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0082",
+      "sha": "1c97adc32f70d86e4550fb6df350b95eb8cc9fe5",
+      "purpose": "control(team): align worker timeout with four-model fallback budget",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0083",
+      "sha": "cb5f6bc1077505bb1fd2c25b01f460989bbc83b6",
+      "purpose": "control(worker): fix model state handoff and bounded OpenCode install",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0084",
+      "sha": "f7c044c24068a1db0f84737bdbf18509d1076126",
+      "purpose": "control(team): fix model state handoff and bounded OpenCode install",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0085",
+      "sha": "e2cc5c8a3161bb22ce622683b1214cbb35256e60",
+      "purpose": "control(team): make QC consume artifact reports and remove duplicate env write",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0086",
+      "sha": "9da0ef55282176ba98f5c39b040063eaa027391c",
+      "purpose": "control(worker): replace broken model selector with schema-aligned parser",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0087",
+      "sha": "1e55d3eaf35bde481ef46eabf2cbe7c3d28d5fea",
+      "purpose": "control(team): harden synthesis free-model selector",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0088",
+      "sha": "4ff018e84fcde64cf2bf28e4854c4243ed89c2f7",
+      "purpose": "control(team): harden QC free-model selector",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0089",
+      "sha": "41b8a614e0b2ae6bcf5ce4d7483975d5dcd016f3",
+      "purpose": "control(team): replace model selector with schema-aligned parser",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0090",
+      "sha": "02a73f7727397561e28cd7c9f3267471c4e9755e",
+      "purpose": "control(team): serialize team and single construction lanes",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0091",
+      "sha": "f3d743088742f47f596f49073466886ec437e64e",
+      "purpose": "control(worker): harden OpenCode model metadata parsing",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0092",
+      "sha": "9851ed53d1aa5887431d5dcae1ed23bdf572b17c",
+      "purpose": "control(team): harden OpenCode model metadata parsing",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0093",
+      "sha": "8c6b8963d7ec74e938b99d8b0aa1e8450e1806ea",
+      "purpose": "control(worker): replace unreliable stop trigger with scheduled watchdog",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0094",
+      "sha": "5e1f06512d7736cd4aa331bf3c33b5fa1817a91d",
+      "purpose": "control(worker): isolate single recovery concurrency lane",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0095",
+      "sha": "fd70842dc1790d6bd31cfd06659726eeb53d3afc",
+      "purpose": "control(team): isolate team concurrency lane from legacy recovery runs",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0096",
+      "sha": "5f2bc4d977fbc4ef5b48c719206db0f33bac55ae",
+      "purpose": "control(worker): make single worker explicit recovery-only",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0097",
+      "sha": "8987be1fd6352c86d4a2e32b45211ec092106c89",
+      "purpose": "control(worker): make stop notifier workflow-run only and team-aware",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0098",
+      "sha": "3c58c7414e5ab416c83f227f08f6fe49265f2581",
+      "purpose": "team(worker): add dynamic orchestration semantic QC and autonomous continuation",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0099",
+      "sha": "f59c6692eda68b67ca4e933e5bbd75057d31430d",
+      "purpose": "team(worker): isolate synthesis and preserve worker reports for QC",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0100",
+      "sha": "2bb0ad5d1b84fe3d7123e58449c31b5d5370eb0a",
+      "purpose": "team(worker): harden parallel QC integration synthesis and continuation",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0101",
+      "sha": "a624534ded4c1960f15272716a3b11f8994884a7",
+      "purpose": "control(worker): yield active mission continuation to team mode",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0102",
+      "sha": "31ebbdb7c6bda95d99be1fcc86520229b0196ffa",
+      "purpose": "control(worker): isolate single-run trigger from team command",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0103",
+      "sha": "367d7297d63df96c027434ce5e3ec8c82b7cd67e",
+      "purpose": "control(team): fix free model eligibility and catalog parsing",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0104",
+      "sha": "c3008bc6682e91bfec6e0b940ceceee3c02b6f1b",
+      "purpose": "control(worker): fix free model eligibility and catalog parsing",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0105",
+      "sha": "fa7926da1ecf36004c6580e76a1c7fe164fbb62c",
+      "purpose": "control(worker): extend stop notifications to team workflow",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0106",
+      "sha": "4efabeef5f9cf55377b615f34e84ae5d7ffa3621",
+      "purpose": "team(worker): preserve per-worker result artifacts",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0107",
+      "sha": "c5dcd110da522d745b74469f0b951e56258389ce",
+      "purpose": "control(worker): serialize single and team construction lanes",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0108",
+      "sha": "00ebd5004096c7b1051a99bd0211c636150668ab",
+      "purpose": "team(worker): add 12-seat isolated parallel autonomous team",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0109",
+      "sha": "aa9c1ef43bf7878437416646d4f61e4fce9d3aff",
+      "purpose": "control(worker): add independent stop notification watchdog",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0110",
+      "sha": "ac8ffdaf343891f1a2223b33f5954e9316398eea",
+      "purpose": "control(worker): harden restart command and adaptive-run timeout",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0111",
+      "sha": "7d587f66ea2c407aae8e871a8a539f9f18b728fe",
+      "purpose": "feat(opencode): adaptively select and fail over across free models",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0112",
+      "sha": "c0a65b3b5a6d388423d10848028d5ae35ad36763",
+      "purpose": "fix(opencode): repair governed mission continuation workflow",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0113",
+      "sha": "129f39f98bbfd84bdad65c4d51487c59ce8a2086",
+      "purpose": "chore(opencode): bind worker to active mission and continue safely",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0114",
+      "sha": "52d7d2d05730ad1f88d771cbf7b3d9b555c9230e",
+      "purpose": "chore(opencode): remove completed smoke-test workflow",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0115",
+      "sha": "da6e1112d2ebcf3b64f8ff34837c9ea4177b4947",
+      "purpose": "chore(opencode): remove completed smoke-test workflow",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0116",
+      "sha": "fa03c6af60080c912bb11774d86c3b764b8b5cfd",
+      "purpose": "chore(opencode): remove temporary push self-test trigger",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0117",
+      "sha": "2b426fce4ee8e3a3360c4dd8e02cdcc2fc0e048a",
+      "purpose": "fix(opencode): validate installed CLI through absolute path",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0118",
+      "sha": "c23a1dbf27887e867ebf85d4f9b66644d307c516",
+      "purpose": "test(opencode): trigger controlled worker self-test",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0119",
+      "sha": "9248cd794758816f54b4af2c00c71c23d52aace3",
+      "purpose": "feat(opencode): add controlled immediate worker trigger",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0120",
+      "sha": "d1d99e93d13235a2548a7be854fcec79302ed46b",
+      "purpose": "fix(opencode): harden continuous worker prompt and git gates",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0121",
+      "sha": "376c2055213da42d9c3918adb516f53e60e981a7",
+      "purpose": "feat(opencode): add governed continuous remote worker",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0122",
+      "sha": "c060eb02083cdfdc4e2be8f00f12189ed2f7e7b8",
+      "purpose": "fix(opencode): preserve GitHub credentials for sandbox push",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0123",
+      "sha": "400ca14cd68df4ff9f552b282964850f4529138d",
+      "purpose": "experiment(opencode): add bounded sandbox write smoke test",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0124",
+      "sha": "eb674c050fbecb19afcabf1776a28332278c7968",
+      "purpose": "test(opencode): use free Zen smoke-test model",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0125",
+      "sha": "9e804907c5662e33c60da88160ca2eb2bef82ff9",
+      "purpose": "test(opencode): use stable Zen smoke-test model",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
+    },
+    {
+      "id": "COMMIT-0126",
+      "sha": "082e8a8d2b8461c1c252b42fcff0078d05aa70c6",
+      "purpose": "test(opencode): add isolated GitHub smoke-test workflow",
+      "status": "INTEGRATED_CONTROL",
+      "date": "2026-10-08",
+      "domain": "TEAM_CONTROL_PLANE_ORIGIN_MAIN_LINEAGE",
+      "in_start_sha_lineage": false,
+      "lineage": "ORIGIN_MAIN",
+      "provenance": "reachable from origin/main (tip fdd289c22e252243d85e660f6ed2997f50b89b62); absent from START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+      "linked_blocker": "BLOCKER-0004"
     }
-  ]
+  ],
+  "backfill_required": false,
+  "backfill_state": {
+    "status": "TEAM_DOMAIN_BACKFILLED",
+    "backfilled_by": "work-0003-memory-backfill",
+    "backfilled_at_sha": "6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+    "scope_completed": [
+      "All 11 Wave-10 worker evidence commits (run 37743827267) now registered with branch-scoped provenance and NOT_PROMOTED promotion state.",
+      "All 37 Team Organization V2 control-plane commits (3ebeaa1d..6c9d4da5) now registered."
+    ],
+    "scope_remaining": [
+      "Pre-V2 product-era commits (product code, Docs, .kilo/plans, .kilo/evidence) are NOT individually registered; they are outside organizational-memory scope and are not reconstructed.",
+      "origin/main control-plane lineage: 79 commits exist on origin/main that are absent from START_SHA. The team-control-plane commits among them are now registered with lineage=ORIGIN_MAIN; the remainder are workflow/worker-orchestration commits not individually registered."
+    ]
+  }
 }
