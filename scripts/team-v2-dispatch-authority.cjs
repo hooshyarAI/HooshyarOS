@@ -3,7 +3,7 @@
 const { execFileSync } = require("node:child_process");
 const { evaluateGate } = require("./lib/team-v2-gate.cjs");
 const { validateWork, deriveTaskClass } = require("./lib/team-v2-admission.cjs");
-const { validateAuthorization } = require("./lib/team-v2-authorization.cjs");
+const { validateAuthorization, canonicalJson } = require("./lib/team-v2-authorization.cjs");
 const { reservationId, reservationRef } = require("./lib/team-v2-reservation.cjs");
 const crypto = require("node:crypto");
 const fs = require("node:fs");
@@ -234,9 +234,7 @@ if (require.main === module) {
   }
   const planText = readRepoFileText(".kilo/team/NEXT-WAVE-PLAN.json");
   const leaseForSnapshot = JSON.parse(planText).leases?.[0] || null;
-  const leaseSha256 = leaseForSnapshot
-    ? sha256(JSON.stringify(leaseForSnapshot, Object.keys(leaseForSnapshot).sort()))
-    : "";
+  const leaseSha256 = leaseForSnapshot ? sha256(canonicalJson(leaseForSnapshot)) : "";
   const plan = JSON.parse(planText);
   const planSha256 = sha256(planText);
   const gate = readRepoJson(".kilo/team/TEAM-V2-ACCEPTANCE-GATE.json");
