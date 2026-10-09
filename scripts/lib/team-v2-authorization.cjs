@@ -6,7 +6,7 @@ function stableJson(value) {
   if (Array.isArray(value)) return value.map(stableJson);
   if (value && typeof value === "object") {
     return Object.keys(value).sort().reduce((out, key) => {
-      if (key !== "signature" && key !== "payload_sha256") out[key] = stableJson(value[key]);
+      if (key !== "signature") out[key] = stableJson(value[key]);
       return out;
     }, {});
   }
@@ -48,21 +48,9 @@ function validateAuthorization(auth, ctx) {
   if (auth.schema !== "team-v2.acceptance-authorization.v1") violations.push({ code: "AUTHORIZATION_SCHEMA_INVALID", detail: String(auth.schema || "") });
   if (!auth.authorization_id) violations.push({ code: "AUTHORIZATION_ID_MISSING", detail: "authorization_id required" });
   if (!auth.issued_by) violations.push({ code: "AUTHORIZATION_ISSUER_MISSING", detail: "issued_by required" });
-  const issuer = auth.issuer || {};
-  if (issuer.workflow_path !== ".github/workflows/team-acceptance-authorization.yml" ||
-      issuer.event !== "workflow_dispatch" ||
-      issuer.actor !== auth.issued_by ||
-      !Number.isSafeInteger(Number(issuer.workflow_run_id)) ||
-      Number(issuer.workflow_run_id) <= 0) {
-    violations.push({ code: "AUTHORIZATION_ISSUER_PROVENANCE_INVALID", detail: "owner-gated workflow provenance is incomplete" });
-  }
-  if (!/^[a-f0-9]{64}$/.test(String(auth.payload_sha256 || "")) ||
-      auth.payload_sha256 !== hashPayload(auth)) {
-    violations.push({ code: "AUTHORIZATION_PAYLOAD_HASH_INVALID", detail: "authorization payload digest mismatch" });
-  }
-  if (auth.signature && ctx.signatureSecret && !verifySignature(auth, ctx.signatureSecret)) {
-    violations.push({ code: "AUTHORIZATION_SIGNATURE_INVALID", detail: "optional HMAC signature verification failed" });
-  }
+  if (!auth.signature) violations.push({ code: "AUTHORIZATION_SIGNATURE_MISSING", detail: "HMAC signature required" });
+  if (ctx.signatureSecret && !verifySignature(auth, ctx.signatureSecret)) violations.push({ code: "AUTHORIZATION_SIGNATURE_INVALID", detail: "signature verification failed" });
+  if (!ctx.signatureSecret) violations.push({ code: "AUTHORIZATION_SIGNATURE_KEY_MISSING", detail: "verification secret unavailable" });
   if (scope.max_worker_reservations !== 1) violations.push({ code: "AUTHORIZATION_MAX_WORKERS_INVALID", detail: "must be exactly 1" });
   if (scope.work_id !== ctx.workId) violations.push({ code: "AUTHORIZATION_WORK_MISMATCH", detail: String(scope.work_id) + " != " + String(ctx.workId) });
   if (scope.lease_id !== ctx.leaseId) violations.push({ code: "AUTHORIZATION_LEASE_MISMATCH", detail: String(scope.lease_id) + " != " + String(ctx.leaseId) });
