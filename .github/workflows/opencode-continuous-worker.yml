@@ -24,7 +24,7 @@ permissions:
 
 jobs:
   continuous-worker:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.legacy_recovery_ack == 'EXPLICIT_LEGACY_RECOVERY' }}
+    if: ${{ false }} # SECURITY_HOLD: OpenCode worker paused pending access review
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
