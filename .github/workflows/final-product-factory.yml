@@ -187,25 +187,25 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: hooshyar-final-product-factory-evidence
-          path: .hooshyar
+          path: .
           merge-multiple: true
       - name: Download Web acceptance evidence
         uses: actions/download-artifact@v4
         with:
           name: hooshyar-web-product-acceptance-evidence
-          path: .hooshyar
+          path: .
           merge-multiple: true
       - name: Download Android acceptance evidence
         uses: actions/download-artifact@v4
         with:
           name: hooshyar-android-product-acceptance-evidence
-          path: .hooshyar
+          path: .
           merge-multiple: true
       - name: Download security acceptance evidence
         uses: actions/download-artifact@v4
         with:
           name: hooshyar-security-tenant-evidence
-          path: .hooshyar
+          path: .
           merge-multiple: true
       - name: Run Cline runtime evidence collector
         run: npm run product:cline:evidence
