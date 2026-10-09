@@ -10,7 +10,8 @@ const base = () => ({
     focus: "memory reconciliation",
     owner: "MEMORY_EDITOR",
     mode: "AUDIT",
-    write_scope: [".kilo/team/memory/", ".kilo/team/results/work-0011-team-v2-memory-reconciliation/"],
+    task_class: "MEMORY",
+    write_scope: [".kilo/team/memory/", ".kilo/team/results/work-0011-team-v2-memory-reconciliation/", ".kilo/team/results/work-0006-team-performance-evaluation/PRE-GATE-BASELINE.md"],
     dependencies: []
   }]},
   registry: { items: [{ id: "WORK-0011", status: "READY", readiness: "READY", execution_attempts: [] }] }
