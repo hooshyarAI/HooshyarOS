@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   recover-controlled-drift:
-    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    if: ${{ false }} # SECURITY_HOLD: Team V2 recovery paused pending review
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -181,7 +181,7 @@ jobs:
 
   recover-synthesize:
     needs: recover-controlled-drift
-    if: ${{ needs.recover-controlled-drift.result == 'success' }}
+    if: ${{ false }} # SECURITY_HOLD: Team V2 recovery paused pending review
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -353,7 +353,7 @@ jobs:
 
   continue-next-wave:
     needs: recover-synthesize
-    if: ${{ needs.recover-synthesize.result == 'success' }}
+    if: ${{ false }} # SECURITY_HOLD: Team V2 recovery paused pending review
     uses: ./.github/workflows/team-dispatch-authority.yml
     with:
       reason: Automatic continuation after controlled team-wave recovery via single authority
