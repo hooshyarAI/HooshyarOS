@@ -20,6 +20,7 @@ permissions:
 
 jobs:
   authorize-and-dispatch:
+    if: ${{ false }} # SECURITY_HOLD: cloud worker disabled pending review
     runs-on: ubuntu-slim
     concurrency:
       group: hooshyaros-team-dispatch-authority
