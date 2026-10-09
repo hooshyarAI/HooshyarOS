@@ -45,7 +45,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: hooshyar-final-product-factory-evidence
-          path: ./factory-success.json
+          path: .hooshyar/factory-success.json
           if-no-files-found: error
           retention-days: 14
       - name: Fail release gate on factory failure
