@@ -18,7 +18,6 @@ jobs:
     # The daemon itself commits and pushes each completed capability. Those
     # bot-originated pushes must not recursively create another daemon run;
     # the daemon continues its governed cycle loop inside this job.
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
