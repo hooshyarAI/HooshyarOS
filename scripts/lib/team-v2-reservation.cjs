@@ -14,6 +14,13 @@ function reservationRef(workId) {
   return "refs/team-v2/active/" + workId;
 }
 
+function reservationRecordRef(reservation) {
+  if (!/^[a-f0-9]{64}$/.test(String(reservation || ""))) {
+    throw new Error("invalid reservation id");
+  }
+  return "refs/team-v2/reservations/" + reservation;
+}
+
 function claimRef(reservation) {
   if (!/^[a-f0-9]{64}$/.test(String(reservation || ""))) {
     throw new Error("invalid reservation id");
@@ -37,4 +44,4 @@ function buildReservation(args) {
   };
 }
 
-module.exports = { reservationId, reservationRef, claimRef, buildReservation };
+module.exports = { reservationId, reservationRef, reservationRecordRef, claimRef, buildReservation };
