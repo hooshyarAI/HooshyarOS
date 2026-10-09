@@ -1,6 +1,7 @@
 name: HooshyarOS Team V2 Control Plane Validation # v3
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
