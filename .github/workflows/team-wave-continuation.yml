@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   continue:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ false }} # SECURITY_HOLD: automatic Team V2 continuation paused pending review
     uses: ./.github/workflows/team-dispatch-authority.yml
     with:
       reason: Post-completion governed Team V2 continuation via single authority
