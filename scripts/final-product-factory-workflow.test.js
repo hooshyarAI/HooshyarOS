@@ -16,11 +16,14 @@ describe('Final Product Factory evidence artifact contract', () => {
     expect(uploadStart).toBeGreaterThan(validationStart);
     expect(releaseGateStart).toBeGreaterThan(uploadStart);
 
-    const validationBlock = workflow.slice(validationStart, uploadStart);
+    const stagingStart = workflow.indexOf('name: Stage canonical factory evidence for artifact upload');
     const uploadBlock = workflow.slice(uploadStart, releaseGateStart);
 
-    expect(validationBlock).toContain('Test-Path .hooshyar/factory-success.json');
-    expect(uploadBlock).toContain('path: .hooshyar/factory-success.json');
-    expect(uploadBlock).not.toContain('path: ./factory-success.json');
+    expect(stagingStart).toBeGreaterThan(validationStart);
+    expect(stagingStart).toBeLessThan(uploadStart);
+    expect(workflow.slice(validationStart, stagingStart)).toContain('Test-Path .hooshyar/factory-success.json');
+    expect(workflow.slice(stagingStart, uploadStart)).toContain('Copy-Item .hooshyar/factory-success.json ./factory-success.json -Force');
+    expect(uploadBlock).toContain('path: ./factory-success.json');
+    expect(uploadBlock).not.toContain('path: .hooshyar/factory-success.json');
   });
 });

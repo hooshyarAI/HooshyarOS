@@ -40,12 +40,20 @@ jobs:
       - name: Emit assistant repair handoff on failure
         if: steps.product-factory.outcome == 'failure'
         run: npm run product:factory:handoff
+      - name: Stage canonical factory evidence for artifact upload
+        if: always()
+        run: |
+          if (-not (Test-Path .hooshyar/factory-success.json)) {
+            Write-Host "Missing factory evidence: .hooshyar/factory-success.json"
+            exit 1
+          }
+          Copy-Item .hooshyar/factory-success.json ./factory-success.json -Force
       - name: Upload product factory evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: hooshyar-final-product-factory-evidence
-          path: .hooshyar/factory-success.json
+          path: ./factory-success.json
           if-no-files-found: error
           retention-days: 14
       - name: Fail release gate on factory failure
