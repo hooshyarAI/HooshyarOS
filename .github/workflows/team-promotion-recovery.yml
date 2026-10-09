@@ -25,6 +25,7 @@ permissions:
 
 jobs:
   recover-and-synthesize:
+    if: ${{ false }} # SECURITY_HOLD: team promotion recovery paused pending review
     runs-on: ubuntu-22.04
     timeout-minutes: 45
     env:
