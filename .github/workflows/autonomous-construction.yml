@@ -13,6 +13,7 @@ concurrency:
 
 jobs:
   launch:
+    if: ${{ false }} # SECURITY_HOLD: construction launcher paused pending review
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
