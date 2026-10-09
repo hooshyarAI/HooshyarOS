@@ -13,8 +13,12 @@ function stableJson(value) {
   return value;
 }
 
+function canonicalJson(value) {
+  return JSON.stringify(stableJson(value));
+}
+
 function payloadForSignature(auth) {
-  return JSON.stringify(stableJson(auth));
+  return canonicalJson(auth);
 }
 
 function hashPayload(auth) {
@@ -65,4 +69,4 @@ function validateAuthorization(auth, ctx) {
   return violations;
 }
 
-module.exports = { validateAuthorization, hashPayload, payloadForSignature, signatureFor, verifySignature };
+module.exports = { validateAuthorization, hashPayload, payloadForSignature, canonicalJson, signatureFor, verifySignature };
