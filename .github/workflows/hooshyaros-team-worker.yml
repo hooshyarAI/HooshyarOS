@@ -39,7 +39,7 @@ permissions:
 
 jobs:
   prepare:
-    if: ${{ github.event_name == 'workflow_dispatch' }}
+    if: ${{ false }} # SECURITY_HOLD: Team V2 execution paused
     runs-on: ubuntu-22.04
     env:
       TEAM_RESERVATION_ID: ${{ inputs.reservation_id }}
@@ -591,7 +591,7 @@ jobs:
           echo "TEAM_START_SHA=${START_SHA}"
   model-qualification:
     needs: prepare
-    if: ${{ needs.prepare.result == 'success' }}
+    if: ${{ false }} # SECURITY_HOLD: Team V2 execution paused
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     outputs:
@@ -786,7 +786,7 @@ jobs:
 
   team-worker:
     needs: [prepare, model-qualification]
-    if: ${{ needs.prepare.result == 'success' && needs.model-qualification.result == 'success' }}
+    if: ${{ false }} # SECURITY_HOLD: Team V2 execution paused
     strategy:
       fail-fast: false
       max-parallel: ${{ fromJSON(needs.prepare.outputs.max_parallel) }}
@@ -1233,7 +1233,7 @@ jobs:
 
   quality-control:
     needs: [prepare, model-qualification, team-worker]
-    if: ${{ always() && needs.prepare.result == 'success' && needs.model-qualification.result == 'success' && needs.team-worker.result != 'cancelled' }}
+    if: ${{ false }} # SECURITY_HOLD: Team V2 execution paused
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     permissions:
@@ -1528,7 +1528,7 @@ jobs:
 
   integrate:
     needs: [prepare, team-worker, quality-control]
-    if: ${{ always() && needs.prepare.result == 'success' && needs.quality-control.result == 'success' }}
+    if: ${{ false }} # SECURITY_HOLD: Team V2 execution paused
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     permissions:
@@ -1761,7 +1761,7 @@ jobs:
 
   synthesize:
     needs: [integrate, model-qualification]
-    if: ${{ success() && needs.model-qualification.result == 'success' }}
+    if: ${{ false }} # SECURITY_HOLD: Team V2 execution paused
     runs-on: ubuntu-22.04
     timeout-minutes: 45
     permissions:
