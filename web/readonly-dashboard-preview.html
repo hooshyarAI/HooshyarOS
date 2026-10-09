@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b1220">
+<meta name="description" content="پیش‌نمایش نمایشی و فقط‌خواندنی داشبورد HooshyarOS">
+<title>HooshyarOS | پیش‌نمایش داشبورد</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1220;--panel:#121d30;--panel2:#17243a;--line:#27364d;--txt:#eef4ff;--muted:#9aaac1;--mint:#54dfbb;--blue:#72a7ff;--amber:#f7c66a;--rose:#ff8a98}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 85% -10%,#1e3b58 0,transparent 38%),var(--bg);color:var(--txt);font-family:Tahoma,"Segoe UI",Arial,sans-serif;line-height:1.6}
+a{color:inherit;text-decoration:none}.wrap{max-width:1400px;margin:auto;padding:22px}.top{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:24px}.brand{display:flex;align-items:center;gap:12px}.logo{width:46px;height:46px;border-radius:15px;background:linear-gradient(140deg,#6ae4c3,#4c8bff);display:grid;place-items:center;color:#081525;font-weight:900;font-size:22px;box-shadow:0 8px 28px #0004}.brand h1{margin:0;font-size:20px;letter-spacing:-.3px}.brand p{margin:2px 0 0;color:var(--muted);font-size:12px}.top-right{display:flex;align-items:center;gap:10px}.demo{background:#352a1a;color:#ffd58b;border:1px solid #70512a;border-radius:99px;padding:7px 12px;font-size:12px;font-weight:700}.user{display:flex;align-items:center;gap:9px;background:#111d2e;border:1px solid var(--line);padding:7px 12px;border-radius:14px;font-size:12px}.avatar{display:grid;place-items:center;width:30px;height:30px;background:#2b4664;border-radius:10px;color:#c8e2ff}
+.hero{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin:18px 0 22px}.eyebrow{color:var(--mint);font-size:12px;font-weight:700;margin:0 0 6px}.hero h2{font-size:clamp(24px,3vw,34px);line-height:1.4;margin:0;letter-spacing:-.8px}.hero p{color:var(--muted);font-size:13px;margin:7px 0 0}.period{border:1px solid var(--line);background:#121d30;border-radius:12px;padding:10px 14px;color:#d5dfef;font-size:12px;white-space:nowrap}
+.grid{display:grid;gap:14px}.kpis{grid-template-columns:repeat(4,minmax(0,1fr))}.card{background:linear-gradient(145deg,#16243a,#111b2d);border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:0 10px 26px #00000013;min-width:0}.kpi-top{display:flex;justify-content:space-between;align-items:center;gap:8px;color:var(--muted);font-size:12px}.kico{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;font-weight:800;font-size:18px;background:#1f3b49;color:var(--mint)}.kico.blue{background:#203555;color:var(--blue)}.kico.amber{background:#3d3322;color:var(--amber)}.kico.rose{background:#402633;color:var(--rose)}.value{font-size:clamp(22px,2.5vw,30px);font-weight:800;margin:14px 0 4px;letter-spacing:-.5px}.unit{font-size:12px;font-weight:500;color:var(--muted);margin-right:5px}.trend{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--mint)}.trend span:last-child{color:var(--muted)}
+.middle{grid-template-columns:minmax(0,1.7fr) minmax(280px,1fr);margin-top:14px}.section-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:16px}.section-title h3{font-size:15px;margin:0}.section-title span{font-size:11px;color:var(--muted)}.chart-head{display:flex;gap:16px;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:11px;margin:0 0 10px}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:5px}.bars{height:180px;display:flex;align-items:end;gap:clamp(7px,2vw,18px);padding:10px 4px 0;border-bottom:1px solid var(--line)}.bar-group{flex:1;height:100%;display:flex;align-items:center;justify-content:end;flex-direction:column;gap:7px;min-width:0}.bar-pair{height:145px;width:100%;display:flex;align-items:end;justify-content:center;gap:4px}.bar{width:min(24px,36%);min-width:9px;border-radius:6px 6px 2px 2px;background:linear-gradient(180deg,#75aaff,#4373c8);opacity:.92}.bar.profit{background:linear-gradient(180deg,#63e4bf,#1f947f)}.month{font-size:10px;color:var(--muted);padding-bottom:10px}.insight{display:flex;gap:10px;align-items:flex-start;padding:12px;border-radius:13px;background:#17283b;border:1px solid #2a4657;margin-bottom:10px}.insight-icon{flex:0 0 30px;height:30px;border-radius:9px;display:grid;place-items:center;background:#203e41;color:var(--mint);font-weight:900}.insight h4{margin:0 0 4px;font-size:12px}.insight p{margin:0;color:#aebdd1;font-size:11px;line-height:1.9}.insight.warn{background:#2a281f;border-color:#4d422a}.insight.warn .insight-icon{background:#493922;color:var(--amber)}
+.bottom{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);margin-top:14px}.risk-head{display:flex;align-items:center;justify-content:space-between}.risk-number{font-size:29px;font-weight:800;color:var(--amber)}.risk-number small{font-size:12px;color:var(--muted);font-weight:500}.meter{height:9px;border-radius:99px;background:#26354a;margin:15px 0 9px;overflow:hidden}.meter span{display:block;height:100%;width:48%;border-radius:99px;background:linear-gradient(90deg,var(--mint),var(--amber))}.meter-labels{display:flex;justify-content:space-between;color:var(--muted);font-size:10px}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap}th,td{text-align:right;padding:12px 8px;border-bottom:1px solid var(--line)}th{color:var(--muted);font-weight:500;font-size:11px}td{color:#e3ebf7}.pos{color:var(--mint)}.neg{color:var(--rose)}.footer{display:flex;justify-content:space-between;gap:10px;color:#788aa4;font-size:10px;margin:18px 2px 0}.stamp{display:inline-flex;gap:6px;align-items:center}.stamp:before{content:"";width:6px;height:6px;background:var(--amber);border-radius:50%}
+@media(max-width:850px){.wrap{padding:15px}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.middle,.bottom{grid-template-columns:1fr}.hero{align-items:flex-start;flex-direction:column}.period{align-self:flex-start}.top-right .user{display:none}.card{padding:15px}.value{font-size:25px}}
+@media(max-width:420px){.wrap{padding:11px}.brand h1{font-size:17px}.logo{width:40px;height:40px}.demo{font-size:10px;padding:6px 9px}.kpis{gap:9px}.kpi-top{font-size:11px}.kico{width:30px;height:30px}.value{font-size:22px}.unit{font-size:10px}.footer{flex-direction:column}.period{font-size:11px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><div class="logo">ه</div><div><h1>هوشیار<span style="color:var(--mint)">OS</span></h1><p>فضای یکپارچه هوشمندی مالی و مدیریتی</p></div></div>
+    <div class="top-right"><span class="demo">پیش‌نمایش نمایشی · فقط‌خواندنی</span><div class="user"><span class="avatar">م</span><span>نمای مدیریتی<br><span style="color:var(--muted)">نسخه نمایشی</span></span></div></div>
+  </header>
+  <section class="hero">
+    <div><p class="eyebrow">داشبورد مدیریتی / نمای کلان</p><h2>تصویر روشن‌تری از وضعیت کسب‌وکار</h2><p>نمایی یکپارچه از عملکرد مالی، روندها و نکات مهم تصمیم‌گیری.</p></div>
+    <div class="period">◷ &nbsp; دوره نمایشی: چهارماهه</div>
+  </section>
+  <section class="grid kpis">
+    <article class="card"><div class="kpi-top"><span>درآمد دوره</span><span class="kico">↗</span></div><div class="value">۱۲٫۴ <span class="unit">میلیارد تومان</span></div><div class="trend">↑ ۸٫۲٪ <span>نسبت به دوره قبل · نمونه</span></div></article>
+    <article class="card"><div class="kpi-top"><span>سود خالص</span><span class="kico blue">◈</span></div><div class="value">۲٫۸ <span class="unit">میلیارد تومان</span></div><div class="trend">↑ ۵٫۶٪ <span>نسبت به دوره قبل · نمونه</span></div></article>
+    <article class="card"><div class="kpi-top"><span>حاشیه سود</span><span class="kico amber">%</span></div><div class="value">۲۲٫۶٪</div><div class="trend">↑ ۱٫۴ واحد درصد <span>نمونه نمایشی</span></div></article>
+    <article class="card"><div class="kpi-top"><span>نسبت بدهی</span><span class="kico rose">◇</span></div><div class="value">۴۸٫۶٪</div><div class="trend" style="color:var(--amber)">● نیازمند پایش <span>مقدار نمونه</span></div></article>
+  </section>
+  <section class="grid middle">
+    <article class="card">
+      <div class="section-title"><h3>روند درآمد و سود</h3><span>مقادیر نمونه · میلیارد تومان</span></div>
+      <div class="chart-head"><span><i class="dot" style="background:var(--blue)"></i>درآمد</span><span><i class="dot" style="background:var(--mint)"></i>سود خالص</span></div>
+      <div class="bars" role="img" aria-label="نمودار نمایشی درآمد و سود در چهار دوره">
+        <div class="bar-group"><div class="bar-pair"><span class="bar" style="height:44%"></span><span class="bar profit" style="height:25%"></span></div><span class="month">فروردین</span></div>
+        <div class="bar-group"><div class="bar-pair"><span class="bar" style="height:58%"></span><span class="bar profit" style="height:34%"></span></div><span class="month">اردیبهشت</span></div>
+        <div class="bar-group"><div class="bar-pair"><span class="bar" style="height:68%"></span><span class="bar profit" style="height:39%"></span></div><span class="month">خرداد</span></div>
+        <div class="bar-group"><div class="bar-pair"><span class="bar" style="height:86%"></span><span class="bar profit" style="height:51%"></span></div><span class="month">تیر</span></div>
+        <div class="bar-group"><div class="bar-pair"><span class="bar" style="height:77%"></span><span class="bar profit" style="height:48%"></span></div><span class="month">مرداد</span></div>
+        <div class="bar-group"><div class="bar-pair"><span class="bar" style="height:95%"></span><span class="bar profit" style="height:60%"></span></div><span class="month">شهریور</span></div>
+      </div>
+    </article>
+    <article class="card">
+      <div class="section-title"><h3>بینش‌ها و نکات تصمیم</h3><span>نمونه</span></div>
+      <div class="insight"><div class="insight-icon">↗</div><div><h4>رشد درآمد در مسیر مثبت</h4><p>روند فرضی این نمونه رشد درآمد را نشان می‌دهد؛ برای نتیجه واقعی باید داده‌های تأییدشده بررسی شوند.</p></div></div>
+      <div class="insight warn"><div class="insight-icon">!</div><div><h4>پایش ساختار بدهی</h4><p>نسبت بدهی را همراه با جریان نقد، سررسید تعهدات و توان بازپرداخت بررسی کنید.</p></div></div>
+      <div class="insight"><div class="insight-icon">✓</div><div><h4>کنترل کیفیت داده پیش از تصمیم</h4><p>مغایرت‌ها و دوره‌های مالی باید پیش از صدور گزارش نهایی تطبیق داده شوند.</p></div></div>
+    </article>
+  </section>
+  <section class="grid bottom">
+    <article class="card">
+      <div class="section-title"><h3>نمای فشرده شاخص‌ها</h3><span>اطلاعات ساختگی برای نمایش رابط</span></div>
+      <div class="table-wrap"><table><thead><tr><th>شاخص</th><th>مقدار نمونه</th><th>وضعیت</th></tr></thead><tbody>
+        <tr><td>نقدینگی کوتاه‌مدت</td><td>۱٫۷</td><td class="pos">قابل‌قبول</td></tr>
+        <tr><td>بازده دارایی</td><td>۹٫۸٪</td><td class="pos">پایدار</td></tr>
+        <tr><td>رشد هزینه عملیاتی</td><td>۱۱٫۳٪</td><td class="neg">نیازمند بررسی</td></tr>
+        <tr><td>پوشش بهره</td><td>۳٫۲</td><td>قابل پایش</td></tr>
+      </tbody></table></div>
+    </article>
+    <article class="card">
+      <div class="section-title"><h3>نمای ریسک مالی</h3><span>نمونه نمایشی</span></div>
+      <div class="risk-head"><div><div style="font-size:12px;color:var(--muted)">امتیاز ریسک ترکیبی</div><div style="font-size:12px;margin-top:6px">ترکیب اهرم مالی و نقدینگی</div></div><div class="risk-number">۴۸<small> / ۱۰۰</small></div></div>
+      <div class="meter"><span></span></div><div class="meter-labels"><span>کم</span><span>متوسط</span><span>زیاد</span></div>
+      <p style="font-size:11px;color:var(--muted);margin:18px 0 0">در نسخه عملیاتی، امتیاز ریسک باید از داده‌های معتبر و قواعد تحلیلی سامانه محاسبه شود؛ این مقدار فقط برای نمایش طراحی است.</p>
+    </article>
+  </section>
+  <footer class="footer"><span class="stamp">محیط نمایشی — به سامانه یا فایل مالی متصل نیست</span><span>HooshyarOS · پیش‌نمایش رابط کاربری · بدون ورود اطلاعات</span></footer>
+</div>
+</body>
+</html>
