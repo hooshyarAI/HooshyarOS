@@ -47,6 +47,12 @@ describe('Unified Intelligent Workspace UI contract',()=>{
     expect(app).toContain('updateDecisionLifecycle({ hasExecutionWorkItems: true })');
     expect(app).toContain("step.setAttribute('aria-current', 'step')");
   });
+  test('only advances past source intake after the canonical ingest job completes',()=>{
+    expect(app).toContain("lastIngestJob && lastIngestJob.status === 'COMPLETED'");
+    expect(app).toContain('updateDecisionLifecycle();');
+    expect(app).toContain('lastIngestJob = null;');
+    expect(app).not.toContain('آماده دریافت و اعتبارسنجی/.test(contextState)) currentStage = 1');
+  });
   test('preserves the legacy workspace anchor for existing links',()=>{ expect(html).toContain('id="workspace"'); expect(html).toContain('id="main-workspace"'); });
   test('parses the shipped app script as valid JavaScript',()=>{ expect(()=>new vm.Script(app,{filename:'web/app.js'})).not.toThrow(); });
   test('keeps the surface framework-free and mobile-adaptive',()=>{

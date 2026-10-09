@@ -420,6 +420,7 @@ function renderIngestJob(job) {
 
   document.querySelector('#analysis-progress-message').textContent = described.message;
   document.querySelector('#analysis-progress-code').textContent = job.code ? `کد تشخیص: ${job.code}` : '';
+  updateDecisionLifecycle();
 }
 
 function persistIngestJob(entry) {
@@ -464,7 +465,10 @@ function updateDecisionLifecycle({ hasExecutionWorkItems } = {}) {
     ? hasExecutionWorkItems
     : document.querySelectorAll('#execution-list .execution-item').length > 0;
   let currentStage = 0;
-  if (hasSource && /منبع انتخاب شد|آماده دریافت و اعتبارسنجی|در حال دریافت|در حال اعتبارسنجی/.test(contextState)) currentStage = 1;
+  // A selected file is not yet a completed intake. Advance to analysis only
+  // after the canonical ingest job reports COMPLETED; analysis context moves
+  // the workflow on to interpretation once the server result is available.
+  if (hasSource && lastIngestJob && lastIngestJob.status === 'COMPLETED') currentStage = 1;
   if (hasSource && /تحلیل و بینش آماده|نتیجه آماده|بخشی از تحلیل|محدودیت/.test(contextState)) currentStage = 2;
   if (hasWorkItems) currentStage = 3;
   steps.forEach((step, index) => {
@@ -519,6 +523,8 @@ function wireWorkspaceInteractions() {
   const file=document.querySelector('#csv-file');
   if(file)file.addEventListener('change',()=>{
     const selected=file.files&&file.files[0]; if(!selected)return;
+    lastIngestJob = null;
+    updateDecisionLifecycle();
     setWorkspaceContext({title:'منبع انتخاب شد',description:'منبع دریافت شد؛ اکنون آن را به context معتبر تبدیل و سپس تحلیل می‌کنیم.',source:selected.name,state:'آماده دریافت و اعتبارسنجی'});
   });
 }
