@@ -97,7 +97,7 @@ jobs:
             "authorization_id":aid,
             "gate_id":"TEAM-V2-ACCEPTANCE",
             "scope":{"wave_id":"WAVE-ACCEPT-0001","work_id":"WORK-0011","lease_id":lease["id"],"task_class":"MEMORY","max_worker_reservations":1,"max_candidate_failovers":3},
-            "bindings":{"plan_sha256":hashlib.sha256(plan_text.encode()).hexdigest(),"lease_sha256":hashlib.sha256(json.dumps(lease,sort_keys=True,separators=(",",":")).encode()).hexdigest(),"target_branch":os.environ["TARGET_BRANCH"],"target_sha":target},
+            "bindings":{"plan_sha256":hashlib.sha256(plan_text.encode()).hexdigest(),"lease_sha256":hashlib.sha256(json.dumps(lease,sort_keys=True,separators=(",",":"),ensure_ascii=False).encode()).hexdigest(),"target_branch":os.environ["TARGET_BRANCH"],"target_sha":target},
             "expiry":{"issued_at":now.isoformat().replace("+00:00","Z"),"not_after":expiry.isoformat().replace("+00:00","Z")},
             "issued_by":os.environ["GITHUB_ACTOR"],
             "consumed":False
