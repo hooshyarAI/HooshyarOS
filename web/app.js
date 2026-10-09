@@ -454,6 +454,32 @@ async function pollIngestJob(jobId) {
 }
 
 
+function updateDecisionLifecycle({ hasExecutionWorkItems } = {}) {
+  const steps = [...document.querySelectorAll('[data-lifecycle-step]')];
+  if (!steps.length) return;
+  const contextState = document.querySelector('#context-state')?.textContent || '';
+  const sourceName = document.querySelector('#context-source')?.textContent || '';
+  const hasSource = Boolean(sourceName.trim()) && !/هیچ منبعی انتخاب نشده|منبعی انتخاب نشده/.test(sourceName);
+  const hasWorkItems = typeof hasExecutionWorkItems === 'boolean'
+    ? hasExecutionWorkItems
+    : document.querySelectorAll('#execution-list .execution-item').length > 0;
+  let currentStage = 0;
+  if (hasSource && /منبع انتخاب شد|آماده دریافت و اعتبارسنجی|در حال دریافت|در حال اعتبارسنجی/.test(contextState)) currentStage = 1;
+  if (hasSource && /تحلیل و بینش آماده|نتیجه آماده|بخشی از تحلیل|محدودیت/.test(contextState)) currentStage = 2;
+  if (hasWorkItems) currentStage = 3;
+  steps.forEach((step, index) => {
+    const state = index < currentStage ? 'completed' : index === currentStage ? 'current' : 'pending';
+    step.dataset.lifecycleState = state;
+    if (state === 'current') step.setAttribute('aria-current', 'step');
+    else step.removeAttribute('aria-current');
+    const label = step.querySelector('.lifecycle-state-label');
+    if (label) label.textContent = state === 'completed' ? 'گام طی‌شده' : state === 'current' ? 'گام فعال' : 'در انتظار';
+  });
+  const status = document.querySelector('#lifecycle-status');
+  const title = steps[currentStage]?.querySelector('strong')?.textContent || 'دریافت و کنترل داده';
+  if (status) status.textContent = 'گام فعال: ' + title;
+}
+
 function syncWorkspaceSnapshot() {
   const pairs=[['#revenue-inline','#revenue'],['#profit-inline','#profit'],['#risk-inline','#risk']];
   for (const [target,source] of pairs) {
@@ -466,6 +492,7 @@ function setWorkspaceContext({title,description,source,state,revealActions=false
     const el=document.querySelector(selector); if(el&&value!==undefined)el.textContent=value;
   }
   const actions=document.querySelector('#context-actions'); if(actions&&revealActions)actions.hidden=false;
+  updateDecisionLifecycle();
 }
 function restoreWorkspaceContextFromLatest(latest) {
   if (!presentationApi || typeof presentationApi.deriveRestoredContext !== 'function') return false;
@@ -1207,8 +1234,10 @@ async function refreshExecution() {
     const payload = await getJson('/api/execution/work-items');
     if (!payload.workItems.length) {
       container.textContent = 'هنوز کار اجرایی ثبت نشده است. ابتدا تصمیم بسازید و سپس کار ایجاد کنید.';
+      updateDecisionLifecycle({ hasExecutionWorkItems: false });
       return;
     }
+    updateDecisionLifecycle({ hasExecutionWorkItems: true });
     container.innerHTML = '';
     for (const item of payload.workItems) {
       const card = document.createElement('div');
