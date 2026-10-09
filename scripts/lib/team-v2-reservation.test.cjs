@@ -1,6 +1,6 @@
 "use strict";
 const assert = require("node:assert/strict");
-const { reservationId, reservationRef, claimRef, buildReservation } = require("./team-v2-reservation.cjs");
+const { reservationId, reservationRef, reservationRecordRef, claimRef, buildReservation } = require("./team-v2-reservation.cjs");
 
 const args = {
   workId: "WORK-0011",
@@ -15,6 +15,7 @@ const id2 = reservationId(args);
 assert.equal(id1.length, 64);
 assert.equal(id1, id2);
 assert.match(reservationRef(args.workId), /^refs\/team-v2\/active\/WORK-0011$/);
+assert.match(reservationRecordRef(id1), new RegExp("^refs/team-v2/reservations/" + id1 + "$"));
 assert.match(claimRef(id1), new RegExp("^refs/team-v2/claims/" + id1 + "$"));
 
 const record = buildReservation({
