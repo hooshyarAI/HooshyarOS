@@ -18,7 +18,11 @@ on:
         required: true
         type: string
       reservation_ref:
-        description: "Authority-issued reservation ref; must exist before execution"
+        description: "Authority-issued active Work reservation ref"
+        required: true
+        type: string
+      reservation_record_ref:
+        description: "Authority-issued per-reservation ref; proves the reservation ID was minted by Authority"
         required: true
         type: string
 
@@ -40,6 +44,7 @@ jobs:
     env:
       TEAM_RESERVATION_ID: ${{ inputs.reservation_id }}
       TEAM_RESERVATION_REF: ${{ inputs.reservation_ref }}
+      TEAM_RESERVATION_RECORD_REF: ${{ inputs.reservation_record_ref }}
     outputs:
       start_sha: ${{ steps.final_state.outputs.start_sha }}
       matrix: ${{ steps.pool.outputs.matrix }}
@@ -58,27 +63,29 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          test -n "${TEAM_RESERVATION_ID}" || { echo "BLOCKED: reservation_id is required"; exit 16; }
-          test -n "${TEAM_RESERVATION_REF}" || { echo "BLOCKED: reservation_ref is required"; exit 16; }
-          python3 -c '
-          import json, os, subprocess, re
-          rid=os.environ["TEAM_RESERVATION_ID"].strip()
-          ref=os.environ["TEAM_RESERVATION_REF"].strip()
-          if not re.fullmatch(r"[a-f0-9]{64}", rid):
-              raise SystemExit("BLOCKED: invalid reservation_id format")
-          if not re.fullmatch(r"team-v2/active/WORK-[0-9]{4}", ref):
-              raise SystemExit("BLOCKED: invalid reservation_ref")
-          repo=os.environ["GITHUB_REPOSITORY"]
-          raw=subprocess.check_output(["gh","api","repos/"+repo+"/git/ref/"+ref],text=True)
-          obj=json.loads(raw)
-          sha=str(obj.get("object",{}).get("sha",""))
-          if not re.fullmatch(r"[0-9a-f]{40}",sha):
-              raise SystemExit("BLOCKED: authoritative reservation ref is invalid")
-          print("TEAM_RESERVATION_REF=FOUND")
-          print("TEAM_RESERVATION_SHA="+sha)
-          with open(os.environ["GITHUB_ENV"],"a",encoding="utf-8") as out:
-              out.write("TEAM_RESERVATION_SHA="+sha+"\n")
-          '
+          python3 - <<'PY'
+          import json, os, re, subprocess
+          rid=os.environ['TEAM_RESERVATION_ID'].strip()
+          active_ref=os.environ['TEAM_RESERVATION_REF'].strip()
+          record_ref=os.environ['TEAM_RESERVATION_RECORD_REF'].strip()
+          if not re.fullmatch(r'[a-f0-9]{64}', rid): raise SystemExit('BLOCKED: invalid reservation ID')
+          if not re.fullmatch(r'team-v2/active/WORK-[0-9]{4}', active_ref): raise SystemExit('BLOCKED: invalid active reservation ref')
+          if record_ref != 'team-v2/reservations/' + rid: raise SystemExit('BLOCKED: reservation-specific ref does not match reservation ID')
+          repo=os.environ['GITHUB_REPOSITORY']
+          def ref_sha(ref):
+              raw=subprocess.check_output(['gh','api','repos/'+repo+'/git/ref/'+ref],text=True)
+              obj=json.loads(raw)
+              return str(obj.get('object',{}).get('sha',''))
+          active_sha=ref_sha(active_ref)
+          record_sha=ref_sha(record_ref)
+          if not re.fullmatch(r'[0-9a-f]{40}', active_sha): raise SystemExit('BLOCKED: invalid active reservation target')
+          if record_sha != active_sha: raise SystemExit('BLOCKED: per-reservation ref does not bind to active target SHA')
+          print('TEAM_RESERVATION_REF=FOUND')
+          print('TEAM_RESERVATION_RECORD_REF=FOUND')
+          print('TEAM_RESERVATION_SHA='+active_sha)
+          with open(os.environ['GITHUB_ENV'],'a',encoding='utf-8') as out:
+              out.write('TEAM_RESERVATION_SHA='+active_sha+'\n')
+          PY
       - name: Team Manager — Queue and Runner Governor
         shell: bash
         env:
@@ -539,13 +546,19 @@ jobs:
           work_id="WORK-" + m.group(1)
           if ref != "team-v2/active/" + work_id:
               raise SystemExit("BLOCKED: reservation_ref does not match selected lease")
+          record_ref=os.environ["TEAM_RESERVATION_RECORD_REF"].strip()
+          if record_ref != "team-v2/reservations/" + rid:
+              raise SystemExit("BLOCKED: reservation record ref does not match reservation ID")
 
           repo=os.environ["GITHUB_REPOSITORY"]
           raw=subprocess.check_output(["gh","api","repos/"+repo+"/git/ref/"+ref],text=True)
           obj=json.loads(raw)
           reservation_sha=str(obj.get("object",{}).get("sha",""))
-          if reservation_sha != base:
-              raise SystemExit("BLOCKED: reservation target SHA != immutable team start SHA")
+          record_raw=subprocess.check_output(["gh","api","repos/"+repo+"/git/ref/"+record_ref],text=True)
+          record_obj=json.loads(record_raw)
+          record_sha=str(record_obj.get("object",{}).get("sha",""))
+          if reservation_sha != base or record_sha != base:
+              raise SystemExit("BLOCKED: reservation refs do not match immutable team start SHA")
 
           claim_ref="refs/team-v2/claims/"+rid
           try:
@@ -790,10 +803,7 @@ jobs:
       START_SHA: ${{ needs.prepare.outputs.start_sha }}
       RESERVATION_ID: ${{ inputs.reservation_id }}
       RESERVATION_REF: ${{ inputs.reservation_ref }}
-      RESERVATION_ID: ${{ inputs.reservation_id }}
-      RESERVATION_REF: ${{ inputs.reservation_ref }}
-      RESERVATION_ID: ${{ inputs.reservation_id }}
-      RESERVATION_REF: ${{ inputs.reservation_ref }}
+      RESERVATION_RECORD_REF: ${{ inputs.reservation_record_ref }}
       WORKER_ID: ${{ matrix.id }}
       WORKER_ROLE: ${{ matrix.role }}
       WORKER_FOCUS: ${{ matrix.focus }}
