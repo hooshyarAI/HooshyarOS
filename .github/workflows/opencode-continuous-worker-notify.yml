@@ -13,6 +13,7 @@ permissions:
 
 jobs:
   watchdog:
+    if: ${{ false }} # SECURITY_HOLD: side-effecting team automation paused pending review
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
