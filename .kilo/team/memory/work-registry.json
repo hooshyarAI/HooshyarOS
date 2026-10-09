@@ -58,7 +58,7 @@
     {
       "id": "WORK-0003",
       "title": "Legacy Work and Evidence Backfill",
-      "status": "EXECUTED_AWAITING_QC",
+      "status": "COMPLETE",
       "mode": "AUDIT",
       "priority": "P0",
       "owner": "MEMORY_EDITOR",
@@ -69,7 +69,7 @@
         ".kilo/team/memory/**",
         ".kilo/team/results/work-0003-memory-backfill/"
       ],
-      "status_reason": "Executed in run 37788700120 against START_SHA 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b. Third execution of this lease; the two earlier ones are registered above as EXECUTED_UNPROMOTED. Ledger backfill and its evidence report are complete and mechanically verified; independent QC, integrator promotion and Gate A are NOT performed by this lease and are NOT claimed.",
+      "status_reason": "Third result 94fb1c2a17bd83aceca65f2ddd7d5dd4799cca0d integrated by bd0c793981a4023b25d975ba97257d64b639a6a2 and final target commit 0ab0f063e31987bcc74ec8f35b14c4c320d96d6e. Aggregate QC passed for two result reports; an independent per-lease verdict was not serialized. Completes this backfill output only, not WAVE-0011/Gate A.",
       "purpose": "Legacy Work and Evidence Backfill",
       "blockers": [
         "BLOCKER-0004",
@@ -78,7 +78,7 @@
       "test_scope": "NO_PRODUCT_CODE_CHANGE_MEMORY_INTEGRITY_ONLY",
       "risk": "P0",
       "value": "Reconstructs team memory from repository evidence and installs the duplicate-work guard that prevented a third blind re-run of this lease.",
-      "readiness": "EXECUTED",
+      "readiness": "COMPLETE_REVIEW_ONLY",
       "estimated_complexity": "MEASURED_MEDIUM_MOST_COST_WAS_EVIDENCE_REVERIFICATION_NOT_GENERATION",
       "last_state_change_by": "work-0003-memory-backfill-37788700120",
       "previous_owner": "PLANNER",
@@ -103,7 +103,8 @@
           "state": "EXECUTED_UNPROMOTED",
           "qc": "NOT_PERFORMED",
           "promoted": false,
-          "note": "First attempt. Full backfill committed; never merged into this lineage. Its ledger content was reused as evidence by run 37779956878."
+          "note": "First attempt. Full backfill committed; never merged into this lineage. Its ledger content was reused as evidence by run 37779956878.",
+          "disposition": "HISTORICAL_SUPERSEDED_BY_RUN_37788700120"
         },
         {
           "run_id": 37779956878,
@@ -112,21 +113,26 @@
           "state": "EXECUTED_UNPROMOTED",
           "qc": "NOT_PERFORMED",
           "promoted": false,
-          "note": "Second attempt. Added the duplicate-lease guard and corrected four stale lineage counts. Six further claims were stale and are corrected in this run. Never merged, so its guard could not gate this third dispatch."
+          "note": "Second attempt. Added the duplicate-lease guard and corrected four stale lineage counts. Six further claims were stale and are corrected in this run. Never merged, so its guard could not gate this third dispatch.",
+          "disposition": "HISTORICAL_SUPERSEDED_BY_RUN_37788700120"
         },
         {
           "run_id": 37788700120,
-          "commit": "PENDING_THIS_LEASE_COMMIT",
+          "commit": "94fb1c2a17bd83aceca65f2ddd7d5dd4799cca0d",
           "branch": "opencode/team-work-0003-memory-backfill-37788700120",
-          "state": "EXECUTED_AWAITING_QC",
-          "qc": "NOT_PERFORMED",
-          "promoted": false,
-          "note": "This run. Re-verified the reused baseline against live git, registered five unpromoted worker attempts, opened BLOCKER-0005 and DEFECT-0008, and corrected a false provenance claim. Independent QC, integration and promotion are NOT performed by this lease and are NOT claimed."
+          "state": "INTEGRATED_VIA_CHERRY_PICK",
+          "qc": "AGGREGATE_WAVE_QC_PASS_PER_LEASE_VERDICT_NOT_SEPARATELY_SERIALIZED",
+          "promoted": true,
+          "note": "This run. Re-verified the reused baseline against live git, registered five unpromoted worker attempts, opened BLOCKER-0005 and DEFECT-0008, and corrected a false provenance claim. Independent QC, integration and promotion are NOT performed by this lease and are NOT claimed.",
+          "state_previous": "EXECUTED_AWAITING_QC",
+          "integration_commit": "bd0c793981a4023b25d975ba97257d64b639a6a2",
+          "final_target_integration_commit": "0ab0f063e31987bcc74ec8f35b14c4c320d96d6e",
+          "target_branch": "fix/autonomous-product-factory"
         }
       ],
-      "anti_duplication_state": "THREE_ATTEMPTS_TWO_UNPROMOTED_NOT_DONE_VERIFIED_OR_ACCEPTED",
-      "anti_duplication_note": "None of the three attempts is DONE, VERIFIED, ACCEPTED, SUPERSEDED-as-invalidated or DUPLICATE-in-the-ledger sense, so no run was barred by the V2 rule. The repetition is caused by BLOCKER-0005 (no promotion), not by a memory failure. A fourth dispatch is duplicate governed work and must be refused until QC adjudication exists.",
-      "fourth_dispatch_rule": "REFUSE unless the ORCHESTRATOR can show QC adjudication or promotion of an earlier attempt. See DECISION-0013.",
+      "anti_duplication_state": "THREE_ATTEMPTS_LATEST_RESULT_INTEGRATED_NO_FOURTH_DISPATCH",
+      "anti_duplication_note": "Third result is integrated; first two attempts remain historical source branches. Do not rerun WORK-0003 or treat its previous pending commit field as a reason for another dispatch.",
+      "fourth_dispatch_rule": "REFUSE an identical WORK-0003 dispatch; any future task needs new governed scope and fresh evidence.",
       "pending_memory_correction_from_sibling_lease": {
         "source": "EVIDENCE-0020",
         "claim": "Wave 10 integration failure root cause is a missing git committer identity, not target drift",
@@ -137,6 +143,15 @@
         ],
         "applied": false,
         "reason": "Claiming lease is unpromoted and not QC-adjudicated. Recorded, not applied (DECISION-0012)."
+      },
+      "status_previous": "EXECUTED_AWAITING_QC",
+      "integrated_result": {
+        "run_id": 37788700120,
+        "worker_commit": "94fb1c2a17bd83aceca65f2ddd7d5dd4799cca0d",
+        "integration_commit": "bd0c793981a4023b25d975ba97257d64b639a6a2",
+        "final_target_commit": "0ab0f063e31987bcc74ec8f35b14c4c320d96d6e",
+        "aggregate_qc": "PASS",
+        "per_lease_qc_record": "NOT_SEPARATELY_SERIALIZED"
       }
     },
     {
@@ -163,7 +178,7 @@
       "test_scope": "NO_PRODUCT_CODE_CHANGE_MEMORY_INTEGRITY_ONLY",
       "risk": "P0",
       "value": "UNKNOWN_NOT_DERIVABLE_FROM_REPOSITORY",
-      "readiness": "BLOCKED_BY_DEPENDENCIES",
+      "readiness": "BLOCKED_BY_UNPROMOTED_UNADJUDICATED_RESULT",
       "estimated_complexity": "UNKNOWN_NOT_DERIVABLE_FROM_REPOSITORY",
       "last_state_change_by": "PRE_EXISTING",
       "attempts": [
@@ -171,21 +186,46 @@
           "run_id": 37776552275,
           "commit": "ba49094f6fe445deaec20e01d73b172c05935807",
           "promoted": false,
-          "qc": "NOT_PERFORMED"
+          "qc": "NOT_PERFORMED",
+          "disposition": "SUPERSEDED_BY_LATER_UNPROMOTED_REPORT_RUN_37779956878"
         },
         {
           "run_id": 37779956878,
           "commit": "305466ccb12c962cf8d37ee70bbfad16a855d8cb",
           "promoted": false,
-          "qc": "NOT_PERFORMED"
+          "qc": "NOT_PERFORMED",
+          "branch": "origin/opencode/team-work-0004-wave10-recovery-37779956878",
+          "disposition": "LATEST_VALID_RESULT_REMAINS_UNPROMOTED_UNADJUDICATED"
+        },
+        {
+          "run_id": 37788700120,
+          "job_id": 113351057678,
+          "commit": null,
+          "branch": null,
+          "promoted": false,
+          "qc": "NOT_PERFORMED",
+          "state": "FAILED_BEFORE_RESULT",
+          "failure": "Install OpenCode failed; no run-specific result branch/commit was produced."
         }
       ],
-      "attempts_note": "Two unpromoted attempts exist; neither is QC-adjudicated, so WORK-0004 is not DONE and its root-cause claim is pending, not accepted. This lease did not adjudicate them."
+      "attempts_note": "Three WORK-0004 worker attempts are accounted for: two reports remain unpromoted/unadjudicated; run 37788700120 failed before a result. Latest valid report is run 37779956878 / commit 305466ccb12c962cf8d37ee70bbfad16a855d8cb. Integrator review remains required.",
+      "current_state_reconciliation": {
+        "observed_at": "2026-10-09",
+        "state": "LATEST_VALID_RESULT_UNPROMOTED_UNADJUDICATED",
+        "unresolved_branch": "origin/opencode/team-work-0004-wave10-recovery-37779956878",
+        "unresolved_commit": "305466ccb12c962cf8d37ee70bbfad16a855d8cb",
+        "latest_attempt_run": 37788700120,
+        "latest_attempt_job_id": 113351057678,
+        "latest_attempt_result": "FAILED_DURING_INSTALL_OPENCODE_BEFORE_RESULT_COMMIT",
+        "qc": "NOT_PERFORMED_FOR_UNPROMOTED_REPORT",
+        "integration": "NOT_PROMOTED",
+        "root_cause_claim": "PENDING_UNDER_DECISION_0012"
+      }
     },
     {
       "id": "WORK-0005",
       "title": "Next Genuinely Missing Capability Reconciliation",
-      "status": "READY",
+      "status": "COMPLETE",
       "mode": "REVIEW",
       "priority": "P1",
       "owner": "PLANNER",
@@ -206,7 +246,7 @@
       "test_scope": "NO_PRODUCT_CODE_CHANGE_MEMORY_INTEGRITY_ONLY",
       "risk": "P1",
       "value": "UNKNOWN_NOT_DERIVABLE_FROM_REPOSITORY",
-      "readiness": "BLOCKED_BY_DEPENDENCIES",
+      "readiness": "COMPLETE_REVIEW_ONLY_AWAITING_MISSION_DIRECTOR_DECISION",
       "estimated_complexity": "UNKNOWN_NOT_DERIVABLE_FROM_REPOSITORY",
       "last_state_change_by": "PRE_EXISTING",
       "attempts": [
@@ -214,10 +254,30 @@
           "run_id": 37779956878,
           "commit": "7fe96e2a28d8b62b175efec3fd9233e4a657a6b2",
           "promoted": false,
-          "qc": "NOT_PERFORMED"
+          "qc": "NOT_PERFORMED",
+          "disposition": "HISTORICAL_SUPERSEDED_BY_RUN_37788700120"
+        },
+        {
+          "run_id": 37788700120,
+          "commit": "bbeb2c08f52561f388e7b4191f2e381fc5f878b7",
+          "branch": "origin/opencode/team-work-0005-next-capability-37788700120",
+          "promoted": true,
+          "qc": "AGGREGATE_WAVE_QC_PASS_PER_LEASE_VERDICT_NOT_SEPARATELY_SERIALIZED",
+          "integration_commit": "0ab0f063e31987bcc74ec8f35b14c4c320d96d6e",
+          "state": "INTEGRATED_VIA_CHERRY_PICK"
         }
       ],
-      "attempts_note": "One unpromoted attempt exists. It selects a next genuinely missing capability; the selection is reserved to MISSION_DIRECTOR and is not adopted here."
+      "attempts_note": "One unpromoted attempt exists. It selects a next genuinely missing capability; the selection is reserved to MISSION_DIRECTOR and is not adopted here.",
+      "status_previous": "READY",
+      "status_reason": "WORK-0005 result bbeb2c08f52561f388e7b4191f2e381fc5f878b7 integrated in 0ab0f063e31987bcc74ec8f35b14c4c320d96d6e after aggregate QC PASS. Capability identification does not authorize product implementation; WORK-0006/Gate A remains mandatory.",
+      "integrated_result": {
+        "run_id": 37788700120,
+        "worker_commit": "bbeb2c08f52561f388e7b4191f2e381fc5f878b7",
+        "integration_commit": "0ab0f063e31987bcc74ec8f35b14c4c320d96d6e",
+        "aggregate_qc": "PASS",
+        "per_lease_qc_record": "NOT_SEPARATELY_SERIALIZED",
+        "product_authorization": "NONE"
+      }
     },
     {
       "id": "WORK-0006",
@@ -498,13 +558,22 @@
         "qc_workspace": "PASS",
         "independent_qc": "FAIL_WITH_SUBSTANTIVE_FINDINGS",
         "duplicate_dispatch": "FORBIDDEN",
-        "next_action": "WORK-0011"
+        "next_action": "WORK-0011",
+        "current_evidence_reconciliation": {
+          "observed_at": "2026-10-09",
+          "qc_job_id": 113455516924,
+          "qc": "FAIL_INDEPENDENT_SEMANTIC_QC",
+          "integration": "SKIPPED",
+          "synthesis": "SKIPPED",
+          "report_status": "PARTIAL_NOT_AN_ACCEPTANCE",
+          "note": "Run 37818114064 had main as its head branch; preserve as cross-lineage evidence, do not rerun WORK-0010."
+        }
       }
     },
     {
       "id": "WORK-0011",
       "title": "Team V2 Memory and Evidence Reconciliation",
-      "status": "READY",
+      "status": "VERIFYING",
       "mode": "AUDIT",
       "priority": "P0",
       "owner": "MEMORY_EDITOR",
@@ -551,13 +620,27 @@
           "reason": "recovery work must not require failed predecessor to be successful"
         }
       ],
-      "readiness": "READY",
-      "last_state_change_by": "TEAM-V2-ADMISSION-CONTRACT-REPAIR-2026-10-08",
+      "readiness": "AWAITING_INDEPENDENT_QC",
+      "last_state_change_by": "WORK-0011_MEMORY_RECONCILIATION_2026-10-09",
       "admission_contract_repair": {
         "issue": "125",
         "action": "materialize explicit readiness=READY for an already-valid governed lease",
         "prior_readiness": null,
         "worker_dispatch_before": false
+      },
+      "status_previous": "READY",
+      "execution_observation": {
+        "observed_at": "2026-10-09",
+        "method": "CONNECTOR_BACKED_MEMORY_ONLY_RECONCILIATION",
+        "start_sha": "dc323b150ae185ff346cea33868a773cf0c88d94",
+        "target_branch": "fix/autonomous-product-factory",
+        "github_actions_run_id": null,
+        "note": "Repository and GitHub Actions evidence only; no Team V2 worker run ID fabricated.",
+        "independent_qc": "NOT_PERFORMED",
+        "gate_a": "NOT_ADJUDICATED",
+        "product_code_changed": false,
+        "workflow_files_changed": false,
+        "tests_changed": false
       }
     }
   ],

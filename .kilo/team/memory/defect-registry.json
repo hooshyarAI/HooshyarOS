@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "next_id": "DEFECT-0009",
+  "next_id": "DEFECT-0011",
   "items": [
     {
       "id": "DEFECT-0001",
@@ -99,6 +99,31 @@
       "evidence": "EVIDENCE-0023",
       "linked_blocker": "BLOCKER-0005",
       "recorded_by": "work-0003-memory-backfill-37788700120"
+    },
+    {
+      "id": "DEFECT-0009",
+      "title": "F1/F2 QC workspace and persisted-QC repairs need lineage reconciliation",
+      "status": "REPAIRED_ON_ORIGIN_MAIN_LINEAGE_PENDING_CANONICAL_LINEAGE_RECONCILIATION",
+      "severity": "P0",
+      "detail": "F1 was a subprocess NameError; F2 was a nested-quote SyntaxError. Commit c19875f1b4bc87fa182d124e594773181a5cf7c8 repairs both; WORK-0010 reports 14/14 embedded Python blocks compiling and 11/11 sandbox checks after repair using main-lineage validation commit 7fdd58fb015b00924018e269f0dd325c7b1fc05b. This does not choose a canonical lineage or establish Team V2 acceptance.",
+      "fix_work": "WORK-0009_CONTROL_PLANE_REPAIR",
+      "verification_work": "WORK-0010 / run 37818114064",
+      "closure": "REPAIR_VERIFIED_ON_MAIN_LINEAGE; CANONICAL_LINEAGE_AND_ACCEPTANCE_OPEN",
+      "evidence": "EVIDENCE-0024",
+      "linked_blocker": "BLOCKER-0004",
+      "recorded_by": "WORK-0011-memory-reconciliation-2026-10-09"
+    },
+    {
+      "id": "DEFECT-0010",
+      "title": "Synthesis model selector indexes a fourth candidate when only three qualify",
+      "status": "OBSERVED_ON_RUN_377887_NEEDS_REVALIDATION_AFTER_SECURITY_HOLD",
+      "severity": "P1",
+      "detail": "Synthesis job 113356045167 failed with MODELS[3]: unbound variable while the qualified candidate list contained exactly three models. This prevented synthesis after two results were integrated. Current main has security holds on team/autonomous workflow paths; do not change workflow files or re-enable automation in this task. Revalidate via separately authorized control-plane work.",
+      "fix_work": "FUTURE_AUTHORIZED_CONTROL_PLANE_AUDIT_AFTER_SECURITY_HOLD_REVIEW",
+      "verification_work": "RUN_37788700120_SYNTHESIS_JOB_113356045167",
+      "closure": "OPEN_NEEDS_CURRENT_HEAD_REVALIDATION",
+      "evidence": "EVIDENCE-0027",
+      "recorded_by": "WORK-0011-memory-reconciliation-2026-10-09"
     }
   ]
 }

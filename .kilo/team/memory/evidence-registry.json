@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "next_id": "EVIDENCE-0024",
+  "next_id": "EVIDENCE-0028",
   "backfill_required": true,
   "items": [
     {
@@ -401,6 +401,61 @@
       ],
       "linked_defect": "DEFECT-0008",
       "linked_blocker": "BLOCKER-0005"
+    },
+    {
+      "id": "EVIDENCE-0024",
+      "subject": "F1/F2 QC control-plane repairs verified on origin/main lineage",
+      "status": "VERIFIED",
+      "source": "WORK-0010 report; commits c19875f1b4bc87fa182d124e594773181a5cf7c8 and 7fdd58fb015b00924018e269f0dd325c7b1fc05b",
+      "note": "Report reproduces missing subprocess import (NameError) and nested-quote persisted-QC SyntaxError; records 13/14 embedded Python blocks before repair vs 14/14 after and 11/11 sandbox checks passing. This is repair evidence on main lineage, not canonical-lineage choice or Team V2 acceptance.",
+      "recorded_by": "WORK-0011-memory-reconciliation-2026-10-09",
+      "linked_defect": "DEFECT-0009",
+      "repair_commits": [
+        "c19875f1b4bc87fa182d124e594773181a5cf7c8",
+        "7fdd58fb015b00924018e269f0dd325c7b1fc05b"
+      ]
+    },
+    {
+      "id": "EVIDENCE-0025",
+      "subject": "WORK-0010 independent semantic QC rejected acceptance; integration and synthesis skipped",
+      "status": "VERIFIED",
+      "source": "Run 37818114064 / QC job 113455516924 / worker commit 85c2cbdfbe0f7522eb1ce935515aeeae90d647dd",
+      "note": "Worker produced an artifact, but independent semantic QC failed; integration and synthesis were skipped. Report verdict PARTIAL — NOT AN ACCEPTANCE. Main was the workflow head branch; preserve as cross-lineage evidence only.",
+      "recorded_by": "WORK-0011-memory-reconciliation-2026-10-09",
+      "linked_work": "WORK-0010",
+      "run_id": 37818114064,
+      "qc_job_id": 113455516924,
+      "worker_commit": "85c2cbdfbe0f7522eb1ce935515aeeae90d647dd",
+      "promoted": false,
+      "acceptance": "NOT_ACCEPTED"
+    },
+    {
+      "id": "EVIDENCE-0026",
+      "subject": "WAVE-0011 run 37788700120 had partial integration, not acceptance",
+      "status": "VERIFIED",
+      "source": "Run 37788700120 job logs: QC 113355594140, integrate 113355926130, synthesis 113356045167, WORK-0004 113351057678",
+      "note": "Aggregate QC passed with 3 envelopes, 2 successful reports and 1 failed worker. WORK-0003/WORK-0005 output contents were integrated to target commit 0ab0f063e31987bcc74ec8f35b14c4c320d96d6e. WORK-0004 failed during Install OpenCode and its latest prior report remains unpromoted/unadjudicated. Synthesis failed.",
+      "recorded_by": "WORK-0011-memory-reconciliation-2026-10-09",
+      "run_id": 37788700120,
+      "aggregate_qc_job_id": 113355594140,
+      "integration_job_id": 113355926130,
+      "integrated_worker_results": 2,
+      "unresolved_work_id": "WORK-0004",
+      "final_target_commit": "0ab0f063e31987bcc74ec8f35b14c4c320d96d6e",
+      "acceptance": "NOT_ACCEPTED"
+    },
+    {
+      "id": "EVIDENCE-0027",
+      "subject": "Synthesis failed because selector indexed MODELS[3] when only three models qualified",
+      "status": "VERIFIED",
+      "source": "Run 37788700120 synthesis job 113356045167",
+      "note": "QUALIFIED_CANDIDATES contained space-bunny-free, muse-spark-1.3-contributor-free, and fledge-alpha-free; the step then failed with MODELS[3]: unbound variable. A bot comment claiming synthesis=READY/model=unknown is not success evidence. Revalidate only in separately authorized control-plane work after reviewing the current security hold; no workflow was changed/re-enabled.",
+      "recorded_by": "WORK-0011-memory-reconciliation-2026-10-09",
+      "run_id": 37788700120,
+      "job_id": 113356045167,
+      "qualified_candidate_count": 3,
+      "failing_expression": "MODELS[3]",
+      "current_main_security_hold": "OBSERVED_DO_NOT_REENABLE_AUTOMATION"
     }
   ],
   "backfill_state": {

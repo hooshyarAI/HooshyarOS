@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "next_id": "COMMIT-0146",
+  "next_id": "COMMIT-0153",
   "items": [
     {
       "id": "COMMIT-0001",
@@ -1817,6 +1817,103 @@
       "run_id": "37779956878",
       "owner_of_reconciliation": "WORK-0005_PLANNER",
       "id": "COMMIT-0145"
+    },
+    {
+      "id": "COMMIT-0146",
+      "sha": "c19875f1b4bc87fa182d124e594773181a5cf7c8",
+      "purpose": "F1/F2 QC control-plane repairs",
+      "date": "2026-10-08T17:36:07Z",
+      "recorded_by": "WORK-0011-memory-reconciliation-2026-10-09",
+      "lineage": "ORIGIN_MAIN",
+      "linked_work": "DEFECT-0009",
+      "linked_evidence": "EVIDENCE-0024",
+      "status": "REPAIR_OR_VALIDATION_CONTEXT_NOT_CANONICALIZED",
+      "in_start_sha_lineage": false,
+      "remote_ref": "origin/main"
+    },
+    {
+      "id": "COMMIT-0147",
+      "sha": "7fdd58fb015b00924018e269f0dd325c7b1fc05b",
+      "purpose": "F1/F2 validation context and legacy workflow quarantine",
+      "date": "2026-10-08T17:36:55Z",
+      "recorded_by": "WORK-0011-memory-reconciliation-2026-10-09",
+      "lineage": "ORIGIN_MAIN",
+      "linked_work": "DEFECT-0009",
+      "linked_evidence": "EVIDENCE-0024",
+      "status": "REPAIR_OR_VALIDATION_CONTEXT_NOT_CANONICALIZED",
+      "in_start_sha_lineage": false,
+      "remote_ref": "origin/main"
+    },
+    {
+      "id": "COMMIT-0148",
+      "sha": "85c2cbdfbe0f7522eb1ce935515aeeae90d647dd",
+      "purpose": "WORK-0010 acceptance audit result rejected by independent QC",
+      "date": "2026-10-08T17:46:33Z",
+      "recorded_by": "WORK-0011-memory-reconciliation-2026-10-09",
+      "lineage": "ORIGIN_MAIN_WORKER_RESULT",
+      "linked_work": "WORK-0010",
+      "linked_evidence": "EVIDENCE-0025",
+      "status": "EXECUTED_UNPROMOTED_QC_FAILED",
+      "in_start_sha_lineage": false,
+      "remote_ref": "origin/opencode/team-work-0010-team-v2-acceptance-37818114064"
+    },
+    {
+      "id": "COMMIT-0149",
+      "sha": "94fb1c2a17bd83aceca65f2ddd7d5dd4799cca0d",
+      "purpose": "WORK-0003 result from run 37788700120",
+      "date": "2026-10-08T14:07:39Z",
+      "recorded_by": "WORK-0011-memory-reconciliation-2026-10-09",
+      "lineage": "WAVE_0011_WORKER_RESULT",
+      "linked_work": "WORK-0003",
+      "linked_evidence": "EVIDENCE-0026",
+      "status": "INTEGRATED_VIA_CHERRY_PICK",
+      "promoted_to_target_branch": true,
+      "integration_commit": "bd0c793981a4023b25d975ba97257d64b639a6a2",
+      "final_target_integration_commit": "0ab0f063e31987bcc74ec8f35b14c4c320d96d6e",
+      "remote_ref": "origin/opencode/team-work-0003-memory-backfill-37788700120"
+    },
+    {
+      "id": "COMMIT-0150",
+      "sha": "bd0c793981a4023b25d975ba97257d64b639a6a2",
+      "purpose": "WORK-0003 result cherry-pick integration commit",
+      "date": "2026-10-08T14:11:21Z",
+      "recorded_by": "WORK-0011-memory-reconciliation-2026-10-09",
+      "lineage": "TARGET_BRANCH",
+      "linked_work": "WORK-0003",
+      "linked_evidence": "EVIDENCE-0026",
+      "status": "INTEGRATED_TO_TARGET",
+      "target_branch": "fix/autonomous-product-factory",
+      "final_target_integration_commit": "0ab0f063e31987bcc74ec8f35b14c4c320d96d6e"
+    },
+    {
+      "id": "COMMIT-0151",
+      "sha": "bbeb2c08f52561f388e7b4191f2e381fc5f878b7",
+      "purpose": "WORK-0005 result from run 37788700120",
+      "date": "2026-10-08T14:10:14Z",
+      "recorded_by": "WORK-0011-memory-reconciliation-2026-10-09",
+      "lineage": "WAVE_0011_WORKER_RESULT",
+      "linked_work": "WORK-0005",
+      "linked_evidence": "EVIDENCE-0026",
+      "status": "INTEGRATED_VIA_CHERRY_PICK",
+      "promoted_to_target_branch": true,
+      "integration_commit": "0ab0f063e31987bcc74ec8f35b14c4c320d96d6e",
+      "remote_ref": "origin/opencode/team-work-0005-next-capability-37788700120"
+    },
+    {
+      "id": "COMMIT-0152",
+      "sha": "0ab0f063e31987bcc74ec8f35b14c4c320d96d6e",
+      "purpose": "Final target integration commit for WORK-0003 and WORK-0005",
+      "date": "2026-10-08T14:11:23Z",
+      "recorded_by": "WORK-0011-memory-reconciliation-2026-10-09",
+      "lineage": "TARGET_BRANCH",
+      "linked_work": "WAVE-0011",
+      "linked_evidence": "EVIDENCE-0026",
+      "status": "INTEGRATED_AND_PUSHED_TO_TARGET",
+      "target_branch": "fix/autonomous-product-factory",
+      "integrated_worker_commits": [
+        "94fb1c2a17bd83aceca65f2ddd7d5dd4799cca0d",
+        "bbeb2c08f52561f388e7b4191f2e381fc5f878b7"
+      ]
     }
   ],
   "backfill_state": {

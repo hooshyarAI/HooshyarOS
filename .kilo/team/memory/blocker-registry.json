@@ -124,10 +124,10 @@
         "origin_main_memory_paths": [],
         "merge_base": "99542164a06f15aa4072a52b9debcf75125a358a",
         "merge_base_date": "2026-08-28T18:23:10+03:30",
-        "origin_main_tip": "0bfe3eae515f58168b230d28895676353e3ba889",
+        "origin_main_tip": "797d4201029f79845e91da7fa4cd406582d68a63",
         "origin_main_tip_date": "2026-10-08T08:52:59-04:00",
-        "origin_main_ahead_of_this_branch": 80,
-        "this_branch_ahead_of_origin_main": 662,
+        "origin_main_ahead_of_this_branch": 209,
+        "this_branch_ahead_of_origin_main": 695,
         "refs_containing_start_sha": [
           "origin/fix/autonomous-product-factory",
           "origin/opencode/team-work-0003-memory-backfill-37776552275",
@@ -172,15 +172,54 @@
           "origin_main_team_control_commits_newer_than_9151fe4d_count": 14,
           "memory_ledgers_still_absent_on_origin_main": true,
           "delta_reason": "origin/main advanced by one commit after run 37779956878. The divergence is unchanged in kind and larger in size; the canonical lineage remains UNDECIDED."
+        },
+        "previous_snapshot_before_2026_10_09": {
+          "origin_main_tip": "0bfe3eae515f58168b230d28895676353e3ba889",
+          "origin_main_ahead_of_this_branch": 80,
+          "this_branch_ahead_of_origin_main": 662,
+          "observed_by": "work-0003-memory-backfill-37779956878",
+          "refresh": {
+            "refreshed_by": "work-0003-memory-backfill-37788700120",
+            "refreshed_at_run_id": 37788700120,
+            "prior_values_preserved": true,
+            "prior_origin_main_tip": "0bfe3eae515f58168b230d28895676353e3ba889",
+            "origin_main_tip": "d90d8e115c49b1e6d50e621d6066bfa191a01a49",
+            "origin_main_tip_date": "2026-10-08 09:58:36 -0400",
+            "prior_origin_main_ahead_of_this_branch": 80,
+            "origin_main_ahead_of_this_branch": 81,
+            "this_branch_ahead_of_origin_main": 662,
+            "refs_containing_start_sha": [
+              "origin/fix/autonomous-product-factory",
+              "  origin/opencode/team-work-0003-memory-backfill-37776552275",
+              "  origin/opencode/team-work-0003-memory-backfill-37779956878",
+              "  origin/opencode/team-work-0004-wave10-recovery-37776552275",
+              "  origin/opencode/team-work-0004-wave10-recovery-37779956878",
+              "  origin/opencode/team-work-0005-next-capability-37779956878"
+            ],
+            "refs_containing_start_sha_count": 6,
+            "origin_main_team_control_commits_newer_than_9151fe4d_count": 14,
+            "memory_ledgers_still_absent_on_origin_main": true,
+            "delta_reason": "origin/main advanced by one commit after run 37779956878. The divergence is unchanged in kind and larger in size; the canonical lineage remains UNDECIDED."
+          }
+        },
+        "latest_refresh": {
+          "observed_at": "2026-10-09",
+          "target_tip_before_reconciliation": "dc323b150ae185ff346cea33868a773cf0c88d94",
+          "origin_main_tip": "797d4201029f79845e91da7fa4cd406582d68a63",
+          "merge_base": "99542164a06f15aa4072a52b9debcf75125a358a",
+          "commits_main_ahead_of_target": 209,
+          "commits_target_ahead_of_main": 695,
+          "canonical_lineage": "UNDECIDED"
         }
       },
-      "root_cause": "Two control planes evolved independently from the same 2026-08-28 merge base. origin/main later added its own queue/runner governance, while the organizational memory tree was created only on the fix lineage. Neither lineage contains the other.",
+      "root_cause": "Two control planes evolved independently from the same 2026-08-28 merge base. origin/main later added its own queue/runner governance, while the organizational memory tree was created only on the fix lineage. Neither lineage contains the other. Refreshed 2026-10-09: target dc323b150ae185ff346cea33868a773cf0c88d94, main 797d4201029f79845e91da7fa4cd406582d68a63; target ahead 695 and main ahead 209, same merge base 99542164a06f15aa4072a52b9debcf75125a358a. Canonical lineage remains UNDECIDED.",
       "safe_unblock": "A governed MISSION_DIRECTOR lineage decision followed by INTEGRATOR-controlled reconciliation. Until then every memory claim is scoped to this branch lineage.",
       "rule": "An AUDIT-mode memory lease must not name the canonical lineage, merge, rebase or promote.",
       "recorded_by": "work-0003-memory-backfill-37779956878",
       "recorded_by_chain": [
         "work-0003-memory-backfill-37779956878",
-        "work-0003-memory-backfill-37788700120"
+        "work-0003-memory-backfill-37788700120",
+        "WORK-0011-memory-reconciliation-2026-10-09"
       ]
     },
     {
@@ -196,80 +235,181 @@
         "WORK-0007"
       ],
       "evidence": {
-        "unpromoted_team_worker_branches": 5,
+        "unpromoted_team_worker_branches": 7,
         "branches": [
           {
-            "ref": "origin/opencode/team-work-0003-memory-backfill-37776552275",
+            "work_id": "WORK-0003",
+            "run_id": 37776552275,
+            "branch": "origin/opencode/team-work-0003-memory-backfill-37776552275",
             "commit": "509ce84cc31d9ccfab1aae8a31d8d6bd17af1a8b",
-            "lease": "work-0003",
-            "run_id": "37776552275",
-            "result_paths": [
-              ".kilo/team/memory/README.md",
-              ".kilo/team/memory/blocker-registry.json",
-              ".kilo/team/memory/commit-registry.json",
-              ".kilo/team/memory/decision-registry.json",
-              ".kilo/team/memory/defect-registry.json",
-              ".kilo/team/memory/evidence-registry.json",
-              ".kilo/team/memory/mission-state.json",
-              ".kilo/team/memory/wave-history.json",
-              ".kilo/team/memory/work-registry.json",
-              ".kilo/team/results/work-0003-memory-backfill/result.md"
-            ]
+            "disposition": "HISTORICAL_SUPERSEDED_BY_RUN_37788700120"
           },
           {
-            "ref": "origin/opencode/team-work-0003-memory-backfill-37779956878",
+            "work_id": "WORK-0003",
+            "run_id": 37779956878,
+            "branch": "origin/opencode/team-work-0003-memory-backfill-37779956878",
             "commit": "3b8b97d0660b251d29c56d60753ffcbcfa01febe",
-            "lease": "work-0003",
-            "run_id": "37779956878",
-            "result_paths": [
-              ".kilo/team/memory/README.md",
-              ".kilo/team/memory/blocker-registry.json",
-              ".kilo/team/memory/commit-registry.json",
-              ".kilo/team/memory/decision-registry.json",
-              ".kilo/team/memory/defect-registry.json",
-              ".kilo/team/memory/evidence-registry.json",
-              ".kilo/team/memory/mission-state.json",
-              ".kilo/team/memory/wave-history.json",
-              ".kilo/team/memory/work-registry.json",
-              ".kilo/team/results/work-0003-memory-backfill/result.md"
-            ]
+            "disposition": "HISTORICAL_SUPERSEDED_BY_RUN_37788700120"
           },
           {
-            "ref": "origin/opencode/team-work-0004-wave10-recovery-37776552275",
+            "work_id": "WORK-0003",
+            "run_id": 37788700120,
+            "branch": "origin/opencode/team-work-0003-memory-backfill-37788700120",
+            "commit": "94fb1c2a17bd83aceca65f2ddd7d5dd4799cca0d",
+            "disposition": "RESULT_CONTENT_INTEGRATED_BY_CHERRY_PICK",
+            "integration_commit": "bd0c793981a4023b25d975ba97257d64b639a6a2",
+            "final_target_commit": "0ab0f063e31987bcc74ec8f35b14c4c320d96d6e"
+          },
+          {
+            "work_id": "WORK-0004",
+            "run_id": 37776552275,
+            "branch": "origin/opencode/team-work-0004-wave10-recovery-37776552275",
             "commit": "ba49094f6fe445deaec20e01d73b172c05935807",
-            "lease": "work-0004",
-            "run_id": "37776552275",
-            "result_paths": [
-              ".kilo/team/results/work-0004-wave10-recovery/result.md"
-            ]
+            "disposition": "SUPERSEDED_BY_LATER_UNPROMOTED_REPORT"
           },
           {
-            "ref": "origin/opencode/team-work-0004-wave10-recovery-37779956878",
+            "work_id": "WORK-0004",
+            "run_id": 37779956878,
+            "branch": "origin/opencode/team-work-0004-wave10-recovery-37779956878",
             "commit": "305466ccb12c962cf8d37ee70bbfad16a855d8cb",
-            "lease": "work-0004",
-            "run_id": "37779956878",
-            "result_paths": [
-              ".kilo/team/results/work-0004-wave10-recovery/result.md"
-            ]
+            "disposition": "ACTIVE_UNPROMOTED_UNADJUDICATED_RESULT"
           },
           {
-            "ref": "origin/opencode/team-work-0005-next-capability-37779956878",
+            "work_id": "WORK-0005",
+            "run_id": 37779956878,
+            "branch": "origin/opencode/team-work-0005-next-capability-37779956878",
             "commit": "7fe96e2a28d8b62b175efec3fd9233e4a657a6b2",
-            "lease": "work-0005",
-            "run_id": "37779956878",
-            "result_paths": [
-              ".kilo/team/results/work-0005-next-capability/result.md"
-            ]
+            "disposition": "HISTORICAL_SUPERSEDED_BY_RUN_37788700120"
+          },
+          {
+            "work_id": "WORK-0005",
+            "run_id": 37788700120,
+            "branch": "origin/opencode/team-work-0005-next-capability-37788700120",
+            "commit": "bbeb2c08f52561f388e7b4191f2e381fc5f878b7",
+            "disposition": "RESULT_CONTENT_INTEGRATED_BY_CHERRY_PICK",
+            "integration_commit": "0ab0f063e31987bcc74ec8f35b14c4c320d96d6e"
           }
         ],
         "qc_adjudications_found": 0,
-        "integrations_performed": 0,
-        "promotions_performed": 0,
+        "integrations_performed": 2,
+        "promotions_performed": 2,
         "shared_start_sha": "6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
-        "observed_by": "work-0003-memory-backfill-37788700120"
+        "observed_by": "WORK-0011-memory-reconciliation-2026-10-09",
+        "previous_snapshot_before_2026_10_09": {
+          "unpromoted_team_worker_branches": 5,
+          "branches": [
+            {
+              "ref": "origin/opencode/team-work-0003-memory-backfill-37776552275",
+              "commit": "509ce84cc31d9ccfab1aae8a31d8d6bd17af1a8b",
+              "lease": "work-0003",
+              "run_id": "37776552275",
+              "result_paths": [
+                ".kilo/team/memory/README.md",
+                ".kilo/team/memory/blocker-registry.json",
+                ".kilo/team/memory/commit-registry.json",
+                ".kilo/team/memory/decision-registry.json",
+                ".kilo/team/memory/defect-registry.json",
+                ".kilo/team/memory/evidence-registry.json",
+                ".kilo/team/memory/mission-state.json",
+                ".kilo/team/memory/wave-history.json",
+                ".kilo/team/memory/work-registry.json",
+                ".kilo/team/results/work-0003-memory-backfill/result.md"
+              ]
+            },
+            {
+              "ref": "origin/opencode/team-work-0003-memory-backfill-37779956878",
+              "commit": "3b8b97d0660b251d29c56d60753ffcbcfa01febe",
+              "lease": "work-0003",
+              "run_id": "37779956878",
+              "result_paths": [
+                ".kilo/team/memory/README.md",
+                ".kilo/team/memory/blocker-registry.json",
+                ".kilo/team/memory/commit-registry.json",
+                ".kilo/team/memory/decision-registry.json",
+                ".kilo/team/memory/defect-registry.json",
+                ".kilo/team/memory/evidence-registry.json",
+                ".kilo/team/memory/mission-state.json",
+                ".kilo/team/memory/wave-history.json",
+                ".kilo/team/memory/work-registry.json",
+                ".kilo/team/results/work-0003-memory-backfill/result.md"
+              ]
+            },
+            {
+              "ref": "origin/opencode/team-work-0004-wave10-recovery-37776552275",
+              "commit": "ba49094f6fe445deaec20e01d73b172c05935807",
+              "lease": "work-0004",
+              "run_id": "37776552275",
+              "result_paths": [
+                ".kilo/team/results/work-0004-wave10-recovery/result.md"
+              ]
+            },
+            {
+              "ref": "origin/opencode/team-work-0004-wave10-recovery-37779956878",
+              "commit": "305466ccb12c962cf8d37ee70bbfad16a855d8cb",
+              "lease": "work-0004",
+              "run_id": "37779956878",
+              "result_paths": [
+                ".kilo/team/results/work-0004-wave10-recovery/result.md"
+              ]
+            },
+            {
+              "ref": "origin/opencode/team-work-0005-next-capability-37779956878",
+              "commit": "7fe96e2a28d8b62b175efec3fd9233e4a657a6b2",
+              "lease": "work-0005",
+              "run_id": "37779956878",
+              "result_paths": [
+                ".kilo/team/results/work-0005-next-capability/result.md"
+              ]
+            }
+          ],
+          "qc_adjudications_found": 0,
+          "integrations_performed": 0,
+          "promotions_performed": 0,
+          "shared_start_sha": "6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b",
+          "observed_by": "work-0003-memory-backfill-37788700120"
+        },
+        "active_unresolved_result_branches": 1,
+        "active_unresolved_result_refs": [
+          "origin/opencode/team-work-0004-wave10-recovery-37779956878"
+        ],
+        "per_lease_qc_adjudications_persisted": 0,
+        "aggregate_wave_qc": {
+          "run_id": 37788700120,
+          "job_id": 113355594140,
+          "result": "PASS",
+          "envelopes": 3,
+          "worker_success": 2,
+          "worker_failed": 1,
+          "report_count": 2
+        },
+        "integration_commit": "0ab0f063e31987bcc74ec8f35b14c4c320d96d6e",
+        "latest_reconciliation": {
+          "observed_at": "2026-10-09",
+          "source_worker_result_branches_observed": 7,
+          "integrated_result_contents": 2,
+          "active_unresolved_result_branches": 1,
+          "unresolved_result": {
+            "work_id": "WORK-0004",
+            "run_id": 37779956878,
+            "commit": "305466ccb12c962cf8d37ee70bbfad16a855d8cb"
+          },
+          "failed_no_result_attempt": {
+            "work_id": "WORK-0004",
+            "run_id": 37788700120,
+            "job_id": 113351057678,
+            "reason": "Install OpenCode failed"
+          },
+          "synthesis": {
+            "run_id": 37788700120,
+            "job_id": 113356045167,
+            "result": "FAILED",
+            "reason": "MODELS[3]: unbound variable"
+          },
+          "acceptance": "NOT_ACCEPTED"
+        }
       },
-      "root_cause": "WAVE-0011 produced five governed worker results across three leases and none reached the target lineage. Everything downstream of promotion — independent QC, integrator promotion, WORK-0006 Gate A, WORK-0007, and any dedup control written by a worker — is therefore blocked. This is the mechanism that allowed the same lease to be dispatched three times.",
-      "safe_unblock": "INTEGRATOR-controlled promotion of QC-passed worker results, in dependency order: WORK-0004 evidence first, then WORK-0003 memory, then WORK-0005. Until QC adjudication exists, no lease outcome may be treated as accepted and no new lease of the same work may be dispatched.",
+      "root_cause": "WAVE-0011 produced five governed worker results across three leases and none reached the target lineage. Everything downstream of promotion — independent QC, integrator promotion, WORK-0006 Gate A, WORK-0007, and any dedup control written by a worker — is therefore blocked. This is the mechanism that allowed the same lease to be dispatched three times. Refreshed 2026-10-09: two result contents integrated after aggregate QC PASS. One latest valid WORK-0004 report remains unresolved; its later attempt failed before result and synthesis failed. Seven source branches are provenance; one current result branch remains active unresolved.",
+      "safe_unblock": "Keep OPEN. Do not redispatch WORK-0003/WORK-0005; latest results are integrated. Route the latest WORK-0004 report to independent Integrator/QC adjudication; do not apply its disputed Wave 10 root-cause claim until governed review. Revalidate synthesis only through separately authorized control-plane review after reviewing the current security hold. Gate A remains ARMED.",
       "corroborates": [
         "BLOCKER-0001",
         "BLOCKER-0003",

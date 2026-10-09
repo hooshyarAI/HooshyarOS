@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "next_id": "WAVE-0001",
+  "next_id": "WAVE-0012",
   "waves": [
     {
       "id": "WAVE-0010",
@@ -22,11 +22,141 @@
     },
     {
       "id": "WAVE-0011",
-      "status": "EXECUTING_AWAITING_QC_AND_PROMOTION",
+      "status": "PARTIALLY_INTEGRATED_NOT_ACCEPTED_SYNTHESIS_FAILED",
       "source": ".kilo/team/NEXT-WAVE-PLAN.json (created_from_sha e564682ad02df31adc458995d4232128c7fa0fd3, verified ancestor of this branch)",
       "wave_status_in_plan": "READY",
       "control_note": "V2 bootstrap wave dispatched after stable-ID reconciliation; no product implementation.",
       "leases": [
+        {
+          "work_id": "WORK-0003",
+          "lease": "work-0003-memory-backfill",
+          "owner": "MEMORY_EDITOR",
+          "mode": "AUDIT",
+          "run_id": 37788700120,
+          "branch": "origin/opencode/team-work-0003-memory-backfill-37788700120",
+          "worker_commit": "94fb1c2a17bd83aceca65f2ddd7d5dd4799cca0d",
+          "integration_commit": "bd0c793981a4023b25d975ba97257d64b639a6a2",
+          "final_target_commit": "0ab0f063e31987bcc74ec8f35b14c4c320d96d6e",
+          "state": "INTEGRATED_WITH_AGGREGATE_QC_PASS_PER_LEASE_VERDICT_NOT_SEPARATELY_SERIALIZED",
+          "attempts": [
+            {
+              "run_id": 37776552275,
+              "commit": "509ce84cc31d9ccfab1aae8a31d8d6bd17af1a8b",
+              "state": "EXECUTED_UNPROMOTED",
+              "disposition": "SUPERSEDED_BY_RUN_37788700120"
+            },
+            {
+              "run_id": 37779956878,
+              "commit": "3b8b97d0660b251d29c56d60753ffcbcfa01febe",
+              "state": "EXECUTED_UNPROMOTED",
+              "disposition": "SUPERSEDED_BY_RUN_37788700120"
+            },
+            {
+              "run_id": 37788700120,
+              "commit": "94fb1c2a17bd83aceca65f2ddd7d5dd4799cca0d",
+              "state": "INTEGRATED_VIA_CHERRY_PICK",
+              "qc": "AGGREGATE_WAVE_QC_PASS",
+              "promoted": true,
+              "integration_commit": "bd0c793981a4023b25d975ba97257d64b639a6a2"
+            }
+          ]
+        },
+        {
+          "work_id": "WORK-0004",
+          "lease": "work-0004-wave10-recovery",
+          "owner": "INTEGRATOR",
+          "mode": "REVIEW",
+          "latest_valid_report_run": 37779956878,
+          "branch": "origin/opencode/team-work-0004-wave10-recovery-37779956878",
+          "worker_commit": "305466ccb12c962cf8d37ee70bbfad16a855d8cb",
+          "state": "UNPROMOTED_UNADJUDICATED",
+          "qc": "NOT_PERFORMED",
+          "promoted": false,
+          "attempts": [
+            {
+              "run_id": 37776552275,
+              "commit": "ba49094f6fe445deaec20e01d73b172c05935807",
+              "disposition": "SUPERSEDED_BY_RUN_37779956878"
+            },
+            {
+              "run_id": 37779956878,
+              "commit": "305466ccb12c962cf8d37ee70bbfad16a855d8cb",
+              "state": "UNPROMOTED_UNADJUDICATED",
+              "qc": "NOT_PERFORMED",
+              "promoted": false
+            },
+            {
+              "run_id": 37788700120,
+              "job_id": 113351057678,
+              "commit": null,
+              "branch": null,
+              "state": "FAILED_BEFORE_RESULT",
+              "failure": "Install OpenCode"
+            }
+          ],
+          "root_cause_claim": "PENDING_UNDER_DECISION_0012"
+        },
+        {
+          "work_id": "WORK-0005",
+          "lease": "work-0005-next-capability",
+          "owner": "PLANNER",
+          "mode": "REVIEW",
+          "run_id": 37788700120,
+          "branch": "origin/opencode/team-work-0005-next-capability-37788700120",
+          "worker_commit": "bbeb2c08f52561f388e7b4191f2e381fc5f878b7",
+          "integration_commit": "0ab0f063e31987bcc74ec8f35b14c4c320d96d6e",
+          "state": "INTEGRATED_WITH_AGGREGATE_QC_PASS_PER_LEASE_VERDICT_NOT_SEPARATELY_SERIALIZED",
+          "attempts": [
+            {
+              "run_id": 37779956878,
+              "commit": "7fe96e2a28d8b62b175efec3fd9233e4a657a6b2",
+              "disposition": "SUPERSEDED_BY_RUN_37788700120"
+            },
+            {
+              "run_id": 37788700120,
+              "commit": "bbeb2c08f52561f388e7b4191f2e381fc5f878b7",
+              "state": "INTEGRATED_VIA_CHERRY_PICK",
+              "qc": "AGGREGATE_WAVE_QC_PASS",
+              "promoted": true,
+              "integration_commit": "0ab0f063e31987bcc74ec8f35b14c4c320d96d6e"
+            }
+          ],
+          "product_authorization": "NONE; Gate A remains mandatory"
+        }
+      ],
+      "run_attempts": [
+        {
+          "run_id": 37759400053,
+          "state": "SUPERSEDED_OR_UNKNOWN",
+          "reason": "Named as current in wave-history at START_SHA. No surviving job evidence in this repository; outcome is NOT guessed."
+        },
+        {
+          "run_id": 37760777088,
+          "state": "QUEUED_NO_RUNNER_ALLOCATED",
+          "reason": "Named as current in mission-state at START_SHA and recorded in BLOCKER-0002. Team run #16, prepare job queued, no runner allocated."
+        },
+        {
+          "run_id": "37776552275",
+          "state": "EXECUTED_UNPROMOTED",
+          "reason": "Obtained a runner. Produced WORK-0003 and WORK-0004 commits on worker branches. Never QC-adjudicated and never promoted; therefore not DONE, VERIFIED or ACCEPTED."
+        },
+        {
+          "run_id": "37779956878",
+          "state": "EXECUTING",
+          "reason": "This lease. Obtained a runner. Reused and independently re-verified the WORK-0003 prior attempt."
+        },
+        {
+          "run_id": 37788700120,
+          "state": "EXECUTING",
+          "reason": "Third dispatch of the WORK-0003 lease at the same START_SHA. Reused and independently re-verified the prior unpromoted backfill; registered five unpromoted worker attempts."
+        }
+      ],
+      "completion_not_claimed": true,
+      "unpromoted_worker_results": 1,
+      "promotion_state": "PARTIAL_TWO_RESULT_CONTENTS_INTEGRATED_ONE_WORK004_RESULT_UNRESOLVED",
+      "linked_blocker": "BLOCKER-0005",
+      "status_previous_before_2026_10_09": "EXECUTING_AWAITING_QC_AND_PROMOTION",
+      "leases_previous_before_2026_10_09": [
         {
           "work_id": "WORK-0003",
           "lease": "work-0003-memory-backfill",
@@ -78,7 +208,7 @@
           "correction": "Run 37779956878 recorded no WORK-0005 branch existed. Re-derived in this run: the branch opencode/team-work-0005-next-capability-37779956878 exists at commit 7fe96e2a. The prior value is preserved as the superseded observation."
         }
       ],
-      "run_attempts": [
+      "run_attempts_previous_before_2026_10_09": [
         {
           "run_id": 37759400053,
           "state": "SUPERSEDED_OR_UNKNOWN",
@@ -105,17 +235,61 @@
           "reason": "Third dispatch of the WORK-0003 lease at the same START_SHA. Reused and independently re-verified the prior unpromoted backfill; registered five unpromoted worker attempts."
         }
       ],
-      "completion_not_claimed": true,
-      "unpromoted_worker_results": 5,
-      "promotion_state": "NO_WORKER_RESULT_PROMOTED_TO_TARGET_LINEAGE",
-      "linked_blocker": "BLOCKER-0005"
+      "aggregate_qc": {
+        "run_id": 37788700120,
+        "job_id": 113355594140,
+        "status": "PASS",
+        "envelopes": 3,
+        "successful_worker_reports": 2,
+        "failed_worker_reports": 1,
+        "per_lease_verdict_serialized": false
+      },
+      "integration": {
+        "run_id": 37788700120,
+        "job_id": 113355926130,
+        "status": "SUCCESS",
+        "integrated_worker_commits": [
+          "94fb1c2a17bd83aceca65f2ddd7d5dd4799cca0d",
+          "bbeb2c08f52561f388e7b4191f2e381fc5f878b7"
+        ],
+        "intermediate_commit": "bd0c793981a4023b25d975ba97257d64b639a6a2",
+        "target_commit": "0ab0f063e31987bcc74ec8f35b14c4c320d96d6e",
+        "target_branch": "fix/autonomous-product-factory",
+        "push_observed": true
+      },
+      "synthesis": {
+        "run_id": 37788700120,
+        "job_id": 113356045167,
+        "status": "FAILED",
+        "error": "MODELS[3]: unbound variable",
+        "qualified_candidate_count": 3
+      },
+      "work004_failed_attempt": {
+        "run_id": 37788700120,
+        "job_id": 113351057678,
+        "status": "FAILED_BEFORE_RESULT",
+        "step": "Install OpenCode",
+        "branch": null,
+        "commit": null
+      },
+      "active_unresolved_result_branches": 1,
+      "source_worker_result_branches_observed": 7,
+      "unresolved_work_id": "WORK-0004",
+      "observed_outcome_by": "WORK-0011-memory-reconciliation-2026-10-09",
+      "acceptance": "NOT_ACCEPTED",
+      "next_state": "WORK-0004_INTEGRATOR_ADJUDICATION_THEN_WORK-0006_GATE_A"
     }
   ],
   "current": {
     "id": "WAVE-0011",
     "run_id": 37788700120,
-    "status": "EXECUTING_AWAITING_QC_AND_PROMOTION",
-    "note": "A runner is allocated for run 37788700120. Five governed worker results exist across three leases; none is promoted and none is QC-adjudicated. WAVE-0011 completion, QC pass, integration success and product advancement are NOT claimed."
+    "status": "PARTIALLY_INTEGRATED_NOT_ACCEPTED_SYNTHESIS_FAILED",
+    "note": "Run 37788700120: aggregate QC PASS (2 successful worker reports, 1 failed); two results integrated to target 0ab0f063e31987bcc74ec8f35b14c4c320d96d6e; WORK-0004 failed before result and its latest prior report remains unresolved; synthesis failed on MODELS[3]. WAVE-0011 is not accepted or closed.",
+    "status_previous_before_2026_10_09": "EXECUTING_AWAITING_QC_AND_PROMOTION",
+    "note_previous_before_2026_10_09": "A runner is allocated for run 37788700120. Five governed worker results exist across three leases; none is promoted and none is QC-adjudicated. WAVE-0011 completion, QC pass, integration success and product advancement are NOT claimed.",
+    "acceptance": "NOT_ACCEPTED",
+    "integration_commit": "0ab0f063e31987bcc74ec8f35b14c4c320d96d6e",
+    "active_unresolved_result_branches": 1
   },
   "unknown_history": {
     "ids": [

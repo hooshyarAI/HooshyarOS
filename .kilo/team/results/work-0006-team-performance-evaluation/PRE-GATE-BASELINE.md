@@ -79,3 +79,14 @@ TEAM_V2_ACCEPTED_WITH_CONTROLLED_GAPS
 TEAM_V2_BLOCKED
 
 Final Gate A must consume actual WAVE-0011 evidence plus this preserved baseline; it must not erase or overwrite historical failure evidence.
+
+
+## Corrections and superseding observations (2026-10-09)
+
+This section supplements the historical Wave 10 baseline above. Original figures and wording are preserved; they are not a current Team V2 acceptance verdict.
+
+1. **Wave 10 QC PASS is not Gate A acceptance.** Later WORK-0010 run 37818114064 (workflow head branch `main`) had a worker artifact pass but independent semantic QC job 113455516924 FAILED; integration and synthesis were skipped. Its report verdict is `PARTIAL — NOT AN ACCEPTANCE`, citing historical memory/baseline contradictions and wrapper context confusion. This is cross-lineage evidence, not a canonical-lineage choice.
+2. **Wave 10 integration root cause remains UNADJUDICATED.** The original baseline records target drift. An unpromoted WORK-0004 report attributes the failure to missing Git committer identity and says recovery failed before drift evaluation because `RECOVERY_START_SHA` was unbound. It has not been independently QC-adjudicated or promoted; DECISION-0012 remains in force. Neither attribution is adopted here as final.
+3. **Later Wave 11 was partial, not accepted.** Run 37788700120 had two successful worker results and one failed WORK-0004 worker. Aggregate QC passed (2 successful reports / 1 failed worker); WORK-0003 and WORK-0005 result contents were integrated at `0ab0f063e31987bcc74ec8f35b14c4c320d96d6e`. Synthesis failed with `MODELS[3]: unbound variable` while only three candidates were qualified. The latest valid WORK-0004 report (run 37779956878, commit `305466ccb12c962cf8d37ee70bbfad16a855d8cb`) remains unpromoted and unadjudicated.
+4. **Metric interpretation is restricted.** Wave 10 measurements describe that audit wave only. Later jobs prove neither successful whole-wave closure nor Team V2 acceptance, and no product advancement is inferred.
+5. **Gate status.** Gate A remains `ARMED` with `hold_after_pass=true`. Do not authorize WORK-0007 or remaining-stage product repair until WAVE-0011 is closed, WORK-0004 has governed adjudication/promotion or rejection, memory closure is verified, and WORK-0006 issues one explicit final verdict.
