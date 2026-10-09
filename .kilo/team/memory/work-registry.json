@@ -123,7 +123,7 @@
           "state": "INTEGRATED_VIA_CHERRY_PICK",
           "qc": "AGGREGATE_WAVE_QC_PASS_PER_LEASE_VERDICT_NOT_SEPARATELY_SERIALIZED",
           "promoted": true,
-          "note": "This run. Re-verified the reused baseline against live git, registered five unpromoted worker attempts, opened BLOCKER-0005 and DEFECT-0008, and corrected a false provenance claim. Independent QC, integration and promotion are NOT performed by this lease and are NOT claimed.",
+          "note": "Verified integration job 113355926130 cherry-picked worker commit 94fb1c2a17bd83aceca65f2ddd7d5dd4799cca0d as bd0c793981a4023b25d975ba97257d64b639a6a2 and pushed the combined target integration commit 0ab0f063e31987bcc74ec8f35b14c4c320d96d6e. Aggregate wave QC passed with two successful result reports and one failed worker; a separate per-lease QC verdict was not serialized. This is not WAVE-0011/Gate A acceptance.",
           "state_previous": "EXECUTED_AWAITING_QC",
           "integration_commit": "bd0c793981a4023b25d975ba97257d64b639a6a2",
           "final_target_integration_commit": "0ab0f063e31987bcc74ec8f35b14c4c320d96d6e",

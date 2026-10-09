@@ -380,7 +380,7 @@
       "subject": "WORK-0003 has been dispatched three times at an identical START_SHA with no promotion",
       "status": "VERIFIED",
       "source": "git for-each-ref refs/remotes/origin/opencode/team-work-0003-memory-backfill-*",
-      "note": "Three executions of this identical lease exist as remote worker branches at the same START_SHA, none promoted and none QC-adjudicated. The duplicate-lease guard installed by run 37779956878 could not prevent this third dispatch because it existed only inside that unpromoted branch: an anti-duplication control that is never promoted cannot gate a dispatcher that reads promoted state. This is the measured root cause of the repetition, not a recall failure.",
+      "note": "Historical observation at the original recording point: three executions of this identical WORK-0003 lease existed at the same START_SHA before the run 37788700120 Integrator job completed, and no result had yet been promoted at that snapshot. Later evidence supersedes the then-current no-promotion status: run 37788700120 integrated the third worker result commit 94fb1c2a17bd83aceca65f2ddd7d5dd4799cca0d via cherry-pick bd0c793981a4023b25d975ba97257d64b639a6a2 and pushed final target commit 0ab0f063e31987bcc74ec8f35b14c4c320d96d6e. Earlier attempts remain historical unpromoted source branches. The repeated-dispatch root cause remains evidenced; do not infer current no-integration from this historical snapshot.",
       "recorded_by": "work-0003-memory-backfill-37788700120",
       "attempts": [
         {
@@ -395,12 +395,25 @@
         },
         {
           "run_id": 37788700120,
-          "commit": "PENDING_THIS_LEASE_COMMIT",
-          "promoted": false
+          "commit": "94fb1c2a17bd83aceca65f2ddd7d5dd4799cca0d",
+          "promoted": true,
+          "integration_commit": "bd0c793981a4023b25d975ba97257d64b639a6a2",
+          "final_target_commit": "0ab0f063e31987bcc74ec8f35b14c4c320d96d6e",
+          "disposition": "INTEGRATED_AFTER_HISTORICAL_SNAPSHOT"
         }
       ],
       "linked_defect": "DEFECT-0008",
-      "linked_blocker": "BLOCKER-0005"
+      "linked_blocker": "BLOCKER-0005",
+      "snapshot_status_at_recording": "TRUE_AS_OF_RUN_37788700120_SOURCE_OBSERVATION_BEFORE_INTEGRATION",
+      "current_correction": {
+        "observed_at": "2026-10-09",
+        "source": "EVIDENCE-0026 and GitHub Actions Integrator job 113355926130",
+        "run_id": 37788700120,
+        "current_disposition": "THIRD_WORKER_RESULT_INTEGRATED_VIA_CHERRY_PICK",
+        "source_commit": "94fb1c2a17bd83aceca65f2ddd7d5dd4799cca0d",
+        "integration_commit": "bd0c793981a4023b25d975ba97257d64b639a6a2",
+        "final_target_commit": "0ab0f063e31987bcc74ec8f35b14c4c320d96d6e"
+      }
     },
     {
       "id": "EVIDENCE-0024",
