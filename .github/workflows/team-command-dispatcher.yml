@@ -15,10 +15,7 @@ concurrency:
 
 jobs:
   parse-command:
-    if: >-
-      ${{ github.event.issue.pull_request == null &&
-          github.event.issue.number == 122 &&
-          startsWith(github.event.comment.body, '/opencode-team-run') }}
+    if: ${{ false }} # SECURITY_HOLD: team command dispatcher paused pending review
     runs-on: ubuntu-slim
     outputs:
       acceptance_authorization_id: ${{ steps.parse.outputs.acceptance_authorization_id }}
@@ -37,6 +34,7 @@ jobs:
           echo "TEAM_COMMAND_ACCEPTANCE_AUTHORIZATION_ID=${AUTH:-NONE}"
 
   dispatch:
+    if: ${{ false }} # SECURITY_HOLD: team command dispatcher paused pending review
     needs: parse-command
     uses: ./.github/workflows/team-dispatch-authority.yml
     with:
