@@ -1538,6 +1538,10 @@ jobs:
     env:
       TARGET_BRANCH: fix/autonomous-product-factory
       START_SHA: ${{ needs.prepare.outputs.start_sha }}
+      RESERVATION_ID: ${{ inputs.reservation_id }}
+      RESERVATION_REF: ${{ inputs.reservation_ref }}
+      RESERVATION_RECORD_REF: ${{ inputs.reservation_record_ref }}
+      LEASE_IDS: ${{ needs.prepare.outputs.lease_ids }}
     steps:
       - name: Checkout immutable integration base
         uses: actions/checkout@v6
@@ -1589,14 +1593,22 @@ jobs:
           repo=os.environ["GITHUB_REPOSITORY"]
           rid=os.environ["RESERVATION_ID"].strip()
           ref=os.environ["RESERVATION_REF"].strip()
+          record_ref=os.environ["RESERVATION_RECORD_REF"].strip()
           if not re.fullmatch(r"[a-f0-9]{64}", rid): raise SystemExit("BLOCKED: invalid reservation id")
           if not re.fullmatch(r"team-v2/active/WORK-[0-9]{4}", ref): raise SystemExit("BLOCKED: invalid reservation ref")
+          if record_ref != "team-v2/reservations/"+rid: raise SystemExit("BLOCKED: reservation record ref/id mismatch")
           claim_ref="team-v2/claims/"+rid
           raw=subprocess.check_output(["gh","api","repos/"+repo+"/git/ref/"+claim_ref],text=True)
           claim=json.loads(raw)
           claim_sha=str(claim.get("object",{}).get("sha",""))
-          if claim_sha != os.environ["START_SHA"]:
-              raise SystemExit("BLOCKED: claim ref does not bind to wave START_SHA")
+          active_raw=subprocess.check_output(["gh","api","repos/"+repo+"/git/ref/"+ref],text=True)
+          active=json.loads(active_raw)
+          active_sha=str(active.get("object",{}).get("sha",""))
+          record_raw=subprocess.check_output(["gh","api","repos/"+repo+"/git/ref/"+record_ref],text=True)
+          record=json.loads(record_raw)
+          record_sha=str(record.get("object",{}).get("sha",""))
+          if claim_sha != os.environ["START_SHA"] or active_sha != os.environ["START_SHA"] or record_sha != os.environ["START_SHA"]:
+              raise SystemExit("BLOCKED: claim/reservation refs do not bind to wave START_SHA")
 
           lease_ids=json.loads(os.environ["LEASE_IDS"])
           if len(lease_ids)!=1: raise SystemExit("BLOCKED: claim projection currently requires one lease")
