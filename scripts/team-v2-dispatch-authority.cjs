@@ -4,7 +4,7 @@ const { execFileSync } = require("node:child_process");
 const { evaluateGate } = require("./lib/team-v2-gate.cjs");
 const { validateWork, deriveTaskClass } = require("./lib/team-v2-admission.cjs");
 const { validateAuthorization, canonicalJson } = require("./lib/team-v2-authorization.cjs");
-const { reservationId, reservationRef } = require("./lib/team-v2-reservation.cjs");
+const { reservationId, reservationRef, reservationRecordRef } = require("./lib/team-v2-reservation.cjs");
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 
@@ -323,6 +323,7 @@ if (require.main === module) {
   const inputsHash = sha256(JSON.stringify({ gate, plan, registry, targetSha, authorizationId }));
   const rid = reservationId({ workId, leaseId: lease.id, startSha: targetSha, inputsHash, attemptNo });
   const rref = reservationRef(workId);
+  const recordRef = reservationRecordRef(rid);
   if (authorizationId && consumedAuthorizationRefExists(authorizationId)) {
     console.log("TEAM_WORKER_DISPATCH=REFUSED_AUTHORIZATION_ALREADY_CONSUMED");
     comment("TEAM DISPATCH AUTHORITY REFUSED: acceptance authorization already consumed.");
@@ -331,6 +332,12 @@ if (require.main === module) {
   if (!createRef(rref, targetSha)) {
     console.log("TEAM_WORKER_DISPATCH=REFUSED_RESERVATION_CONFLICT");
     comment("TEAM DISPATCH AUTHORITY REFUSED: authoritative reservation ref already exists or could not be created; no Worker dispatch.");
+    process.exit(20);
+  }
+  if (!createRef(recordRef, targetSha)) {
+    deleteRef(rref);
+    console.log("TEAM_WORKER_DISPATCH=REFUSED_RESERVATION_RECORD_CONFLICT");
+    comment("TEAM DISPATCH AUTHORITY REFUSED: per-reservation record ref already exists or could not be created; no Worker dispatch.");
     process.exit(20);
   }
   writeAdmissionRecord({
@@ -348,12 +355,14 @@ if (require.main === module) {
     reason,
     reservation_id: rid,
     reservation_ref: rref,
+    reservation_record_ref: recordRef,
     attempt_no: attemptNo
   });
   console.log("TEAM_RESERVATION_CREATED=" + rid);
   console.log("TEAM_RESERVATION_REF=" + rref);
   if (authorizationId && !createConsumedAuthorizationRef(authorizationId, targetSha)) {
     deleteRef(rref);
+    deleteRef(recordRef);
     console.log("TEAM_WORKER_DISPATCH=REFUSED_AUTHORIZATION_CONSUME_CONFLICT");
     comment("TEAM DISPATCH AUTHORITY REFUSED: acceptance authorization could not be consumed atomically; reservation revoked.");
     process.exit(20);
@@ -361,6 +370,7 @@ if (require.main === module) {
   const beforeDispatchSha = readTargetSha();
   if (beforeDispatchSha !== targetSha) {
     deleteRef(rref);
+    deleteRef(recordRef);
     console.log("TEAM_WORKER_DISPATCH=REFUSED_TARGET_DRIFT_BEFORE_DISPATCH");
     comment("TEAM DISPATCH AUTHORITY REFUSED: target drifted after reservation; reservation revoked before dispatch.");
     process.exit(20);
@@ -373,7 +383,8 @@ if (require.main === module) {
       "-f", "ref=main",
       "-f", "inputs[reason]=" + reason,
       "-f", "inputs[reservation_id]=" + rid,
-      "-f", "inputs[reservation_ref]=" + rref.replace(/^refs\//, "")
+      "-f", "inputs[reservation_ref]=" + rref.replace(/^refs\//, ""),
+      "-f", "inputs[reservation_record_ref]=" + recordRef.replace(/^refs\//, "")
     ], { stdio: "inherit" });
   } catch (error) {
     console.log("TEAM_WORKER_DISPATCH=REFUSED_DISPATCH_API_FAILURE");
