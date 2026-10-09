@@ -27,6 +27,15 @@ describe("android product acceptance CI repair regression", () => {
         expect(content).toContain("wait-for-device");
     });
 
+    test("ADB wait and device probes are bounded before the finite boot loop", () => {
+        const script = fs.readFileSync(ACCEPTANCE_SCRIPT_PATH, "utf8");
+        expect(script).toContain('timeout 5s "$ADB" wait-for-device');
+        expect(script).toContain('timeout 2s "$ADB" get-state');
+        expect(script).toContain('timeout 2s "$ADB" shell getprop sys.boot_completed');
+        expect(script).toContain('for i in $(seq 1 180)');
+        expect(script).not.toMatch(/\n\s*"\$ADB" wait-for-device\s*\n/);
+    });
+
     test("android acceptance evidence required steps match script recorded steps", () => {
         const evidence = fs.readFileSync(EVIDENCE_SCRIPT_PATH, "utf8");
         const script = fs.readFileSync(ACCEPTANCE_SCRIPT_PATH, "utf8");

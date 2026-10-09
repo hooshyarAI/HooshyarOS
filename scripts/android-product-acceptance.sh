@@ -31,12 +31,14 @@ on_error() {
 }
 trap on_error ERR
 
+# Every ADB probe is bounded so a missing emulator/transport cannot
+# bypass the finite boot-retry loop and hold the CI job indefinitely.
 get_state() {
-  "$ADB" get-state 2>/dev/null | tr -d '\r' || true
+  timeout 2s "$ADB" get-state 2>/dev/null | tr -d '\r' || true
 }
 
 get_boot() {
-  "$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true
+  timeout 2s "$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true
 }
 
 echo "=== Starting Android product acceptance ==="
@@ -46,13 +48,18 @@ echo "=== Verifying APK artifact ==="
 test -f "$APK"
 record_step apk-present
 
-echo "=== Waiting for ADB transport ==="
-"$ADB" wait-for-device
+echo "=== Waiting for ADB transport (bounded) ==="
+if ! timeout 5s "$ADB" wait-for-device; then
+  echo "ADB transport did not appear within 5 seconds; continuing with bounded state/boot probes."
+fi
 
 echo "=== Waiting for ADB device to become online and Android to boot ==="
 for i in $(seq 1 180); do
   state="$(get_state)"
-  boot="$(get_boot)"
+  boot=""
+  if [[ "$state" == "device" ]]; then
+    boot="$(get_boot)"
+  fi
   echo "attempt ${i}/180: state=${state:-unknown} boot=${boot:-unknown}"
   if [[ "$state" == "device" && "$boot" == "1" ]]; then
     break
