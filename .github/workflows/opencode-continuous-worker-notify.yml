@@ -194,7 +194,7 @@ Run:
           echo "ALERT_NEEDED=${ALERT_NEEDED:-unknown}"
 
   worker-job-watchdog:
-    if: ${{ github.event_name == 'workflow_job' && startsWith(github.event.workflow_job.name, 'team-worker (') && (github.event.workflow_job.conclusion == 'failure' || github.event.workflow_job.conclusion == 'cancelled' || github.event.workflow_job.conclusion == 'timed_out') }}
+    if: ${{ false }} # SECURITY_HOLD: worker-job alert side effects paused pending review
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
