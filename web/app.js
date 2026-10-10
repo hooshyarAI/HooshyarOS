@@ -14,7 +14,16 @@ class NetworkError extends Error {}
 
 const ERROR_MESSAGES = {
   AUTHENTICATION_REQUIRED: 'نشست فعالی وجود ندارد یا منقضی شده است. ابتدا نشست ایجاد کنید.',
-  SESSION_FIELDS_REQUIRED: 'نام کاربری و سازمان هر دو الزامی هستند.',
+  SESSION_FIELDS_REQUIRED: 'نام کاربری و نام سازمان را بررسی کنید.',
+  PASSWORD_POLICY_INVALID: 'رمز عبور باید بین ۱۲ تا ۱۲۸ نویسه باشد.',
+  SESSION_MODE_INVALID: 'نوع عملیات ورود مشخص نیست.',
+  ORGANIZATION_ALREADY_EXISTS: 'این سازمان قبلاً ثبت شده است؛ برای عضویت از مالک کد دعوت بگیرید.',
+  ACCOUNT_ALREADY_EXISTS: 'این نام کاربری قبلاً در سازمان ثبت شده است.',
+  AUTHENTICATION_FAILED: 'نام کاربری، سازمان یا رمز عبور نادرست است.',
+  AUTHENTICATION_RATE_LIMITED: 'تعداد تلاش‌های ورود زیاد است؛ ۱۵ دقیقه بعد دوباره تلاش کنید.',
+  AUTHORIZATION_DENIED: 'این حساب مجوز انجام این عملیات را ندارد.',
+  INVITATION_INVALID: 'کد دعوت نامعتبر، منقضی یا قبلاً استفاده شده است.',
+  INVITATION_ROLE_NOT_ALLOWED: 'این نقش برای حساب فعلی قابل واگذاری نیست.',
   BALANCE_SHEET_FIELDS_REQUIRED: 'مقدار دارایی‌ها و بدهی‌ها باید عدد معتبر باشد.',
   EXECUTIVE_TARGETS_INVALID: 'همه هدف‌ها باید عدد معتبر و بزرگ‌تر از صفر باشند.',
   'request-body-too-large': 'حجم فایل بیش از حد مجاز سرور (۱ مگابایت) است.',
@@ -319,14 +328,17 @@ async function refreshDashboard() {
 
   try {
     const session = await request('/api/session');
-    setPill($('#session-status'), 'ok', `نشست: ${session.organization?.name ?? 'فعال'}`);
+    renderAuthControls(session);
+    setPill($('#session-status'), 'ok', `حساب: ${session.organization?.name ?? 'فعال'} · ${roleLabel(session.role)}`);
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
-      setPill($('#session-status'), 'warn', 'نشست: ایجاد نشده');
-      renderUnavailable('نیاز به نشست', 'برای مشاهده داشبورد ابتدا در بخش «ایجاد نشست» نشست بسازید.');
+      renderAuthControls(null);
+      setPill($('#session-status'), 'warn', 'حساب: وارد نشده');
+      renderUnavailable('نیاز به ورود', 'برای مشاهده داده‌های سازمان، وارد حساب شوید یا یک سازمان جدید ثبت کنید.');
       return;
     }
-    setPill($('#session-status'), 'error', 'نشست: خطا در بررسی');
+    renderAuthControls(null);
+    setPill($('#session-status'), 'error', 'حساب: خطا در بررسی');
     renderUnavailable('داده در دسترس نیست', describeError(error));
     showAlert(describeError(error));
     return;
@@ -351,29 +363,110 @@ function setBusy(form, busy, label) {
   }
 }
 
+function roleLabel(role) {
+  return ({ OWNER: 'مالک', ADMIN: 'مدیر سامانه', MANAGER: 'مدیر', VIEWER: 'مشاهده‌گر' })[role] ?? 'نقش نامشخص';
+}
+
+function renderAuthControls(session) {
+  const canInvite = session && ['OWNER', 'ADMIN'].includes(session.role);
+  $('#invite-form').hidden = !canInvite;
+  $('#logout-button').hidden = !session;
+}
+
+function syncSessionMode() {
+  const mode = $('#session-mode').value;
+  const needsOrganization = mode !== 'join';
+  $('#organization-field').hidden = !needsOrganization;
+  $('#organization').required = needsOrganization;
+  $('#invite-code-field').hidden = mode !== 'join';
+  $('#invitation-code').required = mode === 'join';
+  $('#password').autocomplete = mode === 'login' ? 'current-password' : 'new-password';
+  $('#password').minLength = mode === 'login' ? 1 : 12;
+  const labels = {
+    register: 'ساخت سازمان و حساب مالک',
+    login: 'ورود به حساب',
+    join: 'پیوستن به سازمان',
+  };
+  $('#session-form').querySelector('button[type="submit"]').textContent = labels[mode] ?? 'ادامه';
+}
+
+$('#session-mode').addEventListener('change', syncSessionMode);
+syncSessionMode();
+
 $('#session-form').addEventListener('submit', async event => {
   event.preventDefault();
   const form = event.currentTarget;
   const result = $('#session-result');
+  const mode = $('#session-mode').value;
   const username = $('#username').value.trim();
   const organization = $('#organization').value.trim();
-  if (!username || !organization) {
-    setResult(result, 'error', ERROR_MESSAGES.SESSION_FIELDS_REQUIRED);
+  const password = $('#password').value;
+  const invitationCode = $('#invitation-code').value.trim();
+  if (!username || (mode !== 'join' && !organization) || !password ||
+      ((mode === 'register' || mode === 'join') && password.length < 12) ||
+      (mode === 'join' && !invitationCode)) {
+    const message = !password || ((mode === 'register' || mode === 'join') && password.length < 12)
+      ? ERROR_MESSAGES.PASSWORD_POLICY_INVALID : ERROR_MESSAGES.SESSION_FIELDS_REQUIRED;
+    setResult(result, 'error', message);
     return;
   }
-  setBusy(form, true, 'در حال ایجاد…');
+
+  setBusy(form, true, 'در حال بررسی حساب…');
+  setResult(result, 'info', 'درخواست هویت در حال بررسی است…');
+  const requestBody = { mode, username, password };
+  if (mode !== 'join') requestBody.organization = organization;
+  if (mode === 'join') requestBody.invitationCode = invitationCode;
   try {
     const payload = await request('/api/session', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ username, organization })
+      body: JSON.stringify(requestBody)
     });
-    setResult(result, 'success', `نشست «${payload.organization.name}» با موفقیت ایجاد شد.`);
+    const message = mode === 'login'
+      ? `ورود به «${payload.organization.name}» موفق بود.`
+      : mode === 'join'
+        ? `عضویت در «${payload.organization.name}» با نقش «${roleLabel(payload.role)}» انجام شد.`
+        : `سازمان «${payload.organization.name}» ثبت و حساب مالک ایجاد شد.`;
+    setResult(result, 'success', message);
+    $('#password').value = '';
+    $('#invitation-code').value = '';
+    renderAuthControls(payload);
     await refreshDashboard();
   } catch (error) {
-    setResult(result, 'error', `ایجاد نشست ناموفق بود: ${describeError(error)}`);
+    setResult(result, 'error', `عملیات حساب ناموفق بود: ${describeError(error)}`);
   } finally {
     setBusy(form, false);
+    syncSessionMode();
+  }
+});
+
+$('#invite-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const result = $('#invite-result');
+  setBusy(form, true, 'در حال ساخت کد…');
+  try {
+    const invitation = await request('/api/invitations', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ role: $('#invite-role').value })
+    });
+    setResult(result, 'success',
+      `کد دعوت یک‌بارمصرف (${roleLabel(invitation.role)}) را اکنون کپی و برای عضو ارسال کنید: ${invitation.code} · انقضا: ${faDate.format(new Date(invitation.expiresAt))}`);
+  } catch (error) {
+    setResult(result, 'error', `ساخت کد دعوت ناموفق بود: ${describeError(error)}`);
+  } finally {
+    setBusy(form, false);
+  }
+});
+
+$('#logout-button').addEventListener('click', async () => {
+  try {
+    await request('/api/logout', { method: 'POST' });
+    setResult($('#session-result'), 'success', 'از حساب خارج شدید.');
+    await refreshDashboard();
+  } catch (error) {
+    setResult($('#session-result'), 'error', `خروج ناموفق بود: ${describeError(error)}`);
   }
 });
 

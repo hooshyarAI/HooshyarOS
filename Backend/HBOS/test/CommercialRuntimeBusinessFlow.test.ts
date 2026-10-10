@@ -42,7 +42,7 @@ describe("Commercial runtime real business flow", () => {
     const session = await request(server, "/api/session", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ username: "مدیرعامل", organization: "شرکت نمونه" }),
+      body: JSON.stringify({ mode: "register", username: "مدیرعامل", organization: "شرکت نمونه", password: "Strong-Demo-Password-2026!" }),
     });
     expect(session.status).toBe(201);
     const cookie = session.headers.get("set-cookie");
@@ -106,7 +106,7 @@ describe("Commercial runtime real business flow", () => {
     const session = await request(server, "/api/session", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ username: "مدیرعامل", organization: "شرکت الف" }),
+      body: JSON.stringify({ mode: "register", username: "مدیرعامل", organization: "شرکت الف", password: "Strong-Demo-Password-2026!" }),
     });
     const cookie = session.headers.get("set-cookie")!.split(";")[0];
     const csv = "date,account,debit,credit,currency\n2026-08-01,Cash,1000,0,IRR\n2026-08-01,Sales,0,1000,IRR";
@@ -132,7 +132,7 @@ describe("Commercial runtime real business flow", () => {
     const otherSession = await request(server, "/api/session", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ username: "مدیرعامل", organization: "شرکت ب" }),
+      body: JSON.stringify({ mode: "register", username: "مدیرعامل", organization: "شرکت ب", password: "Strong-Demo-Password-2026!" }),
     });
     const otherCookie = otherSession.headers.get("set-cookie")!.split(";")[0];
     const otherDashboard = await request(server, "/api/dashboard", { headers: { cookie: otherCookie } });
@@ -154,7 +154,7 @@ describe("Commercial runtime real business flow", () => {
     const session = await request(server, "/api/session", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ username: "مدیرعامل", organization: "شرکت با دارایی صفر" }),
+      body: JSON.stringify({ mode: "register", username: "مدیرعامل", organization: "شرکت با دارایی صفر", password: "Strong-Demo-Password-2026!" }),
     });
     const cookie = session.headers.get("set-cookie")!.split(";")[0];
     const csv = "date,account,debit,credit,currency\n2026-08-01,Cash,1000,0,IRR\n2026-08-01,Sales,0,1000,IRR";
@@ -185,7 +185,7 @@ describe("Commercial runtime real business flow", () => {
     const session = await request(server, "/api/session", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ username: "مدیرعامل", organization: "شرکت هدف‌ها" }),
+      body: JSON.stringify({ mode: "register", username: "مدیرعامل", organization: "شرکت هدف‌ها", password: "Strong-Demo-Password-2026!" }),
     });
     const cookie = session.headers.get("set-cookie")!.split(";")[0];
     const response = await request(server, "/api/executive-targets", {

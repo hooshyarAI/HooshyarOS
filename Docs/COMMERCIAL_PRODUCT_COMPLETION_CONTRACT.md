@@ -57,6 +57,8 @@ Required capabilities:
 
 The existence of `UserManagementEngine` alone is not sufficient evidence of commercial identity readiness.
 
+The current runtime has a password-backed registration/login path, a random persistent organization/tenant identifier, single-use expiring membership invitations, role-gated runtime routes, session expiry/logout and identity audit events. Password recovery, stronger account recovery, deployment-grade rate limiting, multi-factor authentication and independent security review remain separate completion requirements; this partial implementation must not be reported as full commercial identity readiness.
+
 ### 3. Multi-tenancy and authorization
 
 Every organization-owned resource must have an explicit ownership/scope rule.

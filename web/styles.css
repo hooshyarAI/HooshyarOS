@@ -200,3 +200,8 @@ select:focus-visible { outline: 3px solid rgba(22,125,117,.28); outline-offset: 
 .executive-subtitle { font-size: 1rem; margin-top: 12px; }
 .executive-finding strong { display: block; margin-bottom: 5px; }
 .executive-finding p { margin: 0; font-size: .86rem; line-height: 1.8; }
+
+.identity-extra[hidden] { display: none !important; }
+#logout-button { margin-top: 10px; }
+#invite-form { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+#invite-form h3 { font-size: 1rem; }

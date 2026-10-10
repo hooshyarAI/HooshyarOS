@@ -159,20 +159,50 @@
 
         <div class="columns">
           <section id="session" class="card" aria-labelledby="session-title">
-            <h2 id="session-title">ایجاد نشست</h2>
-            <p class="card-text">نشست در حافظه سرور نگه‌داری می‌شود و با راه‌اندازی دوباره سرور از بین می‌رود.</p>
+            <h2 id="session-title">ورود امن به فضای سازمان</h2>
+            <p class="card-text">برای حفظ تاریخچه و محرمانگی، از حساب سازمانی استفاده کنید. ساخت سازمان فقط برای سازمانی مجاز است که هنوز ثبت نشده؛ اعضای دیگر با کد دعوت وارد می‌شوند.</p>
             <form id="session-form" class="form" novalidate>
               <label class="field">
-                <span>نام کاربری</span>
-                <input id="username" name="username" autocomplete="username" placeholder="نام خود را وارد کنید" required />
+                <span>نوع عملیات</span>
+                <select id="session-mode" name="mode">
+                  <option value="register">ساخت سازمان و حساب مالک</option>
+                  <option value="login">ورود به حساب موجود</option>
+                  <option value="join">پیوستن با کد دعوت</option>
+                </select>
               </label>
               <label class="field">
-                <span>سازمان</span>
-                <input id="organization" name="organization" autocomplete="organization" placeholder="نام سازمان" required />
+                <span>نام کاربری</span>
+                <input id="username" name="username" autocomplete="username" placeholder="نام کاربری" maxlength="120" required />
               </label>
-              <button class="btn btn-primary" type="submit">ایجاد نشست</button>
+              <label id="organization-field" class="field">
+                <span>نام سازمان</span>
+                <input id="organization" name="organization" autocomplete="organization" placeholder="نام ثبت‌شده سازمان" maxlength="120" required />
+              </label>
+              <label class="field">
+                <span>رمز عبور</span>
+                <input id="password" name="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" placeholder="حداقل ۱۲ نویسه" required />
+              </label>
+              <label id="invite-code-field" class="field" hidden>
+                <span>کد دعوت یک‌بارمصرف</span>
+                <input id="invitation-code" name="invitationCode" autocomplete="off" placeholder="کد دعوت را وارد کنید" maxlength="200" />
+              </label>
+              <button class="btn btn-primary" type="submit">ادامه</button>
             </form>
             <p id="session-result" class="result" aria-live="polite"></p>
+            <button id="logout-button" class="btn btn-secondary identity-extra" type="button" hidden>خروج از حساب</button>
+            <form id="invite-form" class="form identity-extra" novalidate hidden>
+              <h3>دعوت عضو جدید</h3>
+              <label class="field">
+                <span>نقش عضو</span>
+                <select id="invite-role" name="role">
+                  <option value="VIEWER">مشاهده‌گر</option>
+                  <option value="MANAGER">مدیر</option>
+                  <option value="ADMIN">مدیر سامانه</option>
+                </select>
+              </label>
+              <button class="btn btn-secondary" type="submit">ساخت کد دعوت</button>
+              <p id="invite-result" class="result" aria-live="polite"></p>
+            </form>
           </section>
 
           <section id="analysis" class="card" aria-labelledby="analysis-title">
