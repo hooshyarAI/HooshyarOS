@@ -68,6 +68,26 @@ const DOMAINS: readonly InterdisciplinaryKnowledgeDomain[] = [
     outcomeMetrics: ["خطای پیش‌بینی در افق‌های مختلف", "پایداری سناریو", "کیفیت شناسایی علّی"]
   },
   {
+    id: "data-analytics-science", title: "علوم تحلیل داده", priority: "FOUNDATIONAL",
+    appliesWhen: ["تبدیل داده خام به گزارش، علت‌یابی، شاخص، پیش‌بینی یا پیشنهاد اقدام"],
+    concepts: ["تحلیل توصیفی/تشخیصی/پیش‌بینانه/تجویزی", "آمار استنباطی و طراحی سنجه", "کاوش داده و مصورسازی", "تحلیل علّی با طراحی معتبر"],
+    candidateMethods: ["پروفایل‌سازی و کنترل کیفیت داده", "تحلیل روند/بخش‌بندی/همبستگی", "تحلیل علت ریشه‌ای با شواهد", "داشبورد و مصورسازی", "آزمون فرض و پیش‌بینی با اعتبارسنجی مناسب"],
+    requiredEvidence: ["تعریف دقیق سؤال و KPI", "داده با معناشناسی/واحد/زمان مشخص", "منبع و پوشش داده", "خط مبنا برای مقایسه"],
+    qualityGates: ["تعریف شاخص و محاسبه بازتولیدپذیر باشد", "داده مفقود از صفر تفکیک شود", "همبستگی با علیت اشتباه نشود", "نمودار و خلاصه، دامنه و محدودیت داده را نشان دهند"],
+    guardrails: ["بدون تعریف صورت و مخرج، نسبت نساز", "نمایش همبستگی به‌عنوان علت ممنوع", "نمونه کوچک یا داده سوگیر، نتیجه قطعی نمی‌دهد"],
+    outcomeMetrics: ["دقت/پایداری تحلیل", "زمان رسیدن به بینش", "قابلیت بازتولید", "اثر تصمیم بر KPI"]
+  },
+  {
+    id: "data-analytics-management-and-governance", title: "مدیریت تحلیل داده و حاکمیت داده", priority: "FOUNDATIONAL",
+    appliesWhen: ["مالکیت داده، مدیریت KPI، چرخه تحلیل، کیفیت گزارش، داده مرجع و مقیاس‌پذیری تحلیل"],
+    concepts: ["مالک/متولی داده", "فرهنگ‌نامه و کاتالوگ داده", "تبارشناسی و منشأ داده", "کیفیت و قرارداد داده", "چرخه عمر/دسترسی/نگهداری", "تعریف واحد و نسخه KPI"],
+    candidateMethods: ["Data Quality Rules و scorecard", "Data lineage و ثبت provenance", "فرهنگ‌نامه مشترک KPI", "کنترل تغییر schema و قرارداد داده", "طبقه‌بندی حساسیت و حداقل‌سازی دسترسی", "مدیریت backlog تحلیلی بر اساس ارزش و ریسک"],
+    requiredEvidence: ["مالک داده و منبع رسمی", "تعریف فیلد و KPI", "قواعد کیفیت و حد آستانه", "مجوز استفاده و دوره نگهداری"],
+    qualityGates: ["هر KPI تعریف، مالک، واحد، دوره و منبع داشته باشد", "کیفیت و تازگی داده در دسترس مصرف‌کننده باشد", "تغییر schema/KPI versioned و قابل ممیزی باشد", "داده حساس کمینه و دسترسی محدود شود"],
+    guardrails: ["بدون مالک یا منشأ معتبر، داده مرجع تلقی نشود", "تغییر تعریف KPI بین دوره‌ها باید افشا شود", "بازاستفاده از داده نباید هدف یا مجوز جدید را دور بزند"],
+    outcomeMetrics: ["نرخ نقص/تازگی داده", "درصد KPI با تعریف و مالک", "زمان کشف تا رفع خطا", "کاهش ناسازگاری گزارش"]
+  },
+  {
     id: "data-science-ai-and-model-risk", title: "علوم داده، هوش مصنوعی و ریسک مدل", priority: "FOUNDATIONAL",
     appliesWhen: ["پیش‌بینی، طبقه‌بندی، کشف ناهنجاری، پردازش متن و انتخاب مدل"],
     concepts: ["کیفیت و نمایندگی داده", "خط مبنا", "اعتبارسنجی خارج از نمونه", "تبیین‌پذیری و رانش"],
@@ -141,16 +161,16 @@ const DOMAINS: readonly InterdisciplinaryKnowledgeDomain[] = [
 
 const TASK_DOMAINS: Readonly<Record<DecisionTask, readonly string[]>> = {
   EXECUTIVE_DECISION:["strategy-enterprise-performance-and-process","operations-research-and-optimization","economics-and-econometrics","risk-governance-and-regulatory-applicability","behavioral-science-and-human-centered-design"],
-  FINANCIAL_STATEMENT_ANALYSIS:["accounting-financial-reporting","financial-management-and-corporate-finance","data-science-ai-and-model-risk","risk-governance-and-regulatory-applicability","reliable-data-and-platform-engineering"],
-  FINANCIAL_MANAGEMENT:["financial-management-and-corporate-finance","accounting-financial-reporting","economics-and-econometrics","operations-research-and-optimization","risk-governance-and-regulatory-applicability"],
-  FINANCIAL_ENGINEERING:["quantitative-finance-and-financial-engineering","operations-research-and-optimization","economics-and-econometrics","data-science-ai-and-model-risk","risk-governance-and-regulatory-applicability"],
-  ECONOMIC_FORECAST:["economics-and-econometrics","data-science-ai-and-model-risk","financial-management-and-corporate-finance","risk-governance-and-regulatory-applicability"],
-  RISK_ASSESSMENT:["risk-governance-and-regulatory-applicability","financial-management-and-corporate-finance","quantitative-finance-and-financial-engineering","data-science-ai-and-model-risk"],
-  PORTFOLIO_OPTIMIZATION:["quantitative-finance-and-financial-engineering","operations-research-and-optimization","economics-and-econometrics","data-science-ai-and-model-risk","risk-governance-and-regulatory-applicability"],
-  PROCESS_REDESIGN:["strategy-enterprise-performance-and-process","operations-research-and-optimization","organizational-and-people-analytics","behavioral-science-and-human-centered-design","reliable-data-and-platform-engineering"],
-  HR_ANALYTICS:["organizational-and-people-analytics","behavioral-science-and-human-centered-design","data-science-ai-and-model-risk","risk-governance-and-regulatory-applicability"],
-  DIGITAL_FINANCIAL_PRODUCT:["behavioral-science-and-human-centered-design","data-science-ai-and-model-risk","risk-governance-and-regulatory-applicability","reliable-data-and-platform-engineering"],
-  GENERAL:["strategy-enterprise-performance-and-process","data-science-ai-and-model-risk","risk-governance-and-regulatory-applicability","reliable-data-and-platform-engineering"]
+  FINANCIAL_STATEMENT_ANALYSIS:["accounting-financial-reporting","financial-management-and-corporate-finance","data-analytics-science","data-analytics-management-and-governance","data-science-ai-and-model-risk","risk-governance-and-regulatory-applicability","reliable-data-and-platform-engineering"],
+  FINANCIAL_MANAGEMENT:["financial-management-and-corporate-finance","accounting-financial-reporting","data-analytics-science","data-analytics-management-and-governance","economics-and-econometrics","operations-research-and-optimization","risk-governance-and-regulatory-applicability"],
+  FINANCIAL_ENGINEERING:["quantitative-finance-and-financial-engineering","data-analytics-science","data-analytics-management-and-governance","operations-research-and-optimization","economics-and-econometrics","data-science-ai-and-model-risk","risk-governance-and-regulatory-applicability"],
+  ECONOMIC_FORECAST:["economics-and-econometrics","data-analytics-science","data-analytics-management-and-governance","data-science-ai-and-model-risk","financial-management-and-corporate-finance","risk-governance-and-regulatory-applicability"],
+  RISK_ASSESSMENT:["risk-governance-and-regulatory-applicability","financial-management-and-corporate-finance","quantitative-finance-and-financial-engineering","data-analytics-science","data-analytics-management-and-governance","data-science-ai-and-model-risk"],
+  PORTFOLIO_OPTIMIZATION:["quantitative-finance-and-financial-engineering","data-analytics-science","data-analytics-management-and-governance","operations-research-and-optimization","economics-and-econometrics","data-science-ai-and-model-risk","risk-governance-and-regulatory-applicability"],
+  PROCESS_REDESIGN:["strategy-enterprise-performance-and-process","data-analytics-science","data-analytics-management-and-governance","operations-research-and-optimization","organizational-and-people-analytics","behavioral-science-and-human-centered-design","reliable-data-and-platform-engineering"],
+  HR_ANALYTICS:["organizational-and-people-analytics","data-analytics-science","data-analytics-management-and-governance","behavioral-science-and-human-centered-design","data-science-ai-and-model-risk","risk-governance-and-regulatory-applicability"],
+  DIGITAL_FINANCIAL_PRODUCT:["behavioral-science-and-human-centered-design","data-analytics-science","data-analytics-management-and-governance","data-science-ai-and-model-risk","risk-governance-and-regulatory-applicability","reliable-data-and-platform-engineering"],
+  GENERAL:["strategy-enterprise-performance-and-process","data-analytics-science","data-analytics-management-and-governance","data-science-ai-and-model-risk","risk-governance-and-regulatory-applicability","reliable-data-and-platform-engineering"]
 };
 
 const REFERENCES = [
