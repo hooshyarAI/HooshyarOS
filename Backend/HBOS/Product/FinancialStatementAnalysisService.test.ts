@@ -37,7 +37,8 @@ describe("FinancialStatementAnalysisService production behavioral evidence", () 
     expect(capturedReasoningPrompt).toContain("interdisciplinaryKnowledgeVersion=interdisciplinary-decision-knowledge-2026-10-10.v1");
     expect(capturedReasoningPrompt).toContain("accounting-financial-reporting");
     expect(capturedReasoningPrompt).toContain("جمع بدهکار/بستانکار کل، درآمد/هزینه نیست");
-    expect(capturedReasoningPrompt).toContain("Do not turn missing data into zero or correlation into causality");
+    expect(capturedReasoningPrompt).toContain("Select methods only if data, assumptions, objective and computational costs fit.");
+    expect(capturedReasoningPrompt).toContain("For financial reports, confirm account mapping, period, currency, measurement basis and governing standards before asserting profit or compliance.");
     persistence.close();
   });
 
