@@ -25,7 +25,7 @@ export interface DecisionKnowledgeRequest {
   readonly evidenceAvailable?: readonly string[];
 }
 
-const VERSION = "interdisciplinary-decision-knowledge-2026-10-10.v1";
+const VERSION = "interdisciplinary-decision-knowledge-2026-10-10.v2";
 const DOMAINS: readonly InterdisciplinaryKnowledgeDomain[] = [
   {
     id: "accounting-financial-reporting", title: "حسابداری و گزارشگری مالی", priority: "FOUNDATIONAL",
@@ -174,7 +174,9 @@ const TASK_DOMAINS: Readonly<Record<DecisionTask, readonly string[]>> = {
 };
 
 const REFERENCES = [
-  {id:"NIST-AI-RMF",authority:"NIST",url:"https://www.nist.gov/itl/ai-risk-management-framework",kind:"framework",rule:"چارچوب داوطلبانه مدیریت ریسک هوش مصنوعی؛ بازنگری آن پیگیری شود."},
+  {id:"DAMA-DMBOK-REVISION",authority:"DAMA International",url:"https://dama.org/dama-dmbok-revision/",kind:"data-management-framework",rule:"حاکمیت، مالکیت، فراداده، کیفیت و تبارشناسی داده؛ وضعیت نسخه/بازنگری را هنگام استفاده بررسی کنید."},
+  {id:"IFAC-AUDIT-DATA-ANALYTICS",authority:"IFAC / CPA Canada",url:"https://www.ifac.org/content/audit-data-analytics-guide",kind:"professional-guidance",rule:"راهنمای تحلیل داده برای گزارشگری مالی و حسابرسی؛ جایگزین استاندارد حسابرسی لازم‌الاجرا نیست."},
+  {id:"NIST-AI-RMF",authority:"NIST",url:"https://www.nist.gov/itl/ai-risk-management-framework",kind:"framework",rule:"چارچوب داوطلبانه مدیریت ریسک هوش مصنوعی؛ بازنگری آن پیگیری شود."}
   {id:"OECD-AI",authority:"OECD",url:"https://www.oecd.org/en/topics/ai-principles.html",kind:"framework",rule:"اصول سیاستی؛ قانون خودکار هر کشور نیست."},
   {id:"COSO-ERM",authority:"COSO",url:"https://www.coso.org/enterprise-risk-management",kind:"framework",rule:"پیوند ریسک با راهبرد و عملکرد."},
   {id:"GOOGLE-ML-RULES",authority:"Google",url:"https://developers.google.com/machine-learning/guides/rules-of-ml",kind:"engineering",rule:"زیرساخت و خط مبنای ساده پیش از مدل پیچیده."},
