@@ -20,7 +20,9 @@ describe("ExecutiveIntelligenceEngine", () => {
         const onTrack = engine.recommend(engine.analyzeKpi("revenue", 110, 100));
         const atRisk = engine.recommend(engine.analyzeKpi("revenue", 90, 100));
         expect(onTrack.status).toBe("ON_TRACK");
+        expect(onTrack.actionCode).toBe("MONITOR");
         expect(atRisk.status).toBe("AT_RISK");
+        expect(atRisk.actionCode).toBe("INVESTIGATE_TARGET_SHORTFALL");
     });
 
     it("evaluates performance without hiding invalid targets", () => {
@@ -39,6 +41,7 @@ describe("ExecutiveIntelligenceEngine", () => {
         expect(engine.recommend(belowTarget).status).toBe("ON_TRACK");
         expect(engine.evaluatePerformance(0.35, 0.4, "lower-is-better").status).toBe("ON_TRACK");
         expect(engine.recommend(aboveTarget).status).toBe("AT_RISK");
+        expect(engine.recommend(aboveTarget).actionCode).toBe("INVESTIGATE_TARGET_EXCEEDANCE");
         expect(engine.evaluatePerformance(0.45, 0.4, "lower-is-better").status).toBe("BELOW_TARGET");
     });
 
@@ -46,6 +49,7 @@ describe("ExecutiveIntelligenceEngine", () => {
         const engine = new ExecutiveIntelligenceEngine();
         const kpi = engine.analyzeKpi("debtRatio", 0.35, 0, "lower-is-better");
         expect(engine.recommend(kpi).status).toBe("BLOCKED");
+        expect(engine.recommend(kpi).actionCode).toBe("VERIFY_INPUTS");
         expect(engine.evaluatePerformance(0.35, 0, "lower-is-better").status).toBe("BLOCKED");
     });
 });

@@ -10,6 +10,22 @@ const request = async (server: Server, path: string, options: RequestInit = {}) 
 describe("Commercial runtime real business flow", () => {
   let server: Server;
 
+  test("serves a coherent web shell and its executive presentation module", async () => {
+    const [root, index, viewModel] = await Promise.all([
+      request(server, "/"),
+      request(server, "/index.html"),
+      request(server, "/executive-evaluation-view-model.js"),
+    ]);
+    expect(root.status).toBe(200);
+    expect(index.status).toBe(200);
+    expect(viewModel.status).toBe(200);
+    expect(viewModel.headers.get("content-type")).toContain("text/javascript");
+    const html = await root.text();
+    expect(html).toContain('src="/executive-evaluation-view-model.js"');
+    expect(html).toContain('src="/app.js"');
+    expect(await viewModel.text()).toContain("buildRows");
+  });
+
   beforeEach(async () => {
     server = createCommercialRuntimeServer({
       databasePath: ":memory:",

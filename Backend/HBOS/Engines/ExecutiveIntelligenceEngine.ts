@@ -11,8 +11,15 @@ export interface ExecutiveKpi {
     achievementRate: number;
 }
 
+export type ExecutiveRecommendationActionCode =
+    | "MONITOR"
+    | "INVESTIGATE_TARGET_SHORTFALL"
+    | "INVESTIGATE_TARGET_EXCEEDANCE"
+    | "VERIFY_INPUTS";
+
 export interface ExecutiveRecommendation {
     status: "ON_TRACK" | "AT_RISK" | "BLOCKED";
+    actionCode: ExecutiveRecommendationActionCode;
     action: string;
 }
 
@@ -59,12 +66,31 @@ export class ExecutiveIntelligenceEngine implements Engine {
         if (!Number.isFinite(kpi.actual) || !Number.isFinite(kpi.target) ||
             !Number.isFinite(kpi.achievementRate) || kpi.target <= 0 ||
             (kpi.direction !== "higher-is-better" && kpi.direction !== "lower-is-better")) {
-            return { status: "BLOCKED", action: "Provide valid KPI values and a valid target before executive action." };
+            return {
+                status: "BLOCKED",
+                actionCode: "VERIFY_INPUTS",
+                action: "Verify KPI values, direction and target before executive action.",
+            };
         }
         if (kpi.achievementRate >= 100) {
-            return { status: "ON_TRACK", action: "Maintain the current execution path and monitor the KPI." };
+            return {
+                status: "ON_TRACK",
+                actionCode: "MONITOR",
+                action: "Maintain the current execution path and monitor the KPI.",
+            };
         }
-        return { status: "AT_RISK", action: "Review the KPI gap, root causes and corrective actions." };
+        if (kpi.direction === "lower-is-better") {
+            return {
+                status: "AT_RISK",
+                actionCode: "INVESTIGATE_TARGET_EXCEEDANCE",
+                action: "The observed value exceeds a lower-is-better target; review evidence and mitigation options.",
+            };
+        }
+        return {
+            status: "AT_RISK",
+            actionCode: "INVESTIGATE_TARGET_SHORTFALL",
+            action: "The observed value is below a higher-is-better target; review evidence and corrective options.",
+        };
     }
 
     evaluatePerformance(

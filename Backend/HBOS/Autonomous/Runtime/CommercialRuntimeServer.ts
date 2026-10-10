@@ -100,7 +100,8 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
             const path = req.url?.split("?")[0] ?? "/";
             if (req.method === "GET" && path === "/health") return json(res, 200, { status: "ok", service: "hooshyar-commercial-runtime" });
             if (req.method === "GET" && path === "/api/ready") return json(res, 200, { status: "READY", capabilities: ["financial-ingestion", "financial-statement-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-target-evaluation"] });
-            if (req.method === "GET" && path === "/") return asset(res, "index.html", "text/html; charset=utf-8");
+            if (req.method === "GET" && (path === "/" || path === "/index.html")) return asset(res, "index.html", "text/html; charset=utf-8");
+            if (req.method === "GET" && path === "/executive-evaluation-view-model.js") return asset(res, "executive-evaluation-view-model.js", "text/javascript; charset=utf-8");
             if (req.method === "GET" && path === "/app.js") return asset(res, "app.js", "text/javascript; charset=utf-8");
             if (req.method === "GET" && path === "/styles.css") return asset(res, "styles.css", "text/css; charset=utf-8");
             if (req.method === "GET" && path === "/manifest.webmanifest") return asset(res, "manifest.webmanifest", "application/manifest+json; charset=utf-8");

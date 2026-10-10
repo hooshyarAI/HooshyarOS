@@ -105,12 +105,7 @@ const TREND_METRICS = {
   risk: { label: 'ریسک بدهی', color: '#c07828', value: item => item.metrics?.risk }
 };
 
-const EXECUTIVE_METRICS = {
-  revenue: { label: 'درآمد', direction: 'بیشتر بهتر است', format: value => faNumber.format(value) },
-  profit: { label: 'سود', direction: 'بیشتر بهتر است', format: value => faNumber.format(value) },
-  profitMargin: { label: 'حاشیه سود', direction: 'بیشتر بهتر است', format: value => `${faNumber.format(value * 100)}٪` },
-  debtRatio: { label: 'نسبت بدهی', direction: 'کمتر بهتر است', format: value => `${faNumber.format(value * 100)}٪` }
-};
+const EXECUTIVE_VIEW = window.HooshyarExecutiveEvaluationViewModel;
 
 function renderExecutiveTargets(targets) {
   const fields = [
@@ -147,26 +142,23 @@ function renderExecutiveEvaluation(evaluation, targetsConfigured) {
     list.append(item);
     return;
   }
-  note.textContent = 'مقایسه بر اساس آخرین تحلیل موفق و هدف‌هایی است که سازمان ثبت کرده است؛ وضعیت به‌تنهایی علت انحراف را اثبات نمی‌کند.';
-  evaluation.kpis.forEach((kpi, index) => {
-    const metric = EXECUTIVE_METRICS[kpi.name];
-    if (!metric) return;
-    const recommendation = evaluation.recommendations[index];
-    const status = recommendation?.status ?? 'BLOCKED';
-    const statusText = status === 'ON_TRACK'
-      ? 'در محدوده هدف'
-      : status === 'AT_RISK'
-        ? 'نیازمند بررسی فاصله از هدف'
-        : 'ارزیابی مسدود شد';
+  note.textContent = 'مقایسه بر اساس آخرین تحلیل موفق و هدف‌هایی است که سازمان ثبت کرده است؛ اختلاف عددی علت انحراف را به‌تنهایی اثبات نمی‌کند.';
+  for (const row of EXECUTIVE_VIEW.buildRows(evaluation)) {
     const item = document.createElement('li');
-    item.className = `finding ${status === 'ON_TRACK' ? 'finding-ok' : 'finding-warn'} executive-finding`;
+    item.className = `finding ${row.status === 'ON_TRACK' ? 'finding-ok' : 'finding-warn'} executive-finding`;
     const title = document.createElement('strong');
-    title.textContent = `${metric.label}: ${statusText}`;
-    const detail = document.createElement('p');
-    detail.textContent = `مقدار واقعی: ${metric.format(kpi.actual)}؛ هدف: ${metric.format(kpi.target)}. قاعده این شاخص: ${metric.direction}.`;
-    item.append(title, detail);
+    title.textContent = `${row.label}: ${row.statusText}`;
+    const actualTarget = document.createElement('p');
+    actualTarget.textContent = `مقدار واقعی: ${row.actualText}؛ هدف: ${row.targetText}.`;
+    const evidence = document.createElement('p');
+    evidence.className = 'executive-metrics';
+    evidence.textContent = `فاصله از هدف: ${row.varianceText}؛ تحقق هدف: ${row.achievementText}؛ قاعده: ${row.directionText}.`;
+    const action = document.createElement('p');
+    action.className = 'executive-action';
+    action.textContent = `گام بعدی: ${row.actionText}`;
+    item.append(title, actualTarget, evidence, action);
     list.append(item);
-  });
+  }
 }
 
 function renderTrend(history = currentHistory) {

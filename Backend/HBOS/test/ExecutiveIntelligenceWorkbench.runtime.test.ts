@@ -26,6 +26,7 @@ describe("ExecutiveIntelligenceWorkbench runtime contract", () => {
     expect(result.kpis[debtIndex].direction).toBe("lower-is-better");
     expect(result.kpis[debtIndex].achievementRate).toBeGreaterThan(100);
     expect(result.recommendations[debtIndex].status).toBe("ON_TRACK");
+    expect(result.recommendations[debtIndex].actionCode).toBe("MONITOR");
     expect(result.performance[debtIndex].status).toBe("ON_TRACK");
   });
 

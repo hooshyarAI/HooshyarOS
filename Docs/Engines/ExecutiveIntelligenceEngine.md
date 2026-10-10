@@ -20,7 +20,9 @@ It owns deterministic executive information primitives and does not replace the 
 - Health: `health()`
 - KPI analysis: `analyzeKpi(name, actual, target, direction?)`
 - Direction values: `higher-is-better` and `lower-is-better`
-- Executive recommendation: `recommend(kpi)`
+- Executive recommendation: `recommend(kpi)`, returning a stable action code as well as a descriptive action.
+- Action codes: `MONITOR`, `INVESTIGATE_TARGET_SHORTFALL`, `INVESTIGATE_TARGET_EXCEEDANCE`, and `VERIFY_INPUTS`. Lower-is-better overruns and higher-is-better shortfalls must not share the same corrective meaning.
+- The Persian presentation layer renders actual, target, variance (percentage points for ratio metrics), achievement rate, direction and a bounded next step from the structured result.
 - Performance evaluation: `evaluatePerformance(actual, target, direction?)`
 - Direction defaults to `higher-is-better` for backward compatibility.
 - The Executive Intelligence Workbench marks revenue, profit, and profit margin as higher-is-better and debt ratio as lower-is-better.
