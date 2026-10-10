@@ -1,6 +1,7 @@
 import {
   ExecutiveIntelligenceEngine,
   ExecutiveKpi,
+  ExecutiveKpiDirection,
   ExecutivePerformance,
   ExecutiveRecommendation,
 } from "../Engines/ExecutiveIntelligenceEngine";
@@ -40,15 +41,15 @@ export class ExecutiveIntelligenceWorkbench {
   execute(input: ExecutiveIntelligenceWorkbenchInput): ExecutiveIntelligenceWorkbenchResult {
     this.assertBoundaryInput(input);
 
-    const definitions = [
-      ["revenue", input.metrics.revenue],
-      ["profit", input.metrics.profit],
-      ["profitMargin", input.metrics.profitMargin],
-      ["debtRatio", input.metrics.debtRatio],
-    ] as const;
+    const definitions: ReadonlyArray<readonly [keyof ExecutiveIntelligenceWorkbenchInput["metrics"], number, ExecutiveKpiDirection]> = [
+      ["revenue", input.metrics.revenue, "higher-is-better"],
+      ["profit", input.metrics.profit, "higher-is-better"],
+      ["profitMargin", input.metrics.profitMargin, "higher-is-better"],
+      ["debtRatio", input.metrics.debtRatio, "lower-is-better"],
+    ];
 
-    const kpis = definitions.map(([name, actual]) =>
-      this.executiveIntelligence.analyzeKpi(name, actual, input.targets[name]),
+    const kpis = definitions.map(([name, actual, direction]) =>
+      this.executiveIntelligence.analyzeKpi(name, actual, input.targets[name], direction),
     );
 
     return {
@@ -57,7 +58,9 @@ export class ExecutiveIntelligenceWorkbench {
       tenantId: input.tenantId.trim(),
       kpis,
       recommendations: kpis.map((kpi) => this.executiveIntelligence.recommend(kpi)),
-      performance: kpis.map((kpi) => this.executiveIntelligence.evaluatePerformance(kpi.actual, kpi.target)),
+      performance: kpis.map((kpi) =>
+        this.executiveIntelligence.evaluatePerformance(kpi.actual, kpi.target, kpi.direction),
+      ),
       status: "READY",
     };
   }
@@ -77,6 +80,9 @@ export class ExecutiveIntelligenceWorkbench {
       if (!Number.isFinite(input.targets[name])) {
         throw new Error(`executive-intelligence-workbench-target-invalid:${name}`);
       }
+    }
+    if (input.targets.debtRatio <= 0) {
+      throw new Error("executive-intelligence-workbench-target-invalid:debtRatio");
     }
   }
 }
