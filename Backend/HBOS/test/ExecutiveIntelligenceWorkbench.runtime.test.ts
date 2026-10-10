@@ -21,5 +21,20 @@ describe("ExecutiveIntelligenceWorkbench runtime contract", () => {
     expect(result.recommendations).toHaveLength(4);
     expect(result.performance).toHaveLength(4);
     expect(result.kpis.every((kpi) => Number.isFinite(kpi.variance))).toBe(true);
+
+    const debtIndex = result.kpis.findIndex((kpi) => kpi.name === "debtRatio");
+    expect(result.kpis[debtIndex].direction).toBe("lower-is-better");
+    expect(result.kpis[debtIndex].achievementRate).toBeGreaterThan(100);
+    expect(result.recommendations[debtIndex].status).toBe("ON_TRACK");
+    expect(result.performance[debtIndex].status).toBe("ON_TRACK");
+  });
+
+  it("rejects a non-positive debt-ratio target rather than producing a misleading result", () => {
+    const workbench = new ExecutiveIntelligenceWorkbench(new ExecutiveIntelligenceEngine());
+    expect(() => workbench.execute({
+      tenantId: "tenant:runtime-test",
+      metrics: { revenue: 1200, profit: 240, profitMargin: 0.2, debtRatio: 0.35 },
+      targets: { revenue: 1000, profit: 200, profitMargin: 0.18, debtRatio: 0 },
+    })).toThrow("executive-intelligence-workbench-target-invalid:debtRatio");
   });
 });
