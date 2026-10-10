@@ -13,6 +13,8 @@
  * - Provenance preserved for every measurement.
  */
 
+import { ProvenanceTrace } from "../Core/ProvenanceTrace";
+
 export interface BaselineMetrics {
     readonly tenantId: string;
     readonly revenue: number;
@@ -113,8 +115,6 @@ export interface ImpactMeasurementResult {
     };
 }
 
-const CANONICAL_TIMESTAMP = "2026-01-01T00:00:00Z";
-
 export class ImpactMeasurementService {
     readonly capabilityId = "product.impact-measurement";
     readonly targetEngine = "Executive Intelligence Engine";
@@ -130,14 +130,17 @@ export class ImpactMeasurementService {
         if (baseline.tenantId !== post.tenantId) {
             return this.blocked(baseline, post);
         }
+        if (expected !== undefined && !this.validateExpectedImpact(expected)) {
+            return this.blocked(baseline, post);
+        }
 
-        const traceId = `trace-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const traceId = ProvenanceTrace.createTraceId();
         const inputHash = this.hash({ baseline, post, expected });
         const deltas = this.computeDeltas(baseline, post);
         const percentChanges = this.computePercentChanges(baseline, post);
         const actualImpact = this.computeActualImpact(baseline, post, deltas);
 
-        const outputHash = this.hash({ deltas, percentChanges, actualImpact });
+        const outputHash = this.hash({ deltas, percentChanges, actualImpact, expectedImpact: expected });
 
         return {
             status: "READY",
@@ -153,21 +156,42 @@ export class ImpactMeasurementService {
                 traceId,
                 inputHash,
                 outputHash,
-                verificationStatus: "VERIFIED",
+                // Arithmetic ran successfully, but independent source evidence
+                // is not part of this input contract, so qualification remains pending.
+                verificationStatus: "PENDING",
                 sourceRef: "ImpactMeasurementService",
-                calculatedAt: CANONICAL_TIMESTAMP
+                calculatedAt: new Date().toISOString()
             })
         };
     }
 
     private validateMetrics(m: BaselineMetrics | PostInterventionMetrics | null | undefined): m is BaselineMetrics {
         if (!m || typeof m !== "object") return false;
+        if (typeof m.tenantId !== "string" || !m.tenantId.trim() || m.tenantId !== m.tenantId.trim()) return false;
+        if (typeof m.recordedAt !== "string" || !Number.isFinite(Date.parse(m.recordedAt))) return false;
+
         const numericFields = ["revenue", "profit", "profitMargin", "debtRatio", "cycleTime", "throughput", "errorRate", "capacity", "operatingCost", "decisionLatency", "riskScore"];
         for (const f of numericFields) {
             if (!Number.isFinite((m as any)[f])) return false;
+        }
+        // Profit and margin can legitimately be negative; other metrics in
+        // this contract represent non-negative quantities.
+        const nonNegativeFields = ["revenue", "debtRatio", "cycleTime", "throughput", "errorRate", "capacity", "operatingCost", "decisionLatency", "riskScore"];
+        for (const f of nonNegativeFields) {
             if ((m as any)[f] < 0) return false;
         }
         return true;
+    }
+
+    private validateExpectedImpact(expected: ExpectedImpact): boolean {
+        const fields: ReadonlyArray<keyof ExpectedImpact> = [
+            "timeSaved", "costReduced", "capacityRelease", "qualityImprovement",
+            "riskReduction", "financialValue", "roi"
+        ];
+        if (!fields.every(field => Number.isFinite(expected[field]))) return false;
+        return expected.timeSaved >= 0
+            && expected.costReduced >= 0
+            && expected.capacityRelease >= 0;
     }
 
     private computeDeltas(b: BaselineMetrics, p: PostInterventionMetrics) {
@@ -239,33 +263,37 @@ export class ImpactMeasurementService {
         };
     }
 
-    private blocked(baseline: BaselineMetrics, post: PostInterventionMetrics): ImpactMeasurementResult {
+    private blocked(
+        baseline: BaselineMetrics | null | undefined,
+        post: PostInterventionMetrics | null | undefined
+    ): ImpactMeasurementResult {
+        const traceId = ProvenanceTrace.createTraceId();
         return {
             status: "NEEDS_DATA",
             tenantId: baseline?.tenantId ?? post?.tenantId ?? "",
-            measurementId: `trace-${Date.now()}-failed`,
+            measurementId: traceId,
             baseline: baseline ?? this.emptyBaseline(),
             postIntervention: post ?? this.emptyPost(),
             deltas: this.emptyDeltas(),
             percentChanges: this.emptyPercentChanges(),
             actualImpact: this.emptyImpact(),
             provenance: Object.freeze({
-                traceId: `trace-${Date.now()}-failed`,
+                traceId,
                 inputHash: "",
                 outputHash: "",
                 verificationStatus: "FAILED",
                 sourceRef: "ImpactMeasurementService",
-                calculatedAt: CANONICAL_TIMESTAMP
+                calculatedAt: new Date().toISOString()
             })
         };
     }
 
     private emptyBaseline(): BaselineMetrics {
-        return { tenantId: "", revenue: 0, profit: 0, profitMargin: 0, debtRatio: 0, cycleTime: 0, throughput: 0, errorRate: 0, capacity: 0, operatingCost: 0, decisionLatency: 0, riskScore: 0, recordedAt: CANONICAL_TIMESTAMP };
+        return { tenantId: "", revenue: 0, profit: 0, profitMargin: 0, debtRatio: 0, cycleTime: 0, throughput: 0, errorRate: 0, capacity: 0, operatingCost: 0, decisionLatency: 0, riskScore: 0, recordedAt: new Date().toISOString() };
     }
 
     private emptyPost(): PostInterventionMetrics {
-        return { tenantId: "", revenue: 0, profit: 0, profitMargin: 0, debtRatio: 0, cycleTime: 0, throughput: 0, errorRate: 0, capacity: 0, operatingCost: 0, decisionLatency: 0, riskScore: 0, recordedAt: CANONICAL_TIMESTAMP };
+        return { tenantId: "", revenue: 0, profit: 0, profitMargin: 0, debtRatio: 0, cycleTime: 0, throughput: 0, errorRate: 0, capacity: 0, operatingCost: 0, decisionLatency: 0, riskScore: 0, recordedAt: new Date().toISOString() };
     }
 
     private emptyDeltas() {
@@ -281,6 +309,6 @@ export class ImpactMeasurementService {
     }
 
     private hash(obj: unknown): string {
-        return `hash-${JSON.stringify(obj).length}`;
+        return ProvenanceTrace.hashInput(JSON.stringify(obj) ?? "null");
     }
 }
