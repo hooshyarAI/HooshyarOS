@@ -63,7 +63,18 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     const reasoning = options.reasoning ?? new ReasoningEngine();
     const analysis = new FinancialStatementAnalysisService(new FinancialIntelligenceEngine(), reasoning);
     const sessions = new Map<string, Session>();
-    const latestResults = new Map<string, ReturnType<FinancialStatementAnalysisService["execute"]>>();
+    const historyKey = "financial-analysis-history:v1";
+    type AnalysisResult = ReturnType<FinancialStatementAnalysisService["execute"]>;
+    type HistoryEntry = { readonly analyzedAt: string; readonly result: AnalysisResult };
+    const readHistory = async (tenantId: string): Promise<HistoryEntry[]> => {
+        const record = await persistence.read({ tenantId }, historyKey);
+        if (!Array.isArray(record?.value)) return [];
+        return record.value.filter((entry): entry is HistoryEntry => Boolean(
+            entry && typeof entry === "object" &&
+            typeof (entry as HistoryEntry).analyzedAt === "string" &&
+            (entry as HistoryEntry).result?.tenantId === tenantId
+        ));
+    };
 
     const close = () => persistence.close();
     const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
@@ -110,13 +121,17 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const ingested = await ingestion.ingestCsv(session.tenantId, sourceName, csv);
                 const result = analysis.execute({ tenantId: session.tenantId, revenue: ingested.model.totals.credit, expenses: ingested.model.totals.debit, assets, liabilities, source: ingested.evidence });
                 if (result.status !== "READY") return json(res, 422, result);
-                latestResults.set(session.tenantId, result);
+                const history = await readHistory(session.tenantId);
+                const entry: HistoryEntry = { analyzedAt: new Date().toISOString(), result };
+                await persistence.write({ tenantId: session.tenantId }, historyKey, [...history, entry].slice(-24));
                 return json(res, 200, result);
             }
 
             if (req.method === "GET" && path === "/api/dashboard") {
-                const result = latestResults.get(session.tenantId);
-                if (!result) return json(res, 200, { status: "READY", tenantId: session.tenantId, metrics: { revenue: 0, profit: 0, risk: 0 }, analysisAvailable: false });
+                const history = await readHistory(session.tenantId);
+                const latest = history[history.length - 1];
+                if (!latest) return json(res, 200, { status: "READY", tenantId: session.tenantId, metrics: { revenue: 0, profit: 0, risk: 0 }, analysisAvailable: false, history: [] });
+                const result = latest.result;
                 return json(res, 200, {
                     status: result.status,
                     tenantId: result.tenantId,
@@ -124,6 +139,13 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                     metrics: { revenue: result.metrics.revenue, profit: result.metrics.profit, risk: result.metrics.debtRatio * 100 },
                     observations: result.observations,
                     source: result.source,
+                    analyzedAt: latest.analyzedAt,
+                    history: history.map(({ analyzedAt, result: item }) => ({
+                        analyzedAt,
+                        metrics: { revenue: item.metrics.revenue, profit: item.metrics.profit, risk: item.metrics.debtRatio * 100 },
+                        source: item.source,
+                        observations: item.observations,
+                    })),
                 });
             }
 
