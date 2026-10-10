@@ -56,6 +56,8 @@ describe("KnowledgeEngine science registry", () => {
             .toContain("FinancialIntelligenceEngine.npv");
         expect(engine.getScienceDomain("decision-science")?.availableOperations)
             .toContain("DecisionIntelligenceEngine.topsis");
+        expect(engine.getScienceDomain("decision-science")?.availableOperations)
+            .toContain("DecisionWorkbench.execute (Expert Choice)");
         expect(engine.getScienceDomain("strategic-management")?.readiness)
             .toBe("REGISTERED_ONLY");
         expect(engine.getScienceDomain("causal-reasoning")?.availableOperations)

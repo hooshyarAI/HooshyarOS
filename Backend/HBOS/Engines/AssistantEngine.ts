@@ -239,6 +239,12 @@ export class AssistantEngine {
         } else {
             summaryParts.push("Decision: BLOCKED");
         }
+        if (orchestrated.decision.expertChoice) {
+            const expertChoice = orchestrated.decision.expertChoice;
+            summaryParts.push(expertChoice.status === "READY" && expertChoice.recommendation
+                ? `Expert Choice: ${expertChoice.recommendation.alternative} (ranked #${expertChoice.recommendation.alternativeIndex + 1}); weights=${expertChoice.weightsSource}`
+                : "Expert Choice: BLOCKED; inspect supplied alternatives, criteria and scores");
+        }
         const selectedSciences = orchestrated.science?.selected.map(item => item.name).join(", ") ?? "not routed";
         summaryParts.push(`Sciences: ${selectedSciences}`);
         summaryParts.push(`Quality: ${orchestrated.quality.status}; human review required: ${orchestrated.quality.requiresHumanReview}`);

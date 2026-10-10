@@ -10,6 +10,8 @@ import {
 } from "../Engines/DecisionIntelligenceEngine";
 import { KnowledgeEngine, ScienceSelectionPlan, ScienceSignal } from "../Engines/KnowledgeEngine";
 import { ProvenanceTrace } from "../Core/ProvenanceTrace";
+import { DecisionWorkbench } from "./DecisionWorkbench";
+import type { DecisionCriterion, DecisionWorkbenchResult } from "./DecisionWorkbench";
 
 /**
  * Phase 09-1.15: Orchestrated Decision Intelligence (product service).
@@ -50,6 +52,16 @@ export interface OrchestratedInput {
         topsis: { matrix: readonly (readonly number[])[]; weights: readonly number[]; criteria: ReadonlyArray<"benefit" | "cost"> };
         /** Optional expected-value tree; it runs only when a tree is supplied. */
         decisionTree?: DecisionTreeNode;
+        /**
+         * Optional Expert Choice evaluation. Scores, alternatives and criteria
+         * must be explicitly supplied; they are never inferred from prose.
+         */
+        expertChoice?: {
+            alternatives: readonly string[];
+            criteria: readonly DecisionCriterion[];
+            scores: readonly (readonly number[])[];
+            pairwiseMatrix?: readonly (readonly number[])[];
+        };
     };
     /**
      * Extra structured science signals. Baseline financial, risk and
@@ -110,10 +122,12 @@ export interface OrchestratedResult {
         ahp: { weights: number[]; consistent: boolean; consistencyRatio: number; status: "READY" | "BLOCKED" };
         topsis: { scores: number[]; bestIndex: number; status: "READY" | "BLOCKED" };
         decisionTree?: { expectedValue: number; status: "READY" | "BLOCKED" };
+        /** Full transparent output of the existing Expert Choice workbench, when requested. */
+        expertChoice?: DecisionWorkbenchResult;
         execution: {
             status: OrchestratedStatus;
-            methods: readonly DecisionMethodId[];
-            blockedMethods: readonly DecisionMethodId[];
+            methods: readonly (DecisionMethodId | "expertChoice")[];
+            blockedMethods: readonly (DecisionMethodId | "expertChoice")[];
         };
         status: OrchestratedStatus;
     };
@@ -214,17 +228,20 @@ export class OrchestratedDecisionIntelligenceService {
     private readonly risk: RiskIntelligenceEngine;
     private readonly dec: DecisionIntelligenceEngine;
     private readonly knowledge: KnowledgeEngine;
+    private readonly decisionWorkbench: DecisionWorkbench;
 
     constructor(
         fin?: FinancialIntelligenceEngine,
         risk?: RiskIntelligenceEngine,
         dec?: DecisionIntelligenceEngine,
-        knowledge?: KnowledgeEngine
+        knowledge?: KnowledgeEngine,
+        decisionWorkbench?: DecisionWorkbench
     ) {
         this.fin = fin ?? new FinancialIntelligenceEngine();
         this.risk = risk ?? new RiskIntelligenceEngine();
         this.dec = dec ?? new DecisionIntelligenceEngine();
         this.knowledge = knowledge ?? new KnowledgeEngine();
+        this.decisionWorkbench = decisionWorkbench ?? new DecisionWorkbench(this.dec);
     }
 
     orchestrate(input: OrchestratedInput): OrchestratedResult {
@@ -297,6 +314,32 @@ export class OrchestratedDecisionIntelligenceService {
         const topsis = topsisItem?.result.method === "topsis" ? topsisItem.result : blockedTopsis();
         const decisionTree = treeItem?.result.method === "decisionTree" ? treeItem.result : undefined;
 
+        const expertChoice: DecisionWorkbenchResult | undefined = input.decision.expertChoice
+            ? this.decisionWorkbench.execute({
+                tenantId: input.tenantId,
+                problem: input.problem,
+                alternatives: input.decision.expertChoice.alternatives,
+                criteria: input.decision.expertChoice.criteria,
+                scores: input.decision.expertChoice.scores,
+                ...(input.decision.expertChoice.pairwiseMatrix !== undefined
+                    ? { pairwiseMatrix: input.decision.expertChoice.pairwiseMatrix }
+                    : {})
+            })
+            : undefined;
+
+        const combinedMethods: Array<DecisionMethodId | "expertChoice"> = [
+            ...decisionExecution.executedMethods,
+            ...(expertChoice ? ["expertChoice" as const] : [])
+        ];
+        const combinedBlockedMethods: Array<DecisionMethodId | "expertChoice"> = [
+            ...decisionExecution.blockedMethods,
+            ...(expertChoice?.status === "BLOCKED" ? ["expertChoice" as const] : [])
+        ];
+        const combinedDecisionStatus: OrchestratedStatus =
+            expertChoice?.status === "BLOCKED"
+                ? (decisionExecution.status === "BLOCKED" ? "BLOCKED" : "PARTIAL")
+                : decisionExecution.status;
+
         const qualityChecks: DecisionQualityCheck[] = [
             {
                 id: "tenant-scope",
@@ -331,6 +374,13 @@ export class OrchestratedDecisionIntelligenceService {
                         ? "AHP and TOPSIS are required by this workflow; a blocked required method fails the decision quality gate. Successful sub-results are preserved for diagnosis."
                         : decisionExecution.note
             },
+            ...(expertChoice ? [{
+                id: "expert-choice-evaluation",
+                status: expertChoice.status === "READY" ? "PASS" as const : "BLOCKED" as const,
+                detail: expertChoice.status === "READY"
+                    ? "Expert Choice completed using explicitly supplied alternatives, criteria and scores."
+                    : "Expert Choice was requested but the workbench rejected its input contract; inspect its assumptions and limitations."
+            }] : []),
             {
                 id: "science-selection",
                 status: science.status === "READY"
@@ -348,9 +398,9 @@ export class OrchestratedDecisionIntelligenceService {
         ];
 
         const executionStatus: OrchestratedStatus =
-            finReady && risk.status === "READY" && decisionExecution.status === "READY"
+            finReady && risk.status === "READY" && combinedDecisionStatus === "READY"
                 ? "READY"
-                : decisionExecution.status === "PARTIAL" && finReady && risk.status === "READY"
+                : combinedDecisionStatus !== "BLOCKED" && finReady && risk.status === "READY"
                     ? "PARTIAL"
                     : "BLOCKED";
 
@@ -396,12 +446,13 @@ export class OrchestratedDecisionIntelligenceService {
                 ...(decisionTree
                     ? { decisionTree: { expectedValue: decisionTree.expectedValue, status: decisionTree.status } }
                     : {}),
+                ...(expertChoice ? { expertChoice } : {}),
                 execution: {
-                    status: decisionExecution.status,
-                    methods: [...decisionExecution.executedMethods],
-                    blockedMethods: [...decisionExecution.blockedMethods]
+                    status: combinedDecisionStatus,
+                    methods: combinedMethods,
+                    blockedMethods: combinedBlockedMethods
                 },
-                status: decisionExecution.status
+                status: combinedDecisionStatus
             },
             science
         };

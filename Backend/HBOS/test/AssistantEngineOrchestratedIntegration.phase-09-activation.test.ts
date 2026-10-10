@@ -63,6 +63,28 @@ describe("AssistantEngine → Orchestrated Decision Intelligence integration (Ph
         expect(out.response.message).toContain("Sciences:");
     });
 
+    test("AssistantEngine surfaces Expert Choice recommendation in its interpreted response", () => {
+        const engine = new AssistantEngine();
+        const out = engine.analyzeAcquisitionOpportunity("Choose expansion", {
+            ...validInput,
+            problem: "Choose expansion",
+            decision: {
+                ...validInput.decision,
+                expertChoice: {
+                    alternatives: ["Expansion A", "Expansion B"],
+                    criteria: [
+                        { name: "profit", weight: 0.6, direction: "benefit" as const },
+                        { name: "risk", weight: 0.4, direction: "cost" as const }
+                    ],
+                    scores: [[8, 4], [6, 3]]
+                }
+            }
+        });
+
+        expect(out.orchestrated.decision.expertChoice?.status).toBe("READY");
+        expect(out.response.message).toContain("Expert Choice: Expansion A");
+    });
+
     test("analyzeAcquisitionOpportunity propagates BLOCKED with limitations when math fails", () => {
         const orchestrated = new OrchestratedDecisionIntelligenceService();
         const engine = new AssistantEngine({ orchestrated });

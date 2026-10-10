@@ -152,6 +152,52 @@ describe("OrchestratedDecisionIntelligenceService (09-1.15)", () => {
         for (const w of r.decision.ahp.weights) expect(Number.isFinite(w)).toBe(true);
     });
 
+    test("executes Expert Choice only with explicit alternatives, criteria and scores", () => {
+        const r = service.orchestrate({
+            ...validInput,
+            decision: {
+                ...validInput.decision,
+                expertChoice: {
+                    alternatives: ["Expansion A", "Expansion B"],
+                    criteria: [
+                        { name: "profit", weight: 0.6, direction: "benefit" as const },
+                        { name: "risk", weight: 0.4, direction: "cost" as const }
+                    ],
+                    scores: [[8, 4], [6, 3]],
+                    pairwiseMatrix: [[1, 1.5], [1 / 1.5, 1]]
+                }
+            }
+        });
+
+        expect(r.decision.expertChoice?.status).toBe("READY");
+        expect(r.decision.expertChoice?.method).toBe("EXPERT_CHOICE");
+        expect(r.decision.expertChoice?.recommendation?.alternative).toBe("Expansion A");
+        expect(r.decision.expertChoice?.weightsSource).toBe("AHP");
+        expect(r.decision.execution.methods).toEqual(["ahp", "topsis", "expertChoice"]);
+        expect(r.quality.checks.find(check => check.id === "expert-choice-evaluation")?.status).toBe("PASS");
+        expect(r.status).toBe("PARTIAL");
+    });
+
+    test("blocks quality qualification when requested Expert Choice inputs are invalid", () => {
+        const r = service.orchestrate({
+            ...validInput,
+            decision: {
+                ...validInput.decision,
+                expertChoice: {
+                    alternatives: ["Only one"],
+                    criteria: [{ name: "profit", weight: 1, direction: "benefit" as const }],
+                    scores: [[5]]
+                }
+            }
+        });
+
+        expect(r.decision.status).toBe("PARTIAL");
+        expect(r.decision.expertChoice?.status).toBe("BLOCKED");
+        expect(r.decision.execution.blockedMethods).toContain("expertChoice");
+        expect(r.quality.checks.find(check => check.id === "expert-choice-evaluation")?.status).toBe("BLOCKED");
+        expect(r.status).toBe("BLOCKED");
+    });
+
     test("returns a blocked quality report for a missing required payload", () => {
         const r = service.orchestrate({
             ...validInput,
