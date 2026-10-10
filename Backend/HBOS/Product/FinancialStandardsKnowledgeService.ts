@@ -194,7 +194,7 @@ const IRANIAN_PUBLIC_SECTOR_INVENTORY = [
   sourceAuthority:"PersianAcc secondary index (dated 2024-11-17; official approved catalogue must be verified)",
   verifiedAsOf:DATE,
   note:"برای کاربرد در واحد ایرانی، نسخه و اصلاحیه مصوب و دامنه شمول را از متن رسمی جاری دریافت کنید؛ این رکورد به‌تنهایی اثبات‌کننده لازم‌الاجرا بودن نیست."
-})) as const;
+}));
 
 const IRANIAN_SUSTAINABILITY_DISCLOSURE_INVENTORY = [
   {id:"IR-SDS-01",number:1,title:"الزامات کلی افشای اطلاعات مالی مرتبط با پایداری",status:"REPORTED_IN_SECONDARY_INDEX",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:"https://persianacc.ir/disclosure-standards/",sourceAuthority:"PersianAcc secondary index dated 2024-11-17",verifiedAsOf:DATE,note:"متن مصوب، دامنه شمول، تاریخ لازم‌الاجرا و سازوکار پذیرش باید از مرجع رسمی تأیید شوند."},
