@@ -1,26 +1,27 @@
 # Budget Intelligence Engine
 
-Canonical autonomous capability: `platform.budget-intelligence`.
+Canonical capability: `platform.budget-intelligence`.
 
-Capability: implement Budget Intelligence
+## Existing budget comparison
 
-Dependencies: Financial Intelligence Engine
+`analyze` and its canonical alias `analyzeBudget` compare one planned amount with one actual amount. Variance is `actual - planned`; utilization is `actual / planned` when planned is nonzero.
 
-## Architecture contract
-- Architecture Freeze V4
-- One Capability = One Engine
-- Engine must be observable
-- Engine must be testable
-- Engine must be recoverable
-- No duplicate capability owner
+## Cost-center and category variance
 
-## Construction directives
-- Implement exactly one concrete capability from the canonical mission.
-- Create or update the focused implementation, focused test and documentation required by the architecture.
-- Run focused verification followed by the full Jest suite.
-- Repair verification failures before finalization.
-- Do not redesign Architecture Freeze V4.
+`analyzeCostBreakdown({ lines })` calculates:
+- total planned cost, actual cost, variance, utilization and variance percentage;
+- identical rollups by cost center and cost category;
+- line-level variance status;
+- fail-closed validation for empty/malformed input, duplicate IDs, invalid amounts, mixed currencies and arithmetic overflow.
 
-This scaffold is intentionally semantic-neutral. The autonomous construction loop
-must enrich it only from repository architecture, dependencies, tests and evidence;
-it must not invent business rules or create duplicate engine boundaries.
+Each line requires a unique `lineId`, `costCenterId`, `category`, `currency`, `planned` and `actual`. Currency is normalized to uppercase; mixed currencies are rejected instead of being summed. Group output is sorted deterministically.
+
+Variance is `actual - planned`: a positive value is above plan; a negative value is below plan. If planned cost is zero, utilization and variance percentage are `null` rather than fabricated. Positive actual cost against zero plan is marked `UNBUDGETED_SPEND`.
+
+## Scope boundary
+
+This is budget-versus-actual variance analysis by cost center/category, not a complete costing system. It does not calculate product costs, activity-based costing (ABC), cost-driver rates, standard manufacturing variance, currency conversion or accounting allocations. `READY` means supplied numeric lines passed validation and aggregation; it does not independently verify source-document correctness or managerial acceptance.
+
+## Architecture and reuse
+
+The existing `BudgetIntelligenceEngine` remains the sole calculation owner. No new engine, dependency or alternate calculation service was introduced. The KnowledgeEngine cost-management domain maps to this implemented operation.

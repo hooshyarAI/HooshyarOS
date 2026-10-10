@@ -549,11 +549,12 @@ const SCIENCE_DOMAINS: readonly ScienceDomainDefinition[] = [
         signals: ['cost-management', 'budgeting', 'budget-planning', 'financial-performance', 'resource-allocation', 'opportunity-cost', 'applied-analysis'],
         availableOperations: [
             'BudgetIntelligenceEngine.analyzeBudget',
+            'BudgetIntelligenceEngine.analyzeCostBreakdown',
             'FinancialIntelligenceEngine.analyze',
             'FinancialStatementAnalysisService.execute'
         ],
         limitations: [
-            'انحراف بودجه و هزینه‌های واردشده در تحلیل مالی پشتیبانی می‌شوند؛ بهای تمام‌شده محصول، مراکز هزینه، هزینه‌یابی بر مبنای فعالیت، تحلیل محرک هزینه و انحراف استاندارد تولید در این ثبت عملیات اجرایی تأییدشده نیستند.'
+            'مقایسه بودجه و هزینه واقعی به تفکیک مرکز هزینه و گروه هزینه با ارز یکسان پشتیبانی می‌شود؛ بهای تمام‌شده محصول، هزینه‌یابی بر مبنای فعالیت، تحلیل محرک هزینه و انحراف استاندارد تولید همچنان قابلیت کامل و یکپارچه محسوب نمی‌شوند.'
         ]
     },
     {
