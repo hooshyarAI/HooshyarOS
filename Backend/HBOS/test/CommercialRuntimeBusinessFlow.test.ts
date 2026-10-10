@@ -12,14 +12,15 @@ describe("Commercial runtime real business flow", () => {
   let server: Server;
 
   test("serves a coherent and syntactically valid authentication-capable web shell", async () => {
-    const [root, index, viewModel, appResponse, styles] = await Promise.all([
+    const [root, index, viewModel, appResponse, styles, serviceWorker] = await Promise.all([
       request(server, "/"),
       request(server, "/index.html"),
       request(server, "/executive-evaluation-view-model.js"),
       request(server, "/app.js"),
       request(server, "/styles.css"),
+      request(server, "/sw.js"),
     ]);
-    for (const response of [root, index, viewModel, appResponse, styles]) {
+    for (const response of [root, index, viewModel, appResponse, styles, serviceWorker]) {
       expect(response.status).toBe(200);
     }
     expect(viewModel.headers.get("content-type")).toContain("text/javascript");
@@ -33,8 +34,11 @@ describe("Commercial runtime real business flow", () => {
     expect(html).toContain('id="invite-form"');
     const app = await appResponse.text();
     const viewModelSource = await viewModel.text();
+    const worker = await serviceWorker.text();
     expect(() => new Script(app)).not.toThrow();
     expect(() => new Script(viewModelSource)).not.toThrow();
+    expect(worker).toContain("hooshyar-shell-v3");
+    expect(worker).toContain("'/executive-evaluation-view-model.js'");
     expect(app).toContain("request('/api/logout'");
     expect(app).toContain("request('/api/invitations'");
     expect(viewModelSource).toContain("buildRows");
