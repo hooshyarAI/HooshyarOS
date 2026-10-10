@@ -7,7 +7,7 @@ describe("FinancialStandardsKnowledgeService", () => {
     const catalogue = knowledge.getCatalogue();
     const ids = catalogue.standardEntries.map((entry) => entry.id);
 
-    expect(catalogue.version).toBe("financial-standards-2026-10-10.v2");
+    expect(catalogue.version).toBe("financial-standards-2026-10-10.v3");
     expect(catalogue.snapshotDate).toBe("2026-10-10");
     expect(ids).toContain("IR-NAS-43");
     expect(ids).toContain("IR-NAS-44");
@@ -26,6 +26,12 @@ describe("FinancialStandardsKnowledgeService", () => {
     expect(catalogue.internationalAccountingStandardIndex.some((entry) => entry.id === "IAS 11" && entry.status === "SUPERSEDED_FOR_MAIN_SCOPE_BY_IFRS_15")).toBe(true);
     expect(catalogue.internationalAuditStandardIndex.some((entry) => entry.identifiers.includes("ISA 240"))).toBe(true);
     expect(catalogue.internationalAuditStandardIndex.some((entry) => entry.identifiers.includes("ISRE 2400 (Revised)"))).toBe(true);
+    expect(catalogue.iranianAuditingStandardInventory.length).toBeGreaterThanOrEqual(35);
+    expect(catalogue.iranianAuditingStandardInventory.some((entry) => entry.number === "700")).toBe(true);
+    expect(catalogue.iranianOperationalAuditInventory).toHaveLength(1);
+    expect(catalogue.iranianPublicSectorStandardInventory).toHaveLength(20);
+    expect(catalogue.iranianSustainabilityDisclosureInventory.map((entry) => entry.id)).toContain("IR-SDS-01");
+    expect(catalogue.iranianSustainabilityDisclosureInventory.every((entry) => entry.verificationStatus !== undefined)).toBe(true);
     expect(catalogue.iranianNationalStandardInventory.every((entry) => entry.verificationStatus !== undefined)).toBe(true);
 
     const ifrs18 = catalogue.standardEntries.find((entry) => entry.id === "IFRS-18");

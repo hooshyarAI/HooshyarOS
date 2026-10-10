@@ -112,6 +112,95 @@ const IRANIAN_ACCOUNTING_STANDARD_INVENTORY: readonly IranianAccountingStandardI
   { id:"IR-NAS-44",number:44,edition:"reported effective from 1405-01-01",title:"اجاره‌ها",lifecycleStatus:"REPORTED_EFFECTIVE",lifecycleDate:"1405-01-01",successorOrRelated:"Replaces reported scope of NAS 21",verificationStatus:"PROFESSIONAL_BODY_NOTICE_PRIMARY_TEXT_REQUIRED",sourceUrl:IICA_SOURCE,sourceAuthority:"Iranian professional-body notice; official final text and adoption notice remain required",verifiedAsOf:IRAN_DATE,note:"منابع حرفه‌ای اعلام اجرا از ابتدای 1405 می‌کنند؛ متن نهایی و دامنه گذار را از مرجع رسمی تطبیق دهید." }
 ];
 
+
+const IRANIAN_AUDIT_STANDARD_SOURCE = "https://persianacc.ir/استانداردهای-حسابرسی/";
+const IRANIAN_AUDIT_STANDARD_AUTHORITY = "PersianAcc professional secondary index (dated 2024-11-18; current official revisions must be confirmed)";
+const IRANIAN_AUDIT_STANDARD_INVENTORY = [
+  {id:"IR-AUD-QUALITY-01",number:"1",title:"کنترل کیفیت در مؤسسات ارائه‌کننده خدمات حسابرسی، سایر خدمات اطمینان‌بخشی و خدمات مرتبط",reportedEdition:"legacy local quality-control standard; currentness review required",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"با ISQM 1/2، ISA 220 (Revised) و پذیرش محلی جدید تطبیق شود؛ این رکورد ادعای جاری‌بودن متن قدیمی را نمی‌کند."},
+  {id:"IR-ISA-200",number:"200",title:"اهداف کلی حسابرس مستقل و انجام حسابرسی طبق استانداردهای حسابرسی",reportedEdition:"revised 1391 per secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"نسخه لازم‌الاجرا و اصلاحات بعد از 1391 از مرجع رسمی کنترل شود."},
+  {id:"IR-ISA-210",number:"210",title:"توافق در خصوص شرایط کار حسابرسی",reportedEdition:"revised 1401 per secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"پذیرش کار و توافق شرایط باید با نسخه جاری مرجع رسمی تطبیق داده شود."},
+  {id:"IR-ISA-220-OLD",number:"220",title:"کنترل کیفیت حسابرسی اطلاعات مالی تاریخی",reportedEdition:"revised 1386 per secondary index; latestness unverified",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"به‌علت تحولات مدیریت کیفیت بین‌المللی، این نسخه قدیمی بدون تطبیق رسمی نباید به‌عنوان نسخه جاری فرض شود."},
+  {id:"IR-ISA-230",number:"230",title:"مستندات حسابرسی",reportedEdition:"revised 1395 per secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"مستندات باید به‌اندازه‌ای باشد که حسابرس باتجربه مستقل بتواند ماهیت، زمان‌بندی، دامنه و نتیجه کار را درک کند؛ متن محلی جاری کنترل شود."},
+  {id:"IR-ISA-240",number:"240",title:"مسئولیت حسابرس در ارتباط با تقلب در حسابرسی صورت‌های مالی",reportedEdition:"revised 1394 per secondary index; global ISA 240 Revised effective date differs",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"نسخه محلی و پذیرش بازنگری بین‌المللی ISA 240 (Revised) را جداگانه کنترل کنید."},
+  {id:"IR-ISA-250",number:"250",title:"ارزیابی رعایت قوانین و مقررات در حسابرسی صورت‌های مالی",reportedEdition:"revised 1394 per secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"قوانین با اثر مستقیم بر مبالغ/افشا و سایر قوانین با اثر بر عملیات تفکیک و مستند شوند."},
+  {id:"IR-ISA-260",number:"260",title:"اطلاع‌رسانی به ارکان راهبری",reportedEdition:"edition/date not displayed in secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"الزامات ارتباط با ارکان راهبری و پذیرش محلی با متن مصوب جاری تطبیق داده شود."},
+  {id:"IR-ISA-265",number:"265",title:"اطلاع‌رسانی ضعف‌های کنترل داخلی به ارکان راهبری و مدیران اجرایی",reportedEdition:"edition/date not displayed in secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"ضعف‌های بااهمیت و مهم باید بر اساس معیار حرفه‌ای و شواهد مستند شوند."},
+  {id:"IR-ISA-300",number:"300",title:"برنامه‌ریزی حسابرسی صورت‌های مالی",reportedEdition:"revised 1392 per secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"برنامه حسابرسی، راهبرد کلی، منابع، زمان‌بندی و برنامه‌های رسیدگی باید مستند شوند."},
+  {id:"IR-ISA-315",number:"315",title:"تشخیص و ارزیابی خطرهای تحریف بااهمیت از طریق شناخت واحد تجاری و محیط آن",reportedEdition:"revised 1393 per secondary index; global 2019 revision exists",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"آخرین نسخه قابل اعمال محلی باید با ISA 315 (Revised 2019) و پذیرش رسمی مقایسه شود."},
+  {id:"IR-ISA-320",number:"320",title:"اهمیت در برنامه‌ریزی و اجرای عملیات حسابرسی",reportedEdition:"revised 1392 per secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"اهمیت صورت‌های مالی، اهمیت اجرای کار و بازنگری اهمیت در طول مأموریت مستند شوند."},
+  {id:"IR-ISA-330",number:"330",title:"برخوردهای حسابرس با خطرهای ارزیابی‌شده",reportedEdition:"revised 1393 per secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"آزمون کنترل‌ها و روش‌های محتوایی باید به خطر ارزیابی‌شده پیوند داشته باشد."},
+  {id:"IR-ISA-450",number:"450",title:"ارزیابی تحریف‌های شناسایی‌شده در حسابرسی",reportedEdition:"edition/date not displayed in secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"تحریف‌های اصلاح‌شده و اصلاح‌نشده تجمیع و اثر آنها بر اظهارنظر سنجیده شود."},
+  {id:"IR-ISA-500",number:"500",title:"شواهد حسابرسی",reportedEdition:"revised 1395 per secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"کفایت به کمیت و مناسب‌بودن به کیفیت/ارتباط/اتکاپذیری شواهد مربوط است."},
+  {id:"IR-ISA-501",number:"501",title:"شواهد حسابرسی ـ ملاحظات خاص درباره برخی اقلام",reportedEdition:"revised 1395 per secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"موجودی، دعاوی و ادعاها، و اطلاعات بخش‌ها از موارد ویژه‌ای هستند که نسخه قابل اعمال باید تعیین کند."},
+  {id:"IR-ISA-505",number:"505",title:"تأییدیه‌های برون‌سازمانی",reportedEdition:"revised 1392 per secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"کنترل ارسال/دریافت مستقیم تأییدیه و پیگیری عدم پاسخ مهم است."},
+  {id:"IR-ISA-510",number:"510",title:"حسابرسی نخستین ـ مانده‌های اول دوره",reportedEdition:"revised 1395 per secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"مانده‌های اول دوره، رویه‌های حسابداری و اثر احتمالی بر اظهارنظر کنترل شوند."},
+  {id:"IR-ISA-520",number:"520",title:"روش‌های تحلیلی",reportedEdition:"revised 1395 per secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"انتظار حسابرس، دقت داده و آستانه بررسی مغایرت‌ها باید مستند باشد."},
+  {id:"IR-ISA-530",number:"530",title:"نمونه‌گیری در حسابرسی",reportedEdition:"revised 1395 per secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"ریسک نمونه‌گیری، روش انتخاب و ارزیابی نتایج باید متناسب با هدف رسیدگی باشد."},
+  {id:"IR-ISA-540",number:"540",title:"حسابرسی برآوردهای حسابداری، شامل ارزش منصفانه و افشاهای مرتبط",reportedEdition:"revised 1392 per secondary index; global ISA 540 revision exists",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"تطبیق نسخه رسمی ایران با ISA 540 (Revised) ضروری است؛ مدل/داده/فرض‌های برآورد باید بررسی شوند."},
+  {id:"IR-ISA-550",number:"550",title:"اشخاص وابسته",reportedEdition:"revised 1389 per secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"شناسایی اشخاص وابسته و معاملات خارج از روال عادی نیازمند شک حرفه‌ای است."},
+  {id:"IR-ISA-560",number:"560",title:"رویدادهای پس از تاریخ صورت‌های مالی",reportedEdition:"revised 1396 per secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"رویدادهای تعدیلی/غیرتعدیلی و تاریخ گزارش حسابرس باید مطابق متن مصوب تعیین شود."},
+  {id:"IR-ISA-570",number:"570",title:"تداوم فعالیت",reportedEdition:"revised 1401 per secondary index; global ISA 570 Revised 2024 not yet effective at snapshot",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"نسخه محلی موجود و تاریخ اجرای ISA 570 (Revised 2024) را یکی نگیرید؛ منابع مالی، پیش‌بینی نقد، تعهدات و افشای تردید عمده بررسی شوند."},
+  {id:"IR-ISA-580",number:"580",title:"تأییدیه کتبی مدیران",reportedEdition:"revised 1396 per secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"تأییدیه مدیریت مکمل شواهد حسابرسی است و جایگزین شواهد دیگر نمی‌شود."},
+  {id:"IR-ISA-600",number:"600",title:"ملاحظات خاص در حسابرسی صورت‌های مالی گروه، شامل کار حسابرسان بخش",reportedEdition:"revised 1389 per secondary index; global ISA 600 Revised differs",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"نقش حسابرس گروه، کار حسابرسان اجزاء و مسؤولیت گزارشگری باید با نسخه محلی و پذیرش جدیدترین نسخه تطبیق یابد."},
+  {id:"IR-ISA-610",number:"610",title:"استفاده از کار حسابرسان داخلی",reportedEdition:"revised 1397 per secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"بی‌طرفی، صلاحیت، رویکرد نظام‌مند و محدودیت اتکا بررسی شوند."},
+  {id:"IR-ISA-620",number:"620",title:"استفاده از کارشناس حسابرس",reportedEdition:"revised 1398 per secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"صلاحیت، توانایی، بی‌طرفی و کفایت کار کارشناس سنجیده شود."},
+  {id:"IR-ISA-700",number:"700",title:"اظهارنظر و گزارشگری نسبت به صورت‌های مالی",reportedEdition:"revised 1401 per secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"ساختار گزارش و اظهارنظر باید بر اساس شواهد و نسخه جاری محلی تعیین شود."},
+  {id:"IR-ISA-701",number:"701",title:"اطلاع‌رسانی مسائل عمده حسابرسی در گزارش حسابرس مستقل",reportedEdition:"edition/date not displayed in secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"دامنه شمول الزام KAM و استثناها باید در مقررات ایران برای واحد مربوط بررسی شود."},
+  {id:"IR-ISA-705",number:"705",title:"اظهارنظرهای تعدیل‌شده در گزارش حسابرس مستقل",reportedEdition:"revised 1401 per secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"مشروط، مردود و عدم اظهارنظر بر مبنای ماهیت و فراگیری آثار تعیین می‌شوند."},
+  {id:"IR-ISA-706",number:"706",title:"بندهای تأکید بر مطلب خاص و سایر بندهای توضیحی",reportedEdition:"revised 1401 per secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"بند تأکید مطلب جایگزین اظهارنظر تعدیل‌شده نیست."},
+  {id:"IR-ISA-710",number:"710",title:"اطلاعات مقایسه‌ای",reportedEdition:"edition/date not displayed in secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"ارقام مقایسه‌ای و صورت‌های مالی مقایسه‌ای بر اساس چارچوب گزارشگری قابل اعمال تفکیک شوند."},
+  {id:"IR-ISA-720",number:"720",title:"مسئولیت‌های حسابرس در قبال سایر اطلاعات",reportedEdition:"revised 1401 per secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"رسیدگی به سایر اطلاعات به معنای اظهارنظر حسابرسی بر کل گزارش سالانه نیست."},
+  {id:"IR-ISA-800",number:"800",title:"ملاحظات خاص در حسابرسی صورت‌های مالی تهیه‌شده بر اساس چارچوب‌های با مقاصد خاص",reportedEdition:"revised 1390 per secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"مناسب بودن چارچوب و توضیح هدف استفاده‌کنندگان باید سنجیده شود."},
+  {id:"IR-ISA-805",number:"805",title:"ملاحظات خاص در حسابرسی یک صورت مالی یا اجزای یک صورت مالی",reportedEdition:"edition/date not displayed in secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"اهمیت و روش‌ها باید متناسب با صورت/عنصر مورد رسیدگی باشند."},
+  {id:"IR-ISRE-2400",number:"2400",title:"بررسی اجمالی صورت‌های مالی",reportedEdition:"edition/date not displayed in secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"بررسی اجمالی با حسابرسی فرق دارد و سطح اطمینان آن محدود است."},
+  {id:"IR-ISRE-2410",number:"2410",title:"بررسی اجمالی اطلاعات مالی میان‌دوره‌ای توسط حسابرس مستقل واحد تجاری",reportedEdition:"edition/date not displayed in secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"دامنه مأموریت، پرس‌وجوها و روش‌های تحلیلی با حسابرسی کامل برابر نیست."},
+  {id:"IR-ISAE-3400",number:"3400",title:"رسیدگی به اطلاعات مالی آتی",reportedEdition:"edition/date not displayed in secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"فرض‌های بهترین برآورد و فرضی از هم متمایز شوند؛ نوع نتیجه و محدودیت استفاده صریح باشد."},
+  {id:"IR-ISRS-4400",number:"4400",title:"اجرای روش‌های توافقی رسیدگی به اطلاعات مالی",reportedEdition:"edition/date not displayed in secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"یافته‌های واقعی گزارش می‌شوند؛ اطمینان‌بخشی و اظهارنظر حسابرسی نباید القا شود."},
+  {id:"IR-ISRS-4410",number:"4410",title:"تنظیم اطلاعات مالی",reportedEdition:"edition/date not displayed in secondary index",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:IRANIAN_AUDIT_STANDARD_SOURCE,sourceAuthority:IRANIAN_AUDIT_STANDARD_AUTHORITY,verifiedAsOf:DATE,note:"خدمت تنظیم/Compilation جایگزین حسابرسی یا بررسی اجمالی نیست."}
+] as const;
+
+const IRANIAN_OPERATIONAL_AUDIT_INVENTORY = [
+  {id:"IR-OPA-01",number:"1",title:"استانداردهای حسابرسی عملیاتی ـ اصول و ضوابط حسابداری و حسابرسی",reportedEdition:"source notes localized adaptation of GAGAS sections 1–3, 7 and 8 from 2007 edition; local update status unverified",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:"https://persianacc.ir/اصول-و-ضوابط-حسابداری-و-حسابرسی/",sourceAuthority:"PersianAcc reproduction of a document attributed to Iran Audit Organization; primary current approval remains to be verified",verifiedAsOf:DATE,note:"Requirements are distinguished from explanatory guidance in the source, but current formal adoption and any later amendments need official review."}
+] as const;
+
+const IRANIAN_PUBLIC_SECTOR_STANDARD_SOURCE = "https://persianacc.ir/استاندارد-های-حسابداری-بخش-عمومی/";
+const IRANIAN_PUBLIC_SECTOR_INVENTORY = [
+  {id:"IR-PSAS-01",number:1,title:"نحوه ارائه صورت‌های مالی"},
+  {id:"IR-PSAS-02",number:2,title:"نحوه ارائه اطلاعات بودجه‌ای در صورت‌های مالی"},
+  {id:"IR-PSAS-03",number:3,title:"درآمد حاصل از عملیات غیرمبادله‌ای (مالیات و انتقالات)"},
+  {id:"IR-PSAS-04",number:4,title:"درآمدهای حاصل از عملیات مبادله‌ای"},
+  {id:"IR-PSAS-05",number:5,title:"دارایی‌های ثابت مشهود"},
+  {id:"IR-PSAS-06",number:6,title:"موجودی‌ها"},
+  {id:"IR-PSAS-07",number:7,title:"دارایی‌های نامشهود"},
+  {id:"IR-PSAS-08",number:8,title:"ذخایر، بدهی‌های احتمالی و دارایی‌های احتمالی"},
+  {id:"IR-PSAS-09",number:9,title:"حسابداری مخارج تأمین مالی"},
+  {id:"IR-PSAS-10",number:10,title:"رویه‌های حسابداری، تغییر در برآوردهای حسابداری و اشتباهات"},
+  {id:"IR-PSAS-11",number:11,title:"افشای اطلاعات اشخاص وابسته"},
+  {id:"IR-PSAS-12",number:12,title:"مزایای بازنشستگی کارکنان"},
+  {id:"IR-PSAS-13",number:13,title:"آثار تغییر در نرخ تبدیل ارز"},
+  {id:"IR-PSAS-14",number:14,title:"رویدادهای پس از تاریخ گزارشگری"},
+  {id:"IR-PSAS-15",number:15,title:"صورت‌های مالی تلفیقی"},
+  {id:"IR-PSAS-16",number:16,title:"سرمایه‌گذاری در واحدهای وابسته و مشارکت‌های خاص"},
+  {id:"IR-PSAS-17",number:17,title:"ترکیب‌های بخش عمومی"},
+  {id:"IR-PSAS-18",number:18,title:"صورت‌های مالی جداگانه"},
+  {id:"IR-PSAS-19",number:19,title:"صورت جریان‌های نقدی"},
+  {id:"IR-PSAS-20",number:20,title:"افشای منافع در واحدهای دیگر"}
+].map((entry) => ({
+  ...entry,
+  framework:"IRAN_PUBLIC_SECTOR_ACCOUNTING_STANDARDS",
+  lifecycleStatus:"REPORTED_IN_SECONDARY_INDEX",
+  verificationStatus:"SECONDARY_SNAPSHOT_ONLY",
+  sourceUrl:IRANIAN_PUBLIC_SECTOR_STANDARD_SOURCE,
+  sourceAuthority:"PersianAcc secondary index (dated 2024-11-17; official approved catalogue must be verified)",
+  verifiedAsOf:DATE,
+  note:"برای کاربرد در واحد ایرانی، نسخه و اصلاحیه مصوب و دامنه شمول را از متن رسمی جاری دریافت کنید؛ این رکورد به‌تنهایی اثبات‌کننده لازم‌الاجرا بودن نیست."
+})) as const;
+
+const IRANIAN_SUSTAINABILITY_DISCLOSURE_INVENTORY = [
+  {id:"IR-SDS-01",number:1,title:"الزامات کلی افشای اطلاعات مالی مرتبط با پایداری",status:"REPORTED_IN_SECONDARY_INDEX",verificationStatus:"SECONDARY_SNAPSHOT_ONLY",sourceUrl:"https://persianacc.ir/disclosure-standards/",sourceAuthority:"PersianAcc secondary index dated 2024-11-17",verifiedAsOf:DATE,note:"متن مصوب، دامنه شمول، تاریخ لازم‌الاجرا و سازوکار پذیرش باید از مرجع رسمی تأیید شوند."},
+  {id:"IR-SDS-02-CLIMATE",number:2,title:"اطلاعات افشای مالی مرتبط با پایداری ـ اقلیم (گزارش‌شده در منابع حرفه‌ای)",status:"REPORTED_EFFECTIVE_PRIMARY_CONFIRMATION_REQUIRED",verificationStatus:"SECONDARY_REFERENCE_REQUIRES_PRIMARY_CONFIRMATION",sourceUrl:"https://shahinhesab.com/article/",sourceAuthority:"Secondary professional report; official scope/effective date not verified",verifiedAsOf:DATE,note:"رکورد پیگیری است و تا تأیید متن نهایی نباید به عنوان الزام قطعی واحد خاص اعمال شود."}
+] as const;
+
 const INTERNATIONAL_AUDIT_STANDARD_INDEX = [
   {group:"Quality management",identifiers:["ISQM 1","ISQM 2","ISA 220 (Revised)"],note:"Quality management at firm and engagement levels; adoption and effective dates remain jurisdiction-specific."},
   {group:"General principles and responsibilities",identifiers:["ISA 200","ISA 210","ISA 220","ISA 230","ISA 240","ISA 250","ISA 260","ISA 265"],note:"Overall objectives, engagement terms, quality, documentation, fraud, laws/regulations, governance communication and control deficiencies."},
@@ -369,7 +458,7 @@ const GOVERNANCE_RULES = [
 ] as const;
 
 export class FinancialStandardsKnowledgeService {
-  readonly version = "financial-standards-2026-10-10.v2";
+  readonly version = "financial-standards-2026-10-10.v3";
   readonly snapshotDate = DATE;
 
   getCatalogue() {
@@ -381,6 +470,10 @@ export class FinancialStandardsKnowledgeService {
       iranianNationalStandardInventory: IRANIAN_ACCOUNTING_STANDARD_INVENTORY.map((entry) => ({ ...entry })),
       internationalAccountingStandardIndex: INTERNATIONAL_ACCOUNTING_STANDARD_INDEX.map((entry) => ({ ...entry })),
       internationalAuditStandardIndex: INTERNATIONAL_AUDIT_STANDARD_INDEX.map((entry) => ({ ...entry, identifiers: [...entry.identifiers] })),
+      iranianAuditingStandardInventory: IRANIAN_AUDIT_STANDARD_INVENTORY.map((entry) => ({ ...entry })),
+      iranianOperationalAuditInventory: IRANIAN_OPERATIONAL_AUDIT_INVENTORY.map((entry) => ({ ...entry })),
+      iranianPublicSectorStandardInventory: IRANIAN_PUBLIC_SECTOR_INVENTORY.map((entry) => ({ ...entry })),
+      iranianSustainabilityDisclosureInventory: IRANIAN_SUSTAINABILITY_DISCLOSURE_INVENTORY.map((entry) => ({ ...entry })),
       principles: {
         accountingAndReporting: [...ACCOUNTING_PRINCIPLES],
         auditingAndAssurance: [...AUDIT_PRINCIPLES],
