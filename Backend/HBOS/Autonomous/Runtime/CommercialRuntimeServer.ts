@@ -12,6 +12,7 @@ import { ExecutiveIntelligenceEngine } from "../../Engines/ExecutiveIntelligence
 import { ExecutiveIntelligenceWorkbench } from "../../Product/ExecutiveIntelligenceWorkbench";
 import { FinancialStandardsKnowledgeService } from "../../Product/FinancialStandardsKnowledgeService";
 import { InterdisciplinaryDecisionKnowledgeService } from "../../Product/InterdisciplinaryDecisionKnowledgeService";
+import { KnowledgeOutcomeLearningService } from "../../Product/KnowledgeOutcomeLearningService";
 
 export interface CommercialRuntimeOptions {
     readonly databasePath?: string;
@@ -92,6 +93,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     const executiveWorkbench = new ExecutiveIntelligenceWorkbench(executiveEngine);
     const financialStandardsKnowledge = new FinancialStandardsKnowledgeService();
     const interdisciplinaryKnowledge = new InterdisciplinaryDecisionKnowledgeService();
+    const knowledgeOutcomeLearning = new KnowledgeOutcomeLearningService(persistence, interdisciplinaryKnowledge);
     const identity = new CommercialIdentityService(persistence);
     identity.initialize();
     const historyKey = "financial-analysis-history:v1";
@@ -114,7 +116,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
             const requestUrl = new URL(req.url ?? "/", "http://hooshyaros.local");
             const path = requestUrl.pathname;
             if (req.method === "GET" && path === "/health") return json(res, 200, { status: "ok", service: "hooshyar-commercial-runtime" });
-            if (req.method === "GET" && path === "/api/ready") return json(res, 200, { status: "READY", capabilities: ["account-authentication", "organization-membership", "role-based-authorization", "durable-tenant-identity", "financial-ingestion", "financial-statement-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-target-evaluation", "versioned-financial-standards-knowledge", "task-composed-interdisciplinary-decision-knowledge"] });
+            if (req.method === "GET" && path === "/api/ready") return json(res, 200, { status: "READY", capabilities: ["account-authentication", "organization-membership", "role-based-authorization", "durable-tenant-identity", "financial-ingestion", "financial-statement-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-target-evaluation", "versioned-financial-standards-knowledge", "task-composed-interdisciplinary-decision-knowledge", "tenant-scoped-decision-outcome-learning"] });
             if (req.method === "GET" && path === "/api/knowledge/interdisciplinary") {
                 const task = requestUrl.searchParams.get("task") ?? "GENERAL";
                 const objective = requestUrl.searchParams.get("objective") ?? undefined;
@@ -210,6 +212,23 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
 
             if (!session) return json(res, 401, { error: "AUTHENTICATION_REQUIRED" });
 
+            if (req.method === "POST" && path === "/api/knowledge/outcomes") {
+                await identity.authorize(session.token, session.organization, "INGEST_DATA");
+                const body = await readJson(req);
+                const receipt = await knowledgeOutcomeLearning.recordOutcome(session.tenantId, body);
+                return json(res, 201, receipt);
+            }
+
+            if (req.method === "GET" && path === "/api/knowledge/outcomes/summary") {
+                await identity.authorize(session.token, session.organization, "READ_DASHBOARD");
+                const summary = await knowledgeOutcomeLearning.summarize(session.tenantId, {
+                    task: requestUrl.searchParams.get("task") ?? undefined,
+                    methodId: requestUrl.searchParams.get("methodId") ?? undefined,
+                    metricCode: requestUrl.searchParams.get("metricCode") ?? undefined,
+                });
+                return json(res, 200, summary);
+            }
+
             if (req.method === "POST" && path === "/api/invitations") {
                 await identity.authorize(session.token, session.organization, "MANAGE_USERS");
                 const body = await readJson(req);
@@ -304,6 +323,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 "INVITATION_INVALID": 400,
                 "INVITATION_ROLE_NOT_ALLOWED": 403,
                 "IDENTITY_REGISTRY_CORRUPT": 500,
+                "knowledge-outcome-store-invalid": 500,
             };
             const status = statusByError[message] ?? 400;
             const safeMessage = status >= 500 ? "INTERNAL_ERROR" : message;
