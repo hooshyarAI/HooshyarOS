@@ -34,6 +34,8 @@ describe("android product acceptance CI repair regression", () => {
         expect(script).toContain('timeout 2s "$ADB" shell getprop sys.boot_completed');
         expect(script).toContain('for i in $(seq 1 90)');
         expect(script).toContain('attempt ${i}/90: state=');
+        expect(script).toContain('test "$boot" = "1"');
+        expect(script).not.toContain('test "$(get_boot)" = "1"');
         expect(script).not.toMatch(/\n\s*"\$ADB" wait-for-device\s*\n/);
     });
 

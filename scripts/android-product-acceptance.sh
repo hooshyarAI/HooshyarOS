@@ -69,7 +69,7 @@ done
 
 test "$(get_state)" = "device"
 record_step device-online
-test "$(get_boot)" = "1"
+test "$boot" = "1"
 record_step android-booted
 
 echo "=== Waiting for Package Manager ==="
