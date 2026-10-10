@@ -52,6 +52,7 @@ describe("AssistantEngine → Orchestrated Decision Intelligence integration (Ph
         expect(out.response.message).toContain("Overall: PARTIAL");
         expect(out.response.message).toContain("Quality: REVIEW_REQUIRED");
         expect(out.response.limitations).toContain("Decision confidence is unavailable because the quality gate has not qualified this result.");
+        expect(out.response.confidence).toBeUndefined();
         expect(out.response.traceId).toBe(out.orchestrated.quality.provenance.traceId);
         expect(out.orchestrated.financial.status).toBe("READY");
         expect(out.orchestrated.risk.status).toBe("READY");

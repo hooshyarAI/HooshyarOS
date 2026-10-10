@@ -261,7 +261,7 @@ export class AssistantEngine {
             : undefined;
         // Narrative reasoning can explain a result, but it cannot override a
         // failed or pending deterministic quality gate to manufacture confidence.
-        const numericConfidence = confidence.source === "unavailable" ? 0 : confidence.value;
+        const numericConfidence = confidence.source === "unavailable" ? undefined : confidence.value;
 
         // Minimal evidence-only Project shim for the AssistantResponse contract.
         // The AssistantResponse is keyed on Project; the orchestrated call does
