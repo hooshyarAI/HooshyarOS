@@ -14,6 +14,7 @@ export interface FinancialAnalysisResult {
     profitMargin: number;
     debtRatio: number;
     status: "READY" | "BLOCKED";
+    reason?: "INVALID_FINANCIAL_INPUT" | "DEBT_RATIO_DENOMINATOR_ZERO";
 }
 
 export class FinancialIntelligenceEngine implements Engine {
@@ -39,7 +40,20 @@ export class FinancialIntelligenceEngine implements Engine {
                 profit: 0,
                 profitMargin: 0,
                 debtRatio: 0,
-                status: "BLOCKED"
+                status: "BLOCKED",
+                reason: "INVALID_FINANCIAL_INPUT"
+            };
+        }
+
+        if (input.assets === 0) {
+            return {
+                revenue: 0,
+                expenses: 0,
+                profit: 0,
+                profitMargin: 0,
+                debtRatio: 0,
+                status: "BLOCKED",
+                reason: "DEBT_RATIO_DENOMINATOR_ZERO"
             };
         }
 

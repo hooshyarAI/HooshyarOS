@@ -55,7 +55,7 @@ export class FinancialStatementAnalysisService {
     });
 
     if (metrics.status !== "READY") {
-      return this.blocked(input, metrics, "financial-analysis-blocked");
+      return this.blocked(input, metrics, metrics.reason ?? "financial-analysis-blocked");
     }
 
     const observations = this.observations(metrics);

@@ -28,6 +28,11 @@ const OBSERVATION_MESSAGES = {
   PROFITABLE: 'صورت مالی تحلیل‌شده سود غیرمنفی دارد.'
 };
 
+const BLOCK_REASON_MESSAGES = {
+  DEBT_RATIO_DENOMINATOR_ZERO: 'نسبت بدهی قابل محاسبه نیست، زیرا مجموع دارایی‌ها صفر است؛ مقدار دارایی‌ها را اصلاح کنید.',
+  INVALID_FINANCIAL_INPUT: 'یکی از مقادیر مالی نامعتبر است؛ دارایی، بدهی، درآمد و هزینه را بررسی کنید.'
+};
+
 const faNumber = new Intl.NumberFormat('fa-IR', { maximumFractionDigits: 2 });
 const faDate = new Intl.DateTimeFormat('fa-IR', { dateStyle: 'medium', timeStyle: 'short' });
 
@@ -417,7 +422,8 @@ $('#analysis-form').addEventListener('submit', async event => {
   } catch (error) {
     if (error instanceof ApiError && error.code === 'ANALYSIS_BLOCKED') {
       const reason = error.payload?.reasoningEvidence?.status;
-      setResult(result, 'error', `تحلیل مسدود شد و نتیجه‌ای ثبت نشد${reason ? ` (${reason})` : ''}. داده ورودی را بررسی کنید.`);
+      const reasonText = BLOCK_REASON_MESSAGES[reason] ?? 'داده‌های واردشده برای محاسبه امن شاخص‌ها کافی یا معتبر نیستند.';
+      setResult(result, 'error', `تحلیل مسدود شد و نتیجه‌ای ثبت نشد. ${reasonText}`);
     } else {
       setResult(result, 'error', `تحلیل ناموفق بود: ${describeError(error)}`);
     }

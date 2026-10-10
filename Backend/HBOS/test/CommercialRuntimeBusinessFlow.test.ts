@@ -134,6 +134,37 @@ describe("Commercial runtime real business flow", () => {
     expect(otherPayload.executiveEvaluation).toBeNull();
   });
 
+  test("blocks financial analysis when assets denominator is zero and does not persist it", async () => {
+    const session = await request(server, "/api/session", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ username: "مدیرعامل", organization: "شرکت با دارایی صفر" }),
+    });
+    const cookie = session.headers.get("set-cookie")!.split(";")[0];
+    const csv = "date,account,debit,credit,currency\n2026-08-01,Cash,1000,0,IRR\n2026-08-01,Sales,0,1000,IRR";
+
+    const response = await request(server, "/api/analyze", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ csv, sourceName: "zero-assets.csv", assets: 0, liabilities: 250 }),
+    });
+
+    expect(response.status).toBe(422);
+    const blocked = await response.json() as {
+      status: string;
+      metrics: { status: string; reason: string };
+      reasoningEvidence: { success: boolean; status: string };
+    };
+    expect(blocked.status).toBe("BLOCKED");
+    expect(blocked.metrics).toMatchObject({ status: "BLOCKED", reason: "DEBT_RATIO_DENOMINATOR_ZERO" });
+    expect(blocked.reasoningEvidence).toEqual({ success: false, status: "DEBT_RATIO_DENOMINATOR_ZERO" });
+
+    const dashboard = await request(server, "/api/dashboard", { headers: { cookie } });
+    const payload = await dashboard.json() as { analysisAvailable: boolean; history: unknown[] };
+    expect(payload.analysisAvailable).toBe(false);
+    expect(payload.history).toEqual([]);
+  });
+
   test("rejects incomplete or non-positive executive targets", async () => {
     const session = await request(server, "/api/session", {
       method: "POST",
