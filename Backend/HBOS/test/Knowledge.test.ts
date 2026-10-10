@@ -49,7 +49,23 @@ describe("KnowledgeEngine science registry", () => {
             "causal-reasoning",
             "organizational-process-design",
             "governance-compliance",
-            "systems-engineering-reliability"
+            "systems-engineering-reliability",
+            "planning-methods",
+            "budget-management",
+            "general-management",
+            "executive-management",
+            "organizational-theory-design",
+            "systems-thinking",
+            "fundamental-analysis",
+            "technical-analysis",
+            "applied-analysis",
+            "clear-thinking-critical-reasoning",
+            "tax-accounting-audit",
+            "internal-control",
+            "quality-control",
+            "business-management",
+            "sales-management",
+            "opportunity-cost-analysis"
         ]));
 
         expect(engine.getScienceDomain("financial-engineering")?.availableOperations)
@@ -61,6 +77,28 @@ describe("KnowledgeEngine science registry", () => {
         expect(engine.getScienceDomain("strategic-management")?.readiness)
             .toBe("REGISTERED_ONLY");
         expect(engine.getScienceDomain("causal-reasoning")?.availableOperations)
+            .toHaveLength(0);
+
+        expect(engine.getScienceDomain("budget-management")?.availableOperations)
+            .toContain("BudgetIntelligenceEngine.analyzeBudget");
+        expect(engine.getScienceDomain("fundamental-analysis")?.availableOperations)
+            .toContain("FinancialStatementAnalysisService.execute");
+        expect(engine.getScienceDomain("tax-accounting-audit")?.availableOperations)
+            .toContain("TaxIntelligenceEngine.estimate");
+        expect(engine.getScienceDomain("quality-control")?.availableOperations)
+            .toContain("DataQualityProfiler.isQualitySufficient");
+
+        expect(engine.getScienceDomain("technical-analysis")?.readiness)
+            .toBe("REGISTERED_ONLY");
+        expect(engine.getScienceDomain("technical-analysis")?.availableOperations)
+            .toHaveLength(0);
+        expect(engine.getScienceDomain("sales-management")?.readiness)
+            .toBe("REGISTERED_ONLY");
+        expect(engine.getScienceDomain("sales-management")?.availableOperations)
+            .toHaveLength(0);
+        expect(engine.getScienceDomain("opportunity-cost-analysis")?.readiness)
+            .toBe("REGISTERED_ONLY");
+        expect(engine.getScienceDomain("opportunity-cost-analysis")?.availableOperations)
             .toHaveLength(0);
     });
 
@@ -99,6 +137,56 @@ describe("KnowledgeEngine science registry", () => {
         expect(engine.planScienceSelection({
             signals: ["data-analysis", "unknown-signal" as never]
         }).unresolvedSignals).toContain("unknown-signal");
+    });
+
+
+    test("recognizes requested science signals without promoting registered-only areas", () => {
+        const engine = new KnowledgeEngine();
+        const plan = engine.planScienceSelection({
+            signals: [
+                "technical-analysis",
+                "budgeting",
+                "sales-management",
+                "opportunity-cost",
+                "clear-thinking",
+                "systems-thinking",
+                "tax-accounting",
+                "internal-control",
+                "quality-control",
+                "organizational-design",
+                "executive-management",
+                "general-management",
+                "planning",
+                "fundamental-analysis",
+                "applied-analysis"
+            ]
+        });
+
+        expect(plan.requestedSignals).toHaveLength(15);
+        expect(plan.unresolvedSignals).toEqual([]);
+        expect(plan.status).toBe("PARTIAL");
+        expect(plan.requiresReview).toBe(true);
+        expect(plan.selected.map(item => item.domainId)).toEqual(expect.arrayContaining([
+            "technical-analysis",
+            "budget-management",
+            "sales-management",
+            "opportunity-cost-analysis",
+            "clear-thinking-critical-reasoning",
+            "systems-thinking",
+            "tax-accounting-audit",
+            "internal-control",
+            "quality-control",
+            "organizational-theory-design",
+            "executive-management",
+            "general-management",
+            "planning-methods",
+            "fundamental-analysis",
+            "applied-analysis"
+        ]));
+        expect(plan.selected.find(item => item.domainId === "technical-analysis")?.availableOperations)
+            .toEqual([]);
+        expect(plan.selected.find(item => item.domainId === "technical-analysis")?.readiness)
+            .toBe("REGISTERED_ONLY");
     });
 
     test("catalog reads are isolated from caller mutation", () => {

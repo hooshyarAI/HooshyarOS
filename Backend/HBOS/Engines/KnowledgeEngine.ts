@@ -36,7 +36,23 @@ export type ScienceSignal =
     | 'liquidity'
     | 'scheduling'
     | 'organizational-change'
-    | 'automation-design';
+    | 'automation-design'
+    | 'planning'
+    | 'budgeting'
+    | 'general-management'
+    | 'executive-management'
+    | 'organizational-design'
+    | 'systems-thinking'
+    | 'technical-analysis'
+    | 'fundamental-analysis'
+    | 'applied-analysis'
+    | 'clear-thinking'
+    | 'tax-accounting'
+    | 'internal-control'
+    | 'quality-control'
+    | 'business-management'
+    | 'sales-management'
+    | 'opportunity-cost';
 
 export interface ScienceDomainDefinition {
     readonly id: string;
@@ -113,7 +129,7 @@ const SCIENCE_DOMAINS: readonly ScienceDomainDefinition[] = [
         purpose: 'ارزیابی کیفیت داده، آماده‌سازی سری زمانی و انتخاب مدل بر مبنای شواهد و پس‌آزمایی.',
         owner: 'Backend/HBOS/Temporal/DataQualityProfiler.ts; Backend/HBOS/Forecasting/ModelSelector.ts; Backend/HBOS/Forecasting/BaselineForecastEngine.ts',
         readiness: 'PARTIAL',
-        signals: ['data-analysis', 'data-quality', 'historical-analysis', 'forecasting', 'financial-performance', 'strategic-planning', 'resource-optimization'],
+        signals: ['data-analysis', 'data-quality', 'historical-analysis', 'forecasting', 'financial-performance', 'strategic-planning', 'resource-optimization', 'applied-analysis', 'quality-control'],
         availableOperations: [
             'DataQualityProfiler.profile',
             'DataQualityProfiler.isQualitySufficient',
@@ -168,7 +184,7 @@ const SCIENCE_DOMAINS: readonly ScienceDomainDefinition[] = [
         purpose: 'ارزیابی اقتصادی جریان نقدی، ارزش زمانی پول، نرخ بازده و دوره بازگشت سرمایه.',
         owner: 'Backend/HBOS/Engines/FinancialIntelligenceEngine.ts',
         readiness: 'PARTIAL',
-        signals: ['capital-allocation', 'investment-evaluation', 'cash-flow', 'valuation', 'scenario-analysis', 'risk-assessment', 'budget-planning'],
+        signals: ['capital-allocation', 'investment-evaluation', 'cash-flow', 'valuation', 'scenario-analysis', 'risk-assessment', 'budget-planning', 'opportunity-cost', 'fundamental-analysis'],
         availableOperations: [
             'FinancialIntelligenceEngine.npv',
             'FinancialIntelligenceEngine.irr',
@@ -176,7 +192,7 @@ const SCIENCE_DOMAINS: readonly ScienceDomainDefinition[] = [
             'FinancialIntelligenceEngine.wacc'
         ],
         limitations: [
-            'این ثبت، محاسبات مشخص جریان نقدی و هزینه سرمایه را پوشش می‌دهد؛ قیمت‌گذاری مشتقات، بهینه‌سازی پرتفوی و سایر روش‌های پیشرفته تا زمان آزمون و ثبت مالک اجرایی، تأییدشده نیستند.'
+            'این ثبت، محاسبات مشخص جریان نقدی و هزینه سرمایه را پوشش می‌دهد؛ مقایسه صریح هزینه فرصت، قیمت‌گذاری مشتقات و بهینه‌سازی پرتفوی تا زمان پیاده‌سازی و آزمون مستقل، عملیات تأییدشده نیستند.'
         ]
     },
     {
@@ -202,7 +218,7 @@ const SCIENCE_DOMAINS: readonly ScienceDomainDefinition[] = [
         purpose: 'هدف‌گذاری بلندمدت، انتخاب راهبرد، اولویت‌بندی ابتکارها و تبدیل راهبرد به اقدام قابل سنجش.',
         owner: 'Backend/AI_Runtime/strategic/strategic_engine.py; Backend/AI_Runtime/executive_memory/strategic_analysis.py',
         readiness: 'REGISTERED_ONLY',
-        signals: ['strategic-planning', 'long-term-planning', 'resource-allocation', 'performance-improvement', 'budget-planning'],
+        signals: ['strategic-planning', 'long-term-planning', 'resource-allocation', 'performance-improvement', 'budget-planning', 'planning'],
         availableOperations: [],
         limitations: [
             'ماژول‌های فعلیِ بررسی‌شده خروجی عمومی برمی‌گردانند و شواهد کافی برای تحلیل واقعی رقبا، گزینه‌های راهبردی و اجرای چرخه استراتژی ندارند؛ در نتیجه این حوزه ثبت شده اما اجرایی اعلام نمی‌شود.'
@@ -306,6 +322,199 @@ const SCIENCE_DOMAINS: readonly ScienceDomainDefinition[] = [
             'این حوزه راهنمای انتخاب رویکرد و مالک معماری است؛ وجود آن جایگزین آزمون‌های واقعی کارایی، امنیت، پایداری یا پذیرش محصول نیست.'
         ],
         crossCutting: true
+    }
+    },
+    {
+        id: 'planning-methods',
+        name: 'علم برنامه‌ریزی',
+        purpose: 'تبدیل هدف به مراحل و قیود اجرایی؛ تمایز میان برنامه‌ریزی نمایشی و طرحی که منابع، مسئول، زمان و معیار موفقیت دارد.',
+        owner: 'Backend/HBOS/Assistant/Autonomous/AutonomousPlanningEngine.ts; Backend/AI_Runtime/planning/planning_engine.py',
+        readiness: 'REGISTERED_ONLY',
+        signals: ['planning', 'strategic-planning', 'long-term-planning', 'resource-allocation', 'scheduling'],
+        availableOperations: [],
+        limitations: [
+            'نمونه فعلی برنامه‌ریز عمدتاً فهرست عمومی مراحل تولید می‌کند؛ برنامه زمان‌مند، وابستگی‌ها، ظرفیت، هزینه و مسیر بحرانی هنوز به‌عنوان حل‌گر آزمون‌شده تأیید نشده‌اند.'
+        ]
+    },,
+    {
+        id: 'budget-management',
+        name: 'بودجه‌ریزی و کنترل بودجه',
+        purpose: 'مقایسه بودجه مصوب با عملکرد، محاسبه انحراف و نسبت استفاده از بودجه.',
+        owner: 'Backend/HBOS/Engines/BudgetIntelligenceEngine.ts',
+        readiness: 'PARTIAL',
+        signals: ['budgeting', 'budget-planning', 'financial-performance', 'resource-allocation', 'applied-analysis'],
+        availableOperations: ['BudgetIntelligenceEngine.analyze', 'BudgetIntelligenceEngine.analyzeBudget'],
+        limitations: [
+            'انحراف و مصرف بودجه برای ارقام صریح محاسبه می‌شود؛ بودجه جامع چنددوره‌ای، بودجه‌ریزی مبتنی بر محرک و تخصیص بهینه خودکار منابع در این عملیات پیاده‌سازی نشده‌اند.'
+        ]
+    },,
+    {
+        id: 'general-management',
+        name: 'مدیریت عمومی',
+        purpose: 'پشتیبانی محدود از پایش سازمان، تشخیص مسائل فرایندی و صورت‌بندی پیشنهادهای بهبود.',
+        owner: 'Backend/HBOS/Engines/OrganizationalIntelligenceEngine.ts',
+        readiness: 'PARTIAL',
+        signals: ['general-management', 'business-management', 'organizational-change', 'process-improvement', 'performance-improvement'],
+        availableOperations: ['OrganizationalIntelligenceEngine.assess', 'OrganizationalIntelligenceEngine.diagnose', 'OrganizationalIntelligenceEngine.recommendImprovements'],
+        limitations: [
+            'عملیات موجود به ارزیابی و تشخیص سازمانی محدود است؛ پوشش کامل مدیریت منابع انسانی، بازار، عملیات، مالی و اجرای برنامه در یک چرخه مدیریتی یکپارچه اثبات نشده است.'
+        ]
+    },,
+    {
+        id: 'executive-management',
+        name: 'مدیریت اجرایی و پشتیبانی مدیران ارشد',
+        purpose: 'ترکیب شواهد سازمانی، عملکرد مالی و انحراف بودجه برای پشتیبانی تصمیم مدیران؛ نه جایگزینی اختیار مدیر.',
+        owner: 'Backend/HBOS/Engines/OrganizationalIntelligenceEngine.ts; Backend/HBOS/Engines/FinancialIntelligenceEngine.ts; Backend/HBOS/Engines/BudgetIntelligenceEngine.ts',
+        readiness: 'PARTIAL',
+        signals: ['executive-management', 'strategic-planning', 'financial-performance', 'budget-planning', 'resource-allocation', 'applied-analysis'],
+        availableOperations: ['OrganizationalIntelligenceEngine.assess', 'OrganizationalIntelligenceEngine.diagnose', 'FinancialIntelligenceEngine.analyze', 'BudgetIntelligenceEngine.analyzeBudget'],
+        limitations: [
+            'این عملیات شاخص‌ها و شواهد محدود را فراهم می‌کند؛ داشبورد اجرایی به‌تنهایی جایگزین سازوکار تأیید تصمیم، ارزیابی تعارض منافع و اجرای کنترل‌شده مصوبات نیست.'
+        ]
+    },,
+    {
+        id: 'organizational-theory-design',
+        name: 'تئوری، رفتار و طراحی سازمان',
+        purpose: 'ثبت دانش موردنیاز برای طراحی ساختار، نقش‌ها، مسئولیت‌ها، خطوط گزارش‌دهی و هماهنگی سازمانی.',
+        owner: 'Backend/HBOS/Engines/OrganizationModelEngine.ts; Backend/HBOS/Engines/OrganizationalIntelligenceEngine.ts',
+        readiness: 'REGISTERED_ONLY',
+        signals: ['organizational-design', 'organizational-change', 'general-management', 'business-management', 'workflow-redesign'],
+        availableOperations: [],
+        limitations: [
+            'مدل فعلی سازمان و عضویت را نگهداری می‌کند؛ تحلیل آزمون‌شده طراحی ساختار، span of control، RACI، رفتار سازمانی و مقایسه طرح‌های بدیل ثبت نشده است.'
+        ]
+    },,
+    {
+        id: 'systems-thinking',
+        name: 'تفکر سیستمی',
+        purpose: 'صورت‌بندی وابستگی‌های متقابل، بازخوردها، تأخیرها و پیامدهای مرتبه دوم تصمیم‌ها.',
+        owner: 'Backend/HBOS/Engines/OrganizationalIntelligenceEngine.ts; Backend/HBOS/Engines/KnowledgeEngine.ts; Backend/AI_Runtime/causal_reasoning/causal_reasoning.py',
+        readiness: 'REGISTERED_ONLY',
+        signals: ['systems-thinking', 'causal-diagnosis', 'root-cause-analysis', 'strategic-planning', 'process-improvement'],
+        availableOperations: [],
+        limitations: [
+            'تشخیص سازمانی و انتخاب دانش موجود است، اما مدل علّی حلقه‌های بازخورد و شبیه‌سازی پویایی سیستم تا زمان پیاده‌سازی و آزمون مستقل، اجرایی محسوب نمی‌شود.'
+        ]
+    },,
+    {
+        id: 'fundamental-analysis',
+        name: 'تحلیل بنیادی مالی',
+        purpose: 'تحلیل اولیه صورت‌های مالی، سودآوری و ساختار بدهی بر مبنای داده‌های منبع‌دار.',
+        owner: 'Backend/HBOS/Product/FinancialStatementAnalysisService.ts; Backend/HBOS/Engines/FinancialIntelligenceEngine.ts; Backend/HBOS/Product/AuditAnalyticsService.ts',
+        readiness: 'PARTIAL',
+        signals: ['fundamental-analysis', 'financial-performance', 'valuation', 'investment-evaluation', 'historical-analysis', 'applied-analysis'],
+        availableOperations: ['FinancialStatementAnalysisService.execute', 'FinancialIntelligenceEngine.analyze', 'AuditAnalyticsService.run'],
+        limitations: [
+            'تحلیل پایه صورت مالی و چند شاخص مالی موجود است؛ دریافت قیمت روز بازار، مدل کامل ارزش ذاتی، مزیت رقابتی، تحلیل صنعت و توصیه خرید یا فروش تأییدشده نیست.'
+        ]
+    },,
+    {
+        id: 'technical-analysis',
+        name: 'تحلیل تکنیکال بازار',
+        purpose: 'ثبت نیاز تحلیل روند، حجم، اندیکاتورها، سطوح حمایت و مقاومت و اعتبارسنجی راهبردهای معاملاتی.',
+        owner: 'Backend/HBOS/Engines/KnowledgeEngine.ts; Backend/HBOS/Forecasting/ModelSelector.ts',
+        readiness: 'REGISTERED_ONLY',
+        signals: ['technical-analysis', 'historical-analysis', 'forecasting', 'risk-assessment', 'investment-evaluation'],
+        availableOperations: [],
+        limitations: [
+            'مدل پیش‌بینی عمومی سری زمانی، جایگزین شاخص‌های تکنیکال بازار نیست؛ اندیکاتورها، داده قیمت و حجم معتبر، تعدیل رخدادهای شرکتی و پس‌آزمایی راهبرد معاملاتی به‌عنوان عملیات تأییدشده ثبت نشده‌اند.'
+        ]
+    },,
+    {
+        id: 'applied-analysis',
+        name: 'تحلیل کاربردی و تحلیل شواهد',
+        purpose: 'به‌کارگیری محاسبات موجود روی داده واقعی و منبع‌دار، با جداسازی مشاهده، فرض، تفسیر و نتیجه.',
+        owner: 'Backend/HBOS/Product/FinancialStatementAnalysisService.ts; Backend/HBOS/Product/AuditAnalyticsService.ts; Backend/HBOS/Temporal/DataQualityProfiler.ts',
+        readiness: 'PARTIAL',
+        signals: ['applied-analysis', 'data-analysis', 'historical-analysis', 'financial-performance', 'data-quality', 'quality-control'],
+        availableOperations: ['FinancialStatementAnalysisService.execute', 'AuditAnalyticsService.run', 'DataQualityProfiler.profile', 'DataQualityProfiler.isQualitySufficient'],
+        limitations: [
+            'این حوزه مسیر استفاده از عملیات موجود را توصیف می‌کند و الگوریتم عمومی برای هر مسئله‌ای نیست؛ کفایت ورودی، دامنه روش و محدودیت‌ها باید جداگانه بررسی شوند.'
+        ]
+    },,
+    {
+        id: 'clear-thinking-critical-reasoning',
+        name: 'تفکر شفاف و نقادانه',
+        purpose: 'ثبت نیاز به آشکارسازی فرض‌های پنهان، تمایز واقعیت از تفسیر، آزمون شواهد و بررسی سوگیری‌های شناختی.',
+        owner: 'Backend/HBOS/Engines/ReasoningEngine.ts; Backend/HBOS/Engines/KnowledgeEngine.ts',
+        readiness: 'REGISTERED_ONLY',
+        signals: ['clear-thinking', 'applied-analysis', 'multi-criteria-decision', 'risk-assessment', 'strategic-planning'],
+        availableOperations: [],
+        limitations: [
+            'وجود موتور استدلال به‌تنهایی اثبات‌کننده شناسایی نظام‌مند سوگیری شناختی یا کیفیت استدلال نیست؛ چک‌لیست‌های اختصاصی، آزمون‌های رفتاری و کالیبراسیون هنوز به این حوزه متصل نشده‌اند.'
+        ]
+    },,
+    {
+        id: 'tax-accounting-audit',
+        name: 'حسابداری مالیاتی و حسابرسی مالی',
+        purpose: 'بررسی محدود نسبت‌های مالی، نشانه‌های ریسک در ارقام و برآورد ساده مالیات بر پایه مبلغ و نرخ صریح.',
+        owner: 'Backend/HBOS/Engines/TaxIntelligenceEngine.ts; Backend/HBOS/Product/AuditAnalyticsService.ts; Backend/HBOS/Product/FinancialStatementAnalysisService.ts',
+        readiness: 'PARTIAL',
+        signals: ['tax-accounting', 'compliance-review', 'financial-performance', 'fundamental-analysis', 'applied-analysis', 'historical-analysis'],
+        availableOperations: ['TaxIntelligenceEngine.estimate', 'AuditAnalyticsService.run', 'FinancialStatementAnalysisService.execute'],
+        limitations: [
+            'برآورد مالیات فقط ضرب مبلغ مشمول در نرخ ورودی است و چند کنترل نسبت مالی اجرا می‌شود؛ قواعد به‌روز مالیاتی و حسابداری ایران، رسیدگی اظهارنامه، تطبیق کامل دفاتر و حسابرسی قانونی به‌صورت جامع تأیید نشده‌اند.'
+        ]
+    },,
+    {
+        id: 'internal-control',
+        name: 'کنترل داخلی و کنترل‌های مالی',
+        purpose: 'اجرای چند کنترل قاعده‌محور روی نسبت‌های مالی و شناسایی موارد نیازمند رسیدگی.',
+        owner: 'Backend/HBOS/Product/AuditAnalyticsService.ts; Backend/HBOS/Engines/SecurityAuditEngine.ts',
+        readiness: 'PARTIAL',
+        signals: ['internal-control', 'tax-accounting', 'compliance-review', 'data-governance', 'quality-control'],
+        availableOperations: ['AuditAnalyticsService.run', 'SecurityAuditEngine.scan'],
+        limitations: [
+            'این عملیات چند کنترل مالی و امنیتی محدود را پوشش می‌دهد؛ ارزیابی جامع طراحی و اثربخشی کنترل‌های داخلی، تفکیک وظایف، کنترل‌های فرایندی و چارچوب‌های حسابرسی نیازمند توسعه و شواهد مستقل است.'
+        ]
+    },,
+    {
+        id: 'quality-control',
+        name: 'کنترل کیفیت داده و تحلیل',
+        purpose: 'ارزیابی کیفیت ورودی تحلیل و جلوگیری از نتیجه‌گیری فراتر از کفایت داده.',
+        owner: 'Backend/HBOS/Temporal/DataQualityProfiler.ts; Backend/HBOS/Engines/KnowledgeEngine.ts',
+        readiness: 'PARTIAL',
+        signals: ['quality-control', 'data-quality', 'data-analysis', 'platform-quality', 'applied-analysis'],
+        availableOperations: ['DataQualityProfiler.profile', 'DataQualityProfiler.isQualitySufficient', 'DataQualityProfiler.getQualityFlags'],
+        limitations: [
+            'دامنه عملیاتی این ثبت، کیفیت داده و کفایت ورودی تحلیل است؛ کنترل کیفیت تولید، نمودارهای کنترل آماری، قابلیت فرایند و بازرسی محصول در این حوزه اجرایی اعلام نمی‌شوند.'
+        ]
+    },,
+    {
+        id: 'business-management',
+        name: 'مدیریت کسب‌وکار',
+        purpose: 'ثبت نیاز به تصمیم‌سازی یکپارچه درباره مدل کسب‌وکار، عملیات، مشتری، هزینه، درآمد و منابع.',
+        owner: 'Backend/HBOS/Engines/OrganizationalIntelligenceEngine.ts; Backend/HBOS/Engines/FinancialIntelligenceEngine.ts',
+        readiness: 'REGISTERED_ONLY',
+        signals: ['business-management', 'general-management', 'executive-management', 'sales-management', 'financial-performance', 'strategic-planning'],
+        availableOperations: [],
+        limitations: [
+            'چند عملیات سازمانی و مالی قابل استفاده‌اند، اما چرخه یکپارچه و آزمون‌شده مدیریت کل کسب‌وکار، مدل درآمدی، بازار و اجرای برنامه کسب‌وکار در این ثبت موجود نیست.'
+        ]
+    },,
+    {
+        id: 'sales-management',
+        name: 'مدیریت فروش',
+        purpose: 'ثبت نیاز به تحلیل قیف فروش، نرخ تبدیل، عملکرد کانال و فروشنده، پیش‌بینی فروش و پایش هدف فروش.',
+        owner: 'Backend/HBOS/Engines/KnowledgeEngine.ts; Backend/HBOS/Forecasting/ModelSelector.ts',
+        readiness: 'REGISTERED_ONLY',
+        signals: ['sales-management', 'business-management', 'forecasting', 'budgeting', 'performance-improvement', 'applied-analysis'],
+        availableOperations: [],
+        limitations: [
+            'ماژول اختصاصی و آزمون‌شده CRM، قیف فروش، انتساب فروش، مدیریت سرنخ و تحلیل عملکرد فروش در رجیستری موجود نیست؛ پیش‌بینی سری زمانی عمومی به‌خودی‌خود پیش‌بینی فروش نیست.'
+        ]
+    },,
+    {
+        id: 'opportunity-cost-analysis',
+        name: 'تحلیل هزینه فرصت',
+        purpose: 'مقایسه ارزش بهترین گزینه کنارگذاشته‌شده با گزینه منتخب در تصمیم‌گیری سرمایه، زمان و منابع.',
+        owner: 'Backend/HBOS/Engines/KnowledgeEngine.ts; Backend/HBOS/Engines/DecisionIntelligenceEngine.ts; Backend/HBOS/Engines/FinancialIntelligenceEngine.ts',
+        readiness: 'REGISTERED_ONLY',
+        signals: ['opportunity-cost', 'capital-allocation', 'investment-evaluation', 'resource-allocation', 'budgeting'],
+        availableOperations: [],
+        limitations: [
+            'NPV، WACC و رتبه‌بندی چندمعیاره می‌توانند ورودی مقایسه باشند، اما روش صریح و آزمون‌شده برای برآورد هزینه فرصت بر اساس بهترین بدیل کنارگذاشته‌شده هنوز ثبت نشده است.'
+        ]
     }
 ];
 
