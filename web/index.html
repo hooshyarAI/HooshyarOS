@@ -3,60 +3,146 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="theme-color" content="#0f172a" />
+  <meta name="theme-color" content="#0f1b2d" />
   <meta name="description" content="هوشیار.ai — داشبورد هوشمند مالی و مدیریتی" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="stylesheet" href="/styles.css" />
-  <title>هوشیار.ai</title>
+  <title>هوشیار.ai — داشبورد مالی</title>
 </head>
 <body>
-  <main class="shell">
-    <header class="hero">
-      <div>
-        <p class="eyebrow">Hooshyar.ai</p>
-        <h1>مرکز هوشمندی مالی و مدیریتی</h1>
-        <p class="subtitle">از داده مالی معتبر تا داشبورد، بینش و تصمیم قابل اجرا.</p>
-      </div>
-      <a class="primary" href="#workspace">شروع کار</a>
-    </header>
-
-    <section id="workspace" class="grid">
-      <article class="card">
-        <h2>وضعیت سامانه</h2>
-        <p id="readiness">در حال بررسی...</p>
-      </article>
-      <article class="card">
-        <h2>داشبورد مالی</h2>
-        <div class="metrics">
-          <div><span>درآمد</span><strong id="revenue">—</strong></div>
-          <div><span>سود</span><strong id="profit">—</strong></div>
-          <div><span>ریسک بدهی</span><strong id="risk">—</strong></div>
+  <a class="skip-link" href="#main">پرش به محتوای اصلی</a>
+  <div class="layout">
+    <aside class="sidebar" aria-label="ناوبری">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">ه</span>
+        <div>
+          <p class="brand-name">هوشیار.ai</p>
+          <p class="brand-sub">هوشمندی مالی و مدیریتی</p>
         </div>
-      </article>
-    </section>
+      </div>
+      <nav>
+        <ul class="nav">
+          <li><a href="#overview" aria-current="page">نمای کلی</a></li>
+          <li><a href="#session">نشست</a></li>
+          <li><a href="#analysis">تحلیل صورت مالی</a></li>
+          <li><a href="#findings">یافته‌ها و منبع داده</a></li>
+        </ul>
+      </nav>
+      <p class="sidebar-note">داده‌ها فقط از Backend هوشیار خوانده می‌شوند. عدد نمونه یا ساختگی نمایش داده نمی‌شود.</p>
+    </aside>
 
-    <section class="card onboarding">
-      <h2>ایجاد نشست</h2>
-      <form id="session-form">
-        <label>نام کاربری<input id="username" value="مدیرعامل" required /></label>
-        <label>سازمان<input id="organization" value="تست هوشیار" required /></label>
-        <button class="primary" type="submit">ایجاد نشست</button>
-      </form>
-      <p id="session-result" class="result" aria-live="polite"></p>
-    </section>
+    <div class="content">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Hooshyar.ai</p>
+          <h1>داشبورد مالی</h1>
+        </div>
+        <div class="status-group" role="status" aria-live="polite">
+          <span id="connection-status" class="pill pill-pending"><span class="dot" aria-hidden="true"></span><span class="pill-text">در حال بررسی اتصال…</span></span>
+          <span id="session-status" class="pill pill-muted"><span class="dot" aria-hidden="true"></span><span class="pill-text">نشست: نامشخص</span></span>
+        </div>
+      </header>
 
-    <section class="card onboarding">
-      <h2>تحلیل واقعی صورت مالی</h2>
-      <p>یک فایل CSV با ستون‌های date, account, debit, credit, currency انتخاب کنید.</p>
-      <form id="analysis-form">
-        <label>فایل CSV<input id="csv-file" type="file" accept=".csv,text/csv" required /></label>
-        <label>دارایی‌ها<input id="assets" type="number" min="0" step="0.01" value="1000" required /></label>
-        <label>بدهی‌ها<input id="liabilities" type="number" min="0" step="0.01" value="250" required /></label>
-        <button class="primary" type="submit">تحلیل کن</button>
-      </form>
-      <p id="analysis-result" class="result" aria-live="polite"></p>
-    </section>
-  </main>
+      <main id="main">
+        <div id="global-alert" class="alert" role="alert" hidden>
+          <p id="global-alert-text"></p>
+          <button id="retry-button" class="btn btn-secondary" type="button">تلاش دوباره</button>
+        </div>
+
+        <section id="overview" class="section" aria-labelledby="overview-title">
+          <div class="section-head">
+            <h2 id="overview-title">شاخص‌های آخرین تحلیل</h2>
+            <p id="dashboard-meta" class="meta">—</p>
+          </div>
+
+          <div id="dashboard-empty" class="empty" hidden>
+            <p class="empty-title" id="dashboard-empty-title">هنوز تحلیلی انجام نشده است</p>
+            <p id="dashboard-empty-text" class="empty-text">برای دیدن شاخص‌ها، ابتدا نشست ایجاد کنید و یک فایل CSV دفتر حساب را تحلیل کنید.</p>
+          </div>
+
+          <div class="kpis" id="kpis" aria-busy="true">
+            <article class="kpi">
+              <p class="kpi-label">درآمد</p>
+              <p class="kpi-value" id="revenue" data-state="loading"><span class="skeleton" aria-hidden="true"></span><span class="sr-only">در حال بارگذاری</span></p>
+              <p class="kpi-hint">جمع بستانکار دفتر حساب</p>
+            </article>
+            <article class="kpi">
+              <p class="kpi-label">سود</p>
+              <p class="kpi-value" id="profit" data-state="loading"><span class="skeleton" aria-hidden="true"></span><span class="sr-only">در حال بارگذاری</span></p>
+              <p class="kpi-hint">درآمد منهای هزینه</p>
+            </article>
+            <article class="kpi">
+              <p class="kpi-label">ریسک بدهی</p>
+              <p class="kpi-value" id="risk" data-state="loading"><span class="skeleton" aria-hidden="true"></span><span class="sr-only">در حال بارگذاری</span></p>
+              <p class="kpi-hint">نسبت بدهی به دارایی</p>
+            </article>
+          </div>
+        </section>
+
+        <div class="columns">
+          <section id="session" class="card" aria-labelledby="session-title">
+            <h2 id="session-title">ایجاد نشست</h2>
+            <p class="card-text">نشست در حافظه سرور نگه‌داری می‌شود و با راه‌اندازی دوباره سرور از بین می‌رود.</p>
+            <form id="session-form" class="form" novalidate>
+              <label class="field">
+                <span>نام کاربری</span>
+                <input id="username" name="username" autocomplete="username" placeholder="نام خود را وارد کنید" required />
+              </label>
+              <label class="field">
+                <span>سازمان</span>
+                <input id="organization" name="organization" autocomplete="organization" placeholder="نام سازمان" required />
+              </label>
+              <button class="btn btn-primary" type="submit">ایجاد نشست</button>
+            </form>
+            <p id="session-result" class="result" aria-live="polite"></p>
+          </section>
+
+          <section id="analysis" class="card" aria-labelledby="analysis-title">
+            <h2 id="analysis-title">تحلیل واقعی صورت مالی</h2>
+            <p class="card-text">یک فایل CSV با ستون‌های <code dir="ltr">date, account, debit, credit, currency</code> انتخاب کنید و مانده دارایی و بدهی را وارد کنید.</p>
+            <form id="analysis-form" class="form" novalidate>
+              <label class="field field-wide">
+                <span>فایل CSV</span>
+                <input id="csv-file" name="csv" type="file" accept=".csv,text/csv" required />
+              </label>
+              <label class="field">
+                <span>دارایی‌ها</span>
+                <input id="assets" name="assets" type="number" inputmode="decimal" min="0" step="0.01" placeholder="مجموع دارایی‌ها" required />
+              </label>
+              <label class="field">
+                <span>بدهی‌ها</span>
+                <input id="liabilities" name="liabilities" type="number" inputmode="decimal" min="0" step="0.01" placeholder="مجموع بدهی‌ها" required />
+              </label>
+              <button class="btn btn-primary" type="submit">تحلیل کن</button>
+            </form>
+            <p id="analysis-result" class="result" aria-live="polite"></p>
+          </section>
+        </div>
+
+        <section id="findings" class="columns" aria-label="یافته‌ها و منبع داده">
+          <article class="card">
+            <h2>یافته‌های تحلیل</h2>
+            <ul id="observations" class="list"><li class="muted">پس از تحلیل نمایش داده می‌شود.</li></ul>
+          </article>
+          <article class="card">
+            <h2>منبع داده</h2>
+            <dl id="source" class="details"><div><dt>وضعیت</dt><dd class="muted">پس از تحلیل نمایش داده می‌شود.</dd></div></dl>
+          </article>
+        </section>
+
+        <section class="card card-quiet" aria-labelledby="missing-title">
+          <h2 id="missing-title">قابلیت‌های در دسترس نیست</h2>
+          <p class="card-text">این بخش‌ها هنوز API در Backend ندارند و به همین دلیل نمایش داده نمی‌شوند:</p>
+          <ul class="tags">
+            <li>روند زمانی و نمودار روند</li>
+            <li>هشدارها</li>
+            <li>گزارش‌ها</li>
+            <li>مقایسه چند دوره مالی</li>
+          </ul>
+        </section>
+      </main>
+    </div>
+  </div>
   <script src="/app.js" defer></script>
 </body>
 </html>
