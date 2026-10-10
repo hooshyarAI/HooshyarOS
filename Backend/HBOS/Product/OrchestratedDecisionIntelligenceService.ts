@@ -170,7 +170,7 @@ function buildQualityReport(
             sourceRef: "Backend/HBOS/Product/OrchestratedDecisionIntelligenceService",
             timestamp: new Date().toISOString(),
             inputHash,
-            outputHash: ProvenanceTrace.hashInput(JSON.stringify(outputMaterial)),
+            outputHash: ProvenanceTrace.hashInput(JSON.stringify(outputMaterial) ?? "null"),
             verificationStatus: status === "PASS"
                 ? "VERIFIED"
                 : status === "REVIEW_REQUIRED"
@@ -321,10 +321,15 @@ export class OrchestratedDecisionIntelligenceService {
                 id: "decision-method-composition",
                 status: decisionExecution.status === "READY"
                     ? "PASS"
-                    : decisionExecution.status === "PARTIAL"
-                        ? "REVIEW_REQUIRED"
-                        : "BLOCKED",
-                detail: decisionExecution.note
+                    : decisionExecution.status === "BLOCKED" ||
+                        decisionExecution.blockedMethods.some(method => method === "ahp" || method === "topsis")
+                        ? "BLOCKED"
+                        : "REVIEW_REQUIRED",
+                detail: decisionExecution.status === "READY"
+                    ? decisionExecution.note
+                    : decisionExecution.blockedMethods.some(method => method === "ahp" || method === "topsis")
+                        ? "AHP and TOPSIS are required by this workflow; a blocked required method fails the decision quality gate. Successful sub-results are preserved for diagnosis."
+                        : decisionExecution.note
             },
             {
                 id: "science-selection",

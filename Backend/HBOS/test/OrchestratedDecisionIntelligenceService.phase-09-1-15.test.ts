@@ -160,4 +160,15 @@ describe("OrchestratedDecisionIntelligenceService (09-1.15)", () => {
         expect(r.status).toBe("BLOCKED");
         expect(r.quality.checks[0].status).toBe("BLOCKED");
     });
+
+    test("records unsupported supplemental science signals and requires review instead of guessing", () => {
+        const r = service.orchestrate({
+            ...validInput,
+            additionalScienceSignals: ["unknown-signal" as never]
+        });
+
+        expect(r.science?.unresolvedSignals).toContain("unknown-signal");
+        expect(r.status).toBe("PARTIAL");
+        expect(r.quality.requiresHumanReview).toBe(true);
+    });
 });
