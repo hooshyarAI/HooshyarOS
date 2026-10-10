@@ -63,7 +63,26 @@ describe("CommercialRuntimeServer security headers", () => {
         expect(res.headers["access-control-allow-origin"]).toBeUndefined();
     });
 
-    it("uses default CORS origin when none is configured", async () => {
+    it("serves the result presentation and chart scripts referenced by the workspace shell", async () => {
+    const server = await start();
+    (globalThis as unknown as { __crsServers?: http.Server[] }).__crsServers = [server];
+
+    const shell = await request(server, "GET", "/");
+    const presentation = await request(server, "GET", "/result-presentation.js");
+    const charts = await request(server, "GET", "/result-charts.js");
+
+    expect(shell.status).toBe(200);
+    expect(shell.body).toContain('src="/result-presentation.js"');
+    expect(shell.body).toContain('src="/result-charts.js"');
+    expect(presentation.status).toBe(200);
+    expect(presentation.headers["content-type"]).toContain("text/javascript");
+    expect(presentation.body).toContain("HooshyarResultPresentation");
+    expect(charts.status).toBe(200);
+    expect(charts.headers["content-type"]).toContain("text/javascript");
+    expect(charts.body).toContain("HooshyarResultCharts");
+  });
+
+  it("uses default CORS origin when none is configured", async () => {
         const server = createCommercialRuntimeServer({});
         await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
         (globalThis as unknown as { __crsServers?: http.Server[] }).__crsServers = [server];

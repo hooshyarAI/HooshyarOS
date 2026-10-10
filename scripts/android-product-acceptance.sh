@@ -60,28 +60,30 @@ for i in $(seq 1 90); do
   if [[ "$state" == "device" ]]; then
     boot="$(get_boot)"
   fi
-  echo "attempt ${i}/180: state=${state:-unknown} boot=${boot:-unknown}"
+  echo "attempt ${i}/90: state=${state:-unknown} boot=${boot:-unknown}"
   if [[ "$state" == "device" && "$boot" == "1" ]]; then
     break
   fi
   sleep 2
 done
 
-test "$(get_state)" = "device"
+test "$state" = "device"
 record_step device-online
-test "$(get_boot)" = "1"
+test "$boot" = "1"
 record_step android-booted
 
 echo "=== Waiting for Package Manager ==="
+PACKAGE_MANAGER_READY=false
 for i in $(seq 1 30); do
   if timeout 3s "$ADB" shell cmd package list packages >/dev/null 2>&1; then
     echo "Package Manager ready (attempt ${i})"
+    PACKAGE_MANAGER_READY=true
     break
   fi
   echo "Package Manager not ready (attempt ${i}/30)"
   sleep 2
 done
-timeout 3s "$ADB" shell cmd package list packages >/dev/null
+test "$PACKAGE_MANAGER_READY" = "true"
 record_step package-manager-ready
 
 echo "=== Installing APK ==="

@@ -7,7 +7,10 @@
       "capabilityId": "product.financial-data-ingestion",
       "capability": "implement governed multi-format financial ingestion beyond the current CSV-only browser flow (Excel/PDF/structured evidence where supported by existing architecture)",
       "targetEngine": "Financial Data Ingestion Adapter",
-      "dependencies": ["Financial Data Ingestion Adapter", "Commercial Persistence Boundary"],
+      "dependencies": [
+        "Financial Data Ingestion Adapter",
+        "Commercial Persistence Boundary"
+      ],
       "implementationPath": "Backend/HBOS/Product/FinancialDataIngestionAdapter.ts",
       "testPath": "Backend/HBOS/test/FinancialDataIngestionAdapter.test.ts",
       "documentationPath": "Docs/Product/FinancialDataIngestionAdapter.md",
@@ -23,7 +26,10 @@
       "capabilityId": "product.financial-statement-analysis",
       "capability": "analyze normalized financial statements and expose explainable financial intelligence",
       "targetEngine": "Financial Intelligence Engine",
-      "dependencies": ["Financial Intelligence Engine", "Reasoning Engine"],
+      "dependencies": [
+        "Financial Intelligence Engine",
+        "Reasoning Engine"
+      ],
       "implementationPath": "Backend/HBOS/Product/FinancialStatementAnalysisService.ts",
       "testPath": "Backend/HBOS/test/FinancialStatementAnalysisService.test.ts",
       "documentationPath": "Docs/Product/FinancialStatementAnalysisService.md"
@@ -32,7 +38,10 @@
       "capabilityId": "product.executive-intelligence-workbench",
       "capability": "compose executive KPI, dashboard and performance intelligence from verified platform evidence",
       "targetEngine": "Executive Intelligence Engine",
-      "dependencies": ["Executive Intelligence Engine", "Financial Intelligence Engine"],
+      "dependencies": [
+        "Executive Intelligence Engine",
+        "Financial Intelligence Engine"
+      ],
       "implementationPath": "Backend/HBOS/Product/ExecutiveIntelligenceWorkbench.ts",
       "testPath": "Backend/HBOS/test/ExecutiveIntelligenceWorkbench.test.ts",
       "documentationPath": "Docs/Product/ExecutiveIntelligenceWorkbench.md"
@@ -41,7 +50,11 @@
       "capabilityId": "product.decision-workbench",
       "capability": "provide explainable decision scenarios, expert-choice evaluation and recommendation evidence",
       "targetEngine": "Decision Intelligence Engine",
-      "dependencies": ["Decision Engine", "Reasoning Engine", "Governance Engine"],
+      "dependencies": [
+        "Decision Engine",
+        "Reasoning Engine",
+        "Governance Engine"
+      ],
       "implementationPath": "Backend/HBOS/Product/DecisionWorkbench.ts",
       "testPath": "Backend/HBOS/test/DecisionWorkbench.test.ts",
       "documentationPath": "Docs/Product/DecisionWorkbench.md"
@@ -50,7 +63,11 @@
       "capabilityId": "product.organizational-execution",
       "capability": "turn approved managerial decisions into governed workflows, assigned work and outcome evidence",
       "targetEngine": "Organizational Intelligence Engine",
-      "dependencies": ["Organizational Intelligence Engine", "Governance Engine", "Autonomous Operations Engine"],
+      "dependencies": [
+        "Organizational Intelligence Engine",
+        "Governance Engine",
+        "Autonomous Operations Engine"
+      ],
       "implementationPath": "Backend/HBOS/Product/OrganizationalExecutionCoordinator.ts",
       "testPath": "Backend/HBOS/test/OrganizationalExecutionCoordinator.test.ts",
       "documentationPath": "Docs/Product/OrganizationalExecutionCoordinator.md"
@@ -59,7 +76,13 @@
       "capabilityId": "product.financial-analytics",
       "capability": "expose explainable financial analytics (ratios, break-even, cash-flow forecasting and anomaly detection) over the canonical ingested source and structured statement inputs",
       "targetEngine": "Financial Intelligence Engine",
-      "dependencies": ["Financial Intelligence Engine", "Ratio Analysis Service", "Break Even Analysis Service", "Cash Flow Forecasting Service", "Anomaly Detection Service"],
+      "dependencies": [
+        "Financial Intelligence Engine",
+        "Ratio Analysis Service",
+        "Break Even Analysis Service",
+        "Cash Flow Forecasting Service",
+        "Anomaly Detection Service"
+      ],
       "implementationPath": "Backend/HBOS/Product/FinancialAnalyticsService.ts",
       "testPath": "Backend/HBOS/test/FinancialAnalyticsService.test.ts",
       "documentationPath": "Docs/Product/FinancialAnalyticsService.md",
@@ -74,7 +97,12 @@
       "capabilityId": "product.reports-export",
       "capability": "generate real downloadable report file artifacts (TXT/CSV/JSON/XLSX) from verified tenant-scoped results, with persistence, provenance and secure tenant-isolated download",
       "targetEngine": "Reports Engine",
-      "dependencies": ["Reports Engine", "Commercial Persistence Boundary", "Provenance Trace", "Commercial Identity Service"],
+      "dependencies": [
+        "Reports Engine",
+        "Commercial Persistence Boundary",
+        "Provenance Trace",
+        "Commercial Identity Service"
+      ],
       "implementationPath": "Backend/HBOS/Product/ReportExportService.ts",
       "testPath": "Backend/HBOS/test/ReportExportService.test.ts",
       "documentationPath": "Docs/Product/ReportExportService.md",
@@ -84,6 +112,32 @@
         "downloads are authenticated, authorized and cross-tenant denied, with correct content type and disposition",
         "no fake/renamed/display-only artifact is produced; unsupported formats fail closed",
         "focused unit, runtime, application and security/tenant acceptance evidence exists"
+      ]
+    },
+    {
+      "capabilityId": "product.financial-feasibility",
+      "capability": "provide an initial, review-gated financial feasibility worksheet from explicit tenant-scoped investment and cash-flow assumptions using the canonical financial/risk engines",
+      "targetEngine": "FinancialIntelligenceEngine + RiskIntelligenceEngine",
+      "dependencies": [
+        "FinancialIntelligenceEngine",
+        "RiskIntelligenceEngine",
+        "CommercialRuntimeServer",
+        "SQLitePersistenceStore",
+        "FinancialFeasibilityService"
+      ],
+      "implementationPath": "Backend/HBOS/Product/FinancialFeasibilityService.ts",
+      "testPath": "Backend/HBOS/test/FinancialFeasibilityService.test.ts",
+      "runtimeTestPath": "Backend/HBOS/test/FinancialFeasibilityRuntime.test.ts",
+      "documentationPath": "Docs/Product/FinancialFeasibility.md",
+      "acceptanceCriteria": [
+        "NPV, IRR and payback are computed through existing FinancialIntelligenceEngine methods, without duplicate financial mathematics",
+        "five explicitly named cash-flow sensitivity scenarios are returned by the existing RiskIntelligenceEngine",
+        "the authenticated runtime requires an existing tenant-owned uploaded source and persists/retrieves results only in the active tenant",
+        "the Persian workspace exposes the workflow and reloads the persisted latest result",
+        "entered cash flows and discount rate are visibly marked REVIEW_REQUIRED and LINKED_NOT_RECONCILED; no claim is made that they are independently reconciled to the uploaded file",
+        "non-convergent IRR remains BLOCKED instead of being replaced by a fabricated zero",
+        "the capability is explicitly scoped as initial financial feasibility, not a complete technical, market, legal, operational, environmental or tax study",
+        "focused unit/runtime tests and real HTTP web product acceptance pass"
       ]
     }
   ]

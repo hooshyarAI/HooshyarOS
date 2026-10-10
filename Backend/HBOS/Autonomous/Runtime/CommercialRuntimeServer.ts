@@ -37,6 +37,7 @@ import { SecurityEventLogger } from "../../Entities/SecurityEventLogger";
 import { ExecutiveIntelligenceWorkbench, ExecutiveIntelligenceWorkbenchInput, ExecutiveIntelligenceWorkbenchResult } from "../../Product/ExecutiveIntelligenceWorkbench";
 import { DecisionWorkbench, DecisionWorkbenchInput, DecisionWorkbenchResult } from "../../Product/DecisionWorkbench";
 import { FinancialAnalyticsService, FinancialAnalyticsResult, FinancialAnalyticsInput } from "../../Product/FinancialAnalyticsService";
+import { FinancialFeasibilityService } from "../../Product/FinancialFeasibilityService";
 import { TrustAssessmentService, type TrustAssessment } from "../../Product/TrustAssessment";
 import { AssistantConversationHistory } from "../../Product/AssistantConversationHistory";
 import { fromReconciliation, summarizeDualValidations, type DualValidationOutcome } from "../../Product/IndependentValidation";
@@ -106,6 +107,7 @@ const LATEST_EXECUTIVE_WORKBENCH_KEY = "executive-intelligence-workbench:latest"
 const LATEST_DECISION_WORKBENCH_KEY = "decision-workbench:latest";
 const LATEST_ANALYTICS_KEY = "financial-analytics:latest";
 const LATEST_BUDGET_COST_BREAKDOWN_KEY = "budget-cost-breakdown:latest";
+const LATEST_FINANCIAL_FEASIBILITY_KEY = "financial-feasibility:latest";
 const DEFAULT_SESSION_TTL_MS = 60 * 60 * 1000;
 const DEFAULT_SESSION_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 const DEFAULT_CORS_ORIGIN = "http://localhost:3000";
@@ -455,6 +457,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     const decisionWorkbench = new DecisionWorkbench();
     const financialAnalytics = new FinancialAnalyticsService();
     const budgetIntelligence = new BudgetIntelligenceEngine();
+    const financialFeasibility = new FinancialFeasibilityService();
     // B-03: question-driven cognitive orchestration composition over the
     // existing canonical Engines (no new Engine, no new domain logic).
     // B-04: the canonical tenant-safe MemoryEngine is injected as the single
@@ -1206,6 +1209,8 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
             if (req.method === "GET" && path === "/api/ready") return corsJson(200, { status: "READY", dependencies: runtimeDependencies(), capabilities: ["financial-ingestion", "multi-format-ingestion", "raw-source-evidence", "financial-statement-analysis", "financial-analytics", "ingested-source-analysis", "tenant-scoped-persistence", "offline-sync", "reasoning", "executive-intelligence-workbench", "decision-workbench", "expert-choice", "organizational-execution", "governed-approval", "work-item-lifecycle", "kpi-outcome", "reports", "reports-export", "report-artifact-download", "assistant-context", "resilience-analytics", "impact-measurement", "continuous-improvement", "authentication", "auth-rate-limiting", "rbac", "session-lifecycle", "request-observability", "bounded-pagination", "idempotency-keys", "organizational-problem-solving", "ingestion-job-status", "scanned-statement-normalization", "source-trust-assessment", "independent-dual-validation", "assistant-conversation-history", "workspace-attention"] });
             if (req.method === "GET" && path === "/") return asset(res, "index.html", "text/html; charset=utf-8");
             if (req.method === "GET" && path === "/app.js") return asset(res, "app.js", "text/javascript; charset=utf-8");
+            if (req.method === "GET" && path === "/result-presentation.js") return asset(res, "result-presentation.js", "text/javascript; charset=utf-8");
+            if (req.method === "GET" && path === "/result-charts.js") return asset(res, "result-charts.js", "text/javascript; charset=utf-8");
             if (req.method === "GET" && path === "/offline-sync.js") return asset(res, "offline-sync.js", "text/javascript; charset=utf-8");
             if (req.method === "GET" && path === "/styles.css") return asset(res, "styles.css", "text/css; charset=utf-8");
             if (req.method === "GET" && path === "/manifest.webmanifest") return asset(res, "manifest.webmanifest", "application/manifest+json; charset=utf-8");
@@ -1943,6 +1948,60 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 }
                 if (!enforceTenantBoundary(record, Authorization.READ)) {
                     return corsJson(404, { error: "BUDGET_COST_BREAKDOWN_NOT_FOUND" });
+                }
+                return corsJson(200, record);
+            }
+
+
+            if (req.method === "POST" && path === "/api/feasibility/financial") {
+                if (!getOrCreateRateLimiter(session.token).tryAcquire()) return corsJson(429, { error: "RATE_LIMIT_EXCEEDED" });
+                if (!ensurePermission("INGEST_DATA")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                const body = await readJson(req);
+                const sourceSha256 = String(body.sourceSha256 ?? "").trim().toLowerCase();
+                if (!/^[a-f0-9]{64}$/.test(sourceSha256)) return corsJson(400, { error: "SOURCE_SHA256_REQUIRED" });
+                const sourceModel = await loadIngestedModel(session.tenantId, sourceSha256);
+                if (!sourceModel) return corsJson(422, { error: "INGESTED_SOURCE_REQUIRED" });
+                if (sourceModel.source?.sha256 !== sourceSha256) return corsJson(422, { error: "SOURCE_EVIDENCE_MISMATCH" });
+                if (!enforceTenantBoundary(sourceModel, Authorization.READ)) return corsJson(404, { error: "SOURCE_NOT_FOUND" });
+
+                return runIdempotent("feasibility:financial", body, async () => {
+                    const discountRatePercent = body.discountRatePercent;
+                    const result = financialFeasibility.execute({
+                        tenantId: session.tenantId,
+                        projectName: typeof body.projectName === "string" ? body.projectName : "",
+                        currency: typeof body.currency === "string" ? body.currency : "",
+                        initialInvestment: typeof body.initialInvestment === "number" ? body.initialInvestment : Number.NaN,
+                        cashFlows: Array.isArray(body.cashFlows) ? body.cashFlows as number[] : [],
+                        discountRate: typeof discountRatePercent === "number" ? discountRatePercent / 100 : Number.NaN
+                    });
+                    if (result.status !== "READY") return { status: 422, payload: result };
+
+                    const record = {
+                        ...result,
+                        source: {
+                            sha256: sourceSha256,
+                            sourceName: sourceModel.source.sourceName,
+                            sourceType: sourceModel.source.sourceType,
+                            linkStatus: "LINKED_NOT_RECONCILED" as const
+                        },
+                        qualification: "REVIEW_REQUIRED" as const,
+                        qualificationReason: "جریان‌های نقدی و نرخ تنزیل دستی وارد شده‌اند؛ پیوند به منبع به‌تنهایی تطبیق مفروضات را اثبات نمی‌کند.",
+                        generatedAt: new Date(now()).toISOString()
+                    };
+                    await persistence.write({ tenantId: session.tenantId }, LATEST_FINANCIAL_FEASIBILITY_KEY, record);
+                    return { status: 200, payload: record };
+                });
+            }
+
+            if (req.method === "GET" && path === "/api/feasibility/financial/latest") {
+                if (!ensurePermission("READ_DASHBOARD")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                const persisted = await persistence.read({ tenantId: session.tenantId }, LATEST_FINANCIAL_FEASIBILITY_KEY);
+                const record = persisted?.value as { readonly tenantId?: string; readonly status?: string } | undefined;
+                if (!record || record.tenantId !== session.tenantId || record.status !== "READY") {
+                    return corsJson(404, { error: "FINANCIAL_FEASIBILITY_NOT_FOUND" });
+                }
+                if (!enforceTenantBoundary(record, Authorization.READ)) {
+                    return corsJson(404, { error: "FINANCIAL_FEASIBILITY_NOT_FOUND" });
                 }
                 return corsJson(200, record);
             }
