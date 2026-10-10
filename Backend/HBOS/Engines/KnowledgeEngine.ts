@@ -533,10 +533,11 @@ const SCIENCE_DOMAINS: readonly ScienceDomainDefinition[] = [
             'OrganizationalExecutionCoordinator.start',
             'OrganizationalExecutionCoordinator.complete',
             'OrganizationalExecutionCoordinator.cancel',
-            'AutonomousOperationsEngine.planWorkflow'
+            'AutonomousOperationsEngine.planWorkflow',
+            'AutonomousOperationsEngine.planProjectSchedule'
         ],
         limitations: [
-            'چرخه کنترل‌شده work item و برنامه‌ریزی گردش کار موجود است؛ مدیریت کامل پروژه شامل WBS، مسیر بحرانی، زمان‌بندی چندمنبعی، earned value و پیش‌بینی تأخیر به‌عنوان یک قابلیت یکپارچه و آزمون‌شده اثبات نشده است.'
+            'برنامه‌ریزی مسیر بحرانی با مدت‌زمان‌ها و وابستگی‌های صریح در دسترس است؛ WBS کامل، محدودیت منابع/تقویم، earned value و پیش‌بینی تأخیر همچنان پشتیبانی کامل و تأییدشده ندارند.'
         ]
     },
     {

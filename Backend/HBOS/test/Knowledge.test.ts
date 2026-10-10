@@ -108,6 +108,8 @@ describe("KnowledgeEngine science registry", () => {
             .toBe("PARTIAL");
         expect(engine.getScienceDomain("project-management")?.availableOperations)
             .toContain("OrganizationalExecutionCoordinator.approve");
+        expect(engine.getScienceDomain("project-management")?.availableOperations)
+            .toContain("AutonomousOperationsEngine.planProjectSchedule");
         expect(engine.getScienceDomain("cost-management")?.availableOperations)
             .toContain("BudgetIntelligenceEngine.analyzeBudget");
         expect(engine.getScienceDomain("feasibility-study")?.availableOperations)

@@ -52,6 +52,44 @@ export interface WorkflowPlan {
     readonly timestamp: string;
 }
 
+/** Deterministic activity input for Critical Path Method (CPM) planning. */
+export interface ProjectActivityInput {
+    readonly id: string;
+    /** Non-negative duration; all activities in a project must use the same time unit. */
+    readonly duration: number;
+    /** Finish-to-start dependencies by activity id. */
+    readonly dependencies?: readonly string[];
+}
+
+export interface ProjectActivityPlan {
+    readonly id: string;
+    readonly duration: number;
+    readonly dependencies: readonly string[];
+    readonly earliestStart: number;
+    readonly earliestFinish: number;
+    readonly latestStart: number;
+    readonly latestFinish: number;
+    readonly totalFloat: number;
+    readonly isCritical: boolean;
+}
+
+export interface ProjectScheduleResult {
+    readonly projectId: string;
+    /** READY means CPM arithmetic completed; it does not independently verify estimates. */
+    readonly status: "READY" | "BLOCKED";
+    readonly qualification: "REVIEW_REQUIRED" | "BLOCKED";
+    readonly requiresHumanReview: true;
+    readonly projectDuration: number;
+    readonly activities: readonly ProjectActivityPlan[];
+    /** One deterministic critical path; other equal critical paths may also exist. */
+    readonly criticalPath: readonly string[];
+    /** All zero-float activities in deterministic topological order. */
+    readonly criticalActivities: readonly string[];
+    readonly reason?: string;
+    readonly provenance: WorkflowProvenance;
+    readonly timestamp: string;
+}
+
 export interface AgentAssignment {
     readonly agentType: string;
     readonly agentId: string;
@@ -127,6 +165,24 @@ function buildProvenance(
         reasoningSteps: Object.freeze([...reasoningSteps]),
         timestamp: new Date().toISOString()
     });
+}
+
+function safeSerialize(value: unknown): string {
+    try {
+        return JSON.stringify(value) ?? String(value);
+    } catch {
+        return "[unserializable-input]";
+    }
+}
+
+function buildProjectScheduleProvenance(
+    input: string,
+    reasoningSteps: readonly string[],
+    output: string,
+    verificationStatus: WorkflowProvenance["verificationStatus"]
+): WorkflowProvenance {
+    const provenance = buildProvenance(input, reasoningSteps, output);
+    return Object.freeze({ ...provenance, verificationStatus });
 }
 
 export class AutonomousOperationsEngine implements Engine {
@@ -287,6 +343,235 @@ export class AutonomousOperationsEngine implements Engine {
 
         this.workflows.set(plan.workflowId, plan);
         return plan;
+    }
+
+
+    /**
+     * Calculate a deterministic Critical Path Method schedule from explicit
+     * activity durations and finish-to-start dependencies.
+     *
+     * The arithmetic is verified as a computation, but user-supplied duration
+     * estimates are not independent evidence. Successful results therefore
+     * remain REVIEW_REQUIRED and carry PENDING provenance until reviewed.
+     * This plans a schedule only; it never approves or executes project work.
+     */
+    planProjectSchedule(
+        projectId: string,
+        activities: readonly ProjectActivityInput[]
+    ): ProjectScheduleResult {
+        const normalizedProjectId = typeof projectId === "string" ? projectId.trim() : "";
+        const rawInput = safeSerialize({ projectId, activities });
+        const blocked = (
+            reason: string,
+            steps: readonly string[],
+            input = rawInput
+        ): ProjectScheduleResult => {
+            const output = safeSerialize({ status: "BLOCKED", projectId: normalizedProjectId, reason });
+            const provenance = buildProjectScheduleProvenance(input, steps, output, "FAILED");
+            return Object.freeze({
+                projectId: normalizedProjectId,
+                status: "BLOCKED",
+                qualification: "BLOCKED",
+                requiresHumanReview: true as const,
+                projectDuration: 0,
+                activities: Object.freeze([]),
+                criticalPath: Object.freeze([]),
+                criticalActivities: Object.freeze([]),
+                reason,
+                provenance,
+                timestamp: provenance.timestamp
+            });
+        };
+
+        if (!normalizedProjectId) {
+            return blocked("PROJECT_ID_REQUIRED", ["validate-project-id"]);
+        }
+        if (!Array.isArray(activities) || activities.length === 0) {
+            return blocked("PROJECT_ACTIVITIES_REQUIRED", ["validate-activities"]);
+        }
+
+        const normalized: Array<{
+            id: string;
+            duration: number;
+            dependencies: string[];
+            inputIndex: number;
+        }> = [];
+        const ids = new Set<string>();
+
+        for (let index = 0; index < activities.length; index += 1) {
+            const activity = activities[index] as ProjectActivityInput | null | undefined;
+            if (!activity || typeof activity.id !== "string" || !activity.id.trim()) {
+                return blocked("ACTIVITY_ID_REQUIRED", ["validate-activity-ids"]);
+            }
+            const id = activity.id.trim();
+            if (ids.has(id)) return blocked("DUPLICATE_ACTIVITY_ID", ["validate-unique-activity-ids"]);
+            ids.add(id);
+
+            if (typeof activity.duration !== "number" || !Number.isFinite(activity.duration) || activity.duration < 0) {
+                return blocked("ACTIVITY_DURATION_INVALID", ["validate-activity-durations"]);
+            }
+
+            const rawDependencies = activity.dependencies ?? [];
+            if (!Array.isArray(rawDependencies)) {
+                return blocked("ACTIVITY_DEPENDENCIES_INVALID", ["validate-activity-dependencies"]);
+            }
+            const dependencies: string[] = [];
+            const seenDependencies = new Set<string>();
+            for (const rawDependency of rawDependencies as readonly unknown[]) {
+                if (typeof rawDependency !== "string" || !rawDependency.trim()) {
+                    return blocked("ACTIVITY_DEPENDENCIES_INVALID", ["validate-activity-dependencies"]);
+                }
+                const dependency = rawDependency.trim();
+                if (dependency === id) return blocked("SELF_DEPENDENCY", ["validate-dependency-edges"]);
+                if (seenDependencies.has(dependency)) {
+                    return blocked("DUPLICATE_DEPENDENCY", ["validate-unique-dependency-edges"]);
+                }
+                seenDependencies.add(dependency);
+                dependencies.push(dependency);
+            }
+            normalized.push({ id, duration: activity.duration, dependencies, inputIndex: index });
+        }
+
+        for (const activity of normalized) {
+            if (activity.dependencies.some(dependency => !ids.has(dependency))) {
+                return blocked("UNKNOWN_DEPENDENCY", ["validate-dependency-references"]);
+            }
+        }
+
+        const successors = new Map<string, string[]>();
+        const remainingDependencies = new Map<string, number>();
+        for (const activity of normalized) {
+            successors.set(activity.id, []);
+            remainingDependencies.set(activity.id, activity.dependencies.length);
+        }
+        for (const activity of normalized) {
+            for (const dependency of activity.dependencies) {
+                successors.get(dependency)!.push(activity.id);
+            }
+        }
+
+        // Kahn's algorithm with stable input-order tie-breaking keeps output deterministic.
+        const queue = normalized
+            .filter(activity => remainingDependencies.get(activity.id) === 0)
+            .map(activity => activity.id);
+        const topologicalOrder: string[] = [];
+        for (let cursor = 0; cursor < queue.length; cursor += 1) {
+            const id = queue[cursor];
+            topologicalOrder.push(id);
+            for (const successor of successors.get(id)!) {
+                const remaining = remainingDependencies.get(successor)! - 1;
+                remainingDependencies.set(successor, remaining);
+                if (remaining === 0) queue.push(successor);
+            }
+        }
+        if (topologicalOrder.length !== normalized.length) {
+            return blocked("DEPENDENCY_CYCLE", ["validate-dependency-graph", "cycle-detected"]);
+        }
+
+        const byId = new Map(normalized.map(activity => [activity.id, activity]));
+        const earliestStart = new Map<string, number>();
+        const earliestFinish = new Map<string, number>();
+        let projectDuration = 0;
+
+        for (const id of topologicalOrder) {
+            const activity = byId.get(id)!;
+            const start = activity.dependencies.reduce(
+                (latest, dependency) => Math.max(latest, earliestFinish.get(dependency) ?? 0),
+                0
+            );
+            const finish = start + activity.duration;
+            if (!Number.isFinite(finish)) {
+                return blocked("PROJECT_DURATION_OVERFLOW", ["calculate-earliest-times", "duration-overflow"]);
+            }
+            earliestStart.set(id, start);
+            earliestFinish.set(id, finish);
+            projectDuration = Math.max(projectDuration, finish);
+        }
+
+        const latestStart = new Map<string, number>();
+        const latestFinish = new Map<string, number>();
+        for (let index = topologicalOrder.length - 1; index >= 0; index -= 1) {
+            const id = topologicalOrder[index];
+            const activity = byId.get(id)!;
+            const nextActivities = successors.get(id)!;
+            const finish = nextActivities.length > 0
+                ? Math.min(...nextActivities.map(successor => latestStart.get(successor)!))
+                : projectDuration;
+            const start = finish - activity.duration;
+            if (!Number.isFinite(start) || !Number.isFinite(finish)) {
+                return blocked("PROJECT_DURATION_OVERFLOW", ["calculate-latest-times", "duration-overflow"]);
+            }
+            latestFinish.set(id, finish);
+            latestStart.set(id, start);
+        }
+
+        const tolerance = 1e-9;
+        const plannedActivities: ProjectActivityPlan[] = topologicalOrder.map(id => {
+            const activity = byId.get(id)!;
+            const start = earliestStart.get(id)!;
+            const finish = earliestFinish.get(id)!;
+            const lateStart = latestStart.get(id)!;
+            const lateFinish = latestFinish.get(id)!;
+            const rawFloat = lateStart - start;
+            const totalFloat = Math.abs(rawFloat) <= tolerance ? 0 : rawFloat;
+            return Object.freeze({
+                id,
+                duration: activity.duration,
+                dependencies: Object.freeze([...activity.dependencies]),
+                earliestStart: start,
+                earliestFinish: finish,
+                latestStart: lateStart,
+                latestFinish: lateFinish,
+                totalFloat,
+                isCritical: totalFloat === 0
+            });
+        });
+        const criticalSet = new Set(plannedActivities.filter(activity => activity.isCritical).map(activity => activity.id));
+        const criticalActivities = plannedActivities.filter(activity => activity.isCritical).map(activity => activity.id);
+
+        // Return one deterministic path. The separate criticalActivities list
+        // preserves all zero-float activities when several critical paths exist.
+        const terminal = topologicalOrder.find(id =>
+            successors.get(id)!.length === 0 &&
+            Math.abs((earliestFinish.get(id) ?? 0) - projectDuration) <= tolerance &&
+            criticalSet.has(id)
+        );
+        const reversedPath: string[] = [];
+        let current = terminal;
+        while (current) {
+            reversedPath.push(current);
+            const currentStart = earliestStart.get(current)!;
+            const predecessor = byId.get(current)!.dependencies.find(dependency =>
+                criticalSet.has(dependency) &&
+                Math.abs((earliestFinish.get(dependency) ?? 0) - currentStart) <= tolerance
+            );
+            current = predecessor;
+        }
+        const criticalPath = reversedPath.reverse();
+        const resultInput = safeSerialize({
+            projectId: normalizedProjectId,
+            activities: normalized.map(({ id, duration, dependencies }) => ({ id, duration, dependencies }))
+        });
+        const output = safeSerialize({ projectDuration, activities: plannedActivities, criticalPath, criticalActivities });
+        const provenance = buildProjectScheduleProvenance(
+            resultInput,
+            ["validate-activities", "validate-dependencies", "topological-sort", "calculate-earliest-times", "calculate-latest-times", "identify-critical-path"],
+            output,
+            "PENDING"
+        );
+
+        return Object.freeze({
+            projectId: normalizedProjectId,
+            status: "READY",
+            qualification: "REVIEW_REQUIRED",
+            requiresHumanReview: true as const,
+            projectDuration,
+            activities: Object.freeze(plannedActivities),
+            criticalPath: Object.freeze(criticalPath),
+            criticalActivities: Object.freeze(criticalActivities),
+            provenance,
+            timestamp: provenance.timestamp
+        });
     }
 
     coordinateAgents(workflowId: string, agents: readonly AgentAssignment[]): CoordinationResult {
