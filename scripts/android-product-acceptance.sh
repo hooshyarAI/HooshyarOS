@@ -67,7 +67,7 @@ for i in $(seq 1 90); do
   sleep 2
 done
 
-test "$(get_state)" = "device"
+test "$state" = "device"
 record_step device-online
 test "$boot" = "1"
 record_step android-booted
