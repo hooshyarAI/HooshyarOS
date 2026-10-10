@@ -334,7 +334,7 @@ const SCIENCE_DOMAINS: readonly ScienceDomainDefinition[] = [
         limitations: [
             'نمونه فعلی برنامه‌ریز عمدتاً فهرست عمومی مراحل تولید می‌کند؛ برنامه زمان‌مند، وابستگی‌ها، ظرفیت، هزینه و مسیر بحرانی هنوز به‌عنوان حل‌گر آزمون‌شده تأیید نشده‌اند.'
         ]
-    },,
+    },
     {
         id: 'budget-management',
         name: 'بودجه‌ریزی و کنترل بودجه',
@@ -346,7 +346,7 @@ const SCIENCE_DOMAINS: readonly ScienceDomainDefinition[] = [
         limitations: [
             'انحراف و مصرف بودجه برای ارقام صریح محاسبه می‌شود؛ بودجه جامع چنددوره‌ای، بودجه‌ریزی مبتنی بر محرک و تخصیص بهینه خودکار منابع در این عملیات پیاده‌سازی نشده‌اند.'
         ]
-    },,
+    },
     {
         id: 'general-management',
         name: 'مدیریت عمومی',
@@ -358,7 +358,7 @@ const SCIENCE_DOMAINS: readonly ScienceDomainDefinition[] = [
         limitations: [
             'عملیات موجود به ارزیابی و تشخیص سازمانی محدود است؛ پوشش کامل مدیریت منابع انسانی، بازار، عملیات، مالی و اجرای برنامه در یک چرخه مدیریتی یکپارچه اثبات نشده است.'
         ]
-    },,
+    },
     {
         id: 'executive-management',
         name: 'مدیریت اجرایی و پشتیبانی مدیران ارشد',
@@ -370,7 +370,7 @@ const SCIENCE_DOMAINS: readonly ScienceDomainDefinition[] = [
         limitations: [
             'این عملیات شاخص‌ها و شواهد محدود را فراهم می‌کند؛ داشبورد اجرایی به‌تنهایی جایگزین سازوکار تأیید تصمیم، ارزیابی تعارض منافع و اجرای کنترل‌شده مصوبات نیست.'
         ]
-    },,
+    },
     {
         id: 'organizational-theory-design',
         name: 'تئوری، رفتار و طراحی سازمان',
@@ -382,7 +382,7 @@ const SCIENCE_DOMAINS: readonly ScienceDomainDefinition[] = [
         limitations: [
             'مدل فعلی سازمان و عضویت را نگهداری می‌کند؛ تحلیل آزمون‌شده طراحی ساختار، span of control، RACI، رفتار سازمانی و مقایسه طرح‌های بدیل ثبت نشده است.'
         ]
-    },,
+    },
     {
         id: 'systems-thinking',
         name: 'تفکر سیستمی',
@@ -394,7 +394,7 @@ const SCIENCE_DOMAINS: readonly ScienceDomainDefinition[] = [
         limitations: [
             'تشخیص سازمانی و انتخاب دانش موجود است، اما مدل علّی حلقه‌های بازخورد و شبیه‌سازی پویایی سیستم تا زمان پیاده‌سازی و آزمون مستقل، اجرایی محسوب نمی‌شود.'
         ]
-    },,
+    },
     {
         id: 'fundamental-analysis',
         name: 'تحلیل بنیادی مالی',
@@ -406,7 +406,7 @@ const SCIENCE_DOMAINS: readonly ScienceDomainDefinition[] = [
         limitations: [
             'تحلیل پایه صورت مالی و چند شاخص مالی موجود است؛ دریافت قیمت روز بازار، مدل کامل ارزش ذاتی، مزیت رقابتی، تحلیل صنعت و توصیه خرید یا فروش تأییدشده نیست.'
         ]
-    },,
+    },
     {
         id: 'technical-analysis',
         name: 'تحلیل تکنیکال بازار',
@@ -418,7 +418,7 @@ const SCIENCE_DOMAINS: readonly ScienceDomainDefinition[] = [
         limitations: [
             'مدل پیش‌بینی عمومی سری زمانی، جایگزین شاخص‌های تکنیکال بازار نیست؛ اندیکاتورها، داده قیمت و حجم معتبر، تعدیل رخدادهای شرکتی و پس‌آزمایی راهبرد معاملاتی به‌عنوان عملیات تأییدشده ثبت نشده‌اند.'
         ]
-    },,
+    },
     {
         id: 'applied-analysis',
         name: 'تحلیل کاربردی و تحلیل شواهد',
@@ -430,7 +430,7 @@ const SCIENCE_DOMAINS: readonly ScienceDomainDefinition[] = [
         limitations: [
             'این حوزه مسیر استفاده از عملیات موجود را توصیف می‌کند و الگوریتم عمومی برای هر مسئله‌ای نیست؛ کفایت ورودی، دامنه روش و محدودیت‌ها باید جداگانه بررسی شوند.'
         ]
-    },,
+    },
     {
         id: 'clear-thinking-critical-reasoning',
         name: 'تفکر شفاف و نقادانه',
@@ -442,7 +442,7 @@ const SCIENCE_DOMAINS: readonly ScienceDomainDefinition[] = [
         limitations: [
             'وجود موتور استدلال به‌تنهایی اثبات‌کننده شناسایی نظام‌مند سوگیری شناختی یا کیفیت استدلال نیست؛ چک‌لیست‌های اختصاصی، آزمون‌های رفتاری و کالیبراسیون هنوز به این حوزه متصل نشده‌اند.'
         ]
-    },,
+    },
     {
         id: 'tax-accounting-audit',
         name: 'حسابداری مالیاتی و حسابرسی مالی',
@@ -454,7 +454,7 @@ const SCIENCE_DOMAINS: readonly ScienceDomainDefinition[] = [
         limitations: [
             'برآورد مالیات فقط ضرب مبلغ مشمول در نرخ ورودی است و چند کنترل نسبت مالی اجرا می‌شود؛ قواعد به‌روز مالیاتی و حسابداری ایران، رسیدگی اظهارنامه، تطبیق کامل دفاتر و حسابرسی قانونی به‌صورت جامع تأیید نشده‌اند.'
         ]
-    },,
+    },
     {
         id: 'internal-control',
         name: 'کنترل داخلی و کنترل‌های مالی',
@@ -466,7 +466,7 @@ const SCIENCE_DOMAINS: readonly ScienceDomainDefinition[] = [
         limitations: [
             'این عملیات چند کنترل مالی و امنیتی محدود را پوشش می‌دهد؛ ارزیابی جامع طراحی و اثربخشی کنترل‌های داخلی، تفکیک وظایف، کنترل‌های فرایندی و چارچوب‌های حسابرسی نیازمند توسعه و شواهد مستقل است.'
         ]
-    },,
+    },
     {
         id: 'quality-control',
         name: 'کنترل کیفیت داده و تحلیل',
@@ -478,7 +478,7 @@ const SCIENCE_DOMAINS: readonly ScienceDomainDefinition[] = [
         limitations: [
             'دامنه عملیاتی این ثبت، کیفیت داده و کفایت ورودی تحلیل است؛ کنترل کیفیت تولید، نمودارهای کنترل آماری، قابلیت فرایند و بازرسی محصول در این حوزه اجرایی اعلام نمی‌شوند.'
         ]
-    },,
+    },
     {
         id: 'business-management',
         name: 'مدیریت کسب‌وکار',
@@ -490,7 +490,7 @@ const SCIENCE_DOMAINS: readonly ScienceDomainDefinition[] = [
         limitations: [
             'چند عملیات سازمانی و مالی قابل استفاده‌اند، اما چرخه یکپارچه و آزمون‌شده مدیریت کل کسب‌وکار، مدل درآمدی، بازار و اجرای برنامه کسب‌وکار در این ثبت موجود نیست.'
         ]
-    },,
+    },
     {
         id: 'sales-management',
         name: 'مدیریت فروش',
@@ -502,7 +502,7 @@ const SCIENCE_DOMAINS: readonly ScienceDomainDefinition[] = [
         limitations: [
             'ماژول اختصاصی و آزمون‌شده CRM، قیف فروش، انتساب فروش، مدیریت سرنخ و تحلیل عملکرد فروش در رجیستری موجود نیست؛ پیش‌بینی سری زمانی عمومی به‌خودی‌خود پیش‌بینی فروش نیست.'
         ]
-    },,
+    },
     {
         id: 'opportunity-cost-analysis',
         name: 'تحلیل هزینه فرصت',
