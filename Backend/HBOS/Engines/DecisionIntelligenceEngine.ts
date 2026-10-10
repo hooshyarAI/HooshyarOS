@@ -81,6 +81,31 @@ export interface DecisionTreeResult {
     status: "READY" | "BLOCKED";
 }
 
+
+export type DecisionMethodId = "ahp" | "topsis" | "decisionTree";
+
+export interface DecisionMethodExecutionInput {
+    /** Supplying a payload explicitly opts into executing that method. */
+    readonly ahp?: AhpInput;
+    readonly topsis?: TopsisInput;
+    readonly decisionTree?: DecisionTreeNode;
+}
+
+export interface DecisionMethodExecutionItem {
+    readonly method: DecisionMethodId;
+    readonly status: "READY" | "BLOCKED";
+    readonly result: AhpResult | TopsisResult | DecisionTreeResult;
+}
+
+export interface DecisionMethodExecutionResult {
+    readonly status: "READY" | "PARTIAL" | "BLOCKED";
+    /** Methods actually invoked, in deterministic execution order. */
+    readonly executedMethods: readonly DecisionMethodId[];
+    readonly results: readonly DecisionMethodExecutionItem[];
+    readonly blockedMethods: readonly DecisionMethodId[];
+    readonly note: string;
+}
+
 export class DecisionIntelligenceEngine implements Engine {
     name = "DecisionIntelligenceEngine";
 
@@ -292,4 +317,68 @@ export class DecisionIntelligenceEngine implements Engine {
         }
         return { method: "decisionTree", expectedValue: ev, status: "READY" };
     }
+
+    /**
+     * Execute a caller-supplied bundle of existing decision methods.
+     * A method runs only when its complete input payload is supplied; missing
+     * data is never invented. A mixed outcome is reported as PARTIAL.
+     */
+    executeAvailableMethods(input: DecisionMethodExecutionInput): DecisionMethodExecutionResult {
+        if (!input || typeof input !== "object") {
+            return {
+                status: "BLOCKED",
+                executedMethods: [],
+                results: [],
+                blockedMethods: [],
+                note: "No decision-method input was supplied."
+            };
+        }
+
+        const results: DecisionMethodExecutionItem[] = [];
+
+        if (input.ahp !== undefined) {
+            const result = this.ahp(input.ahp);
+            results.push({ method: "ahp", status: result.status, result });
+        }
+        if (input.topsis !== undefined) {
+            const result = this.topsis(input.topsis);
+            results.push({ method: "topsis", status: result.status, result });
+        }
+        if (input.decisionTree !== undefined) {
+            const result = this.decisionTree(input.decisionTree);
+            results.push({ method: "decisionTree", status: result.status, result });
+        }
+
+        if (results.length === 0) {
+            return {
+                status: "BLOCKED",
+                executedMethods: [],
+                results: [],
+                blockedMethods: [],
+                note: "No supported method payload was supplied; execution was not guessed."
+            };
+        }
+
+        const executedMethods = results.map(item => item.method);
+        const blockedMethods = results.filter(item => item.status === "BLOCKED").map(item => item.method);
+        const successfulCount = results.length - blockedMethods.length;
+        const status = successfulCount === results.length
+            ? "READY"
+            : successfulCount > 0
+                ? "PARTIAL"
+                : "BLOCKED";
+
+        return {
+            status,
+            executedMethods,
+            results,
+            blockedMethods,
+            note: status === "READY"
+                ? "All supplied decision methods completed successfully."
+                : status === "PARTIAL"
+                    ? "Some supplied methods were blocked; successful results are preserved separately."
+                    : "All supplied methods were blocked by their input or validation contracts."
+        };
+    }
+
 }
