@@ -12,7 +12,7 @@ describe("Commercial runtime real business flow", () => {
   let server: Server;
 
   test("serves a coherent and syntactically valid authentication-capable web shell", async () => {
-    const [root, index, viewModel, appResponse, styles, serviceWorker, standardsKnowledge, interdisciplinaryKnowledge] = await Promise.all([
+    const [root, index, viewModel, appResponse, styles, serviceWorker, standardsKnowledge, interdisciplinaryKnowledge, dataAnalyticsManagementKnowledge] = await Promise.all([
       request(server, "/"),
       request(server, "/index.html"),
       request(server, "/executive-evaluation-view-model.js"),
@@ -21,8 +21,9 @@ describe("Commercial runtime real business flow", () => {
       request(server, "/sw.js"),
       request(server, "/api/knowledge/financial-standards"),
       request(server, "/api/knowledge/interdisciplinary?task=PROCESS_REDESIGN"),
+      request(server, "/api/knowledge/interdisciplinary?task=DATA_ANALYTICS_MANAGEMENT"),
     ]);
-    for (const response of [root, index, viewModel, appResponse, styles, serviceWorker, standardsKnowledge, interdisciplinaryKnowledge]) {
+    for (const response of [root, index, viewModel, appResponse, styles, serviceWorker, standardsKnowledge, interdisciplinaryKnowledge, dataAnalyticsManagementKnowledge]) {
       expect(response.status).toBe(200);
       expect(response.headers.get("x-content-type-options")).toBe("nosniff");
       expect(response.headers.get("x-frame-options")).toBe("DENY");
@@ -52,10 +53,19 @@ describe("Commercial runtime real business flow", () => {
       composition: { task: string; domainIds: string[]; reasoningContext: string };
     };
     expect(interdisciplinaryPayload.catalogue.version).toBe("interdisciplinary-decision-knowledge-2026-10-10.v2");
-    expect(interdisciplinaryPayload.catalogue.domainCount).toBeGreaterThanOrEqual(10);
+    expect(interdisciplinaryPayload.catalogue.domainCount).toBeGreaterThanOrEqual(13);
     expect(interdisciplinaryPayload.composition.task).toBe("PROCESS_REDESIGN");
     expect(interdisciplinaryPayload.composition.domainIds).toContain("organizational-and-people-analytics");
     expect(interdisciplinaryPayload.composition.reasoningContext).toContain("تشویق معامله/ریسک غیرضروری ممنوع");
+    const dataManagementPayload = await dataAnalyticsManagementKnowledge.json() as {
+      catalogue: { domains: Array<{ id: string }>; references: Array<{ id: string }> };
+      composition: { task: string; domainIds: string[] };
+    };
+    expect(dataManagementPayload.composition.task).toBe("DATA_ANALYTICS_MANAGEMENT");
+    expect(dataManagementPayload.composition.domainIds).toContain("data-analytics-management-and-governance");
+    expect(dataManagementPayload.composition.domainIds).toContain("data-analytics-science");
+    expect(dataManagementPayload.catalogue.references.map((source) => source.id)).toContain("EDM-COUNCIL-DCAM-V3");
+    expect(dataManagementPayload.catalogue.references.map((source) => source.id)).toContain("ISO-8000-1-2022");
     expect(viewModel.headers.get("content-type")).toContain("text/javascript");
     expect(appResponse.headers.get("content-type")).toContain("text/javascript");
     expect(styles.headers.get("content-type")).toContain("text/css");

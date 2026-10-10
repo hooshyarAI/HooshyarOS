@@ -19,6 +19,11 @@ describe("InterdisciplinaryDecisionKnowledgeService", () => {
     expect(ids).toContain("organizational-and-people-analytics");
     expect(catalogue.references.some((source) => source.id === "NIST-AI-RMF")).toBe(true);
     expect(catalogue.references.some((source) => source.id === "GOOGLE-ML-MONITORING")).toBe(true);
+    expect(catalogue.references.some((source) => source.id === "EDM-COUNCIL-DCAM-V3")).toBe(true);
+    expect(catalogue.references.some((source) => source.id === "ISO-8000-1-2022")).toBe(true);
+    expect(catalogue.references.some((source) => source.id === "KIMBALL-DIMENSIONAL-MODELING")).toBe(true);
+    expect(catalogue.sourceReviewPolicy.automaticExternalRefreshImplemented).toBe(false);
+    expect(catalogue.sourceReviewPolicy.adoptionLifecycle).toContain("APPROVED_VERSIONED_RELEASE");
     expect(catalogue.rules.some((rule) => rule.includes("baseline"))).toBe(true);
   });
 
@@ -65,6 +70,24 @@ describe("InterdisciplinaryDecisionKnowledgeService", () => {
     const managementDecision = knowledge.composeForTask({task:"MANAGEMENT_DECISION"});
     expect(managementDecision.task).toBe("EXECUTIVE_DECISION");
     expect(managementDecision.domainIds).toContain("strategy-enterprise-performance-and-process");
+  });
+
+  test("separately routes data analysis and analytics-management tasks", () => {
+    const analysis = knowledge.composeForTask({ task: "DATA_ANALYTICS", evidenceAvailable: ["monthly-sales.csv", "metric:sales-net"] });
+    expect(analysis.task).toBe("DATA_ANALYTICS");
+    expect(analysis.domainIds).toContain("data-analytics-science");
+    expect(analysis.domainIds).toContain("data-science-ai-and-model-risk");
+    expect(analysis.domainIds).not.toContain("quantitative-finance-and-financial-engineering");
+
+    const management = knowledge.composeForTask({ task: "DATA_ANALYTICS_MANAGEMENT", evidenceAvailable: ["data-dictionary", "KPI-catalogue"] });
+    expect(management.task).toBe("DATA_ANALYTICS_MANAGEMENT");
+    expect(management.domainIds).toContain("data-analytics-management-and-governance");
+    expect(management.domainIds).toContain("data-analytics-science");
+    expect(management.domainIds).toContain("reliable-data-and-platform-engineering");
+    expect(management.domainIds).not.toContain("quantitative-finance-and-financial-engineering");
+
+    expect(knowledge.composeForTask({ task: "BUSINESS_ANALYTICS" }).task).toBe("DATA_ANALYTICS");
+    expect(knowledge.composeForTask({ task: "DATA_GOVERNANCE" }).task).toBe("DATA_ANALYTICS_MANAGEMENT");
   });
 
   test("keeps regulatory scope and missing evidence explicit", () => {

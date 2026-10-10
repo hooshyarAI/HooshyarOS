@@ -1,7 +1,8 @@
 export type DecisionTask =
   | "FINANCIAL_STATEMENT_ANALYSIS" | "EXECUTIVE_DECISION" | "FINANCIAL_MANAGEMENT" | "FINANCIAL_ENGINEERING"
   | "ECONOMIC_FORECAST" | "RISK_ASSESSMENT" | "PORTFOLIO_OPTIMIZATION"
-  | "PROCESS_REDESIGN" | "HR_ANALYTICS" | "DIGITAL_FINANCIAL_PRODUCT" | "GENERAL";
+  | "PROCESS_REDESIGN" | "HR_ANALYTICS" | "DIGITAL_FINANCIAL_PRODUCT"
+  | "DATA_ANALYTICS" | "DATA_ANALYTICS_MANAGEMENT" | "GENERAL";
 
 export type KnowledgePriority = "FOUNDATIONAL" | "CONDITIONAL" | "SPECIALIZED" | "EXPERIMENTAL";
 
@@ -160,7 +161,7 @@ const DOMAINS: readonly InterdisciplinaryKnowledgeDomain[] = [
 ];
 
 const TASK_DOMAINS: Readonly<Record<DecisionTask, readonly string[]>> = {
-  EXECUTIVE_DECISION:["strategy-enterprise-performance-and-process","operations-research-and-optimization","economics-and-econometrics","risk-governance-and-regulatory-applicability","behavioral-science-and-human-centered-design"],
+  EXECUTIVE_DECISION:["strategy-enterprise-performance-and-process","data-analytics-science","data-analytics-management-and-governance","operations-research-and-optimization","economics-and-econometrics","risk-governance-and-regulatory-applicability","behavioral-science-and-human-centered-design"],
   FINANCIAL_STATEMENT_ANALYSIS:["accounting-financial-reporting","financial-management-and-corporate-finance","data-analytics-science","data-analytics-management-and-governance","data-science-ai-and-model-risk","risk-governance-and-regulatory-applicability","reliable-data-and-platform-engineering"],
   FINANCIAL_MANAGEMENT:["financial-management-and-corporate-finance","accounting-financial-reporting","data-analytics-science","data-analytics-management-and-governance","economics-and-econometrics","operations-research-and-optimization","risk-governance-and-regulatory-applicability"],
   FINANCIAL_ENGINEERING:["quantitative-finance-and-financial-engineering","data-analytics-science","data-analytics-management-and-governance","operations-research-and-optimization","economics-and-econometrics","data-science-ai-and-model-risk","risk-governance-and-regulatory-applicability"],
@@ -170,6 +171,8 @@ const TASK_DOMAINS: Readonly<Record<DecisionTask, readonly string[]>> = {
   PROCESS_REDESIGN:["strategy-enterprise-performance-and-process","data-analytics-science","data-analytics-management-and-governance","operations-research-and-optimization","organizational-and-people-analytics","behavioral-science-and-human-centered-design","reliable-data-and-platform-engineering"],
   HR_ANALYTICS:["organizational-and-people-analytics","data-analytics-science","data-analytics-management-and-governance","behavioral-science-and-human-centered-design","data-science-ai-and-model-risk","risk-governance-and-regulatory-applicability"],
   DIGITAL_FINANCIAL_PRODUCT:["behavioral-science-and-human-centered-design","data-analytics-science","data-analytics-management-and-governance","data-science-ai-and-model-risk","risk-governance-and-regulatory-applicability","reliable-data-and-platform-engineering"],
+  DATA_ANALYTICS:["data-analytics-science","data-science-ai-and-model-risk","data-analytics-management-and-governance","risk-governance-and-regulatory-applicability","reliable-data-and-platform-engineering"],
+  DATA_ANALYTICS_MANAGEMENT:["data-analytics-management-and-governance","data-analytics-science","reliable-data-and-platform-engineering","risk-governance-and-regulatory-applicability","strategy-enterprise-performance-and-process"],
   GENERAL:["strategy-enterprise-performance-and-process","data-analytics-science","data-analytics-management-and-governance","data-science-ai-and-model-risk","risk-governance-and-regulatory-applicability","reliable-data-and-platform-engineering"]
 };
 
@@ -183,7 +186,12 @@ const REFERENCES = [
   {id:"GOOGLE-ML-MONITORING",authority:"Google",url:"https://developers.google.com/machine-learning/crash-course/production-ml-systems/monitoring",kind:"engineering",rule:"نسخه‌بندی و پایش مدل، داده و زمان پاسخ."},
   {id:"SKLEARN-TIME-SERIES",authority:"scikit-learn",url:"https://scikit-learn.org/stable/modules/cross_validation.html",kind:"engineering",rule:"اعتبارسنجی سری زمانی مبتنی بر ترتیب زمان."},
   {id:"BCBS-239",authority:"Basel Committee",url:"https://www.bis.org/publ/bcbs239.pdf",kind:"framework",rule:"اصول تجمیع و گزارش ریسک بانکی؛ دامنه شمول باید احراز شود."},
-  {id:"WORLD-BANK-DIGITAL-FINANCE",authority:"World Bank",url:"https://digitalfinance.worldbank.org/topics/financial-consumer-protection",kind:"research",rule:"حفاظت مصرف‌کننده در مالی دیجیتال."}
+  {id:"WORLD-BANK-DIGITAL-FINANCE",authority:"World Bank",url:"https://digitalfinance.worldbank.org/topics/financial-consumer-protection",kind:"research",rule:"حفاظت مصرف‌کننده در مالی دیجیتال."},
+  {id:"EDM-COUNCIL-DCAM-V3",authority:"EDM Council",url:"https://edmcouncil.org/frameworks/dcam/",kind:"data-management-framework",status:"PUBLISHED_FRAMEWORK",lastReviewed:"2026-10-10",reviewCadence:"quarterly",rule:"چارچوب بلوغ مدیریت داده و تحلیل؛ مرجع حرفه‌ای، نه قانون عمومی."},
+  {id:"ISO-8000-1-2022",authority:"ISO",url:"https://www.iso.org/standard/81745.html",kind:"data-quality-standard",status:"CURRENT_CONFIRMED_BY_ISSUER",lastReviewed:"2026-10-10",reviewCadence:"annual",rule:"ISO وضعیت این نسخه کیفیت داده را در ۲۰۲۴ بازبینی/تأیید و همچنان جاری معرفی می‌کند."},
+  {id:"ISO-8000-8-2015",authority:"ISO",url:"https://www.iso.org/standard/60805.html",kind:"data-quality-standard",status:"CURRENT_CONFIRMED_BY_ISSUER",lastReviewed:"2026-10-10",reviewCadence:"annual",rule:"مفاهیم و سنجش کیفیت اطلاعات و داده؛ وضعیت جاری مطابق صفحه رسمی ISO بررسی شود."},
+  {id:"W3C-PROV",authority:"W3C",url:"https://www.w3.org/TR/prov-overview/",kind:"data-provenance-standard",status:"TECHNICAL_RECOMMENDATION_FAMILY",lastReviewed:"2026-10-10",reviewCadence:"annual",rule:"مدل منشأ داده برای ردیابی عامل، فعالیت و موجودیت؛ نسخه فعلی خانواده مشخصات کنترل شود."},
+  {id:"KIMBALL-DIMENSIONAL-MODELING",authority:"Kimball Group",url:"https://www.kimballgroup.com/data-warehouse-business-intelligence-resources/kimball-techniques/dimensional-modeling-techniques/",kind:"analytics-engineering-guidance",status:"REFERENCE_GUIDANCE",lastReviewed:"2026-10-10",reviewCadence:"semiannual",rule:"مدل‌سازی ابعادی انباره داده بر اساس فرایند، grain، fact و dimension."}
 ] as const;
 
 export class InterdisciplinaryDecisionKnowledgeService {
@@ -196,6 +204,13 @@ export class InterdisciplinaryDecisionKnowledgeService {
       domains:DOMAINS.map((d)=>({...d,appliesWhen:[...d.appliesWhen],concepts:[...d.concepts],candidateMethods:[...d.candidateMethods],requiredEvidence:[...d.requiredEvidence],qualityGates:[...d.qualityGates],guardrails:[...d.guardrails],outcomeMetrics:[...d.outcomeMetrics]})),
       taskProfiles:Object.fromEntries(Object.entries(TASK_DOMAINS).map(([task,ids])=>[task,[...ids]])),
       references:REFERENCES.map((reference)=>({...reference})),
+      sourceReviewPolicy:{
+        snapshotDate:"2026-10-10",
+        cadenceRules:"Quarterly for fast-changing AI/data-governance/regulatory references; annual or semiannual for slower-moving standards and technical guidance.",
+        adoptionLifecycle:["DISCOVERED","SOURCE_VERIFIED","SCOPE_ASSESSED","PILOTED","BENCHMARKED","REVIEW_REQUIRED","APPROVED_VERSIONED_RELEASE"],
+        automaticExternalRefreshImplemented:false,
+        rule:"A newly discovered source or method does not enter production policy until authoritative version, applicability, tests and approved versioned release are recorded."
+      },
       rules:[
         "Define the objective and measurable success criterion before selecting methods.",
         "Start with an interpretable baseline; complexity must demonstrate measurable improvement.",
@@ -240,7 +255,9 @@ export class InterdisciplinaryDecisionKnowledgeService {
       FINANCIAL_ANALYSIS:"FINANCIAL_STATEMENT_ANALYSIS",MANAGEMENT_DECISION:"EXECUTIVE_DECISION",
       FORECASTING:"ECONOMIC_FORECAST",TIME_SERIES:"ECONOMIC_FORECAST",RISK:"RISK_ASSESSMENT",
       PORTFOLIO:"PORTFOLIO_OPTIMIZATION",PROCESS_IMPROVEMENT:"PROCESS_REDESIGN",
-      ORGANIZATIONAL_REDESIGN:"PROCESS_REDESIGN",PEOPLE_ANALYTICS:"HR_ANALYTICS",FINTECH_PRODUCT:"DIGITAL_FINANCIAL_PRODUCT"
+      ORGANIZATIONAL_REDESIGN:"PROCESS_REDESIGN",PEOPLE_ANALYTICS:"HR_ANALYTICS",FINTECH_PRODUCT:"DIGITAL_FINANCIAL_PRODUCT",
+      DATA_ANALYSIS:"DATA_ANALYTICS",ANALYTICS:"DATA_ANALYTICS",BUSINESS_ANALYTICS:"DATA_ANALYTICS",BI_ANALYTICS:"DATA_ANALYTICS",
+      DATA_MANAGEMENT:"DATA_ANALYTICS_MANAGEMENT",DATA_GOVERNANCE:"DATA_ANALYTICS_MANAGEMENT",ANALYTICS_MANAGEMENT:"DATA_ANALYTICS_MANAGEMENT"
     };
     if(Object.prototype.hasOwnProperty.call(TASK_DOMAINS,task)) return task as DecisionTask;
     return aliases[task]??"GENERAL";
