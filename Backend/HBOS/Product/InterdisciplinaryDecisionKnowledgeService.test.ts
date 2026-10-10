@@ -8,7 +8,9 @@ describe("InterdisciplinaryDecisionKnowledgeService", () => {
     const ids = catalogue.domains.map((domain) => domain.id);
 
     expect(catalogue.version).toBe("interdisciplinary-decision-knowledge-2026-10-10.v1");
-    expect(catalogue.domainCount).toBeGreaterThanOrEqual(10);
+    expect(catalogue.domainCount).toBeGreaterThanOrEqual(12);
+    expect(ids).toContain("data-analytics-science");
+    expect(ids).toContain("data-analytics-management-and-governance");
     expect(ids).toContain("financial-management-and-corporate-finance");
     expect(ids).toContain("quantitative-finance-and-financial-engineering");
     expect(ids).toContain("economics-and-econometrics");
@@ -28,6 +30,8 @@ describe("InterdisciplinaryDecisionKnowledgeService", () => {
 
     expect(result.domainIds).toContain("accounting-financial-reporting");
     expect(result.domainIds).toContain("financial-management-and-corporate-finance");
+    expect(result.domainIds).toContain("data-analytics-science");
+    expect(result.domainIds).toContain("data-analytics-management-and-governance");
     expect(result.domainIds).toContain("risk-governance-and-regulatory-applicability");
     expect(result.domainIds).not.toContain("organizational-and-people-analytics");
     expect(result.reasoningContext).toContain("جمع بدهکار/بستانکار کل، درآمد/هزینه نیست");
@@ -41,6 +45,7 @@ describe("InterdisciplinaryDecisionKnowledgeService", () => {
     });
     expect(management.domainIds).toContain("financial-management-and-corporate-finance");
     expect(management.domainIds).toContain("economics-and-econometrics");
+    expect(management.domainIds).toContain("data-analytics-management-and-governance");
 
     const engineering = knowledge.composeForTask({
       task: "FINANCIAL_ENGINEERING", jurisdiction: "IR", entityType: "investment-firm",
@@ -48,6 +53,7 @@ describe("InterdisciplinaryDecisionKnowledgeService", () => {
     });
     expect(engineering.domainIds).toContain("quantitative-finance-and-financial-engineering");
     expect(engineering.domainIds).toContain("operations-research-and-optimization");
+    expect(engineering.domainIds).toContain("data-analytics-science");
   });
 
   test("uses task-specific knowledge rather than every discipline for every task", () => {
