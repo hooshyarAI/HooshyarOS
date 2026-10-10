@@ -46,6 +46,9 @@ jobs:
           api-level: 35
           arch: x86_64
           profile: pixel_2
+          force-avd-creation: true
+          disable-animations: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           # Single canonical Android acceptance owner: waits for the device and
           # boot, installs, launches, verifies process liveness and MainActivity
           # foreground, and emits commit-bound acceptance evidence. The previous
