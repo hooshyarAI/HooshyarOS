@@ -32,9 +32,18 @@ const isExecutiveTargets = (value: unknown): value is ExecutiveTargets => {
     );
 };
 
+const RESPONSE_SECURITY_HEADERS: Readonly<Record<string, string>> = {
+    "Content-Security-Policy": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+};
+
 const send = (res: ServerResponse, status: number, contentType: string, body: string, headers: Record<string, string> = {}) => {
     res.statusCode = status;
     res.setHeader("Content-Type", contentType);
+    for (const [key, value] of Object.entries(RESPONSE_SECURITY_HEADERS)) res.setHeader(key, value);
     for (const [key, value] of Object.entries(headers)) res.setHeader(key, value);
     res.end(body);
 };

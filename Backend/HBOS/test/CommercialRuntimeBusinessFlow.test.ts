@@ -22,7 +22,12 @@ describe("Commercial runtime real business flow", () => {
     ]);
     for (const response of [root, index, viewModel, appResponse, styles, serviceWorker]) {
       expect(response.status).toBe(200);
+      expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+      expect(response.headers.get("x-frame-options")).toBe("DENY");
+      expect(response.headers.get("content-security-policy")).toContain("default-src 'self'");
     }
+    expect(root.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(root.headers.get("permissions-policy")).toContain("camera=()");
     expect(viewModel.headers.get("content-type")).toContain("text/javascript");
     expect(appResponse.headers.get("content-type")).toContain("text/javascript");
     expect(styles.headers.get("content-type")).toContain("text/css");
@@ -284,6 +289,8 @@ describe("Commercial runtime real business flow", () => {
   test("fails closed without a session", async () => {
     const response = await request(server, "/api/analyze", { method: "POST", body: "{}" });
     expect(response.status).toBe(401);
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
     await expect(response.json()).resolves.toEqual({ error: "AUTHENTICATION_REQUIRED" });
   });
 });
