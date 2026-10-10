@@ -17,9 +17,11 @@ describe("android product acceptance CI repair regression", () => {
     test("Android release workflow uses bounded, deterministic emulator setup", () => {
         const workflow = fs.readFileSync(ANDROID_RELEASE_WORKFLOW_PATH, "utf8");
         expect(workflow).toContain("timeout-minutes: 30");
-        expect(workflow).toContain("force-avd-creation: true");
-        expect(workflow).toContain("disable-animations: false");
-        expect(workflow).toContain("emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim");
+        // Preserve cached AVD snapshots; forcing a fresh device caused a slow cold boot.
+        expect(workflow).not.toContain("force-avd-creation: true");
+        expect(workflow).not.toContain("disable-animations: false");
+        // Use the emulator runner's known-good default options to permit snapshot restore.
+        expect(workflow).not.toContain("emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim");
     });
 
     test("workflow references android-product-acceptance.sh script", () => {
