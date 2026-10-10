@@ -3,6 +3,7 @@ const path = require("node:path");
 
 const ROOT = process.cwd();
 const WORKFLOW_PATH = path.join(ROOT, ".github", "workflows", "final-product-factory.yml");
+const ANDROID_RELEASE_WORKFLOW_PATH = path.join(ROOT, ".github", "workflows", "android-release.yml");
 const ACCEPTANCE_SCRIPT_PATH = path.join(ROOT, "scripts", "android-product-acceptance.sh");
 const EVIDENCE_SCRIPT_PATH = path.join(ROOT, "scripts", "android-acceptance-evidence.cjs");
 
@@ -11,6 +12,14 @@ describe("android product acceptance CI repair regression", () => {
         const workflow = fs.readFileSync(WORKFLOW_PATH, "utf8");
         expect(workflow).toContain("emulator-options:");
         expect(workflow).not.toContain("-no-snapshot");
+    });
+
+    test("Android release workflow uses bounded, deterministic emulator setup", () => {
+        const workflow = fs.readFileSync(ANDROID_RELEASE_WORKFLOW_PATH, "utf8");
+        expect(workflow).toContain("timeout-minutes: 30");
+        expect(workflow).toContain("force-avd-creation: true");
+        expect(workflow).toContain("disable-animations: false");
+        expect(workflow).toContain("emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim");
     });
 
     test("workflow references android-product-acceptance.sh script", () => {
