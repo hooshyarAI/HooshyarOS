@@ -25,6 +25,7 @@
           <li><a href="#overview" aria-current="page">نمای کلی</a></li>
           <li><a href="#session">نشست</a></li>
           <li><a href="#analysis">تحلیل صورت مالی</a></li>
+          <li><a href="#executive">ارزیابی مدیریتی</a></li>
           <li><a href="#findings">یافته‌ها و منبع داده</a></li>
         </ul>
       </nav>
@@ -121,6 +122,41 @@
           <p id="trend-summary" class="trend-summary" aria-live="polite">پس از ثبت دست‌کم دو تحلیل موفق، روند واقعی این شاخص نمایش داده می‌شود.</p>
         </section>
 
+        <section id="executive" class="card executive-card" aria-labelledby="executive-title">
+          <div class="section-head">
+            <div>
+              <h2 id="executive-title">ارزیابی اهداف مدیریتی</h2>
+              <p class="card-text">هدف‌ها را از برنامه مصوب سازمان وارد کنید. هوشیار برای تکمیل فرم هدف یا آستانه ساختگی نمی‌سازد.</p>
+            </div>
+          </div>
+          <form id="targets-form" class="form executive-target-form" novalidate>
+            <label class="field">
+              <span>هدف درآمد (همان واحد فایل)</span>
+              <input id="target-revenue" name="targetRevenue" type="number" inputmode="decimal" min="0.000001" step="any" placeholder="هدف درآمد" required />
+            </label>
+            <label class="field">
+              <span>هدف سود (همان واحد فایل)</span>
+              <input id="target-profit" name="targetProfit" type="number" inputmode="decimal" min="0.000001" step="any" placeholder="هدف سود" required />
+            </label>
+            <label class="field">
+              <span>هدف حاشیه سود (درصد)</span>
+              <input id="target-profit-margin" name="targetProfitMargin" type="number" inputmode="decimal" min="0.000001" step="any" placeholder="درصد هدف مصوب" required />
+            </label>
+            <label class="field">
+              <span>حد هدف نسبت بدهی (درصد)</span>
+              <input id="target-debt-ratio" name="targetDebtRatio" type="number" inputmode="decimal" min="0.000001" step="any" placeholder="کمتر بودن نسبت مطلوب است" required />
+            </label>
+            <button class="btn btn-primary" type="submit">ثبت هدف‌ها و ارزیابی</button>
+          </form>
+          <p id="target-config-status" class="card-text" aria-live="polite">هنوز هدفی ثبت نشده است؛ هوشیار هدف پیش‌فرض یا ساختگی ایجاد نمی‌کند.</p>
+          <p id="targets-result" class="result" aria-live="polite"></p>
+          <h3 class="executive-subtitle">نتیجه مقایسه شاخص‌ها با هدف سازمان</h3>
+          <ul id="executive-findings" class="list">
+            <li class="muted">بدون هدف مصوب، وضعیت مدیریتی اعلام نمی‌شود.</li>
+          </ul>
+          <p id="executive-evaluation-note" class="trend-summary" aria-live="polite">ابتدا هدف‌های واقعی سازمان را ثبت کنید.</p>
+        </section>
+
         <div class="columns">
           <section id="session" class="card" aria-labelledby="session-title">
             <h2 id="session-title">ایجاد نشست</h2>
@@ -173,13 +209,13 @@
         </section>
 
         <section class="card card-quiet" aria-labelledby="missing-title">
-          <h2 id="missing-title">قابلیت‌های تکمیل‌نشده</h2>
-          <p class="card-text">این بخش‌ها تا زمان اتصال به داده و قواعد معتبر، به‌عنوان قابلیت آماده نمایش داده نمی‌شوند:</p>
+          <h2 id="missing-title">قابلیت‌های در حال تکمیل</h2>
+          <p class="card-text">این موارد هنوز به قواعد معتبر و داده کافی متصل نشده‌اند و نباید به‌عنوان خروجی آماده معرفی شوند:</p>
           <ul class="tags">
-            <li>روند زمانی و نمودار روند</li>
-            <li>هشدارها</li>
-            <li>گزارش‌ها</li>
-            <li>مقایسه چند دوره مالی</li>
+            <li>هشدارهای مدیریتی مستند</li>
+            <li>گزارش‌های رسمی و قابل ارائه</li>
+            <li>مقایسه چند دوره مالی هم‌مبنا</li>
+            <li>تحلیل علل انحراف و سناریوها</li>
           </ul>
         </section>
       </main>

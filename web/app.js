@@ -16,6 +16,7 @@ const ERROR_MESSAGES = {
   AUTHENTICATION_REQUIRED: 'نشست فعالی وجود ندارد یا منقضی شده است. ابتدا نشست ایجاد کنید.',
   SESSION_FIELDS_REQUIRED: 'نام کاربری و سازمان هر دو الزامی هستند.',
   BALANCE_SHEET_FIELDS_REQUIRED: 'مقدار دارایی‌ها و بدهی‌ها باید عدد معتبر باشد.',
+  EXECUTIVE_TARGETS_INVALID: 'همه هدف‌ها باید عدد معتبر و بزرگ‌تر از صفر باشند.',
   'request-body-too-large': 'حجم فایل بیش از حد مجاز سرور (۱ مگابایت) است.',
   'request-json-invalid': 'درخواست ارسال‌شده نامعتبر بود.',
   NOT_FOUND: 'مسیر درخواستی در سرور وجود ندارد.',
@@ -99,6 +100,70 @@ const TREND_METRICS = {
   risk: { label: 'ریسک بدهی', color: '#c07828', value: item => item.metrics?.risk }
 };
 
+const EXECUTIVE_METRICS = {
+  revenue: { label: 'درآمد', direction: 'بیشتر بهتر است', format: value => faNumber.format(value) },
+  profit: { label: 'سود', direction: 'بیشتر بهتر است', format: value => faNumber.format(value) },
+  profitMargin: { label: 'حاشیه سود', direction: 'بیشتر بهتر است', format: value => `${faNumber.format(value * 100)}٪` },
+  debtRatio: { label: 'نسبت بدهی', direction: 'کمتر بهتر است', format: value => `${faNumber.format(value * 100)}٪` }
+};
+
+function renderExecutiveTargets(targets) {
+  const fields = [
+    ['#target-revenue', targets?.revenue],
+    ['#target-profit', targets?.profit],
+    ['#target-profit-margin', Number.isFinite(targets?.profitMargin) ? targets.profitMargin * 100 : null],
+    ['#target-debt-ratio', Number.isFinite(targets?.debtRatio) ? targets.debtRatio * 100 : null]
+  ];
+  for (const [selector, value] of fields) {
+    $(selector).value = Number.isFinite(value) ? String(value) : '';
+  }
+  $('#target-config-status').textContent = targets
+    ? 'هدف‌های صریح سازمان بارگذاری شد؛ ارزیابی بر همین مبنا انجام می‌شود.'
+    : 'هنوز هدفی ثبت نشده است؛ هوشیار هدف پیش‌فرض یا ساختگی ایجاد نمی‌کند.';
+}
+
+function renderExecutiveEvaluation(evaluation, targetsConfigured) {
+  const list = $('#executive-findings');
+  list.replaceChildren();
+  const note = $('#executive-evaluation-note');
+  if (!targetsConfigured) {
+    note.textContent = 'ابتدا هدف‌های واقعی سازمان را ثبت کنید تا شاخص‌های تحلیل‌شده با همان هدف‌ها مقایسه شوند.';
+    const item = document.createElement('li');
+    item.className = 'muted';
+    item.textContent = 'بدون هدف مصوب، وضعیت مدیریتی اعلام نمی‌شود.';
+    list.append(item);
+    return;
+  }
+  if (!evaluation) {
+    note.textContent = 'هدف‌ها ثبت شده‌اند؛ پس از ثبت یک تحلیل مالی موفق، نتیجه مقایسه نمایش داده می‌شود.';
+    const item = document.createElement('li');
+    item.className = 'muted';
+    item.textContent = 'هنوز داده مالی موفقی برای ارزیابی وجود ندارد.';
+    list.append(item);
+    return;
+  }
+  note.textContent = 'مقایسه بر اساس آخرین تحلیل موفق و هدف‌هایی است که سازمان ثبت کرده است؛ وضعیت به‌تنهایی علت انحراف را اثبات نمی‌کند.';
+  evaluation.kpis.forEach((kpi, index) => {
+    const metric = EXECUTIVE_METRICS[kpi.name];
+    if (!metric) return;
+    const recommendation = evaluation.recommendations[index];
+    const status = recommendation?.status ?? 'BLOCKED';
+    const statusText = status === 'ON_TRACK'
+      ? 'در محدوده هدف'
+      : status === 'AT_RISK'
+        ? 'نیازمند بررسی فاصله از هدف'
+        : 'ارزیابی مسدود شد';
+    const item = document.createElement('li');
+    item.className = `finding ${status === 'ON_TRACK' ? 'finding-ok' : 'finding-warn'} executive-finding`;
+    const title = document.createElement('strong');
+    title.textContent = `${metric.label}: ${statusText}`;
+    const detail = document.createElement('p');
+    detail.textContent = `مقدار واقعی: ${metric.format(kpi.actual)}؛ هدف: ${metric.format(kpi.target)}. قاعده این شاخص: ${metric.direction}.`;
+    item.append(title, detail);
+    list.append(item);
+  });
+}
+
 function renderTrend(history = currentHistory) {
   currentHistory = Array.isArray(history) ? history : [];
   const svg = $('#trend-chart');
@@ -157,7 +222,7 @@ function renderTrend(history = currentHistory) {
   summary.textContent = `روند ${metric.label}: ${direction} ${faNumber.format(Math.abs(delta))} از اولین تا آخرین تحلیل؛ بر پایه ${points.length} تحلیل ثبت‌شده.`;
 }
 
-function renderUnavailable(title, text) {
+function renderUnavailable(title, text, clearExecutive = true) {
   $('#kpis').setAttribute('aria-busy', 'false');
   setKpi('#revenue', null);
   setKpi('#profit', null);
@@ -166,6 +231,10 @@ function renderUnavailable(title, text) {
   $('#dashboard-empty-text').textContent = text;
   $('#dashboard-empty').hidden = false;
   $('#dashboard-meta').textContent = '—';
+  if (clearExecutive) {
+    renderExecutiveTargets(null);
+    renderExecutiveEvaluation(null, false);
+  }
   renderObservations(null);
   renderSource(null);
   renderTrend([]);
@@ -216,8 +285,10 @@ function renderSource(source) {
 
 function renderDashboard(dashboard) {
   $('#kpis').setAttribute('aria-busy', 'false');
+  renderExecutiveTargets(dashboard.targets ?? null);
+  renderExecutiveEvaluation(dashboard.executiveEvaluation ?? null, dashboard.targetsConfigured === true);
   if (!dashboard.analysisAvailable) {
-    renderUnavailable('هنوز تحلیلی انجام نشده است', 'نشست فعال است اما هیچ تحلیلی برای آن ثبت نشده. یک فایل CSV را در بخش «تحلیل صورت مالی» بارگذاری کنید.');
+    renderUnavailable('هنوز تحلیلی انجام نشده است', 'نشست فعال است اما هیچ تحلیلی برای آن ثبت نشده. یک فایل CSV را در بخش «تحلیل صورت مالی» بارگذاری کنید.', false);
     return;
   }
   $('#dashboard-empty').hidden = true;
@@ -351,6 +422,46 @@ $('#analysis-form').addEventListener('submit', async event => {
       setResult(result, 'error', `تحلیل ناموفق بود: ${describeError(error)}`);
     }
     if (error instanceof ApiError && error.status === 401) await refreshDashboard();
+  } finally {
+    setBusy(form, false);
+  }
+});
+
+$('#targets-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const result = $('#targets-result');
+  const raw = {
+    revenue: $('#target-revenue').value.trim(),
+    profit: $('#target-profit').value.trim(),
+    profitMargin: $('#target-profit-margin').value.trim(),
+    debtRatio: $('#target-debt-ratio').value.trim()
+  };
+  const values = Object.fromEntries(Object.entries(raw).map(([key, value]) => [key, Number(value)]));
+  if (Object.values(raw).some(value => value === '') ||
+      Object.values(values).some(value => !Number.isFinite(value) || value <= 0)) {
+    setResult(result, 'error', ERROR_MESSAGES.EXECUTIVE_TARGETS_INVALID);
+    return;
+  }
+  setBusy(form, true, 'در حال ثبت هدف‌ها…');
+  setResult(result, 'info', 'هدف‌های واردشده در حال ذخیره‌سازی هستند…');
+  try {
+    await request('/api/executive-targets', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        targets: {
+          revenue: values.revenue,
+          profit: values.profit,
+          profitMargin: values.profitMargin / 100,
+          debtRatio: values.debtRatio / 100
+        }
+      })
+    });
+    setResult(result, 'success', 'هدف‌های سازمان ذخیره شد و ارزیابی مدیریتی به‌روزرسانی می‌شود.');
+    await refreshDashboard();
+  } catch (error) {
+    setResult(result, 'error', `ثبت هدف‌ها ناموفق بود: ${describeError(error)}`);
   } finally {
     setBusy(form, false);
   }

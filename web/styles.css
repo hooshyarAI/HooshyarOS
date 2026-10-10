@@ -193,3 +193,10 @@ select:focus-visible { outline: 3px solid rgba(22,125,117,.28); outline-offset: 
 .trend-axis-label { fill: #728197; font-size: 12px; }
 .trend-summary { color: var(--muted); font-size: .88rem; margin-top: 8px; }
 @media (max-width: 650px) { .trend-heading { flex-direction: column; } .trend-select { width: 100%; } }
+
+.executive-card { margin-block: 20px; }
+.executive-card .section-head { margin-bottom: 10px; }
+.executive-target-form { margin-block: 8px 14px; }
+.executive-subtitle { font-size: 1rem; margin-top: 12px; }
+.executive-finding strong { display: block; margin-bottom: 5px; }
+.executive-finding p { margin: 0; font-size: .86rem; line-height: 1.8; }

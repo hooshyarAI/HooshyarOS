@@ -48,9 +48,42 @@ describe("Commercial runtime real business flow", () => {
 
     const dashboard = await request(server, "/api/dashboard", { headers: { cookie: cookie!.split(";")[0] } });
     expect(dashboard.status).toBe(200);
-    const dashboardPayload = await dashboard.json() as { analysisAvailable: boolean; metrics: { revenue: number; profit: number; risk: number } };
+    const dashboardPayload = await dashboard.json() as {
+      analysisAvailable: boolean;
+      metrics: { revenue: number; profit: number; risk: number };
+      targetsConfigured: boolean;
+      executiveEvaluation: unknown;
+    };
     expect(dashboardPayload.analysisAvailable).toBe(true);
     expect(dashboardPayload.metrics).toEqual({ revenue: 1000, profit: 0, risk: 25 });
+    expect(dashboardPayload.targetsConfigured).toBe(false);
+    expect(dashboardPayload.executiveEvaluation).toBeNull();
+
+    const targetsResponse = await request(server, "/api/executive-targets", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: cookie!.split(";")[0] },
+      body: JSON.stringify({ targets: { revenue: 900, profit: 10, profitMargin: 0.1, debtRatio: 0.4 } }),
+    });
+    expect(targetsResponse.status).toBe(200);
+    expect((await targetsResponse.json() as { saved: boolean }).saved).toBe(true);
+
+    const evaluatedDashboard = await request(server, "/api/dashboard", { headers: { cookie: cookie!.split(";")[0] } });
+    const evaluated = await evaluatedDashboard.json() as {
+      targetsConfigured: boolean;
+      targets: { debtRatio: number };
+      executiveEvaluation: {
+        kpis: Array<{ name: string; direction: string; achievementRate: number }>;
+        recommendations: Array<{ status: string }>;
+        performance: Array<{ status: string }>;
+      };
+    };
+    expect(evaluated.targetsConfigured).toBe(true);
+    expect(evaluated.targets.debtRatio).toBe(0.4);
+    const debtIndex = evaluated.executiveEvaluation.kpis.findIndex((kpi) => kpi.name === "debtRatio");
+    expect(evaluated.executiveEvaluation.kpis[debtIndex].direction).toBe("lower-is-better");
+    expect(evaluated.executiveEvaluation.kpis[debtIndex].achievementRate).toBeGreaterThan(100);
+    expect(evaluated.executiveEvaluation.recommendations[debtIndex].status).toBe("ON_TRACK");
+    expect(evaluated.executiveEvaluation.performance[debtIndex].status).toBe("ON_TRACK");
   });
 
   test("persists analysis history per tenant and exposes it to the dashboard", async () => {
@@ -69,6 +102,11 @@ describe("Commercial runtime real business flow", () => {
       });
       expect(response.status).toBe(200);
     }
+    await request(server, "/api/executive-targets", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ targets: { revenue: 900, profit: 100, profitMargin: 0.15, debtRatio: 0.4 } }),
+    });
     const dashboard = await request(server, "/api/dashboard", { headers: { cookie } });
     const payload = await dashboard.json() as { history: Array<{ analyzedAt: string; source: { sourceName: string } }> };
     expect(payload.history).toHaveLength(2);
@@ -82,9 +120,34 @@ describe("Commercial runtime real business flow", () => {
     });
     const otherCookie = otherSession.headers.get("set-cookie")!.split(";")[0];
     const otherDashboard = await request(server, "/api/dashboard", { headers: { cookie: otherCookie } });
-    const otherPayload = await otherDashboard.json() as { analysisAvailable: boolean; history: unknown[] };
+    const otherPayload = await otherDashboard.json() as {
+      analysisAvailable: boolean;
+      history: unknown[];
+      targetsConfigured: boolean;
+      targets: unknown;
+      executiveEvaluation: unknown;
+    };
     expect(otherPayload.analysisAvailable).toBe(false);
     expect(otherPayload.history).toEqual([]);
+    expect(otherPayload.targetsConfigured).toBe(false);
+    expect(otherPayload.targets).toBeNull();
+    expect(otherPayload.executiveEvaluation).toBeNull();
+  });
+
+  test("rejects incomplete or non-positive executive targets", async () => {
+    const session = await request(server, "/api/session", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ username: "مدیرعامل", organization: "شرکت هدف‌ها" }),
+    });
+    const cookie = session.headers.get("set-cookie")!.split(";")[0];
+    const response = await request(server, "/api/executive-targets", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ targets: { revenue: 100, profit: 20, profitMargin: 0.1, debtRatio: 0 } }),
+    });
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "EXECUTIVE_TARGETS_INVALID" });
   });
 
   test("fails closed without a session", async () => {

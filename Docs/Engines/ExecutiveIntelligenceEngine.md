@@ -24,7 +24,10 @@ It owns deterministic executive information primitives and does not replace the 
 - Performance evaluation: `evaluatePerformance(actual, target, direction?)`
 - Direction defaults to `higher-is-better` for backward compatibility.
 - The Executive Intelligence Workbench marks revenue, profit, and profit margin as higher-is-better and debt ratio as lower-is-better.
-- Lower-is-better evaluation requires a positive target; invalid targets are blocked instead of being treated as successful.
+- Evaluation requires explicit, finite, positive targets; invalid targets are blocked instead of being treated as successful.
+- The commercial runtime stores target values under tenant scope at `executive-kpi-targets:v1` through `POST /api/executive-targets`.
+- The API target values for `profitMargin` and `debtRatio` are ratios, not percentages; the Persian UI accepts percentages and normalizes them before saving.
+- `GET /api/dashboard` composes the latest verified financial metrics with these explicit targets via `ExecutiveIntelligenceWorkbench`; without configured targets, it returns no executive evaluation.
 
 ## Governance
 

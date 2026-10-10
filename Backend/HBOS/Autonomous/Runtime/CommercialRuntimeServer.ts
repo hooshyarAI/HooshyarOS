@@ -7,6 +7,8 @@ import { ReasoningEngine } from "../../Engines/ReasoningEngine";
 import { FinancialDataIngestionAdapter } from "../../Product/FinancialDataIngestionAdapter";
 import { FinancialStatementAnalysisService } from "../../Product/FinancialStatementAnalysisService";
 import { SQLitePersistenceStore } from "../../Product/SQLitePersistenceStore";
+import { ExecutiveIntelligenceEngine } from "../../Engines/ExecutiveIntelligenceEngine";
+import { ExecutiveIntelligenceWorkbench } from "../../Product/ExecutiveIntelligenceWorkbench";
 
 export interface CommercialRuntimeOptions {
     readonly databasePath?: string;
@@ -17,6 +19,18 @@ const WEB_ROOT = resolve(process.cwd(), "web");
 const MAX_BODY_BYTES = 1024 * 1024;
 
 type Session = { token: string; tenantId: string; organization: string };
+const EXECUTIVE_TARGET_KEYS = ["revenue", "profit", "profitMargin", "debtRatio"] as const;
+type ExecutiveTargetKey = typeof EXECUTIVE_TARGET_KEYS[number];
+type ExecutiveTargets = Readonly<Record<ExecutiveTargetKey, number>>;
+const isExecutiveTargets = (value: unknown): value is ExecutiveTargets => {
+    if (!value || typeof value !== "object") return false;
+    const candidate = value as Record<string, unknown>;
+    return EXECUTIVE_TARGET_KEYS.every((key) =>
+        typeof candidate[key] === "number" &&
+        Number.isFinite(candidate[key]) &&
+        (candidate[key] as number) > 0
+    );
+};
 
 const send = (res: ServerResponse, status: number, contentType: string, body: string, headers: Record<string, string> = {}) => {
     res.statusCode = status;
@@ -62,8 +76,12 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     const ingestion = new FinancialDataIngestionAdapter(persistence);
     const reasoning = options.reasoning ?? new ReasoningEngine();
     const analysis = new FinancialStatementAnalysisService(new FinancialIntelligenceEngine(), reasoning);
+    const executiveEngine = new ExecutiveIntelligenceEngine();
+    executiveEngine.initialize();
+    const executiveWorkbench = new ExecutiveIntelligenceWorkbench(executiveEngine);
     const sessions = new Map<string, Session>();
     const historyKey = "financial-analysis-history:v1";
+    const executiveTargetsKey = "executive-kpi-targets:v1";
     type AnalysisResult = ReturnType<FinancialStatementAnalysisService["execute"]>;
     type HistoryEntry = { readonly analyzedAt: string; readonly result: AnalysisResult };
     const readHistory = async (tenantId: string): Promise<HistoryEntry[]> => {
@@ -81,7 +99,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
         try {
             const path = req.url?.split("?")[0] ?? "/";
             if (req.method === "GET" && path === "/health") return json(res, 200, { status: "ok", service: "hooshyar-commercial-runtime" });
-            if (req.method === "GET" && path === "/api/ready") return json(res, 200, { status: "READY", capabilities: ["financial-ingestion", "financial-statement-analysis", "tenant-scoped-persistence", "reasoning"] });
+            if (req.method === "GET" && path === "/api/ready") return json(res, 200, { status: "READY", capabilities: ["financial-ingestion", "financial-statement-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-target-evaluation"] });
             if (req.method === "GET" && path === "/") return asset(res, "index.html", "text/html; charset=utf-8");
             if (req.method === "GET" && path === "/app.js") return asset(res, "app.js", "text/javascript; charset=utf-8");
             if (req.method === "GET" && path === "/styles.css") return asset(res, "styles.css", "text/css; charset=utf-8");
@@ -111,6 +129,15 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
 
             if (!session) return json(res, 401, { error: "AUTHENTICATION_REQUIRED" });
 
+            if (req.method === "POST" && path === "/api/executive-targets") {
+                const body = await readJson(req);
+                if (!isExecutiveTargets(body.targets)) {
+                    return json(res, 400, { error: "EXECUTIVE_TARGETS_INVALID" });
+                }
+                await persistence.write({ tenantId: session.tenantId }, executiveTargetsKey, body.targets);
+                return json(res, 200, { saved: true, targets: body.targets });
+            }
+
             if (req.method === "POST" && path === "/api/analyze") {
                 const body = await readJson(req);
                 const csv = String(body.csv ?? "");
@@ -130,8 +157,24 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
             if (req.method === "GET" && path === "/api/dashboard") {
                 const history = await readHistory(session.tenantId);
                 const latest = history[history.length - 1];
-                if (!latest) return json(res, 200, { status: "READY", tenantId: session.tenantId, metrics: { revenue: 0, profit: 0, risk: 0 }, analysisAvailable: false, history: [] });
+                const targetRecord = await persistence.read({ tenantId: session.tenantId }, executiveTargetsKey);
+                const targets = isExecutiveTargets(targetRecord?.value) ? targetRecord.value : null;
+                if (!latest) {
+                    return json(res, 200, {
+                        status: "READY",
+                        tenantId: session.tenantId,
+                        metrics: { revenue: 0, profit: 0, risk: 0 },
+                        analysisAvailable: false,
+                        history: [],
+                        targetsConfigured: targets !== null,
+                        targets,
+                        executiveEvaluation: null,
+                    });
+                }
                 const result = latest.result;
+                const executiveEvaluation = targets
+                    ? executiveWorkbench.execute({ tenantId: session.tenantId, metrics: result.metrics, targets })
+                    : null;
                 return json(res, 200, {
                     status: result.status,
                     tenantId: result.tenantId,
@@ -146,6 +189,9 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                         source: item.source,
                         observations: item.observations,
                     })),
+                    targetsConfigured: targets !== null,
+                    targets,
+                    executiveEvaluation,
                 });
             }
 

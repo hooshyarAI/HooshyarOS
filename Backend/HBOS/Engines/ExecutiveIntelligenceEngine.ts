@@ -57,8 +57,8 @@ export class ExecutiveIntelligenceEngine implements Engine {
 
     recommend(kpi: ExecutiveKpi): ExecutiveRecommendation {
         if (!Number.isFinite(kpi.actual) || !Number.isFinite(kpi.target) ||
-            !Number.isFinite(kpi.achievementRate) ||
-            (kpi.direction === "lower-is-better" && kpi.target <= 0)) {
+            !Number.isFinite(kpi.achievementRate) || kpi.target <= 0 ||
+            (kpi.direction !== "higher-is-better" && kpi.direction !== "lower-is-better")) {
             return { status: "BLOCKED", action: "Provide valid KPI values and a valid target before executive action." };
         }
         if (kpi.achievementRate >= 100) {
