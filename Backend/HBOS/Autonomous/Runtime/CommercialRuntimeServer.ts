@@ -11,6 +11,7 @@ import { SQLitePersistenceStore } from "../../Product/SQLitePersistenceStore";
 import { ExecutiveIntelligenceEngine } from "../../Engines/ExecutiveIntelligenceEngine";
 import { ExecutiveIntelligenceWorkbench } from "../../Product/ExecutiveIntelligenceWorkbench";
 import { FinancialStandardsKnowledgeService } from "../../Product/FinancialStandardsKnowledgeService";
+import { InterdisciplinaryDecisionKnowledgeService } from "../../Product/InterdisciplinaryDecisionKnowledgeService";
 
 export interface CommercialRuntimeOptions {
     readonly databasePath?: string;
@@ -90,6 +91,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     executiveEngine.initialize();
     const executiveWorkbench = new ExecutiveIntelligenceWorkbench(executiveEngine);
     const financialStandardsKnowledge = new FinancialStandardsKnowledgeService();
+    const interdisciplinaryKnowledge = new InterdisciplinaryDecisionKnowledgeService();
     const identity = new CommercialIdentityService(persistence);
     identity.initialize();
     const historyKey = "financial-analysis-history:v1";
@@ -112,7 +114,20 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
             const requestUrl = new URL(req.url ?? "/", "http://hooshyaros.local");
             const path = requestUrl.pathname;
             if (req.method === "GET" && path === "/health") return json(res, 200, { status: "ok", service: "hooshyar-commercial-runtime" });
-            if (req.method === "GET" && path === "/api/ready") return json(res, 200, { status: "READY", capabilities: ["account-authentication", "organization-membership", "role-based-authorization", "durable-tenant-identity", "financial-ingestion", "financial-statement-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-target-evaluation", "versioned-financial-standards-knowledge"] });
+            if (req.method === "GET" && path === "/api/ready") return json(res, 200, { status: "READY", capabilities: ["account-authentication", "organization-membership", "role-based-authorization", "durable-tenant-identity", "financial-ingestion", "financial-statement-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-target-evaluation", "versioned-financial-standards-knowledge", "task-composed-interdisciplinary-decision-knowledge"] });
+            if (req.method === "GET" && path === "/api/knowledge/interdisciplinary") {
+                const task = requestUrl.searchParams.get("task") ?? "GENERAL";
+                const objective = requestUrl.searchParams.get("objective") ?? undefined;
+                const jurisdiction = requestUrl.searchParams.get("jurisdiction") ?? undefined;
+                const entityType = requestUrl.searchParams.get("entityType") ?? undefined;
+                const evidenceAvailable = requestUrl.searchParams.getAll("evidence");
+                return json(res, 200, {
+                    catalogue: interdisciplinaryKnowledge.getCatalogue(),
+                    composition: interdisciplinaryKnowledge.composeForTask({
+                        task, objective, jurisdiction, entityType, evidenceAvailable,
+                    }),
+                });
+            }
             if (req.method === "GET" && path === "/api/knowledge/financial-standards") {
                 const catalogue = financialStandardsKnowledge.getCatalogue();
                 const jurisdiction = requestUrl.searchParams.get("jurisdiction");
