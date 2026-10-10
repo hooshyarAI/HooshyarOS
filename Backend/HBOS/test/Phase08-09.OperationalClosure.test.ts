@@ -299,13 +299,20 @@ describe("Phase 08-09 Operational Closure", () => {
     };
 
     const orchestratedResult = orchestrated.orchestrate(orchestratedInput);
-    expect(orchestratedResult.status).toBe("READY");
+    // The numerical workflow completes, but the orchestrator has not received
+    // a source-observation quality profile. The final decision therefore needs review.
+    expect(orchestratedResult.status).toBe("PARTIAL");
+    expect(orchestratedResult.executionStatus).toBe("READY");
+    expect(orchestratedResult.quality.status).toBe("REVIEW_REQUIRED");
+    expect(orchestratedResult.quality.checks.find(check => check.id === "source-data-quality")?.status).toBe("REVIEW_REQUIRED");
     expect(orchestratedResult.tenantId).toBe("tenant-a");
 
     const assistant = new AssistantEngine({ orchestrated });
     const fullResult = assistant.analyzeAcquisitionOpportunity("Evaluate acquisition", orchestratedInput);
     expect(fullResult.response.project.name).toBe("Evaluate acquisition");
-    expect(fullResult.response.traceId).toBeDefined();
+    expect(fullResult.response.traceId).toBe(fullResult.orchestrated.quality.provenance.traceId);
+    expect(fullResult.response.confidence).toBeUndefined();
+    expect(fullResult.response.message).toContain("Quality: REVIEW_REQUIRED");
     expect(fullResult.orchestrated.tenantId).toBe("tenant-a");
 
     persistence.close();

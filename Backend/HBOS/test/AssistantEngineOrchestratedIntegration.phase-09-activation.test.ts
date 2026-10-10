@@ -39,20 +39,50 @@ describe("AssistantEngine → Orchestrated Decision Intelligence integration (Ph
         expect(engine).toBeDefined();
     });
 
-    test("analyzeAcquisitionOpportunity returns READY when orchestrated math is READY", () => {
+    test("analyzeAcquisitionOpportunity exposes PARTIAL quality status when math is READY but qualification is pending", () => {
         const orchestrated = new OrchestratedDecisionIntelligenceService();
         const engine = new AssistantEngine({ orchestrated });
         const out = engine.analyzeAcquisitionOpportunity(
             "Should we acquire Company Y?",
             validInput
         );
-        expect(out.orchestrated.status).toBe("READY");
+        expect(out.orchestrated.status).toBe("PARTIAL");
+        expect(out.orchestrated.executionStatus).toBe("READY");
+        expect(out.orchestrated.quality.status).toBe("REVIEW_REQUIRED");
+        expect(out.response.message).toContain("Overall: PARTIAL");
+        expect(out.response.message).toContain("Quality: REVIEW_REQUIRED");
+        expect(out.response.limitations).toContain("Decision confidence is unavailable because the quality gate has not qualified this result.");
+        expect(out.response.confidence).toBeUndefined();
+        expect(out.response.traceId).toBe(out.orchestrated.quality.provenance.traceId);
         expect(out.orchestrated.financial.status).toBe("READY");
         expect(out.orchestrated.risk.status).toBe("READY");
         expect(out.orchestrated.decision.status).toBe("READY");
         expect(out.response.message).toContain("Financial:");
         expect(out.response.message).toContain("Risk:");
         expect(out.response.message).toContain("Decision:");
+        expect(out.response.message).toContain("Sciences:");
+    });
+
+    test("AssistantEngine surfaces Expert Choice recommendation in its interpreted response", () => {
+        const engine = new AssistantEngine();
+        const out = engine.analyzeAcquisitionOpportunity("Choose expansion", {
+            ...validInput,
+            problem: "Choose expansion",
+            decision: {
+                ...validInput.decision,
+                expertChoice: {
+                    alternatives: ["Expansion A", "Expansion B"],
+                    criteria: [
+                        { name: "profit", weight: 0.6, direction: "benefit" as const },
+                        { name: "risk", weight: 0.4, direction: "cost" as const }
+                    ],
+                    scores: [[8, 4], [6, 3]]
+                }
+            }
+        });
+
+        expect(out.orchestrated.decision.expertChoice?.status).toBe("READY");
+        expect(out.response.message).toContain("Expert Choice: Expansion A");
     });
 
     test("analyzeAcquisitionOpportunity propagates BLOCKED with limitations when math fails", () => {

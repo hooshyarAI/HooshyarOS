@@ -1,4 +1,4 @@
-﻿import { OrchestratedDecisionIntelligenceService } from "../Product/OrchestratedDecisionIntelligenceService";
+import { OrchestratedDecisionIntelligenceService } from "../Product/OrchestratedDecisionIntelligenceService";
 
 describe("OrchestratedDecisionIntelligenceService (09-1.15)", () => {
     const service = new OrchestratedDecisionIntelligenceService();
@@ -34,56 +34,187 @@ describe("OrchestratedDecisionIntelligenceService (09-1.15)", () => {
         }
     };
 
-    test("orchestrate returns full READY when all inputs are valid", () => {
+    test("composes calculation results but requires review while science/data-quality coverage is partial", () => {
         const r = service.orchestrate(validInput);
         expect(r.tenantId).toBe("tenant-1");
-        expect(r.status).toBe("READY");
+        expect(r.executionStatus).toBe("READY");
+        expect(r.status).toBe("PARTIAL");
         expect(r.financial.status).toBe("READY");
         expect(r.financial.profit).toBe(300);
         expect(r.risk.status).toBe("READY");
         expect(r.risk.score).toBe(30);
         expect(r.decision.status).toBe("READY");
+        expect(r.decision.execution.methods).toEqual(["ahp", "topsis"]);
         expect(r.decision.ahp.consistent).toBe(true);
         expect(r.decision.topsis.bestIndex).toBe(0);
+        expect(r.science?.status).toBe("PARTIAL");
+        expect(r.science?.selected.map(item => item.domainId)).toEqual(expect.arrayContaining([
+            "financial-management",
+            "financial-engineering",
+            "decision-science",
+            "risk-uncertainty-analysis"
+        ]));
+        expect(r.quality.status).toBe("REVIEW_REQUIRED");
+        expect(r.quality.requiresHumanReview).toBe(true);
+        expect(r.quality.checks.map(check => check.id)).toEqual(expect.arrayContaining([
+            "financial-calculations",
+            "risk-calculations",
+            "decision-method-composition",
+            "science-selection",
+            "source-data-quality"
+        ]));
+        expect(r.quality.provenance.inputHash).toMatch(/^[a-f0-9]{64}$/);
+        expect(r.quality.provenance.outputHash).toMatch(/^[a-f0-9]{64}$/);
+        expect(r.quality.provenance.traceId).toContain("TRACE-");
+        expect(r.quality.provenance.verificationStatus).toBe("PENDING");
     });
 
-    test("orchestrate blocks on missing tenantId", () => {
+    test("orchestrate blocks on missing tenantId before executing methods", () => {
         const r = service.orchestrate({ ...validInput, tenantId: "" });
         expect(r.status).toBe("BLOCKED");
+        expect(r.executionStatus).toBe("BLOCKED");
+        expect(r.quality.status).toBe("BLOCKED");
+        expect(r.quality.provenance.verificationStatus).toBe("FAILED");
+        expect(r.decision.execution.methods).toHaveLength(0);
     });
 
-    test("orchestrate preserves per-section BLOCKED status when sub-result is BLOCKED", () => {
+    test("keeps per-section readiness visible while the quality gate blocks invalid financial inputs", () => {
         const r = service.orchestrate({
             ...validInput,
             financial: { ...validInput.financial, revenue: Number.NaN, expenses: 700, assets: 2000, liabilities: 500 }
         });
-        // The financial section is BLOCKED, but the risk and decision sections can still be READY.
+        expect(r.status).toBe("BLOCKED");
         expect(r.financial.status).toBe("BLOCKED");
         expect(r.risk.status).toBe("READY");
         expect(r.decision.status).toBe("READY");
+        expect(r.quality.checks.find(check => check.id === "financial-calculations")?.status).toBe("BLOCKED");
     });
 
-    test("orchestrate blocks when AHP matrix is invalid", () => {
-        const r = service.orchestrate({ ...validInput, decision: { ...validInput.decision, ahpMatrix: [[1, 2]] } });
+    test("reports blocked AHP method without discarding the other decision result", () => {
+        const r = service.orchestrate({
+            ...validInput,
+            decision: { ...validInput.decision, ahpMatrix: [[1, 2]] }
+        });
         expect(r.decision.ahp.status).toBe("BLOCKED");
+        expect(r.decision.topsis.status).toBe("READY");
+        expect(r.decision.execution.status).toBe("PARTIAL");
+        expect(r.decision.execution.blockedMethods).toEqual(["ahp"]);
+        expect(r.status).toBe("BLOCKED");
     });
 
-    test("orchestrate blocks when TOPSIS matrix has wrong dimensions", () => {
-        const r = service.orchestrate({ ...validInput, decision: { ...validInput.decision, topsis: { matrix: [[1, 2], [3]], weights: [1, 1], criteria: ["benefit", "benefit"] } } });
+    test("reports blocked TOPSIS input while retaining AHP evidence", () => {
+        const r = service.orchestrate({
+            ...validInput,
+            decision: {
+                ...validInput.decision,
+                topsis: { matrix: [[1, 2], [3]], weights: [1, 1], criteria: ["benefit", "benefit"] }
+            }
+        });
         expect(r.decision.topsis.status).toBe("BLOCKED");
+        expect(r.decision.ahp.status).toBe("READY");
+        expect(r.decision.execution.status).toBe("PARTIAL");
+        expect(r.decision.execution.blockedMethods).toEqual(["topsis"]);
+        expect(r.status).toBe("BLOCKED");
     });
 
-    test("tenantId propagated through result", () => {
+    test("executes the optional decision tree only when supplied and exposes its expected value", () => {
+        const r = service.orchestrate({
+            ...validInput,
+            decision: {
+                ...validInput.decision,
+                decisionTree: {
+                    name: "investment",
+                    children: [
+                        { name: "success", probability: 0.6, value: 100 },
+                        { name: "failure", probability: 0.4, value: 0 }
+                    ]
+                }
+            }
+        });
+        expect(r.decision.status).toBe("READY");
+        expect(r.decision.execution.methods).toEqual(["ahp", "topsis", "decisionTree"]);
+        expect(r.decision.decisionTree?.status).toBe("READY");
+        expect(r.decision.decisionTree?.expectedValue).toBeCloseTo(60, 8);
+    });
+
+    test("propagates tenantId unchanged", () => {
         const r = service.orchestrate({ ...validInput, tenantId: "tenant-42" });
         expect(r.tenantId).toBe("tenant-42");
     });
 
-    test("no NaN/Infinity leaks in READY sub-results", () => {
+    test("keeps numeric sub-results finite even while quality review is pending", () => {
         const r = service.orchestrate(validInput);
-        expect(r.status).toBe("READY");
+        expect(r.executionStatus).toBe("READY");
+        expect(r.status).toBe("PARTIAL");
         expect(Number.isFinite(r.financial.npv)).toBe(true);
         expect(Number.isFinite(r.financial.irr)).toBe(true);
         expect(Number.isFinite(r.financial.wacc)).toBe(true);
         for (const w of r.decision.ahp.weights) expect(Number.isFinite(w)).toBe(true);
+    });
+
+    test("executes Expert Choice only with explicit alternatives, criteria and scores", () => {
+        const r = service.orchestrate({
+            ...validInput,
+            decision: {
+                ...validInput.decision,
+                expertChoice: {
+                    alternatives: ["Expansion A", "Expansion B"],
+                    criteria: [
+                        { name: "profit", weight: 0.6, direction: "benefit" as const },
+                        { name: "risk", weight: 0.4, direction: "cost" as const }
+                    ],
+                    scores: [[8, 4], [6, 3]],
+                    pairwiseMatrix: [[1, 1.5], [1 / 1.5, 1]]
+                }
+            }
+        });
+
+        expect(r.decision.expertChoice?.status).toBe("READY");
+        expect(r.decision.expertChoice?.method).toBe("EXPERT_CHOICE");
+        expect(r.decision.expertChoice?.recommendation?.alternative).toBe("Expansion A");
+        expect(r.decision.expertChoice?.weightsSource).toBe("AHP");
+        expect(r.decision.execution.methods).toEqual(["ahp", "topsis", "expertChoice"]);
+        expect(r.quality.checks.find(check => check.id === "expert-choice-evaluation")?.status).toBe("PASS");
+        expect(r.status).toBe("PARTIAL");
+    });
+
+    test("blocks quality qualification when requested Expert Choice inputs are invalid", () => {
+        const r = service.orchestrate({
+            ...validInput,
+            decision: {
+                ...validInput.decision,
+                expertChoice: {
+                    alternatives: ["Only one"],
+                    criteria: [{ name: "profit", weight: 1, direction: "benefit" as const }],
+                    scores: [[5]]
+                }
+            }
+        });
+
+        expect(r.decision.status).toBe("PARTIAL");
+        expect(r.decision.expertChoice?.status).toBe("BLOCKED");
+        expect(r.decision.execution.blockedMethods).toContain("expertChoice");
+        expect(r.quality.checks.find(check => check.id === "expert-choice-evaluation")?.status).toBe("BLOCKED");
+        expect(r.status).toBe("BLOCKED");
+    });
+
+    test("returns a blocked quality report for a missing required payload", () => {
+        const r = service.orchestrate({
+            ...validInput,
+            risk: { ...validInput.risk, model: undefined as never }
+        });
+        expect(r.status).toBe("BLOCKED");
+        expect(r.quality.checks[0].status).toBe("BLOCKED");
+    });
+
+    test("records unsupported supplemental science signals and requires review instead of guessing", () => {
+        const r = service.orchestrate({
+            ...validInput,
+            additionalScienceSignals: ["unknown-signal" as never]
+        });
+
+        expect(r.science?.unresolvedSignals).toContain("unknown-signal");
+        expect(r.status).toBe("PARTIAL");
+        expect(r.quality.requiresHumanReview).toBe(true);
     });
 });

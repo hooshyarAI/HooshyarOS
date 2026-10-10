@@ -183,16 +183,17 @@ const SCIENCE_DOMAINS: readonly ScienceDomainDefinition[] = [
         id: 'decision-science',
         name: 'علم تصمیم‌گیری',
         purpose: 'مقایسه گزینه‌ها، وزن‌دهی معیارها و ارزیابی پیامدهای احتمالاتی با داده و فرض‌های صریح.',
-        owner: 'Backend/HBOS/Engines/DecisionIntelligenceEngine.ts',
+        owner: 'Backend/HBOS/Engines/DecisionIntelligenceEngine.ts; Backend/HBOS/Product/DecisionWorkbench.ts',
         readiness: 'PARTIAL',
         signals: ['multi-criteria-decision', 'capital-allocation', 'strategic-planning', 'resource-optimization', 'risk-assessment', 'process-improvement', 'investment-evaluation'],
         availableOperations: [
             'DecisionIntelligenceEngine.ahp',
             'DecisionIntelligenceEngine.topsis',
-            'DecisionIntelligenceEngine.decisionTree'
+            'DecisionIntelligenceEngine.decisionTree',
+            'DecisionWorkbench.execute (Expert Choice)'
         ],
         limitations: [
-            'AHP، TOPSIS و ارزش مورد انتظار درخت تصمیم موجودند؛ روش مناسب باید با نوع داده و فرض‌های واقعی مسئله تطبیق داده شود.'
+            'AHP، TOPSIS، Expert Choice و ارزش مورد انتظار درخت تصمیم در قراردادهای مشخص موجودند؛ Expert Choice نیازمند امتیازهای صریح گزینه‌ها و معیارهاست و به‌تنهایی مجوز اجرای تصمیم نیست.'
         ]
     },
     {

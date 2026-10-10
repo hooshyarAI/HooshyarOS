@@ -198,20 +198,28 @@ export class AssistantEngine {
 
         const orchestrated = this.orchestrated.orchestrate(orchestratedInput);
 
-        const confidence = orchestrated.status === "READY"
+        const qualityQualified = orchestrated.status === "READY" && orchestrated.quality.status === "PASS";
+        const confidence = qualityQualified
             ? IntelligencePipeline.fromCalculatedConfidence(
                 0.5,
                 "deterministic-orchestrated-result",
-                "OrchestratedDecisionIntelligenceService returned READY for all sections",
+                "OrchestratedDecisionIntelligenceService passed the calculation and quality gates",
             )
             : IntelligencePipeline.unavailable();
 
+        const qualityLimitations = orchestrated.quality.checks
+            .filter(check => check.status !== "PASS")
+            .map(check => `${check.id}: ${check.detail}`);
         const limitations: string[] = [
-            ...(orchestrated.status === "BLOCKED" ? ["Orchestration returned BLOCKED — review per-section status"] : []),
-            ...(confidence.source === "unavailable" ? ["Confidence score not available — deterministic math returned BLOCKED"] : []),
+            ...(orchestrated.status === "BLOCKED" ? ["Orchestration is BLOCKED — required calculations or input contracts failed."] : []),
+            ...(orchestrated.status === "PARTIAL" ? ["Quality gate requires review before this result can be treated as a final decision."] : []),
+            ...(confidence.source === "unavailable" ? ["Decision confidence is unavailable because the quality gate has not qualified this result."] : []),
+            ...qualityLimitations,
         ];
 
-        const summaryParts: string[] = [];
+        const summaryParts: string[] = [
+            `Overall: ${orchestrated.status}; execution: ${orchestrated.executionStatus}; quality: ${orchestrated.quality.status}`
+        ];
         if (orchestrated.financial.status === "READY") {
             summaryParts.push(
                 `Financial: profit=${orchestrated.financial.profit}, NPV=${orchestrated.financial.npv.toFixed(2)}, IRR=${orchestrated.financial.irr.toFixed(4)}, WACC=${orchestrated.financial.wacc.toFixed(4)}`,
@@ -226,27 +234,40 @@ export class AssistantEngine {
         }
         if (orchestrated.decision.status === "READY") {
             summaryParts.push(`Decision: AHP consistent=${orchestrated.decision.ahp.consistent}, TOPSIS best=${orchestrated.decision.topsis.bestIndex}`);
+        } else if (orchestrated.decision.status === "PARTIAL") {
+            summaryParts.push(`Decision: PARTIAL; completed=${orchestrated.decision.execution.methods.join(",")}; blocked=${orchestrated.decision.execution.blockedMethods.join(",") || "none"}`);
         } else {
             summaryParts.push("Decision: BLOCKED");
         }
+        if (orchestrated.decision.expertChoice) {
+            const expertChoice = orchestrated.decision.expertChoice;
+            summaryParts.push(expertChoice.status === "READY" && expertChoice.recommendation
+                ? `Expert Choice: ${expertChoice.recommendation.alternative} (ranked #${expertChoice.recommendation.alternativeIndex + 1}); weights=${expertChoice.weightsSource}`
+                : "Expert Choice: BLOCKED; inspect supplied alternatives, criteria and scores");
+        }
+        const selectedSciences = orchestrated.science?.selected.map(item => item.name).join(", ") ?? "not routed";
+        summaryParts.push(`Sciences: ${selectedSciences}`);
+        summaryParts.push(`Quality: ${orchestrated.quality.status}; human review required: ${orchestrated.quality.requiresHumanReview}`);
         const explanation = summaryParts.join(" | ");
 
         // Use the existing assistant reasoning path for *interpretation* only.
         const intelligenceInput: IntelligenceInput = {
             problem,
-            data: { orchestratedStatus: orchestrated.status },
+            data: {
+                orchestratedStatus: orchestrated.status,
+                executionStatus: orchestrated.executionStatus,
+                qualityStatus: orchestrated.quality.status,
+                selectedScienceDomains: orchestrated.science?.selected.map(item => item.domainId) ?? [],
+                blockedDecisionMethods: orchestrated.decision.execution.blockedMethods,
+            },
             tenantId: orchestrated.tenantId,
         };
         const reasoningResult = context
             ? this.intelligenceEngine.reason(intelligenceInput, context)
             : undefined;
-        const reasoningConfidenceValue = reasoningResult
-            ? IntelligencePipeline.getConfidenceValue(reasoningResult.confidence)
-            : undefined;
-
-        const numericConfidence = confidence.source === "unavailable"
-            ? (reasoningConfidenceValue ?? 0)
-            : confidence.value;
+        // Narrative reasoning can explain a result, but it cannot override a
+        // failed or pending deterministic quality gate to manufacture confidence.
+        const numericConfidence = confidence.source === "unavailable" ? undefined : confidence.value;
 
         // Minimal evidence-only Project shim for the AssistantResponse contract.
         // The AssistantResponse is keyed on Project; the orchestrated call does
@@ -263,8 +284,8 @@ export class AssistantEngine {
             explanation,
             numericConfidence,
             DecisionContext.fromEvidence({
-                traceId: reasoningResult?.traceId ?? `orchestrated:${orchestrated.tenantId}`,
-                inputHash: reasoningResult?.inputHash ?? `tenant=${orchestrated.tenantId}`,
+                traceId: reasoningResult?.traceId ?? orchestrated.quality.provenance.traceId,
+                inputHash: reasoningResult?.inputHash ?? orchestrated.quality.provenance.inputHash,
                 reasoningRef: reasoningResult?.traceId,
                 explanation,
                 confidence: numericConfidence,
