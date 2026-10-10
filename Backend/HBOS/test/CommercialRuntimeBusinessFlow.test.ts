@@ -51,7 +51,7 @@ describe("Commercial runtime real business flow", () => {
       catalogue: { version: string; domainCount: number };
       composition: { task: string; domainIds: string[]; reasoningContext: string };
     };
-    expect(interdisciplinaryPayload.catalogue.version).toBe("interdisciplinary-decision-knowledge-2026-10-10.v1");
+    expect(interdisciplinaryPayload.catalogue.version).toBe("interdisciplinary-decision-knowledge-2026-10-10.v2");
     expect(interdisciplinaryPayload.catalogue.domainCount).toBeGreaterThanOrEqual(10);
     expect(interdisciplinaryPayload.composition.task).toBe("PROCESS_REDESIGN");
     expect(interdisciplinaryPayload.composition.domainIds).toContain("organizational-and-people-analytics");
