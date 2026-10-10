@@ -336,3 +336,9 @@ Human action is reserved for:
 - acceptance of consequential external operations
 
 All other safe work remains autonomous.
+
+
+## Versioned accounting, audit and financial-reporting knowledge
+The platform exposes the reviewed knowledge snapshot at `GET /api/knowledge/financial-standards`, backed by `FinancialStandardsKnowledgeService` and documented in `Docs/Knowledge/FINANCIAL_STANDARDS_AND_REPORTING_KNOWLEDGE_FA.md`.
+
+This is a versioned knowledge index and application-control set, not a full copy of copyrighted standards. It separates issued, effective, locally adopted, and entity-applicable requirements. Where the official Iranian issuer's current final text/effective date was not obtained, entries remain explicitly review-required and cannot authorize a final compliance conclusion. The snapshot date is 2026-10-10; the full official Iranian catalogue remains a named follow-up, not a completed claim.

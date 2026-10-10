@@ -10,6 +10,7 @@ import { FinancialStatementAnalysisService } from "../../Product/FinancialStatem
 import { SQLitePersistenceStore } from "../../Product/SQLitePersistenceStore";
 import { ExecutiveIntelligenceEngine } from "../../Engines/ExecutiveIntelligenceEngine";
 import { ExecutiveIntelligenceWorkbench } from "../../Product/ExecutiveIntelligenceWorkbench";
+import { FinancialStandardsKnowledgeService } from "../../Product/FinancialStandardsKnowledgeService";
 
 export interface CommercialRuntimeOptions {
     readonly databasePath?: string;
@@ -88,6 +89,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     const executiveEngine = new ExecutiveIntelligenceEngine();
     executiveEngine.initialize();
     const executiveWorkbench = new ExecutiveIntelligenceWorkbench(executiveEngine);
+    const financialStandardsKnowledge = new FinancialStandardsKnowledgeService();
     const identity = new CommercialIdentityService(persistence);
     identity.initialize();
     const historyKey = "financial-analysis-history:v1";
@@ -107,9 +109,30 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     const close = () => persistence.close();
     const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
         try {
-            const path = req.url?.split("?")[0] ?? "/";
+            const requestUrl = new URL(req.url ?? "/", "http://hooshyaros.local");
+            const path = requestUrl.pathname;
             if (req.method === "GET" && path === "/health") return json(res, 200, { status: "ok", service: "hooshyar-commercial-runtime" });
-            if (req.method === "GET" && path === "/api/ready") return json(res, 200, { status: "READY", capabilities: ["account-authentication", "organization-membership", "role-based-authorization", "durable-tenant-identity", "financial-ingestion", "financial-statement-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-target-evaluation"] });
+            if (req.method === "GET" && path === "/api/ready") return json(res, 200, { status: "READY", capabilities: ["account-authentication", "organization-membership", "role-based-authorization", "durable-tenant-identity", "financial-ingestion", "financial-statement-analysis", "tenant-scoped-persistence", "reasoning", "executive-intelligence-target-evaluation", "versioned-financial-standards-knowledge"] });
+            if (req.method === "GET" && path === "/api/knowledge/financial-standards") {
+                const catalogue = financialStandardsKnowledge.getCatalogue();
+                const jurisdiction = requestUrl.searchParams.get("jurisdiction");
+                const entityType = requestUrl.searchParams.get("entityType");
+                const fiscalYearStartJalali = requestUrl.searchParams.get("fiscalYearStartJalali");
+                if (jurisdiction || entityType || fiscalYearStartJalali) {
+                    return json(res, 200, {
+                        catalogue,
+                        applicability: financialStandardsKnowledge.assessIranianApplicability({
+                            jurisdiction: jurisdiction ?? "",
+                            entityType: entityType ?? "",
+                            fiscalYearStartJalali: fiscalYearStartJalali ?? "",
+                            isListed: requestUrl.searchParams.get("isListed") === "true",
+                            isFinancialInstitution: requestUrl.searchParams.get("isFinancialInstitution") === "true",
+                            publicInterestEntity: requestUrl.searchParams.get("publicInterestEntity") === "true",
+                        }),
+                    });
+                }
+                return json(res, 200, { catalogue });
+            }
             if (req.method === "GET" && (path === "/" || path === "/index.html")) return asset(res, "index.html", "text/html; charset=utf-8");
             if (req.method === "GET" && path === "/executive-evaluation-view-model.js") return asset(res, "executive-evaluation-view-model.js", "text/javascript; charset=utf-8");
             if (req.method === "GET" && path === "/app.js") return asset(res, "app.js", "text/javascript; charset=utf-8");

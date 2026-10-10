@@ -12,15 +12,16 @@ describe("Commercial runtime real business flow", () => {
   let server: Server;
 
   test("serves a coherent and syntactically valid authentication-capable web shell", async () => {
-    const [root, index, viewModel, appResponse, styles, serviceWorker] = await Promise.all([
+    const [root, index, viewModel, appResponse, styles, serviceWorker, standardsKnowledge] = await Promise.all([
       request(server, "/"),
       request(server, "/index.html"),
       request(server, "/executive-evaluation-view-model.js"),
       request(server, "/app.js"),
       request(server, "/styles.css"),
       request(server, "/sw.js"),
+      request(server, "/api/knowledge/financial-standards"),
     ]);
-    for (const response of [root, index, viewModel, appResponse, styles, serviceWorker]) {
+    for (const response of [root, index, viewModel, appResponse, styles, serviceWorker, standardsKnowledge]) {
       expect(response.status).toBe(200);
       expect(response.headers.get("x-content-type-options")).toBe("nosniff");
       expect(response.headers.get("x-frame-options")).toBe("DENY");
@@ -28,6 +29,22 @@ describe("Commercial runtime real business flow", () => {
     }
     expect(root.headers.get("referrer-policy")).toBe("no-referrer");
     expect(root.headers.get("permissions-policy")).toContain("camera=()");
+    const standardsPayload = await standardsKnowledge.json() as {
+      catalogue: {
+        version: string;
+        standardEntries: Array<{ id: string; status: string }>;
+        principles: { accountingAndReporting: string[]; auditingAndAssurance: string[] };
+      };
+    };
+    expect(standardsPayload.catalogue.version).toBe("financial-standards-2026-10-10.v1");
+    expect(standardsPayload.catalogue.standardEntries.map((entry) => entry.id)).toContain("IR-NAS-44");
+    expect(standardsPayload.catalogue.standardEntries.map((entry) => entry.id)).toContain("IFRS-18");
+    expect(standardsPayload.catalogue.principles.accountingAndReporting.length).toBeGreaterThanOrEqual(10);
+    const contextualStandards = await request(server, "/api/knowledge/financial-standards?jurisdiction=IR&entityType=listed-company&fiscalYearStartJalali=1405-01-01&isListed=true");
+    expect(contextualStandards.status).toBe(200);
+    const contextualPayload = await contextualStandards.json() as { applicability: { status: string; finalDeterminationAllowed: boolean } };
+    expect(contextualPayload.applicability.status).toBe("REVIEW_REQUIRED");
+    expect(contextualPayload.applicability.finalDeterminationAllowed).toBe(false);
     expect(viewModel.headers.get("content-type")).toContain("text/javascript");
     expect(appResponse.headers.get("content-type")).toContain("text/javascript");
     expect(styles.headers.get("content-type")).toContain("text/css");
