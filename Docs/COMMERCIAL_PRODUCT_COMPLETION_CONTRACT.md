@@ -348,3 +348,6 @@ This is a versioned knowledge index and application-control set, not a full copy
 The versioned interdisciplinary catalogue is `interdisciplinary-decision-knowledge-2026-10-10.v2`, served by `GET /api/knowledge/interdisciplinary?task=...`. Its 13 knowledge domains explicitly separate data analytics science from data analytics management/data governance and separately cover financial management and quantitative finance/financial engineering.
 
 The existing financial statement analysis boundary passes a task-composed knowledge context into the existing ReasoningEngine. The catalogue defines data prerequisites, quality gates, safeguards and outcome measures; adding an entry does not claim that its algorithm is production-implemented. Sources include DAMA-DMBOK, IFAC audit data analytics guidance, NIST AI RMF, OECD principles, COSO ERM and production ML engineering guidance. Their authority and applicability types remain distinct.
+
+
+The current version additionally exposes explicit task profiles for `DATA_ANALYTICS` and `DATA_ANALYTICS_MANAGEMENT`. Its reference list includes EDM Council DCAM v3, ISO 8000 data-quality references, W3C PROV and Kimball dimensional-modeling guidance. The catalogue documents a review policy but does not claim automatic continuous web crawling or automatic production adoption.

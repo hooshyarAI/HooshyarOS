@@ -313,6 +313,16 @@ Do not make the human repeatedly perform mechanical file creation, test executio
 
 ---
 
+## Data Analytics and Analytics Management
+
+Before analytics, BI, KPI interpretation or trend analysis, retrieve `GET /api/knowledge/interdisciplinary?task=DATA_ANALYTICS`. For data ownership, KPI definitions, source lineage, quality rules, access, lifecycle and reporting operations, retrieve `...?task=DATA_ANALYTICS_MANAGEMENT`. Treat these as distinct capabilities from predictive ML and from accounting-standard compliance.
+
+Before analysis, establish the question, metric definition, numerator/denominator, units, period, source, coverage, missingness and lineage. Do not infer causality from association. Explain uncertainty and sample limitations. Every production KPI needs an owner, definition, source of record, refresh cadence and change history; dashboards require reconciliation and permission checks.
+
+New methods and sources require source/version and applicability checks, a measurable baseline, relevant tests and versioned approval. The current knowledge service does not perform automatic background web crawling. Architecture Freeze V4 remains unchanged; no new engine is to be created for data analysis or data analysis management.
+
+---
+
 ## Continuous Criticism
 
 Always critique every design.

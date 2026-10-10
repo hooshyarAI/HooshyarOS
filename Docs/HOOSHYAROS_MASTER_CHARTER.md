@@ -550,3 +550,12 @@ When a more specific technical contract defines an implementation detail, follow
 **ASSISTANT ROLE: CONSTRUCTION INTELLIGENCE ONLY**
 
 **PLATFORM CONTINUATION AFTER ASSISTANT COMPLETION: REQUIRED**
+
+
+## 20. Data Analytics and Analytics-Management Knowledge
+
+HooshyarOS explicitly distinguishes **data analytics science** from **analytics management/data governance**. Analytics science covers question-led exploratory, descriptive, diagnostic, inferential, predictive/prescriptive analysis and BI communication. Analytics management governs data strategy and operating model, ownership/stewardship, catalogue/glossary, lineage, data quality, KPI/metric semantics, data contracts, access, lifecycle, reporting changes and the analytics backlog.
+
+Both are versioned knowledge domains routed through the existing interdisciplinary service and frozen engine owners. Financial, forecast, risk, portfolio, process, HR and executive profiles select them where relevant. Neither domain creates a new engine.
+
+The reference catalogue includes professional data-management frameworks, ISO 8000 data-quality references, W3C PROV provenance guidance and dimensional-modeling guidance. A revision project is not a released standard, and a voluntary framework is not automatically local law. The service does not claim automatic background web crawling; new methods require source/scope verification, baseline/benchmark, tests and versioned approval.
