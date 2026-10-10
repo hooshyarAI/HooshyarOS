@@ -1,5 +1,5 @@
 export type DecisionTask =
-  | "FINANCIAL_STATEMENT_ANALYSIS" | "FINANCIAL_MANAGEMENT" | "FINANCIAL_ENGINEERING"
+  | "FINANCIAL_STATEMENT_ANALYSIS" | "EXECUTIVE_DECISION" | "FINANCIAL_MANAGEMENT" | "FINANCIAL_ENGINEERING"
   | "ECONOMIC_FORECAST" | "RISK_ASSESSMENT" | "PORTFOLIO_OPTIMIZATION"
   | "PROCESS_REDESIGN" | "HR_ANALYTICS" | "DIGITAL_FINANCIAL_PRODUCT" | "GENERAL";
 
@@ -140,6 +140,7 @@ const DOMAINS: readonly InterdisciplinaryKnowledgeDomain[] = [
 ];
 
 const TASK_DOMAINS: Readonly<Record<DecisionTask, readonly string[]>> = {
+  EXECUTIVE_DECISION:["strategy-enterprise-performance-and-process","operations-research-and-optimization","economics-and-econometrics","risk-governance-and-regulatory-applicability","behavioral-science-and-human-centered-design"],
   FINANCIAL_STATEMENT_ANALYSIS:["accounting-financial-reporting","financial-management-and-corporate-finance","data-science-ai-and-model-risk","risk-governance-and-regulatory-applicability","reliable-data-and-platform-engineering"],
   FINANCIAL_MANAGEMENT:["financial-management-and-corporate-finance","accounting-financial-reporting","economics-and-econometrics","operations-research-and-optimization","risk-governance-and-regulatory-applicability"],
   FINANCIAL_ENGINEERING:["quantitative-finance-and-financial-engineering","operations-research-and-optimization","economics-and-econometrics","data-science-ai-and-model-risk","risk-governance-and-regulatory-applicability"],
