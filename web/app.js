@@ -240,6 +240,7 @@ async function refreshDashboard() {
     await refreshAnalyticsSources();
     await refreshReportArtifacts();
     await refreshBudgetCostBreakdown();
+    await refreshFinancialFeasibility();
     try {
       const latest = await getJson('/api/financial/insights/latest');
       if (latest.statementInsight) {
@@ -1557,7 +1558,7 @@ function parseNumberList(value) {
 }
 
 async function refreshAnalyticsSources() {
-  const selects = [...document.querySelectorAll('#analytics-source, #budget-cost-source')];
+  const selects = [...document.querySelectorAll('#analytics-source, #budget-cost-source, #feasibility-source')];
   if (!selects.length) return;
   try {
     const payload = await getJson('/api/sources');
@@ -1715,6 +1716,74 @@ document.querySelector('#budget-cost-form').addEventListener('submit', async eve
     await refreshBudgetCostBreakdown();
   } catch (error) {
     result.textContent = `تحلیل هزینه انجام نشد: ${error.message}`;
+  }
+});
+
+function renderFinancialFeasibility(container, payload) {
+  if (!container) return;
+  container.replaceChildren();
+  const summary = document.createElement('p');
+  const irr = payload.irr?.status === 'READY'
+    ? `IRR ${(Number(payload.irr.irr) * 100).toLocaleString('fa-IR', { maximumFractionDigits: 2 })}٪`
+    : 'IRR برای این جریان نقدی قابل محاسبه نیست';
+  const payback = Number.isFinite(payload.payback?.paybackPeriod)
+    ? `دوره بازگشت ساده ${Number(payload.payback.paybackPeriod).toLocaleString('fa-IR', { maximumFractionDigits: 2 })} دوره`
+    : 'سرمایه در افق واردشده بازیابی نمی‌شود';
+  summary.textContent = `${payload.projectName} — NPV: ${Number(payload.npv.npv).toLocaleString('fa-IR', { maximumFractionDigits: 2 })} ${payload.currency}؛ ${irr}؛ ${payback}. نیازمند بازبینی.`;
+  container.appendChild(summary);
+  const evidence = document.createElement('p');
+  evidence.textContent = `منبع مرتبط: ${payload.source?.sourceName || 'منبع بارگذاری‌شده'}؛ پیوند ثبت شده، اما مفروضات نقدی تطبیق نشده‌اند (${String(payload.source?.sha256 || '').slice(0, 12)}…). سیگنال NPV: ${payload.indicativeSignal}.`;
+  container.appendChild(evidence);
+  const title = document.createElement('strong');
+  title.textContent = 'سناریوهای حساسیت جریان نقدی';
+  container.appendChild(title);
+  const list = document.createElement('ul');
+  for (const scenario of payload.cashFlowScenarios?.entries || []) {
+    const item = document.createElement('li');
+    item.textContent = `${scenario.name}: NPV ${Number(scenario.output).toLocaleString('fa-IR', { maximumFractionDigits: 2 })} ${payload.currency} (تغییر ${Number(scenario.delta).toLocaleString('fa-IR', { maximumFractionDigits: 2 })})`;
+    list.appendChild(item);
+  }
+  container.appendChild(list);
+}
+
+async function refreshFinancialFeasibility() {
+  const container = document.querySelector('#financial-feasibility-latest');
+  if (!container) return;
+  try {
+    const payload = await getJson('/api/feasibility/financial/latest');
+    renderFinancialFeasibility(container, payload);
+  } catch (error) {
+    container.textContent = error.status === 404
+      ? 'هنوز امکان‌سنجی مالی برای این سازمان ذخیره نشده است.'
+      : `دریافت امکان‌سنجی ناموفق بود: ${error.message}`;
+  }
+}
+
+document.querySelector('#financial-feasibility-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const result = document.querySelector('#financial-feasibility-result');
+  try {
+    const sourceSha256 = document.querySelector('#feasibility-source').value;
+    if (!sourceSha256) throw new Error('ابتدا منبع بارگذاری‌شده را انتخاب کنید.');
+    const projectName = document.querySelector('#feasibility-project-name').value.trim();
+    const currency = document.querySelector('#feasibility-currency').value.trim();
+    const initialInvestment = normalizeCostNumber(document.querySelector('#feasibility-investment').value);
+    const discountRatePercent = normalizeCostNumber(document.querySelector('#feasibility-discount-rate').value);
+    const flowsText = document.querySelector('#feasibility-cash-flows').value.trim();
+    const cashFlows = flowsText.split(/[\r\n;؛]+/).map(normalizeCostNumber);
+    if (!projectName || !currency || !Number.isFinite(initialInvestment) || !Number.isFinite(discountRatePercent) || !cashFlows.length || cashFlows.some(value => !Number.isFinite(value))) {
+      throw new Error('نام طرح، واحد مبالغ، سرمایه‌گذاری، نرخ تنزیل و جریان‌های نقدی معتبر را وارد کنید.');
+    }
+    const payload = await getJson('/api/feasibility/financial', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'idempotency-key': idempotencyKey('feasibility:financial') },
+      body: JSON.stringify({ sourceSha256, projectName, currency, initialInvestment, discountRatePercent, cashFlows })
+    });
+    rotateIdempotencyKey('feasibility:financial');
+    renderFinancialFeasibility(result, payload);
+    await refreshFinancialFeasibility();
+  } catch (error) {
+    result.textContent = `امکان‌سنجی مالی انجام نشد: ${error.message}`;
   }
 });
 

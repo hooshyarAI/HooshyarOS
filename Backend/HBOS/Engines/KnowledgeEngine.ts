@@ -561,7 +561,7 @@ const SCIENCE_DOMAINS: readonly ScienceDomainDefinition[] = [
         id: 'feasibility-study',
         name: 'امکان‌سنجی طرح و سرمایه‌گذاری',
         purpose: 'ترکیب محدود ارزش زمانی پول، معیارهای بازده، تحلیل ریسک و مقایسه گزینه‌ها برای کمک به ارزیابی اولیه طرح.',
-        owner: 'Backend/HBOS/Engines/FinancialIntelligenceEngine.ts; Backend/HBOS/Engines/RiskIntelligenceEngine.ts; Backend/HBOS/Product/DecisionWorkbench.ts',
+        owner: 'Backend/HBOS/Product/FinancialFeasibilityService.ts; Backend/HBOS/Engines/FinancialIntelligenceEngine.ts; Backend/HBOS/Engines/RiskIntelligenceEngine.ts; Backend/HBOS/Product/DecisionWorkbench.ts',
         readiness: 'PARTIAL',
         signals: ['feasibility-study', 'investment-evaluation', 'capital-allocation', 'cash-flow', 'valuation', 'risk-assessment', 'scenario-analysis', 'budget-planning'],
         availableOperations: [
@@ -572,10 +572,11 @@ const SCIENCE_DOMAINS: readonly ScienceDomainDefinition[] = [
             'RiskIntelligenceEngine.assess',
             'RiskIntelligenceEngine.sensitivity',
             'RiskIntelligenceEngine.scenario',
-            'DecisionWorkbench.execute (Expert Choice)'
+            'DecisionWorkbench.execute (Expert Choice)',
+            'FinancialFeasibilityService.execute'
         ],
         limitations: [
-            'روش‌های مالی و ریسک موجود می‌توانند ورودی امکان‌سنجی باشند، اما گزارش جامع امکان‌سنجی با داده‌های فنی، بازار، حقوقی، عملیاتی، محیط‌زیستی، مفروضات تأییدشده و گیت تصمیم در یک مسیر انتهابه‌انتها هنوز اعتبارسنجی نشده است.'
+            'امکان‌سنجی مالی اولیه با NPV، IRR، دوره بازگشت و سناریوهای جریان نقدی در محیط کاربری موجود است و مفروضات نیازمند بازبینی علامت می‌خورند؛ مطالعه جامع فنی، بازار، حقوقی، عملیاتی و محیط‌زیستی با داده‌های تأییدشده هنوز کامل نیست.'
         ]
     }
 ];

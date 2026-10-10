@@ -234,6 +234,21 @@ async function main() {
     if (costBreakdown.status !== 200 || costBreakdown.body.capabilityId !== 'product.cost-management' || costBreakdown.body.status !== 'READY' || costBreakdown.body.total?.planned !== 1500 || costBreakdown.body.total?.actual !== 1500 || costBreakdown.body.qualification !== 'REVIEW_REQUIRED' || costBreakdown.body.source?.linkStatus !== 'LINKED_NOT_RECONCILED') throw new Error(`WEB_ACCEPTANCE_COST_BREAKDOWN_FAILED:${costBreakdown.status}:${JSON.stringify(costBreakdown.body)}`);
     const latestCostBreakdown = await request('/api/budget/cost-breakdown/latest', { headers: { cookie } });
     if (latestCostBreakdown.status !== 200 || latestCostBreakdown.body.tenantId !== session.body.tenantId || latestCostBreakdown.body.total?.variance !== 0) throw new Error(`WEB_ACCEPTANCE_COST_BREAKDOWN_LATEST_FAILED:${latestCostBreakdown.status}`);
+
+    // Initial financial feasibility composes the canonical NPV/IRR/payback and risk owners.
+    await sleep(1100);
+    const feasibility = await request('/api/feasibility/financial', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie, 'idempotency-key': 'acceptance:financial-feasibility' },
+      body: JSON.stringify({
+        sourceSha256: structuredIngest.body.evidence.sha256,
+        projectName: 'Factory expansion', currency: 'IRR',
+        initialInvestment: 1000, discountRatePercent: 10, cashFlows: [400, 400, 400, 400]
+      })
+    });
+    if (feasibility.status !== 200 || feasibility.body.capabilityId !== 'product.financial-feasibility' || feasibility.body.status !== 'READY' || !(feasibility.body.npv?.npv > 0) || feasibility.body.cashFlowScenarios?.entries?.length !== 5 || feasibility.body.qualification !== 'REVIEW_REQUIRED' || feasibility.body.source?.linkStatus !== 'LINKED_NOT_RECONCILED') throw new Error(`WEB_ACCEPTANCE_FINANCIAL_FEASIBILITY_FAILED:${feasibility.status}:${JSON.stringify(feasibility.body)}`);
+    const latestFeasibility = await request('/api/feasibility/financial/latest', { headers: { cookie } });
+    if (latestFeasibility.status !== 200 || latestFeasibility.body.tenantId !== session.body.tenantId || latestFeasibility.body.projectName !== 'Factory expansion') throw new Error(`WEB_ACCEPTANCE_FINANCIAL_FEASIBILITY_LATEST_FAILED:${latestFeasibility.status}`);
     const analyticsLatest = await request('/api/financial/insights/latest', { headers: { cookie } });
     if (analyticsLatest.status !== 200 || analyticsLatest.body.capabilityId !== 'product.financial-analytics' || analyticsLatest.body.tenantId !== session.body.tenantId) throw new Error(`WEB_ACCEPTANCE_ANALYTICS_LATEST_FAILED:${analyticsLatest.status}`);
     const enrichedReport = await request('/api/report', { headers: { cookie } });

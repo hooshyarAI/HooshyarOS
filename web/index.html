@@ -209,6 +209,22 @@
             <div id="budget-cost-latest" class="execution-list" aria-live="polite"></div>
           </div></details>
 
+          <details id="financial-feasibility-section" class="tool-panel"><summary>امکان‌سنجی مالی طرح</summary><div class="panel-body">
+            <p>این ابزار ارزیابی مالی اولیه را بر پایه سرمایه‌گذاری و جریان‌های نقدی واردشده انجام می‌دهد. منبع بارگذاری‌شده فقط برای ردیابی پیوند داده می‌شود؛ مفروضات به‌طور خودکار از فایل استخراج یا تطبیق نمی‌شوند. پیش از تصمیم سرمایه‌گذاری، نتیجه نیازمند بازبینی است.</p>
+            <form id="financial-feasibility-form">
+              <label>نام طرح<input id="feasibility-project-name" required placeholder="مثلاً توسعه خط تولید" /></label>
+              <label>منبع مرتبط<select id="feasibility-source" required><option value="">— انتخاب منبع بارگذاری‌شده —</option></select></label>
+              <label>ارز/واحد مبالغ<input id="feasibility-currency" required placeholder="مثلاً IRR یا تومان" /></label>
+              <label>سرمایه‌گذاری اولیه<input id="feasibility-investment" type="number" min="0.01" step="any" required /></label>
+              <label>نرخ تنزیل (درصد)<input id="feasibility-discount-rate" type="number" min="0" step="any" required placeholder="مثلاً ۱۰" /></label>
+              <label class="analytics-wide">جریان نقدی دوره‌های آینده<textarea id="feasibility-cash-flows" rows="4" required placeholder="400000&#10;450000&#10;500000&#10;550000"></textarea></label>
+              <p class="analytics-wide">هر سطر یک دوره آینده است. تمام مبالغ را در همان ارز/واحد وارد کنید. سناریوها فقط آزمون حساسیت‌اند، نه پیش‌بینی بازار.</p>
+              <button class="primary-button" type="submit">محاسبه امکان‌سنجی مالی</button>
+            </form>
+            <div id="financial-feasibility-result" class="result" role="status" aria-live="polite"></div>
+            <div id="financial-feasibility-latest" class="execution-list" aria-live="polite"></div>
+          </div></details>
+
           <details id="execution-tools" class="tool-panel"><summary>اجرای سازمانی</summary><div class="panel-body">
             <p>تصمیم تأییدشده را به کار واگذارشده با مسئول، موعد، KPI، شواهد و بازخورد تبدیل کنید.</p>
             <form id="execution-form">
