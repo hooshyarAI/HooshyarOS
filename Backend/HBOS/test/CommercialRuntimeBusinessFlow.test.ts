@@ -12,7 +12,7 @@ describe("Commercial runtime real business flow", () => {
   let server: Server;
 
   test("serves a coherent and syntactically valid authentication-capable web shell", async () => {
-    const [root, index, viewModel, appResponse, styles, serviceWorker, standardsKnowledge] = await Promise.all([
+    const [root, index, viewModel, appResponse, styles, serviceWorker, standardsKnowledge, interdisciplinaryKnowledge] = await Promise.all([
       request(server, "/"),
       request(server, "/index.html"),
       request(server, "/executive-evaluation-view-model.js"),
@@ -20,8 +20,9 @@ describe("Commercial runtime real business flow", () => {
       request(server, "/styles.css"),
       request(server, "/sw.js"),
       request(server, "/api/knowledge/financial-standards"),
+      request(server, "/api/knowledge/interdisciplinary?task=PROCESS_REDESIGN"),
     ]);
-    for (const response of [root, index, viewModel, appResponse, styles, serviceWorker, standardsKnowledge]) {
+    for (const response of [root, index, viewModel, appResponse, styles, serviceWorker, standardsKnowledge, interdisciplinaryKnowledge]) {
       expect(response.status).toBe(200);
       expect(response.headers.get("x-content-type-options")).toBe("nosniff");
       expect(response.headers.get("x-frame-options")).toBe("DENY");
@@ -45,6 +46,16 @@ describe("Commercial runtime real business flow", () => {
     const contextualPayload = await contextualStandards.json() as { applicability: { status: string; finalDeterminationAllowed: boolean } };
     expect(contextualPayload.applicability.status).toBe("REVIEW_REQUIRED");
     expect(contextualPayload.applicability.finalDeterminationAllowed).toBe(false);
+
+    const interdisciplinaryPayload = await interdisciplinaryKnowledge.json() as {
+      catalogue: { version: string; domainCount: number };
+      composition: { task: string; domainIds: string[]; reasoningContext: string };
+    };
+    expect(interdisciplinaryPayload.catalogue.version).toBe("interdisciplinary-decision-knowledge-2026-10-10.v1");
+    expect(interdisciplinaryPayload.catalogue.domainCount).toBeGreaterThanOrEqual(10);
+    expect(interdisciplinaryPayload.composition.task).toBe("PROCESS_REDESIGN");
+    expect(interdisciplinaryPayload.composition.domainIds).toContain("organizational-and-people-analytics");
+    expect(interdisciplinaryPayload.composition.reasoningContext).toContain("تشویق معامله/ریسک غیرضروری ممنوع");
     expect(viewModel.headers.get("content-type")).toContain("text/javascript");
     expect(appResponse.headers.get("content-type")).toContain("text/javascript");
     expect(styles.headers.get("content-type")).toContain("text/css");
