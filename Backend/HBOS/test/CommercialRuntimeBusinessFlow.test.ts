@@ -1,4 +1,5 @@
 import { Server } from "node:http";
+import { Script } from "node:vm";
 import { createCommercialRuntimeServer } from "../Autonomous/Runtime/CommercialRuntimeServer";
 
 const request = async (server: Server, path: string, options: RequestInit = {}) => {
@@ -10,20 +11,33 @@ const request = async (server: Server, path: string, options: RequestInit = {}) 
 describe("Commercial runtime real business flow", () => {
   let server: Server;
 
-  test("serves a coherent web shell and its executive presentation module", async () => {
-    const [root, index, viewModel] = await Promise.all([
+  test("serves a coherent and syntactically valid authentication-capable web shell", async () => {
+    const [root, index, viewModel, appResponse, styles] = await Promise.all([
       request(server, "/"),
       request(server, "/index.html"),
       request(server, "/executive-evaluation-view-model.js"),
+      request(server, "/app.js"),
+      request(server, "/styles.css"),
     ]);
-    expect(root.status).toBe(200);
-    expect(index.status).toBe(200);
-    expect(viewModel.status).toBe(200);
+    for (const response of [root, index, viewModel, appResponse, styles]) {
+      expect(response.status).toBe(200);
+    }
     expect(viewModel.headers.get("content-type")).toContain("text/javascript");
+    expect(appResponse.headers.get("content-type")).toContain("text/javascript");
+    expect(styles.headers.get("content-type")).toContain("text/css");
     const html = await root.text();
     expect(html).toContain('src="/executive-evaluation-view-model.js"');
     expect(html).toContain('src="/app.js"');
-    expect(await viewModel.text()).toContain("buildRows");
+    expect(html).toContain('id="session-mode"');
+    expect(html).toContain('id="password"');
+    expect(html).toContain('id="invite-form"');
+    const app = await appResponse.text();
+    const viewModelSource = await viewModel.text();
+    expect(() => new Script(app)).not.toThrow();
+    expect(() => new Script(viewModelSource)).not.toThrow();
+    expect(app).toContain("request('/api/logout'");
+    expect(app).toContain("request('/api/invitations'");
+    expect(viewModelSource).toContain("buildRows");
   });
 
   beforeEach(async () => {
@@ -148,6 +162,72 @@ describe("Commercial runtime real business flow", () => {
     expect(otherPayload.targetsConfigured).toBe(false);
     expect(otherPayload.targets).toBeNull();
     expect(otherPayload.executiveEvaluation).toBeNull();
+  });
+
+  test("enforces invited-member role at the real runtime boundary", async () => {
+    const ownerResponse = await request(server, "/api/session", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        mode: "register",
+        username: "owner",
+        organization: "Role Test Org",
+        password: "Strong-Demo-Password-2026!",
+      }),
+    });
+    expect(ownerResponse.status).toBe(201);
+    const ownerCookie = ownerResponse.headers.get("set-cookie")!.split(";")[0];
+    const ownerData = await ownerResponse.json() as { tenantId: string };
+
+    const invitationResponse = await request(server, "/api/invitations", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: ownerCookie },
+      body: JSON.stringify({ role: "VIEWER" }),
+    });
+    expect(invitationResponse.status).toBe(201);
+    const invitation = await invitationResponse.json() as { code: string; role: string };
+    expect(invitation.role).toBe("VIEWER");
+
+    const viewerResponse = await request(server, "/api/session", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        mode: "join",
+        username: "viewer",
+        password: "Strong-Demo-Password-2026!",
+        invitationCode: invitation.code,
+      }),
+    });
+    expect(viewerResponse.status).toBe(201);
+    const viewerCookie = viewerResponse.headers.get("set-cookie")!.split(";")[0];
+    const viewerData = await viewerResponse.json() as { tenantId: string; role: string };
+    expect(viewerData.tenantId).toBe(ownerData.tenantId);
+    expect(viewerData.role).toBe("VIEWER");
+
+    const dashboard = await request(server, "/api/dashboard", { headers: { cookie: viewerCookie } });
+    expect(dashboard.status).toBe(200);
+
+    const forbiddenTargets = await request(server, "/api/executive-targets", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: viewerCookie },
+      body: JSON.stringify({ targets: { revenue: 1, profit: 1, profitMargin: 0.1, debtRatio: 0.1 } }),
+    });
+    expect(forbiddenTargets.status).toBe(403);
+    await expect(forbiddenTargets.json()).resolves.toEqual({ error: "AUTHORIZATION_DENIED" });
+
+    const forbiddenInvites = await request(server, "/api/invitations", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: viewerCookie },
+      body: JSON.stringify({ role: "VIEWER" }),
+    });
+    expect(forbiddenInvites.status).toBe(403);
+
+    const forbiddenAnalysis = await request(server, "/api/analyze", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: viewerCookie },
+      body: JSON.stringify({}),
+    });
+    expect(forbiddenAnalysis.status).toBe(403);
   });
 
   test("blocks financial analysis when assets denominator is zero and does not persist it", async () => {
