@@ -50,6 +50,14 @@ describe("android product acceptance CI repair regression", () => {
         expect(script).not.toMatch(/\n\s*"\$ADB" wait-for-device\s*\n/);
     });
 
+    test("Package Manager readiness is recorded from the successful bounded probe without a duplicate timeout probe", () => {
+        const script = fs.readFileSync(ACCEPTANCE_SCRIPT_PATH, "utf8");
+        expect(script).toContain("PACKAGE_MANAGER_READY=false");
+        expect(script).toContain("PACKAGE_MANAGER_READY=true");
+        expect(script).toContain('test "$PACKAGE_MANAGER_READY" = "true"');
+        expect(script).not.toContain('timeout 3s "$ADB" shell cmd package list packages >/dev/null\nrecord_step package-manager-ready');
+    });
+
     test("android acceptance evidence required steps match script recorded steps", () => {
         const evidence = fs.readFileSync(EVIDENCE_SCRIPT_PATH, "utf8");
         const script = fs.readFileSync(ACCEPTANCE_SCRIPT_PATH, "utf8");

@@ -73,15 +73,17 @@ test "$boot" = "1"
 record_step android-booted
 
 echo "=== Waiting for Package Manager ==="
+PACKAGE_MANAGER_READY=false
 for i in $(seq 1 30); do
   if timeout 3s "$ADB" shell cmd package list packages >/dev/null 2>&1; then
     echo "Package Manager ready (attempt ${i})"
+    PACKAGE_MANAGER_READY=true
     break
   fi
   echo "Package Manager not ready (attempt ${i}/30)"
   sleep 2
 done
-timeout 3s "$ADB" shell cmd package list packages >/dev/null
+test "$PACKAGE_MANAGER_READY" = "true"
 record_step package-manager-ready
 
 echo "=== Installing APK ==="
