@@ -22,6 +22,12 @@ READ → UNDERSTAND → AUDIT → SELECT ONE KNOT → PLAN → CHECK DEPENDENCIE
 
 A knot is accepted only when implementation, focused verification, repository evidence, and architecture ownership agree.
 
+### Whole-system intelligence and integration evidence
+
+Treat individual engines as coordinated parts of one product, not as isolated completion targets. Before accepting a cross-engine knot, trace the source/context, owner contract, reasoning or decision handoff, governance check, observable outcome and any feedback path affected by the change. Test the seams where incorrect coordination can occur.
+
+Do not infer system-level intelligence from engine count, file presence, unit-test success or visual polish. Require focused tests, integration evidence and application/acceptance evidence appropriate to the affected workflow. Keep facts separate from assumptions, expose uncertainty and failure, and preserve Architecture Freeze V4, tenant isolation and governed action.
+
 ## Recovery Loop
 
 ```text
