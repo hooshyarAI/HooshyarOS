@@ -30,6 +30,29 @@ describe('Unified Intelligent Workspace UI contract',()=>{
   test('distinguishes result semantics without exposing private reasoning',()=>{
     expect(html).toContain('واقعیت تأییدشده'); expect(html).toContain('شاخص مشتق‌شده'); expect(html).toContain('اقدام مدیریتی'); expect(app).toContain('evidenceBadge'); expect(app).not.toContain('chain-of-thought');
   });
+  test('adds one accessible four-stage decision lifecycle linked to canonical workspace sections',()=>{
+    expect((html.match(/data-lifecycle-step=/g)||[]).length).toBe(4);
+    expect(html).toContain('id="decision-lifecycle"');
+    expect(html).toContain('data-scroll-target="#source-workspace"');
+    expect(html).toContain('data-scroll-target="#findings"');
+    expect(html).toContain('data-scroll-target="#next-actions"');
+    expect(html).toContain('data-scroll-target="#execution-tools"');
+    expect(html).toContain('id="lifecycle-status"');
+    expect(css).toContain('.lifecycle-step[data-lifecycle-state="current"]');
+    expect(css).toContain('@media(max-width:760px)');
+  });
+  test('derives workflow progress from current source context and real work items, not a synthetic timer',()=>{
+    expect(app).toContain('function updateDecisionLifecycle');
+    expect(app).toContain("document.querySelectorAll('#execution-list .execution-item').length > 0");
+    expect(app).toContain('updateDecisionLifecycle({ hasExecutionWorkItems: true })');
+    expect(app).toContain("step.setAttribute('aria-current', 'step')");
+  });
+  test('only advances past source intake after the canonical ingest job completes',()=>{
+    expect(app).toContain("lastIngestJob && lastIngestJob.status === 'COMPLETED'");
+    expect(app).toContain('updateDecisionLifecycle();');
+    expect(app).toContain('lastIngestJob = null;');
+    expect(app).not.toContain('آماده دریافت و اعتبارسنجی/.test(contextState)) currentStage = 1');
+  });
   test('preserves the legacy workspace anchor for existing links',()=>{ expect(html).toContain('id="workspace"'); expect(html).toContain('id="main-workspace"'); });
   test('parses the shipped app script as valid JavaScript',()=>{ expect(()=>new vm.Script(app,{filename:'web/app.js'})).not.toThrow(); });
   test('keeps the surface framework-free and mobile-adaptive',()=>{

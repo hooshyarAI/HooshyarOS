@@ -5,6 +5,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: hooshyaros-final-product-factory-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   windows-product-factory:
     runs-on: windows-latest
@@ -36,6 +40,14 @@ jobs:
       - name: Emit assistant repair handoff on failure
         if: steps.product-factory.outcome == 'failure'
         run: npm run product:factory:handoff
+      - name: Stage canonical factory evidence for artifact upload
+        if: always()
+        run: |
+          if (-not (Test-Path .hooshyar/factory-success.json)) {
+            Write-Host "Missing factory evidence: .hooshyar/factory-success.json"
+            exit 1
+          }
+          Copy-Item .hooshyar/factory-success.json ./factory-success.json -Force
       - name: Upload product factory evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -67,8 +79,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: hooshyar-web-product-acceptance-evidence
-          path: ./web-acceptance-success.json
-          if-no-files-found: warn
+          path: ./.hooshyar/web-acceptance-success.json
+          if-no-files-found: error
           retention-days: 14
 
   security-tenant-acceptance:
@@ -90,8 +102,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: hooshyar-security-tenant-evidence
-          path: ./security-acceptance-success.json
-          if-no-files-found: warn
+          path: ./.hooshyar/security-acceptance-success.json
+          if-no-files-found: error
           retention-days: 14
 
   android-product-acceptance:
@@ -132,8 +144,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: hooshyar-android-product-acceptance-evidence
-          path: ./android-acceptance-success.json
-          if-no-files-found: warn
+          path: ./.hooshyar/android-acceptance-success.json
+          if-no-files-found: error
           retention-days: 14
       - name: Publish installable Android APK
         if: success()

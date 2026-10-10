@@ -185,7 +185,7 @@ The platform must preferentially reuse existing:
 
 Creating a parallel Agent, duplicate Engine, duplicate business semantic, duplicate orchestration hierarchy or provider-specific construction path is prohibited unless an explicit architecture decision establishes a genuine missing capability or contradiction.
 
-The construction fabric must not depend on an external coding agent. Existing product provider integrations may exist only where approved by product architecture; they must never become dependencies of the construction fabric itself.
+The construction fabric must not make any coding operator an architectural dependency. Approved repository-governed operators may execute bounded work under their explicit contracts, but they remain replaceable, subordinate mechanisms and must never become owners of architecture, governance, product semantics or completion.
 
 ### 6.3 Global Knowledge and Open-Source Leverage Law — PERMANENT
 
@@ -402,7 +402,7 @@ The Assistant is complete only when its construction fabric can reliably:
 20. re-plan from the new repository state;
 21. hand off automatically from Assistant completion into platform construction.
 
-The Assistant construction fabric is deliberately constrained to the approved Python/GitHub/Assistant authorities and must not depend on external coding agents. Approved local execution operators may act only as subordinate, replaceable mechanisms under those authorities (see §9).
+The Assistant construction fabric is deliberately constrained to the approved Python/GitHub/Assistant authorities. Approved execution operators, including Kilo Code and OpenCode under their explicit contracts, may act only as subordinate, replaceable mechanisms under those authorities (see §9).
 
 ---
 
@@ -429,17 +429,22 @@ TypeScript remains the canonical implementation language where the platform arch
 
 ### Mandatory construction toolchain
 
-Only these three participants are permitted in the HooshyarOS construction process:
+The construction process has three **authorities**:
 
 1. **Python** — autonomous worker, generator, analyzer, verifier, repair and orchestration layer.
 2. **GitHub** — repository, source control, synchronization, commits, review and publication.
 3. **This Assistant** — architecture reasoning, critical review, expert choice and construction orchestration.
 
-These three are the only construction **authorities**. Approved local execution **operators** may act as subordinate, replaceable mechanisms under them, but they are not additional participants, authorities or providers. In particular, **Kilo Code** is an approved local VS Code execution/operator layer — a repository-governed local mechanism, not an external coding provider and not an architectural authority. An approved operator may inspect the repository, execute authorized commands, apply governed implementation/repair changes, run focused tests and produce evidence only inside an explicit stage/handoff contract. See `Docs/HOOSHYAROS_GOVERNANCE_CHARTER.md` §5 and §10, `Docs/KILO_EXECUTION_OPERATOR_CONTRACT.md` and `Docs/ARCHITECTURE_DECISIONS/KILO_GOVERNED_OPERATOR_DECISION.md`.
+Approved **execution operators** act beneath these authorities and are replaceable mechanisms rather than additional authorities. The approved set is:
 
-External coding assistants, cloud coding agents and alternative code-generation providers are prohibited from the construction path. They must not be invoked, installed, configured or depended upon for autonomous construction. Approved repository-governed local execution operators are not external coding providers under this prohibition.
+- **Kilo Code** — local VS Code execution/operator.
+- **OpenCode** — remote/CI execution/operator governed by `Docs/OPENCODE_EXECUTION_OPERATOR_CONTRACT.md`.
 
-This includes Codex, GitHub Copilot, Claude and equivalent coding agents.
+An operator may inspect the repository, execute authorized commands, apply governed implementation/repair changes, run focused tests, produce evidence and perform unattended routine work when its contract explicitly permits those actions.
+
+OpenCode has no authority over Architecture Freeze V4/V4.1, governance, product semantics, canonical engine ownership, backlog ordering, completion gates, security boundaries or persistent construction memory.
+
+Unapproved external coding assistants and code-generation providers remain prohibited. OpenCode is an explicit repository-specific operator approval, not a general approval of external coding agents.
 
 Provider-facing abstractions may exist inside the finished product where an approved runtime architecture requires them, but such providers must never become dependencies of the autonomous construction fabric.
 
@@ -505,7 +510,7 @@ The construction system must never:
 - invent a new engine when an existing engine owns the capability;
 - create duplicate capability owners;
 - turn the construction Assistant into the platform's end-user advisor;
-- introduce external coding agents or alternative coding providers into the construction path;
+- introduce unapproved external coding agents or alternative coding providers into the construction path;
 - require the human to perform mechanical construction that the approved Python/GitHub/Assistant fabric can safely automate;
 - skip validation or integration evidence;
 - declare completion from file existence;
@@ -1116,7 +1121,7 @@ When a more specific technical contract defines an implementation detail, follow
 
 **EPISTEMIC DISCIPLINE (FACT / ASSUMPTION / HYPOTHESIS / EXPERIMENT / MEASURED RESULT / DECISION): REQUIRED**
 
-**EXTERNAL CODING AGENTS IN CONSTRUCTION: PROHIBITED**
+**UNAPPROVED EXTERNAL CODING AGENTS IN CONSTRUCTION: PROHIBITED — OPENCODE APPROVED AS GOVERNED OPERATOR**
 
 **ASSISTANT ROLE: CONSTRUCTION INTELLIGENCE ONLY**
 
@@ -1126,3 +1131,410 @@ When a more specific technical contract defines an implementation detail, follow
 ## Phase 12 Reservation — Resilience, Analytical Intelligence & Commercial Realization
 
 The Resilience, Analytical Intelligence & Commercial Realization Audit Contract V1 is reserved for Phase 12. It MUST NOT pre-empt, interrupt, or redefine Phase 11. Phase 12 may begin only after the Phase 11 completion gate is independently verified. When Phase 12 begins, the contract becomes an active mandatory audit/implementation/commercialization workstream under Architecture Freeze V4.1 and existing governance controls.
+
+---
+
+## Active Autonomous Intelligence Quality & Product Evolution Mission Protocol
+
+# HOOSHYAROS — AUTONOMOUS INTELLIGENCE QUALITY & PRODUCT EVOLUTION MASTER MISSION
+
+MISSION_STATUS = ACTIVE
+CONTINUE_ALLOWED = TRUE
+MISSION_AUTHORITY = MASTER_CHARTER + GOVERNANCE + ARCHITECTURE_FREEZE_V4_V4.1 + ACTIVE_PLAN
+MISSION_TYPE = MULTI_STAGE_GOVERNED_CONTINUATION
+
+## PURPOSE
+Complete the remaining evidence-backed audits, quality improvements and safe product evolution needed to strengthen deep analytical/compositional reasoning, Financial Semantic Synthesis, Financial Causal Reasoning, Contextual Interpretation, Decision Formation, quality/harness assurance, information-flow continuity, performance management, process-architecture optimization, human-readable reporting, charts/visual presentation, and commercial/application acceptance.
+
+Improve composition and real execution of the existing architecture. Do not add engines merely because a new abstraction is attractive.
+
+## FIRST ACTIVE OBJECTIVE
+Complete the interrupted 2026-10-07 Post-Recovery / Architecture + Audit Reconciliation before unrelated generic backlog work.
+
+Required outputs:
+- current repository reconciliation;
+- governance consistency matrix;
+- architecture/capability/dependency/evidence graph;
+- real remaining audit inventory;
+- strategic audit of Flow Optimization, Performance Management and Process Architecture Optimization;
+- overlap/deduplication matrix;
+- information-flow review;
+- chart gate;
+- evidence-backed prioritization;
+- one NEXT GENUINELY MISSING CAPABILITY;
+- update the existing canonical continuation queue/plan.
+
+No product implementation during this reconciliation stage.
+
+## INTELLIGENCE-BRAIN
+Audit:
+Semantic Synthesis → Contextual Interpretation → Financial Causal Reasoning → Cross-Metric Relationship Analysis → Scenario Interpretation → Risk Interpretation → Decision Formation → Action Recommendation → Outcome Measurement → Learning
+
+Classify each as EXISTS / PARTIAL / BEHAVIORALLY_VERIFIED / INTEGRATION_VERIFIED / GENUINELY_MISSING.
+Reuse existing Reasoning/Intelligence composition, Financial Intelligence, Decision Intelligence, Executive Intelligence, Governance, Memory and Knowledge before new implementation.
+
+## 123.XLSX BENCHMARK
+When governed 123.xlsx evidence is available, measure:
+numeric fidelity; question understanding; semantic synthesis; causal financial reasoning; contextual interpretation; decision quality; missing-data discipline; explainability/provenance; Persian clarity; actionability.
+
+DeepSeek/Claude comparison is valid only when reproducible and evidence-backed. Never send confidential/customer financial data to an inappropriate free-model endpoint.
+
+## QUALITY / HARNESS / NERVOUS SYSTEM
+Audit false-green/false-positive/false-negative, harness fidelity, observation identity, evidence binding, provenance continuity, real runtime behavior, integration/application/acceptance evidence, cross-tenant evidence, failure/blocked semantics, stale evidence and independent QC.
+Implementation-agent self-report is not independent QC.
+
+## INFORMATION FLOW / CATALYST
+Audit:
+Context → Evidence → Provenance → State → Reasoning → Decision → Action → Outcome → Learning
+and:
+SENSE → INGEST → CONTEXTUALIZE → UNDERSTAND → REASON → PLAN → DECIDE → GOVERN → EXECUTE → OBSERVE → MEASURE → LEARN → ADAPT
+
+Treat Flow Optimization as a cross-cutting operating principle unless real architectural contradiction is proven.
+
+## PERFORMANCE MANAGEMENT
+Audit without creating a new engine:
+CLARIFY → ALIGN → ENABLE → EXECUTE → CHECK-IN → DIAGNOSE → INTERVENE → RECHECK → EVALUATE → GOVERN → LEARN
+Compare Executive Intelligence vs Organizational Intelligence ownership. Inspect goals, target/actual, trend, deviation, assignment, execution, feedback, check-in, dialogue, individual-vs-system diagnosis, development plan, PIP, contextual evidence, privacy and governance.
+
+## PROCESS ARCHITECTURE
+Audit:
+AS-IS → FRICTION MAP → ROOT CAUSE → TO-BE → ALTERNATIVES → SIMULATION/COMPARISON → GOVERNANCE → IMPLEMENTATION → MEASUREMENT → LEARNING
+Optimize jointly for Speed + Cost + Quality + Control + Security + Resilience + Sustainability.
+
+## REPORT / PRESENTATION
+For non-financial users explain progressively:
+WHAT HAPPENED → WHY IT MATTERS → WHAT MAY CAUSE IT → RISK/IMPACT → WHAT TO WATCH → WHAT ACTION IS RECOMMENDED → WHAT EVIDENCE SUPPORTS IT → WHAT IS UNKNOWN
+Persian is the normal user-facing surface. Technical identifiers use progressive disclosure.
+
+## CHART GATE
+Do not rebuild web/result-charts.js without current evidence of a genuine gap.
+Contract: presentation-only; canonical server values; no browser financial calculation; no fabrication; truthful missing-data semantics; Persian-first; accessibility; methodology preservation; CCC labels; no technical leakage.
+
+## PRIORITIZATION
+Rank real gaps by VALUE × RISK × DEPENDENCY × READINESS × SPEED.
+P0 recovery/control-plane/evidence/security/harness
+P1 reasoning composition/financial interpretation/123 benchmark/decision formation
+P2 reporting/presentation/provenance/chart quality
+P3 performance/process architecture/flow optimization
+P4 commercial/application/production evidence
+
+Do not repeat accepted F1/F6/CCC/UX absent current regression/invalidation evidence.
+
+## MICRO-STAGES
+The mission is internally decomposed into Micro-Stages.
+Each Micro-Stage remains:
+ONE REAL CAPABILITY → ONE OWNER → ONE COHERENT KNOT → ONE VERIFIED COMMIT
+After successful promotion, automatically continue to the next Micro-Stage without human approval.
+
+## FAILURE / REPAIR
+DETECT → PRESERVE EVIDENCE → TRUSTED CHECKPOINT → ROOT CAUSE → MINIMAL REPAIR → RE-TEST → RE-VERIFY → CHECKPOINT → CONTINUE
+No blind retries. No weakening tests. External blockers remain BLOCKED_EXTERNAL while independent safe work continues.
+
+## HARD BOUNDARIES
+Never redesign Architecture Freeze V4/V4.1; create duplicate engines/owners; fabricate financial values/evidence/completion; delete failed evidence; weaken tests; force-push/history rewrite; bypass security/tenant boundaries; invent billing/subscription/production scope; or rebuild chart code because an old checkpoint is stale.
+
+## SUCCESS
+MISSION_COMPLETE requires:
+AUDIT COMPLETE + REMAINING WORK RECONCILED + PLAN UPDATED + SAFE MICRO-STAGES EXECUTED + FOCUSED VERIFICATION + INTEGRATION VERIFICATION + INDEPENDENT QC + REMOTE COMMIT/PROMOTION VERIFICATION + MISSION STATE PERSISTED.
+
+Canonical active state:
+.kilo/plans/ACTIVE-AUTONOMOUS-INTELLIGENCE-QUALITY-PRODUCT-EVOLUTION-MISSION.md
+
+
+## Adaptive Free-Model Selection Policy for Autonomous Construction
+
+Automatic construction is **free-only but model-adaptive**. The operator must not be locked to one fixed free model when the configured OpenCode catalog exposes other eligible free models.
+
+Before each autonomous worker run:
+1. refresh the available OpenCode model catalog;
+2. identify only models whose effective input/output/reasoning cost is zero and whose provider is currently authenticated/available;
+3. rank eligible models by task fitness, prioritizing reasoning, tool calling, structured output, context capacity, output capacity and current catalog metadata;
+4. use the highest-ranked eligible model for the current Micro-Stage;
+5. if that model fails technically before producing a usable governed result, automatically move to the next eligible free candidate, preserving failure evidence;
+6. never fall back automatically to a paid model.
+
+Model selection is an execution mechanism, not an architecture or product decision. A model may not redefine governance, architecture, product semantics or completion rules.
+
+For complex reasoning, financial analysis, repository-scale work or multi-file construction, model fitness must favor strong reasoning + tool calling + sufficient context over raw speed alone.
+
+When no eligible free model is available, the run enters `BLOCKED_FREE_MODEL_UNAVAILABLE`. This is an infrastructure/model-availability blocker, not permission to use a paid model.
+
+No customer financial data, personal data, secrets or confidential external-company material may be sent to a free-model endpoint when current provider terms permit model-improvement use.
+
+
+### 6.8 Autonomous Team Worker Law — PERMANENT / CAPACITY-CONTROLLED
+
+HooshyarOS construction may operate as an autonomous team rather than a single worker when the current dependency graph contains independently executable Micro-Stages. The team is a construction mechanism, not a new product engine and not a change to Architecture Freeze V4/V4.1.
+
+The canonical team loop is:
+
+**ORCHESTRATE → LEASE → ISOLATE → EXECUTE IN PARALLEL → VERIFY INDEPENDENTLY → INTEGRATE → QC → PROMOTE → REPLAN**
+
+Initial capacity is twelve workers. The pool may scale to 25, 50 or 100 only when evidence demonstrates sufficient independent work, runner capacity, model availability, integration capacity, and no material degradation in correctness, evidence quality or governance.
+
+Parallelism is dependency-aware, not count-driven. A worker may execute a Micro-Stage in parallel only when:
+- dependencies are satisfied;
+- its write scope is isolated;
+- no protected boundary is touched;
+- independent verification is possible;
+- the active mission permits that stage.
+
+Every worker receives an explicit Work Lease:
+- worker identity;
+- role/focus;
+- owning canonical engine;
+- immutable START_SHA;
+- allowed write scope;
+- mission/stage identifier;
+- verification contract.
+
+Workers must never share a working tree. Each worker operates on an isolated branch and produces at most one coherent verified commit for its assigned knot. Worker branches are integrated only after independent evidence/QC and target-drift verification.
+
+The Integrator is the only team-level promotion mechanism. Worker self-report is not independent QC.
+
+A single worker failure must not stop safe independent workers. Failed, blocked, timed-out or unavailable-model workers preserve evidence and remain independently observable.
+
+The team must never:
+- create duplicate engines merely to gain parallelism;
+- allow overlapping uncontrolled writes to the same product surface;
+- weaken tests to unblock a wave;
+- bypass protected architecture/governance/control-plane boundaries;
+- infer product completion from worker count or green unit tests.
+
+The approved first implementation is documented in:
+- `.kilo/team/TEAM-WORKER-V1.json`
+- `.kilo/team/TEAM-WORKER-V1-PROTOCOL.md`
+
+The initial V1 mode is **AUDIT_PARALLEL** because the active master mission's first objective requires reconciliation before product implementation. Future implementation waves may use the same team mechanism only after their Micro-Stage dependency and write-scope graph is evidence-backed.
+
+The existing single-worker path remains the recovery fallback until the team implementation completes its first controlled wave.
+
+
+### 6.9 Empirical Free-Model Qualification Law — PERMANENT
+
+Adaptive free-model selection must not rely on catalog metadata alone when a bounded empirical check is practical.
+
+Before releasing a worker wave, the construction control plane should:
+**DISCOVER → FILTER → RANK → QUALIFY → RELEASE → FALLBACK**
+
+Qualification must use a harmless non-customer, non-secret probe that verifies the selected model can actually execute the required OpenCode task shape. Models that fail the probe are excluded from that wave's candidate set.
+
+Worker-level fallback remains mandatory because a generic qualification probe cannot guarantee task-specific success.
+
+Qualification evidence must record:
+- catalog revision;
+- eligible model set;
+- prefilter ranking;
+- probe result;
+- selected model;
+- fallback candidates;
+- failure evidence.
+
+Qualification never grants a model architecture, governance, product, security or completion authority.
+
+
+### 6.10 Autonomous Construction Team Organization V2 — PERMANENT / MEMORY-GOVERNED / CAPACITY-CONTROLLED
+
+HooshyarOS autonomous construction shall operate as a professional governed team organization when parallel work is beneficial. This organization is a control-plane operating model over the existing construction fabric; it is **not** a new product engine, intelligence engine, or Architecture Freeze V4/V4.1 change.
+
+The canonical organization is:
+
+```text
+MISSION DIRECTOR
+      |
+      v
+PLANNER
+      |
+      v
+MEMORY & EDITOR
+      |
+      v
+ORCHESTRATOR
+      |
+      +----> SPECIALIST WORKER POOL
+      |          |
+      |          v
+      |       EVIDENCE
+      |          |
+      |          v
+      |         QC
+      |          |
+      |          v
+      |      INTEGRATOR
+      |
+      +----> WATCHDOG / ALERTING
+      |
+      +----> EXECUTIVE + TECHNICAL REPORTING
+      |
+      v
+PERSISTENT ORGANIZATIONAL MEMORY
+```
+
+#### V2 leadership and control roles
+
+1. **MISSION DIRECTOR** — operational authority for mission priority, conflict resolution, capacity allocation and governed continuation. The Director does not override architecture authority, governance law or evidence.
+2. **PLANNER** — converts the active mission into dependency-aware Work Packages and Micro-Stages, assigns stable IDs, defines readiness, dependencies, write scope, evidence contract and verification contract.
+3. **MEMORY & EDITOR** — protects organizational memory integrity; consolidates prior work, detects duplicate/repeated/stale/superseded evidence, links decisions/defects/blockers/commits to work, records corrections with provenance and produces authoritative reports. The Editor may correct factual inconsistency in memory when evidence supports the correction, but may never cosmetically improve failed technical output.
+4. **ORCHESTRATOR** — dispatches only READY, non-duplicate, dependency-satisfied work to the existing governed worker mechanism.
+5. **SPECIALIST WORKER POOL** — bounded execution by domain; each worker has one lease, one isolated branch, one explicit write scope and one coherent verified commit.
+6. **QC** — independent verification; worker self-report never substitutes for QC.
+7. **INTEGRATOR** — only promotion authority for team output; verifies ancestry, scope, evidence, target drift and integration state.
+8. **WATCHDOG** — detects stopped, stalled, failed, timed-out and blocked workers/waves and preserves evidence while alerting the human only when a governed human intervention is actually required.
+9. **REPORTING** — maintains executive and technical status reports from memory/evidence, not from worker prose alone.
+
+These roles may be implemented by existing control-plane stages and approved operators. Creating separate autonomous agents for these roles is not required and is prohibited unless an evidence-backed capability gap is demonstrated.
+
+#### Stable identity law
+
+The organizational memory uses stable identifiers that are never recycled:
+
+```text
+MISSION-####
+PROGRAM-####
+WAVE-####
+WORK-####
+DECISION-####
+EVIDENCE-####
+BLOCKER-####
+DEFECT-####
+COMMIT-####
+REPORT-####
+RECOVERY-####
+```
+
+A historical item keeps its identifier permanently. A renamed task is linked to its existing ID rather than renumbered. Legacy artifacts without IDs must be backfilled by the Memory & Editor role from repository evidence; backfill must never fabricate unknown historical facts.
+
+#### Canonical Work Registry lifecycle
+
+```text
+DISCOVERED -> REGISTERED -> PLANNED -> READY -> LEASED -> EXECUTING
+-> VERIFYING -> QC -> INTEGRATING -> PROMOTED -> MEMORIZED -> CLOSED
+```
+
+Governed failure path:
+
+```text
+EXECUTING -> BLOCKED -> DIAGNOSING -> REPAIRED -> REVERIFYING
+```
+
+Duplicate/superseded path:
+
+```text
+DISCOVERED -> DUPLICATE -> LINKED -> CLOSED
+```
+
+Only `READY + NOT_DUPLICATE + DEPENDENCIES_SATISFIED` work may be dispatched.
+
+Before execution, the Planner/Editor must classify the candidate against existing memory as one or more of:
+
+```text
+EXISTS / DONE / VERIFIED / IN_PROGRESS / BLOCKED / SUPERSEDED / DUPLICATE / REGRESSION
+```
+
+A capability that is `EXISTS_IN_CODE` but `NOT_RUNTIME_INTEGRATED` is not silently marked complete; the contradiction is recorded and routed to the correct verification work.
+
+#### Persistent memory law
+
+The organizational memory is durable repository state under:
+
+```text
+.kilo/team/memory/
+```
+
+The canonical ledgers are:
+
+```text
+mission-state.json
+work-registry.json
+evidence-registry.json
+decision-registry.json
+defect-registry.json
+blocker-registry.json
+commit-registry.json
+wave-history.json
+```
+
+Every active or completed work item should link, where applicable, to its owner, dependency set, blocker set, write scope, verification contract, evidence IDs, decision IDs, defect IDs, commit IDs, recovery IDs and resulting report.
+
+Memory status for evidence is explicit:
+
+```text
+OBSERVED / REPRODUCED / VERIFIED / INTEGRATION_VERIFIED
+/ ACCEPTED / STALE / SUPERSEDED / INVALID
+```
+
+Stale memory cannot be used as proof of current completion. Failed evidence is preserved; it is never deleted merely because a later run is cleaner.
+
+#### Decision and defect traceability
+
+A Decision Record must capture: question, decision, rationale, evidence, owner, date, impact and review trigger.
+
+A Defect Record must link:
+
+```text
+DEFECT -> FIX WORK -> VERIFICATION WORK -> CLOSURE
+```
+
+A Blocker Record must preserve root cause, first observation, affected work, dependency, current status, last attempted governed action and safe-unblock condition so later waves do not rediscover the same blocker.
+
+#### Anti-duplication and anti-waste law
+
+The construction team must maximize **correct throughput**, not activity volume. Re-opening completed work without current regression/invalidation evidence is prohibited. Parallelism that increases collision, false-green risk, duplicate work or integration debt is not productive throughput and must be reduced or blocked.
+
+The next action is selected from:
+
+**VALUE x RISK x DEPENDENCY x READINESS x SPEED**
+
+using the full accumulated memory and evidence, not only the latest worker report.
+
+#### V2 role mapping to the existing construction fabric
+
+V2 does not create a second orchestration hierarchy. The existing governed team mechanism remains the execution substrate:
+
+- Mission Director = governed continuation/priority gate;
+- Planner = dependency-aware synthesis and Work Registry;
+- Memory & Editor = evidence/decision/defect/blocker consolidation and report authority;
+- Orchestrator = existing Team Worker control plane;
+- Specialist Pool = existing isolated workers;
+- QC = independent semantic/structural quality gate;
+- Integrator = sole promotion mechanism;
+- Watchdog = existing stop/stall/failure notification layer;
+- Reporting = persisted mission/wave/report artifacts.
+
+The existing V1 execution protocol therefore remains valid as the mechanical worker contract, while V2 becomes the permanent organizational governance and memory layer over it.
+
+#### V2 implementation sequence
+
+```text
+TEAM-ORG-01  Director + Planner + Editor + Orchestrator
+TEAM-ORG-02  Stable Work Registry and identity
+TEAM-ORG-03  Evidence / Decision / Defect / Blocker ledgers
+TEAM-ORG-04  Memory context injection into planning/execution
+TEAM-ORG-05  Dependency graph + dynamic wave planning
+TEAM-ORG-06  Independent QC + Integrator strengthening
+TEAM-ORG-07  Recovery + Watchdog + alerts
+TEAM-ORG-08  Empirical adaptive model qualification
+TEAM-ORG-09  Automatic next-wave generation
+TEAM-ORG-10  Evidence-backed capacity scaling 12 -> 25 -> 50 -> 100
+```
+
+No V2 stage authorizes product implementation while the active mission explicitly requires reconciliation-only work.
+
+#### Completion law
+
+Team success requires:
+
+```text
+WORK REGISTRY UPDATED
++ EVIDENCE PERSISTED
++ INDEPENDENT QC
++ INTEGRATION VERIFIED
++ MEMORY UPDATED
++ MISSION STATE PERSISTED
++ NEXT SAFE WORK IDENTIFIED
+```
+
+A green workflow, worker count or commit count alone is never sufficient.
+
+**V2 TEAM ORGANIZATION: REGISTERED AS A PERMANENT CONSTRUCTION-PROCESS LAW.**
+

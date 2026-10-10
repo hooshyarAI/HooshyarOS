@@ -1,0 +1,47 @@
+name: HooshyarOS Dashboard Preview
+
+on:
+  push:
+    branches:
+      - fix/autonomous-product-factory
+    paths:
+      - 'web/**'
+      - '.github/workflows/dashboard-preview-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: hooshyaros-dashboard-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+    steps:
+      - name: Checkout dashboard
+        uses: actions/checkout@v4
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - name: Prepare site
+        run: |
+          mkdir -p _site
+          cp -R web/. _site/
+          sed -i 's|href="/styles.css"|href="styles.css"|g; s|href="/manifest.webmanifest"|href="manifest.webmanifest"|g; s|src="/offline-sync.js"|src="offline-sync.js"|g; s|src="/result-presentation.js"|src="result-presentation.js"|g; s|src="/app.js"|src="app.js"|g; s|src="/result-charts.js"|src="result-charts.js"|g' _site/index.html
+          sed -i 's|"start_url": "/"|"start_url": "./"|g' _site/manifest.webmanifest
+          sed -i "s|navigator.serviceWorker.register('/sw.js')|navigator.serviceWorker.register('sw.js')|g" _site/app.js
+          touch _site/.nojekyll
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - name: Deploy site
+        id: deployment
+        uses: actions/deploy-pages@v4

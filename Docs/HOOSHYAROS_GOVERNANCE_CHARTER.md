@@ -172,22 +172,27 @@ The system must never invent a capability or silently reorder the canonical back
 
 ### Approved execution operators
 
-**Kilo Code** is an approved local VS Code execution/operator layer for repository inspection, governed implementation, command execution, testing, repair, standardization, evidence production and Git operations when safely automatable.
+**Kilo Code** is an approved local VS Code execution/operator layer.
 
-Kilo Code has **no architecture ownership** and no authority to redefine:
+**OpenCode** is an approved remote/CI execution/operator layer under `Docs/OPENCODE_EXECUTION_OPERATOR_CONTRACT.md`.
 
-- Architecture Freeze V4
+Both operators may perform repository inspection, governed implementation, command execution, testing, repair, standardization, evidence production and Git operations when their active stage/operator contract permits it.
+
+Neither operator has authority to redefine:
+
+- Architecture Freeze V4/V4.1
 - governance decisions
 - product semantics
 - source-of-truth hierarchy
 - completion rules
 - canonical engine ownership
+- persistent construction memory
 
-Kilo Code must operate under the same lifecycle, evidence, scope, security and anti-drift rules as the autonomous construction Assistant.
+OpenCode may operate unattended for routine construction without per-stage human approval. Unattended execution does not authorize architecture changes, governance changes, security-boundary changes, product-scope decisions, destructive migrations, billing/subscription scope invention, production deployment or completion claims.
 
-Kilo Code may be used as an execution tool even when other external coding providers are prohibited. **No external coding provider, model service or agent may become a hidden architectural dependency or mandatory product runtime component.**
+When OpenCode is used, repository rules remain authoritative; the prompt, model, memory, provider configuration or local/CI configuration never overrides repository governance.
 
-When Kilo Code is used, repository rules remain authoritative; the agent's prompt, memory, model preference or local configuration never overrides repository governance.
+OpenCode is a replaceable operator, not an architectural dependency, product runtime provider or authority. Its contract requires bounded scope, free-only model selection, focused verification, trusted checkpoints, one-knot execution and evidence-backed BLOCKED states.
 
 ### Stage-bounded atomic construction
 
@@ -301,9 +306,9 @@ The human supplies product intent, approved decisions and governance. The constr
 
 Repository-native tooling is preferred. **Python is the preferred implementation/orchestration worker for autonomous construction, analysis, generation, verification and repair where appropriate**, because it provides a reproducible local execution layer.
 
-The autonomous construction path must remain provider-independent. Codex, GitHub Copilot, Claude or another external coding provider must not become hidden architectural dependencies or mandatory runtime components.
+The autonomous construction path must remain provider-independent. Codex, GitHub Copilot, Claude and other unapproved external coding providers must not become hidden architectural dependencies or mandatory runtime components.
 
-Kilo Code is permitted as an execution/operator layer only and does not alter this provider-independence rule.
+Kilo Code and OpenCode are permitted only as governed execution/operator layers and do not alter this provider-independence rule.
 
 All construction flows must use the stage-bounded atomic construction rules in Section 5. A routine task should be decomposed and completed one bounded stage at a time, with local recovery and checkpointing after each verified stage.
 
@@ -480,13 +485,15 @@ For the autonomous Assistant itself, DONE additionally means the verified comple
 
 **KILO CODE: APPROVED LOCAL EXECUTION / OPERATOR LAYER**
 
+**OPENCODE: APPROVED REMOTE/CI EXECUTION / OPERATOR LAYER**
+
 **STAGE-BOUNDED ATOMIC CONSTRUCTION: REQUIRED**
 
 **LOCAL STAGE RECOVERY: REQUIRED**
 
 **TRUSTED CHECKPOINTING: REQUIRED**
 
-**EXTERNAL CODING PROVIDERS: NON-MANDATORY AND MUST NOT BECOME ARCHITECTURAL DEPENDENCIES**
+**UNAPPROVED EXTERNAL CODING PROVIDERS: PROHIBITED; APPROVED OPERATORS REMAIN NON-MANDATORY AND MUST NOT BECOME ARCHITECTURAL DEPENDENCIES**
 
 ---
 

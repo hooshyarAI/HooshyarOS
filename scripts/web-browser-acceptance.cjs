@@ -368,7 +368,10 @@ async function main() {
       return true;
     })()`);
     await waitFor(
-      () => evaluate(cdp, `document.querySelector('#analysis-result').textContent.includes('تحلیل موفق')`),
+      () => evaluate(cdp, `(function () {
+        const text = document.querySelector('#analysis-result').textContent;
+        return text.includes('انجام شد') && text.includes('سود') && text.includes('وضعیت: آماده');
+      })()`),
       'analysis-interaction',
       30000,
     );

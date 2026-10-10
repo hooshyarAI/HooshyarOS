@@ -1,0 +1,129 @@
+{
+  "schema_version": "1.0",
+  "next_id": "DEFECT-0011",
+  "items": [
+    {
+      "id": "DEFECT-0001",
+      "title": "Wave 10 architecture-governance Markdown trailing whitespace",
+      "status": "VERIFIED",
+      "severity": "P2",
+      "fix_work": "control-plane diff gate repair",
+      "verification_work": "Wave 10 validation",
+      "closure": "CONTROLLED / NOT PRODUCT DEFECT",
+      "evidence": "Team Wave 10 run 37743827267"
+    },
+    {
+      "id": "DEFECT-0002",
+      "title": "Organizational memory exists on only one of two divergent team-control-plane lineages",
+      "status": "OPEN",
+      "severity": "P0",
+      "detail": "All eight ledgers exist only on origin/fix/autonomous-product-factory (tip = 6c9d4da5b04a1063e9fe616c2b1c4d9fd072397b). origin/main has no .kilo/team/memory/ path. merge-base 99542164a06f15aa4072a52b9debcf75125a358a (2026-08-28T18:23:10+03:30); origin/main is 80 commits ahead of this branch while this branch is 662 commits ahead of origin/main.",
+      "fix_work": "GOVERNED_MISSION_DIRECTOR_LINEAGE_DECISION",
+      "verification_work": "WORK-0006_GATE_A",
+      "closure": "OPEN",
+      "evidence": "EVIDENCE lineage divergence record",
+      "linked_blocker": "BLOCKER-0004",
+      "lease_constraint": "An AUDIT-mode memory lease may not merge, rebase, promote or choose the canonical lineage.",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "DEFECT-0003",
+      "title": "Stable-ID allocation collisions in the work and wave registries",
+      "status": "REPAIRED_IN_THIS_LEASE",
+      "severity": "P2",
+      "detail": "work-registry next_id was WORK-0007 while a WORK-0007 item already existed; wave-history next_id was WAVE-0011 while WAVE-0011 was in use. Both advanced to the first unused permanent ID.",
+      "fix_work": "work-0003-memory-backfill-37779956878",
+      "verification_work": "work-0003-memory-backfill-37779956878 structural verification",
+      "closure": "CLOSED_BY_ALLOCATION_REPAIR",
+      "evidence": "git-independent structural check of the ledgers",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "DEFECT-0004",
+      "title": "WORK-0003 owner and mode contradiction between the work registry and the executed lease",
+      "status": "REPAIRED_IN_THIS_LEASE",
+      "severity": "P1",
+      "detail": "work-registry named owner=PLANNER and mode=RECONCILIATION; NEXT-WAVE-PLAN.json and the executed lease name owner=MEMORY_EDITOR and mode=AUDIT.",
+      "fix_work": "work-0003-memory-backfill-37779956878",
+      "verification_work": "work-0003-memory-backfill-37779956878 structural verification",
+      "closure": "CLOSED_WITH_PROVENANCE",
+      "evidence": ".kilo/team/NEXT-WAVE-PLAN.json + executed lease",
+      "preservation": "previous_owner and previous_mode retained; nothing overwritten silently",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "DEFECT-0005",
+      "title": "Three contradictory current-run identifiers for one wave",
+      "status": "REPAIRED_IN_THIS_LEASE",
+      "severity": "P1",
+      "detail": "mission-state named 37760777088; wave-history current named 37759400053; the executing branch carried 37776552275; this run is 37779956878. All prior values are preserved in run_id_history and run_attempts with their reasons. No job outcome is inferred for any superseded run.",
+      "fix_work": "work-0003-memory-backfill-37779956878",
+      "verification_work": "work-0003-memory-backfill-37779956878 structural verification",
+      "closure": "CLOSED_WITH_PROVENANCE",
+      "evidence": "git branch names + ledger history",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "DEFECT-0006",
+      "title": "WAVE-0011 was absent from the wave list and Wave 10's lease count contradicted its surviving branches",
+      "status": "REPAIRED_IN_THIS_LEASE",
+      "severity": "P2",
+      "detail": "At START_SHA WAVE-0011 existed only in the wave-history current block, never in the waves list, and wave-history next_id collided with it. Separately Wave 10 recorded 12 leases while only 11 worker branches survive; the absent branch is unknown-cause and is NOT treated as a proven integration outcome.",
+      "fix_work": "work-0003-memory-backfill-37779956878",
+      "verification_work": "work-0003-memory-backfill-37779956878 structural verification",
+      "closure": "CLOSED_WITH_UNKNOWN_PRESERVED",
+      "evidence": "git for-each-ref refs/remotes/origin/opencode/team-*-37743827267",
+      "recorded_by": "work-0003-memory-backfill-37779956878"
+    },
+    {
+      "id": "DEFECT-0007",
+      "title": "Evidence records asserting a path was present while simultaneously recording it absent",
+      "status": "REPAIRED_IN_THIS_LEASE",
+      "severity": "P2",
+      "detail": "The prior WORK-0003 attempt (run 37779956878) wrote source_present_at_start_sha=true on EVIDENCE-0003 and EVIDENCE-0004 while writing source_reachability=NOT_PRESENT_ON_THIS_BRANCH_RESOLVES_ON_UNPROMOTED_WAVE10_BRANCHES on the same records. One of the two fields was false. git cat-file -e HEAD:<path> shows both paths absent, so the factual field was corrected and the original claim preserved as a *_previous_claim.",
+      "fix_work": "work-0003-memory-backfill-37788700120",
+      "verification_work": "work-0003-memory-backfill-37788700120 structural verification",
+      "closure": "CLOSED_WITH_PROVENANCE_PRESERVED",
+      "evidence": "EVIDENCE-0022",
+      "recorded_by": "work-0003-memory-backfill-37788700120"
+    },
+    {
+      "id": "DEFECT-0008",
+      "title": "Identical lease dispatched three times with no promotion, QC or dedup feedback",
+      "status": "OPEN",
+      "severity": "P1",
+      "detail": "WORK-0003 ran in 37776552275, 37779956878 and this run, all from START_SHA 6c9d4da5, all unpromoted and all without QC adjudication. The second run installed a duplicate-lease guard inside its own unpromoted commit, which is why the third dispatch was still possible: the control could not gate a dispatcher reading promoted state.",
+      "fix_work": "WORK-0004_INTEGRATOR_PROMOTION_AND_QC",
+      "verification_work": "WORK-0006_GATE_A_DUPLICATE_WORK_RATE",
+      "closure": "OPEN",
+      "evidence": "EVIDENCE-0023",
+      "linked_blocker": "BLOCKER-0005",
+      "recorded_by": "work-0003-memory-backfill-37788700120"
+    },
+    {
+      "id": "DEFECT-0009",
+      "title": "F1/F2 QC workspace and persisted-QC repairs need lineage reconciliation",
+      "status": "REPAIRED_ON_ORIGIN_MAIN_LINEAGE_PENDING_CANONICAL_LINEAGE_RECONCILIATION",
+      "severity": "P0",
+      "detail": "F1 was a subprocess NameError; F2 was a nested-quote SyntaxError. Commit c19875f1b4bc87fa182d124e594773181a5cf7c8 repairs both; WORK-0010 reports 14/14 embedded Python blocks compiling and 11/11 sandbox checks after repair using main-lineage validation commit 7fdd58fb015b00924018e269f0dd325c7b1fc05b. This does not choose a canonical lineage or establish Team V2 acceptance.",
+      "fix_work": "WORK-0009_CONTROL_PLANE_REPAIR",
+      "verification_work": "WORK-0010 / run 37818114064",
+      "closure": "REPAIR_VERIFIED_ON_MAIN_LINEAGE; CANONICAL_LINEAGE_AND_ACCEPTANCE_OPEN",
+      "evidence": "EVIDENCE-0024",
+      "linked_blocker": "BLOCKER-0004",
+      "recorded_by": "WORK-0011-memory-reconciliation-2026-10-09"
+    },
+    {
+      "id": "DEFECT-0010",
+      "title": "Synthesis model selector indexes a fourth candidate when only three qualify",
+      "status": "OBSERVED_ON_RUN_377887_NEEDS_REVALIDATION_AFTER_SECURITY_HOLD",
+      "severity": "P1",
+      "detail": "Synthesis job 113356045167 failed with MODELS[3]: unbound variable while the qualified candidate list contained exactly three models. This prevented synthesis after two results were integrated. Current main has security holds on team/autonomous workflow paths; do not change workflow files or re-enable automation in this task. Revalidate via separately authorized control-plane work.",
+      "fix_work": "FUTURE_AUTHORIZED_CONTROL_PLANE_AUDIT_AFTER_SECURITY_HOLD_REVIEW",
+      "verification_work": "RUN_37788700120_SYNTHESIS_JOB_113356045167",
+      "closure": "OPEN_NEEDS_CURRENT_HEAD_REVALIDATION",
+      "evidence": "EVIDENCE-0027",
+      "recorded_by": "WORK-0011-memory-reconciliation-2026-10-09"
+    }
+  ]
+}

@@ -121,15 +121,22 @@ DETECT FAILURE → IDENTIFY LAST TRUSTED CHECKPOINT → ROLLBACK / ISOLATE
 Repairs must be bounded, evidence-driven and architecture-preserving. A failed repair leaves the run BLOCKED with failure evidence intact.
 
 ## Construction tool policy
-The construction process has three **principal authorities/roles**:
+The construction process has three **principal authorities**:
 
 1. **Python** — canonical repository-native construction worker, analyzer, verifier, repair worker and orchestration layer.
 2. **GitHub/Git** — source control, trusted checkpoints, synchronization, review and publication.
 3. **This Assistant** — architecture reasoning, critical review, expert choice, implementation decisions and orchestration authority.
 
-**Kilo Code is an approved local VS Code execution/operator layer subordinate to these authorities.** It may perform repository inspection, bounded implementation or repair, authorized command execution, focused testing and evidence production only within an explicit stage/handoff contract. Kilo Code does not replace the Python worker, does not become a provider dependency and has no authority over architecture, product semantics, backlog order, completion rules or governance.
+Approved subordinate execution **operators** may act under those authorities. They are replaceable mechanisms, not additional architectural authorities. The approved operator set includes:
 
-No external cloud coding provider or alternative coding agent may participate as a hidden or mandatory construction dependency. Kilo Code is explicitly treated as a local execution mechanism under repository governance, not as a fourth architectural authority or provider runtime.
+- **Kilo Code** — local VS Code execution/operator layer.
+- **OpenCode** — remote/CI execution/operator layer governed by Docs/OPENCODE_EXECUTION_OPERATOR_CONTRACT.md.
+
+Kilo Code and OpenCode may inspect the repository, execute bounded implementation or repair, run authorized commands, run focused tests and produce evidence only within an explicit stage/handoff contract. Neither operator may redefine architecture, product semantics, backlog order, completion rules, source-of-truth hierarchy or governance.
+
+OpenCode may operate unattended in GitHub Actions for routine construction work. Unattended operation is an execution mode, not new decision authority. It may create an isolated worker branch, commit and push verified work and perform autonomous continuation only when the contract permits it.
+
+Unapproved external coding assistants, cloud coding agents or alternative code-generation providers remain prohibited. An approved, repository-governed operator is not a product runtime dependency and must remain replaceable.
 
 This restriction is operational, not architectural: the HooshyarOS product may still contain provider-facing runtime abstractions when the frozen architecture explicitly requires them, but the autonomous construction fabric itself must remain provider-independent.
 
@@ -139,7 +146,7 @@ This restriction is operational, not architectural: the HooshyarOS product may s
 3. Never create a duplicate engine when an existing engine owns the capability.
 4. Prefer the smallest complete change that advances the frozen architecture.
 5. Use Python as the canonical construction worker and GitHub/Git as the durable repository control surface.
-6. Use Kilo Code only as a bounded local execution/operator layer under its stage contract and the Python/Assistant orchestration boundary.
+6. Use Kilo Code or OpenCode only as bounded execution/operator layers under their respective stage contracts and the Python/Assistant orchestration boundary.
 7. Run static validation, focused tests and integration verification before finalizing, using the risk-proportional cadence defined by the seven-day performance law.
 8. If verification fails, diagnose and repair automatically within a bounded budget.
 9. Preserve failure evidence; never fake a healthy result.
@@ -159,14 +166,16 @@ This restriction is operational, not architectural: the HooshyarOS product may s
 23. Preserve repair intent end-to-end; `repair-<capabilityId>` must reach the repair worker unchanged.
 24. Use the best approved tool for each stage before considering additional human intervention.
 25. Before declaring commercial product completion, pass the Commercial Product Completion Contract and keep external production dependencies distinct from repository-native completion.
-26. When Kilo Code is selected, pass a structured handoff, keep the stage scope bounded, prefer Python for deterministic repository-native work, require focused evidence on return, and leave integration/qualification ownership with the outer construction fabric.
-27. Before writing native code, inspect standards, mature free/open-source capabilities, existing owners and adapters in the canonical leverage order, and record the reuse decision as part of PLAN/INSPECT.
-28. Admit external software only when it is free, open source, licensed for commercial use and self-hosted/offline-suitable where required; verify license and commercial-use rights from authoritative evidence; treat unverifiable candidates as `DEFERRED`.
-29. Admit a native implementation only with recorded evidence that every earlier reuse tier was unsuitable; convenience or "we can code it ourselves" is never sufficient.
-30. Treat existing architecture, product, capability set, providers and assumptions as renewable: actively detect strategic decay and re-examine decisions against current and plausible future conditions (anti-legacy-bias).
-31. Where uncertainty is material, run a bounded, reversible experiment with explicit hypothesis, success criteria, scope, stop conditions and measured result instead of a speculative rewrite; never present an unmeasured experiment as completed capability.
-32. Label claims by epistemic status — FACT, ASSUMPTION, HYPOTHESIS, EXPERIMENT, MEASURED RESULT, DECISION — and never present an assumption or hypothesis as a fact or a measured result.
-33. Resolve every renewal outcome to improve, scale, adapt, replace or retire from measured evidence; keep externally sourced software subject to the permanent permitted class and route genuine architectural contradictions through Architecture Change Control.
+26. When Kilo Code or OpenCode is selected, pass the structured handoff required by its operator contract, keep the stage scope bounded, prefer Python for deterministic repository-native work, require focused evidence on return, and leave integration/qualification ownership with the outer construction fabric.
+27. OpenCode autonomous continuation is permitted for routine construction, audit, standardization, bounded repair and commercialization work only when the active contract authorizes it; it must never mutate Architecture Freeze V4/V4.1, governing charters, security boundaries, product-scope decisions, completion gates or canonical engine ownership. A conflict is BLOCKED, not auto-approved.
+28. OpenCode must use a free model from the repository-approved model policy; paid models are never selected automatically. Current default: opencode/big-pickle because it has passed the repository smoke tests. Alternative free models are candidates only after a bounded benchmark and evidence.
+29. Before writing native code, inspect standards, mature free/open-source capabilities, existing owners and adapters in the canonical leverage order, and record the reuse decision as part of PLAN/INSPECT.
+30. Admit external software only when it is free, open source, licensed for commercial use and self-hosted/offline-suitable where required; verify license and commercial-use rights from authoritative evidence; treat unverifiable candidates as `DEFERRED`.
+31. Admit a native implementation only with recorded evidence that every earlier reuse tier was unsuitable; convenience or "we can code it ourselves" is never sufficient.
+32. Treat existing architecture, product, capability set, providers and assumptions as renewable: actively detect strategic decay and re-examine decisions against current and plausible future conditions (anti-legacy-bias).
+33. Where uncertainty is material, run a bounded, reversible experiment with explicit hypothesis, success criteria, scope, stop conditions and measured result instead of a speculative rewrite; never present an unmeasured experiment as completed capability.
+34. Label claims by epistemic status — FACT, ASSUMPTION, HYPOTHESIS, EXPERIMENT, MEASURED RESULT, DECISION — and never present an assumption or hypothesis as a fact or a measured result.
+35. Resolve every renewal outcome to improve, scale, adapt, replace or retire from measured evidence; keep externally sourced software subject to the permanent permitted class and route genuine architectural contradictions through Architecture Change Control.
 
 ## Architecture changes
 Architecture Freeze V4 is the default source of truth. Change it only when an actual contradiction or missing architectural capability is demonstrated by repository evidence. If changed, update the master charter, architecture document, governance charter and affected decisions before continuing construction.
