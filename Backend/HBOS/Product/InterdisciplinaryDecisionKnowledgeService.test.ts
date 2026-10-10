@@ -55,6 +55,10 @@ describe("InterdisciplinaryDecisionKnowledgeService", () => {
     expect(process.domainIds).toContain("organizational-and-people-analytics");
     expect(process.domainIds).toContain("behavioral-science-and-human-centered-design");
     expect(process.domainIds).not.toContain("quantitative-finance-and-financial-engineering");
+
+    const managementDecision = knowledge.composeForTask({task:"MANAGEMENT_DECISION"});
+    expect(managementDecision.task).toBe("EXECUTIVE_DECISION");
+    expect(managementDecision.domainIds).toContain("strategy-enterprise-performance-and-process");
   });
 
   test("keeps regulatory scope and missing evidence explicit", () => {
