@@ -52,7 +52,10 @@ export type ScienceSignal =
     | 'quality-control'
     | 'business-management'
     | 'sales-management'
-    | 'opportunity-cost';
+    | 'opportunity-cost'
+    | 'project-management'
+    | 'cost-management'
+    | 'feasibility-study';
 
 export interface ScienceDomainDefinition {
     readonly id: string;
@@ -513,6 +516,64 @@ const SCIENCE_DOMAINS: readonly ScienceDomainDefinition[] = [
         availableOperations: [],
         limitations: [
             'NPV، WACC و رتبه‌بندی چندمعیاره می‌توانند ورودی مقایسه باشند، اما روش صریح و آزمون‌شده برای برآورد هزینه فرصت بر اساس بهترین بدیل کنارگذاشته‌شده هنوز ثبت نشده است.'
+        ]
+    },
+
+    {
+        id: 'project-management',
+        name: 'مدیریت پروژه',
+        purpose: 'پشتیبانی محدود از تعریف کار، تصویب، تخصیص مسئول، تعیین موعد و کنترل وضعیت اجرای کار در چارچوب حاکمیتی.',
+        owner: 'Backend/HBOS/Product/OrganizationalExecutionCoordinator.ts; Backend/HBOS/Engines/AutonomousOperationsEngine.ts',
+        readiness: 'PARTIAL',
+        signals: ['project-management', 'planning', 'scheduling', 'resource-allocation', 'performance-improvement', 'organizational-change'],
+        availableOperations: [
+            'OrganizationalExecutionCoordinator.propose',
+            'OrganizationalExecutionCoordinator.approve',
+            'OrganizationalExecutionCoordinator.assign',
+            'OrganizationalExecutionCoordinator.start',
+            'OrganizationalExecutionCoordinator.complete',
+            'OrganizationalExecutionCoordinator.cancel',
+            'AutonomousOperationsEngine.planWorkflow'
+        ],
+        limitations: [
+            'چرخه کنترل‌شده work item و برنامه‌ریزی گردش کار موجود است؛ مدیریت کامل پروژه شامل WBS، مسیر بحرانی، زمان‌بندی چندمنبعی، earned value و پیش‌بینی تأخیر به‌عنوان یک قابلیت یکپارچه و آزمون‌شده اثبات نشده است.'
+        ]
+    },
+    {
+        id: 'cost-management',
+        name: 'مدیریت هزینه',
+        purpose: 'بررسی هزینه‌های ثبت‌شده در تحلیل مالی و مقایسه بودجه برنامه‌ریزی‌شده با هزینه واقعی.',
+        owner: 'Backend/HBOS/Engines/BudgetIntelligenceEngine.ts; Backend/HBOS/Engines/FinancialIntelligenceEngine.ts; Backend/HBOS/Product/FinancialStatementAnalysisService.ts',
+        readiness: 'PARTIAL',
+        signals: ['cost-management', 'budgeting', 'budget-planning', 'financial-performance', 'resource-allocation', 'opportunity-cost', 'applied-analysis'],
+        availableOperations: [
+            'BudgetIntelligenceEngine.analyzeBudget',
+            'FinancialIntelligenceEngine.analyze',
+            'FinancialStatementAnalysisService.execute'
+        ],
+        limitations: [
+            'انحراف بودجه و هزینه‌های واردشده در تحلیل مالی پشتیبانی می‌شوند؛ بهای تمام‌شده محصول، مراکز هزینه، هزینه‌یابی بر مبنای فعالیت، تحلیل محرک هزینه و انحراف استاندارد تولید در این ثبت عملیات اجرایی تأییدشده نیستند.'
+        ]
+    },
+    {
+        id: 'feasibility-study',
+        name: 'امکان‌سنجی طرح و سرمایه‌گذاری',
+        purpose: 'ترکیب محدود ارزش زمانی پول، معیارهای بازده، تحلیل ریسک و مقایسه گزینه‌ها برای کمک به ارزیابی اولیه طرح.',
+        owner: 'Backend/HBOS/Engines/FinancialIntelligenceEngine.ts; Backend/HBOS/Engines/RiskIntelligenceEngine.ts; Backend/HBOS/Product/DecisionWorkbench.ts',
+        readiness: 'PARTIAL',
+        signals: ['feasibility-study', 'investment-evaluation', 'capital-allocation', 'cash-flow', 'valuation', 'risk-assessment', 'scenario-analysis', 'budget-planning'],
+        availableOperations: [
+            'FinancialIntelligenceEngine.npv',
+            'FinancialIntelligenceEngine.irr',
+            'FinancialIntelligenceEngine.payback',
+            'FinancialIntelligenceEngine.wacc',
+            'RiskIntelligenceEngine.assess',
+            'RiskIntelligenceEngine.sensitivity',
+            'RiskIntelligenceEngine.scenario',
+            'DecisionWorkbench.execute (Expert Choice)'
+        ],
+        limitations: [
+            'روش‌های مالی و ریسک موجود می‌توانند ورودی امکان‌سنجی باشند، اما گزارش جامع امکان‌سنجی با داده‌های فنی، بازار، حقوقی، عملیاتی، محیط‌زیستی، مفروضات تأییدشده و گیت تصمیم در یک مسیر انتهابه‌انتها هنوز اعتبارسنجی نشده است.'
         ]
     }
 ];

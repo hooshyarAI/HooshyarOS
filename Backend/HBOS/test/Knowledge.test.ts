@@ -65,7 +65,10 @@ describe("KnowledgeEngine science registry", () => {
             "quality-control",
             "business-management",
             "sales-management",
-            "opportunity-cost-analysis"
+            "opportunity-cost-analysis",
+            "project-management",
+            "cost-management",
+            "feasibility-study"
         ]));
 
         expect(engine.getScienceDomain("financial-engineering")?.availableOperations)
@@ -100,6 +103,17 @@ describe("KnowledgeEngine science registry", () => {
             .toBe("REGISTERED_ONLY");
         expect(engine.getScienceDomain("opportunity-cost-analysis")?.availableOperations)
             .toHaveLength(0);
+
+        expect(engine.getScienceDomain("project-management")?.readiness)
+            .toBe("PARTIAL");
+        expect(engine.getScienceDomain("project-management")?.availableOperations)
+            .toContain("OrganizationalExecutionCoordinator.approve");
+        expect(engine.getScienceDomain("cost-management")?.availableOperations)
+            .toContain("BudgetIntelligenceEngine.analyzeBudget");
+        expect(engine.getScienceDomain("feasibility-study")?.availableOperations)
+            .toContain("FinancialIntelligenceEngine.npv");
+        expect(engine.getScienceDomain("feasibility-study")?.availableOperations)
+            .toContain("RiskIntelligenceEngine.scenario");
     });
 
     test("selects relevant sciences deterministically and adds cross-cutting guardrails", () => {
@@ -158,11 +172,14 @@ describe("KnowledgeEngine science registry", () => {
                 "general-management",
                 "planning",
                 "fundamental-analysis",
-                "applied-analysis"
+                "applied-analysis",
+                "project-management",
+                "cost-management",
+                "feasibility-study"
             ]
         });
 
-        expect(plan.requestedSignals).toHaveLength(15);
+        expect(plan.requestedSignals).toHaveLength(18);
         expect(plan.unresolvedSignals).toEqual([]);
         expect(plan.status).toBe("PARTIAL");
         expect(plan.requiresReview).toBe(true);
@@ -181,7 +198,10 @@ describe("KnowledgeEngine science registry", () => {
             "general-management",
             "planning-methods",
             "fundamental-analysis",
-            "applied-analysis"
+            "applied-analysis",
+            "project-management",
+            "cost-management",
+            "feasibility-study"
         ]));
         expect(plan.selected.find(item => item.domainId === "technical-analysis")?.availableOperations)
             .toEqual([]);
