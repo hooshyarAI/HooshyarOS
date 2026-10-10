@@ -847,7 +847,14 @@ export function composeFinancialStatementInsight(
       push(strengths, `Operating cash flow (${operatingCashFlow}) covers the reported net profit (${netProfit}); earnings are cash-backed.`, "DERIVED_METRIC", [`operatingCashFlow=${operatingCashFlow}`, `netProfit=${netProfit}`]);
     } else {
       qualityOfEarnings = "PROFIT_NOT_CASH_BACKED";
-      push(weaknesses, `Operating cash flow (${operatingCashFlow}) is below reported net profit (${netProfit}); earnings are not fully cash-backed and may depend on accruals or non-cash income.`, "DERIVED_METRIC", [`operatingCashFlow=${operatingCashFlow}`, `netProfit=${netProfit}`]);
+      const wcNuance = workingCapitalView
+        ? workingCapitalView.cashConversionCycle > 0
+          ? ` Part of this gap may reflect cash tied up in working capital (CCC ${workingCapitalView.cashConversionCycle.toFixed(1)} days: DSO ${workingCapitalView.dso.toFixed(1)}, DIO ${workingCapitalView.dio.toFixed(1)}, DPO ${workingCapitalView.dpo.toFixed(1)}).`
+          : workingCapitalView.cashConversionCycle < 0
+            ? " Working capital is currently releasing cash, so the gap is more likely driven by non-cash accruals or non-operating items."
+            : ""
+        : "";
+      push(weaknesses, `Operating cash flow (${operatingCashFlow}) is below reported net profit (${netProfit}); earnings are not fully cash-backed and may depend on accruals or non-cash income.${wcNuance}`, "DERIVED_METRIC", [`operatingCashFlow=${operatingCashFlow}`, `netProfit=${netProfit}`]);
       push(managementActions, `Reconcile the gap of ${netProfit - operatingCashFlow} between net profit and operating cash flow to identify non-cash or accrual drivers.`, "MANAGEMENT_RECOMMENDATION", [`operatingCashFlow=${operatingCashFlow}`, `netProfit=${netProfit}`]);
     }
   }

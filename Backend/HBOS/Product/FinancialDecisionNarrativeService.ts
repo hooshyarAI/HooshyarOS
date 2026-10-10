@@ -1459,6 +1459,12 @@ export function composeAnswer(insight: FinancialStatementInsight, question: stri
     const grossProfitChange = change(insight, "grossProfit");
     const operatingExpenseChange = change(insight, "operatingExpenses");
     const operatingProfit = metric(insight, "operatingProfit");
+    const preTaxIncome = metric(insight, "preTaxIncome");
+    const preTaxChange = change(insight, "preTaxIncome");
+    const taxes = metric(insight, "taxes");
+    const interest = metric(insight, "interest");
+    const cogs = metric(insight, "cogs");
+    const cogsChange = change(insight, "cogs");
     sections.push({
       heading: "تغییر سود",
       lines: netProfitChange
@@ -1469,12 +1475,16 @@ export function composeAnswer(insight: FinancialStatementInsight, question: stri
         : [netProfit !== null ? `سود خالص دوره جاری ${formatFaAmount(netProfit, currency)} است؛ شواهد دوره قبل برای توضیح تغییر در دسترس نیست.` : "شواهد سود خالص یا دوره مقایسهای در دسترس نیست."],
     });
     sections.push({
-      heading: "زنجیره عوامل قابل مشاهده",
+      heading: "عوامل قابل مشاهده در صورت مالی",
       lines: [
         revenueChange ? `درآمد: ${changeText(revenueChange)}.` : "درآمد: شواهد مقایسهای در دسترس نیست.",
+        cogsChange ? `بهای تمام‌شده: ${changeText(cogsChange)}.` : "بهای تمام‌شده: شواهد مقایسهای در دسترس نیست.",
         grossProfitChange ? `سود ناخالص: ${changeText(grossProfitChange)}.` : "سود ناخالص: شواهد مقایسهای در دسترس نیست.",
-        operatingExpenseChange ? `هزینههای عملیاتی: ${changeText(operatingExpenseChange)}.` : "هزینههای عملیاتی: شواهد مقایسهای در دسترس نیست.",
+        operatingExpenseChange ? `هزینه‌های عملیاتی: ${changeText(operatingExpenseChange)}.` : "هزینه‌های عملیاتی: شواهد مقایسهای در دسترس نیست.",
         operatingProfit !== null ? `سود عملیاتی دوره جاری: ${formatFaAmount(operatingProfit, currency)}.` : "سود عملیاتی: از سند استخراج نشده است.",
+        interest !== null ? `هزینه مالی: ${formatFaAmount(interest, currency)}.` : "هزینه مالی: از سند استخراج نشده است.",
+        preTaxChange ? `سود قبل از مالیات: ${changeText(preTaxChange)}.` : preTaxIncome !== null ? `سود قبل از مالیات: ${formatFaAmount(preTaxIncome, currency)}.` : "سود قبل از مالیات: از سند استخراج نشده است.",
+        taxes !== null ? `مالیات: ${formatFaAmount(taxes, currency)}.` : "مالیات: از سند استخراج نشده است.",
       ],
     });
     sections.push({
@@ -1560,7 +1570,7 @@ export function composeAnswer(insight: FinancialStatementInsight, question: stri
       ] });
     } else if (target === "ANALYZE") {
     const keyFigures = [      metric(insight, "revenue") !== null ? `درآمد: ${formatFaAmount(metric(insight, "revenue"), currency)}` : "درآمد: در سند استخراج نشده است",
-      metric(insight, "netProfit") !== null ? `سود خالص: ${formatFaAmount(metric(insight, "netProfit"), currency)}` : "سود خالص: در سند استخراج نشده است",
+      metric(insight, "netProfit") !== null ? `سود خالص: ${formatFaAmount(metric(insight, "netProfit"), currency)}` : "سود خالص: در سند استخراج نشده است.",
       metric(insight, "grossProfit") !== null ? `سود ناخالص: ${formatFaAmount(metric(insight, "grossProfit"), currency)}` : null,
       metric(insight, "totalAssets") !== null ? `کل دارایی‌ها: ${formatFaAmount(metric(insight, "totalAssets"), currency)}` : null,
       metric(insight, "equity") !== null ? `حقوق مالکانه: ${formatFaAmount(metric(insight, "equity"), currency)}` : null,
@@ -1573,6 +1583,17 @@ export function composeAnswer(insight: FinancialStatementInsight, question: stri
     ] });
     sections.push({ heading: "ریسکها", lines: linesOf(groups.risks) });
     sections.push({ heading: "فرصتها و رشد", lines: linesOf(groups.opportunities) });
+    if (insight.duPont && insight.duPont.roe !== null) {
+      const dupontLines = [];
+      if (insight.duPont.netMargin !== null) dupontLines.push(`حاشیه سود: ${formatFaPercent(insight.duPont.netMargin)}`);
+      if (insight.duPont.assetTurnover !== null) dupontLines.push(`گردش دارایی: ${formatFaRatio(insight.duPont.assetTurnover)}`);
+      if (insight.duPont.equityMultiplier !== null) dupontLines.push(`ساختار تأمین مالی: ${formatFaRatio(insight.duPont.equityMultiplier)}`);
+      dupontLines.push(`بازده حقوق مالکانه: ${formatFaPercent(insight.duPont.roe)}`);
+      sections.push({ heading: "بازده حقوق مالکانه (روش داپونت)", lines: [
+        'بازده حقوق مالکانه از سه عامل تشکیل شده است: حاشیه سود، گردش دارایی و ساختار تأمین مالی.',
+        ...dupontLines
+      ] });
+    }
     for (const section of productSegmentSections(insight)) sections.push(section);
     if (!answeredIntents.has("ACTION")) sections.push({ heading: "اقدامات پیشنهادی", lines: linesOf(groups.actions) });
     } else {

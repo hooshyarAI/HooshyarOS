@@ -1035,7 +1035,19 @@ function renderStatementInsight(insight, statusMeta) {
     ]));
   }
 
-  if (Array.isArray(insight.integrity) && insight.integrity.length > 0) {
+   if (insight.duPont && insight.duPont.roe !== null) {
+     const dupontLines = [];
+     if (insight.duPont.netMargin !== null) dupontLines.push(`حاشیه سود: ${formatFaPercent(insight.duPont.netMargin)}`);
+     if (insight.duPont.assetTurnover !== null) dupontLines.push(`گردش دارایی: ${formatFaRatio(insight.duPont.assetTurnover)}`);
+     if (insight.duPont.equityMultiplier !== null) dupontLines.push(`ساختار تأمین مالی: ${formatFaRatio(insight.duPont.equityMultiplier)}`);
+     dupontLines.push(`بازده حقوق مالکانه: ${formatFaPercent(insight.duPont.roe)}`);
+     append(textSection('بازده حقوق مالکانه (روش داپونت)', [
+       'بازده حقوق مالکانه از سه عامل تشکیل شده است: حاشیه سود، گردش دارایی و ساختار تأمین مالی.',
+       ...dupontLines
+     ]));
+   }
+
+   if (Array.isArray(insight.integrity) && insight.integrity.length > 0) {
     append(textSection('کنترل‌های سازگاری حسابداری', insight.integrity.map(check=>integrityLine(check, insight.currency || 'IRR'))));
   }
 

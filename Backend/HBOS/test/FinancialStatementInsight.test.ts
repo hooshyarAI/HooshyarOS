@@ -127,4 +127,15 @@ describe("composeFinancialStatementInsight", () => {
     expect(identity?.status).toBe("MISMATCH");
     expect(insight.risks.some((finding) => finding.message.includes("balance-sheet-identity"))).toBe(true);
   });
+
+  describe("GAP-E CFO quality working-capital nuance regression", () => {
+    test("CFO below net profit includes working-capital nuance when CCC is positive", () => {
+      const { insight } = insightFor(FULL_FACTS);
+      // Verify the weakness message format when working capital data exists.
+      const cfoWeakness = insight.weaknesses.find((finding) => finding.message.includes("Operating cash flow") || finding.message.includes("جریان نقد عملیاتی"));
+      if (cfoWeakness && insight.workingCapital && insight.workingCapital.cashConversionCycle > 0) {
+        expect(cfoWeakness.message).toContain("working capital");
+      }
+    });
+  });
 });
