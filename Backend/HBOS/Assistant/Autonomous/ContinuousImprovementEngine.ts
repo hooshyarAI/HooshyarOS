@@ -91,11 +91,16 @@ export class ContinuousImprovementEngine {
 
         const traceId = ProvenanceTrace.createTraceId();
         const inputHash = this.hash(input);
-        const recommendations = this.generateRecommendations(input);
+        const qualified = this.hasVerifiedMeasurement(input.measurementProvenance);
+        const recommendationCandidates = this.generateRecommendations(input);
+        // Never expose heuristic recommendation confidence while its source
+        // measurement is not qualified.
+        const recommendations = qualified
+            ? recommendationCandidates
+            : recommendationCandidates.map(recommendation => ({ ...recommendation, confidence: 0 }));
         const gapDetected = this.detectGap(input);
         const sustainabilityMet = input.actualImpact.sustainability === "SUSTAINABLE";
         const adaptationRequired = gapDetected || !sustainabilityMet;
-        const qualified = this.hasVerifiedMeasurement(input.measurementProvenance);
         const learningQualification: LearningQualification = qualified ? "QUALIFIED" : "REVIEW_REQUIRED";
         // Heuristic rules do not constitute evidence-backed confidence.
         const confidence = qualified

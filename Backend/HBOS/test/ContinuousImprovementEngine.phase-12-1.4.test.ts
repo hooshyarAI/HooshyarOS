@@ -56,6 +56,7 @@ describe("ContinuousImprovementEngine", () => {
         expect(result.learningSummary.confidence).toBe(0);
         expect(result.provenance.verificationStatus).toBe("PENDING");
         expect(result.recommendations.length).toBeGreaterThan(0);
+        expect(result.recommendations.every(recommendation => recommendation.confidence === 0)).toBe(true);
         expect(result.recommendations.some(r => r.action === "Maintain current trajectory")).toBe(true);
         expect(result.learningSummary.gapDetected).toBe(false);
         expect(result.learningSummary.sustainabilityMet).toBe(true);
