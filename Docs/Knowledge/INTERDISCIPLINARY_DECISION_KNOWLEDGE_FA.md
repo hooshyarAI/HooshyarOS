@@ -1,5 +1,5 @@
 # دانش بین‌رشته‌ای و مهندسی تصمیم هوشیارOS
-**نسخه:** interdisciplinary-decision-knowledge-2026-10-10.v1  
+**نسخه:** interdisciplinary-decision-knowledge-2026-10-10.v2  
 **تاریخ مبنا:** ۱۰ اکتبر ۲۰۲۶  
 **سیاست معماری:** این بسته دانش و قواعد انتخاب روش است؛ موتور جدیدی به Architecture Freeze V4/V4.1 اضافه نمی‌کند.
 
