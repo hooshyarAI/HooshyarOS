@@ -34,7 +34,7 @@ describe("FinancialStatementAnalysisService production behavioral evidence", () 
     expect(result.observations[0]).toMatchObject({ code: "PROFITABLE" });
     expect(result.reasoningEvidence).toEqual({ status: "verified", success: true });
     expect(result.source.sha256).toBe(ingested.evidence.sha256);
-    expect(capturedReasoningPrompt).toContain("interdisciplinaryKnowledgeVersion=interdisciplinary-decision-knowledge-2026-10-10.v1");
+    expect(capturedReasoningPrompt).toContain("interdisciplinaryKnowledgeVersion=interdisciplinary-decision-knowledge-2026-10-10.v2");
     expect(capturedReasoningPrompt).toContain("accounting-financial-reporting");
     expect(capturedReasoningPrompt).toContain("جمع بدهکار/بستانکار کل، درآمد/هزینه نیست");
     expect(capturedReasoningPrompt).toContain("Select methods only if data, assumptions, objective and computational costs fit.");
