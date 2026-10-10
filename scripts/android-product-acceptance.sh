@@ -60,7 +60,7 @@ for i in $(seq 1 90); do
   if [[ "$state" == "device" ]]; then
     boot="$(get_boot)"
   fi
-  echo "attempt ${i}/180: state=${state:-unknown} boot=${boot:-unknown}"
+  echo "attempt ${i}/90: state=${state:-unknown} boot=${boot:-unknown}"
   if [[ "$state" == "device" && "$boot" == "1" ]]; then
     break
   fi
