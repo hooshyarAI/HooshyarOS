@@ -239,6 +239,7 @@ async function refreshDashboard() {
     syncWorkspaceSnapshot();
     await refreshAnalyticsSources();
     await refreshReportArtifacts();
+    await refreshBudgetCostBreakdown();
     try {
       const latest = await getJson('/api/financial/insights/latest');
       if (latest.statementInsight) {
@@ -1556,21 +1557,23 @@ function parseNumberList(value) {
 }
 
 async function refreshAnalyticsSources() {
-  const select = document.querySelector('#analytics-source');
-  if (!select) return;
+  const selects = [...document.querySelectorAll('#analytics-source, #budget-cost-source')];
+  if (!selects.length) return;
   try {
     const payload = await getJson('/api/sources');
-    const current = select.value;
-    select.innerHTML = '<option value="">— انتخاب منبع —</option>';
-    for (const source of payload.sources || []) {
-      const option = document.createElement('option');
-      option.value = source.sha256;
-      option.textContent = `${source.sourceName} (${source.format})`;
-      select.appendChild(option);
+    for (const select of selects) {
+      const current = select.value;
+      select.innerHTML = '<option value="">— انتخاب منبع —</option>';
+      for (const source of payload.sources || []) {
+        const option = document.createElement('option');
+        option.value = source.sha256;
+        option.textContent = `${source.sourceName} (${source.format})`;
+        select.appendChild(option);
+      }
+      if (current) select.value = current;
     }
-    if (current) select.value = current;
   } catch {
-    select.innerHTML = '<option value="">— ابتدا نشست ایجاد کنید —</option>';
+    for (const select of selects) select.innerHTML = '<option value="">— ابتدا نشست ایجاد کنید —</option>';
   }
 }
 
@@ -1617,6 +1620,101 @@ document.querySelector('#analytics-form').addEventListener('submit', async event
     presentUserResult(result, 'summarizeAnalytics', summary);
   } catch (error) {
     result.textContent = `تحلیل پیشرفته ناموفق بود: ${error.message}`;
+  }
+});
+
+
+const COST_VARIANCE_LABELS = {
+  WITHIN_BUDGET: 'مطابق بودجه',
+  OVER_BUDGET: 'بیش‌ازبودجه',
+  UNDER_BUDGET: 'کمتر از بودجه',
+  UNBUDGETED_SPEND: 'هزینه بدون بودجه'
+};
+
+function formatCostAmount(value) {
+  return Number(value).toLocaleString('fa-IR', { maximumFractionDigits: 2 });
+}
+
+function renderBudgetCostRecord(container, payload) {
+  if (!container) return;
+  container.replaceChildren();
+  const summary = document.createElement('p');
+  summary.textContent = `جمع کل: بودجه ${formatCostAmount(payload.total.planned)}، هزینه واقعی ${formatCostAmount(payload.total.actual)}، انحراف ${formatCostAmount(payload.total.variance)}؛ ${COST_VARIANCE_LABELS[payload.total.status] || payload.total.status}. وضعیت تصمیم: نیازمند بازبینی.`;
+  container.appendChild(summary);
+  const source = document.createElement('p');
+  source.textContent = `منبع مرتبط: ${payload.source?.sourceName || 'منبع بارگذاری‌شده'} — پیوند منبع ثبت شده اما تطبیق سطرها انجام نشده (${String(payload.source?.sha256 || '').slice(0, 12)}…).`;
+  container.appendChild(source);
+
+  const addGroups = (title, groups) => {
+    const heading = document.createElement('strong');
+    heading.textContent = title;
+    container.appendChild(heading);
+    const list = document.createElement('ul');
+    for (const group of groups || []) {
+      const item = document.createElement('li');
+      item.textContent = `${group.key}: بودجه ${formatCostAmount(group.planned)}، واقعی ${formatCostAmount(group.actual)}، انحراف ${formatCostAmount(group.variance)}؛ ${COST_VARIANCE_LABELS[group.status] || group.status}`;
+      list.appendChild(item);
+    }
+    container.appendChild(list);
+  };
+  addGroups('به تفکیک مرکز هزینه', payload.byCostCenter);
+  addGroups('به تفکیک گروه هزینه', payload.byCategory);
+}
+
+function normalizeCostNumber(value) {
+  const normalized = String(value).trim()
+    .replace(/[۰-۹]/g, digit => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)))
+    .replace(/[٠-٩]/g, digit => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
+    .replace(/[٬,]/g, '')
+    .replace(/[٫]/g, '.');
+  return normalized ? Number(normalized) : Number.NaN;
+}
+
+async function refreshBudgetCostBreakdown() {
+  const container = document.querySelector('#budget-cost-latest');
+  if (!container) return;
+  try {
+    const payload = await getJson('/api/budget/cost-breakdown/latest');
+    renderBudgetCostRecord(container, payload);
+  } catch (error) {
+    container.textContent = error.status === 404
+      ? 'هنوز تحلیل انحراف هزینه‌ای برای این سازمان ذخیره نشده است.'
+      : `دریافت تحلیل هزینه ناموفق بود: ${error.message}`;
+  }
+}
+
+document.querySelector('#budget-cost-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const result = document.querySelector('#budget-cost-result');
+  try {
+    const selectedSource = document.querySelector('#budget-cost-source').value;
+    if (!selectedSource) throw new Error('ابتدا منبع بارگذاری‌شده را انتخاب کنید.');
+    const currency = document.querySelector('#budget-cost-currency').value.trim();
+    if (!currency) throw new Error('ارز یا واحد مبالغ را وارد کنید.');
+    const rawLines = document.querySelector('#budget-cost-lines').value.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    if (!rawLines.length) throw new Error('حداقل یک سطر هزینه وارد کنید.');
+    const lines = rawLines.map((line, index) => {
+      const fields = line.split(/[;؛]/).map(field => field.trim());
+      if (fields.length !== 4 || fields.some(field => !field)) {
+        throw new Error(`سطر ${index + 1}: چهار مقدار مرکز هزینه، گروه هزینه، بودجه و هزینه واقعی لازم است.`);
+      }
+      const planned = normalizeCostNumber(fields[2]);
+      const actual = normalizeCostNumber(fields[3]);
+      if (!Number.isFinite(planned) || !Number.isFinite(actual)) {
+        throw new Error(`سطر ${index + 1}: بودجه و هزینه واقعی باید عدد معتبر باشند.`);
+      }
+      return { lineId: `line-${index + 1}`, costCenterId: fields[0], category: fields[1], currency, planned, actual };
+    });
+    const payload = await getJson('/api/budget/cost-breakdown', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'idempotency-key': idempotencyKey('budget:cost-breakdown') },
+      body: JSON.stringify({ sourceSha256: selectedSource, lines })
+    });
+    rotateIdempotencyKey('budget:cost-breakdown');
+    renderBudgetCostRecord(result, payload);
+    await refreshBudgetCostBreakdown();
+  } catch (error) {
+    result.textContent = `تحلیل هزینه انجام نشد: ${error.message}`;
   }
 });
 

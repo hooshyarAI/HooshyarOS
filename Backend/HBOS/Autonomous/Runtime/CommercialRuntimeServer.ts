@@ -3,6 +3,7 @@ import { createServer, IncomingMessage, ServerResponse, Server } from "node:http
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { FinancialIntelligenceEngine } from "../../Engines/FinancialIntelligenceEngine";
+import { BudgetIntelligenceEngine, type BudgetCostBreakdownInput } from "../../Engines/BudgetIntelligenceEngine";
 import { ExecutiveIntelligenceEngine } from "../../Engines/ExecutiveIntelligenceEngine";
 import { ReasoningEngine } from "../../Engines/ReasoningEngine";
 import { ReportsEngine, SUPPORTED_REPORT_FORMATS, type ReportFormat, type ReportSection } from "../../Engines/ReportsEngine";
@@ -104,6 +105,7 @@ const LATEST_ANALYSIS_KEY = "financial-analysis:latest";
 const LATEST_EXECUTIVE_WORKBENCH_KEY = "executive-intelligence-workbench:latest";
 const LATEST_DECISION_WORKBENCH_KEY = "decision-workbench:latest";
 const LATEST_ANALYTICS_KEY = "financial-analytics:latest";
+const LATEST_BUDGET_COST_BREAKDOWN_KEY = "budget-cost-breakdown:latest";
 const DEFAULT_SESSION_TTL_MS = 60 * 60 * 1000;
 const DEFAULT_SESSION_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 const DEFAULT_CORS_ORIGIN = "http://localhost:3000";
@@ -131,7 +133,7 @@ interface IdempotencyRecord {
 const corsHeaders = (origin: string): Record<string, string> => ({
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Cookie",
+    "Access-Control-Allow-Headers": "Content-Type, Cookie, Idempotency-Key",
 });
 
 type StoredAnalysis = ReturnType<FinancialStatementAnalysisService["execute"]>;
@@ -452,6 +454,7 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
     const executiveWorkbench = new ExecutiveIntelligenceWorkbench(new ExecutiveIntelligenceEngine());
     const decisionWorkbench = new DecisionWorkbench();
     const financialAnalytics = new FinancialAnalyticsService();
+    const budgetIntelligence = new BudgetIntelligenceEngine();
     // B-03: question-driven cognitive orchestration composition over the
     // existing canonical Engines (no new Engine, no new domain logic).
     // B-04: the canonical tenant-safe MemoryEngine is injected as the single
@@ -1886,6 +1889,62 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 return corsJson(200, result.statementInsight
                     ? { ...withMeta, presentation: { findings: composeFindingGroups(result.statementInsight), scenarios: composeScenarios(result.statementInsight) } }
                     : withMeta);
+            }
+
+
+            if (req.method === "POST" && path === "/api/budget/cost-breakdown") {
+                if (!getOrCreateRateLimiter(session.token).tryAcquire()) return corsJson(429, { error: "RATE_LIMIT_EXCEEDED" });
+                if (!ensurePermission("INGEST_DATA")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                const body = await readJson(req);
+                const sourceSha256 = String(body.sourceSha256 ?? "").trim().toLowerCase();
+                if (!/^[a-f0-9]{64}$/.test(sourceSha256)) return corsJson(400, { error: "SOURCE_SHA256_REQUIRED" });
+                if (!Array.isArray(body.lines)) return corsJson(400, { error: "COST_LINES_REQUIRED" });
+                if (body.lines.length > 5000) return corsJson(400, { error: "COST_LINE_LIMIT_EXCEEDED" });
+
+                // The canonical source must belong to this tenant. A source link alone
+                // does not prove that manually entered budget/actual rows reconcile to it.
+                const sourceModel = await loadIngestedModel(session.tenantId, sourceSha256);
+                if (!sourceModel) return corsJson(422, { error: "INGESTED_SOURCE_REQUIRED" });
+                if (sourceModel.source?.sha256 !== sourceSha256) return corsJson(422, { error: "SOURCE_EVIDENCE_MISMATCH" });
+                if (!enforceTenantBoundary(sourceModel, Authorization.READ)) return corsJson(404, { error: "SOURCE_NOT_FOUND" });
+
+                return runIdempotent("budget:cost-breakdown", body, async () => {
+                    const result = budgetIntelligence.analyzeCostBreakdown({
+                        lines: body.lines as BudgetCostBreakdownInput["lines"]
+                    });
+                    if (result.status !== "READY") return { status: 422, payload: result };
+
+                    const record = {
+                        ...result,
+                        tenantId: session.tenantId,
+                        capabilityId: "product.cost-management",
+                        targetEngine: "BudgetIntelligenceEngine",
+                        source: {
+                            sha256: sourceSha256,
+                            sourceName: sourceModel.source.sourceName,
+                            sourceType: sourceModel.source.sourceType,
+                            linkStatus: "LINKED_NOT_RECONCILED" as const
+                        },
+                        qualification: "REVIEW_REQUIRED" as const,
+                        qualificationReason: "مقادیر بودجه و هزینه در این فرم دستی وارد شده‌اند؛ پیوند به منبع بارگذاری‌شده به‌تنهایی تطبیق سطرها را اثبات نمی‌کند.",
+                        generatedAt: new Date(now()).toISOString()
+                    };
+                    await persistence.write({ tenantId: session.tenantId }, LATEST_BUDGET_COST_BREAKDOWN_KEY, record);
+                    return { status: 200, payload: record };
+                });
+            }
+
+            if (req.method === "GET" && path === "/api/budget/cost-breakdown/latest") {
+                if (!ensurePermission("READ_DASHBOARD")) return corsJson(403, { error: "INSUFFICIENT_PERMISSIONS" });
+                const persisted = await persistence.read({ tenantId: session.tenantId }, LATEST_BUDGET_COST_BREAKDOWN_KEY);
+                const record = persisted?.value as { readonly tenantId?: string; readonly status?: string } | undefined;
+                if (!record || record.tenantId !== session.tenantId || record.status !== "READY") {
+                    return corsJson(404, { error: "BUDGET_COST_BREAKDOWN_NOT_FOUND" });
+                }
+                if (!enforceTenantBoundary(record, Authorization.READ)) {
+                    return corsJson(404, { error: "BUDGET_COST_BREAKDOWN_NOT_FOUND" });
+                }
+                return corsJson(200, record);
             }
 
             if (path === "/api/execution/work-items" && req.method === "POST") {
