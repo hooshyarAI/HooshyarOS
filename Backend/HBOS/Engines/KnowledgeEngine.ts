@@ -322,7 +322,6 @@ const SCIENCE_DOMAINS: readonly ScienceDomainDefinition[] = [
             'این حوزه راهنمای انتخاب رویکرد و مالک معماری است؛ وجود آن جایگزین آزمون‌های واقعی کارایی، امنیت، پایداری یا پذیرش محصول نیست.'
         ],
         crossCutting: true
-    }
     },
     {
         id: 'planning-methods',
