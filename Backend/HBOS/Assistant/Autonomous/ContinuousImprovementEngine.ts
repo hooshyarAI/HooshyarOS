@@ -14,7 +14,15 @@
  * - Provenance preserved for every recommendation.
  */
 
+import { ProvenanceTrace } from "../../Core/ProvenanceTrace";
 import type { ImpactMeasurementResult } from "../../Product/ImpactMeasurementService";
+
+export type LearningQualification = "QUALIFIED" | "REVIEW_REQUIRED" | "NEEDS_DATA";
+
+export type MeasurementProvenance = Pick<
+    ImpactMeasurementResult["provenance"],
+    "traceId" | "inputHash" | "outputHash" | "verificationStatus" | "sourceRef" | "calculatedAt"
+>;
 
 export interface ImprovementInput {
     readonly tenantId: string;
@@ -31,6 +39,8 @@ export interface ImprovementInput {
         readonly riskScore: number;
         readonly decisionLatency: number;
     };
+    /** Evidence carried from the canonical before/after measurement. */
+    readonly measurementProvenance?: MeasurementProvenance;
 }
 
 export interface AdaptationRecommendation {
@@ -43,7 +53,9 @@ export interface AdaptationRecommendation {
 }
 
 export interface ImprovementResult {
+    /** READY means the rule workflow executed; qualification is reported separately. */
     readonly status: "READY" | "BLOCKED" | "NEEDS_DATA";
+    readonly learningQualification: LearningQualification;
     readonly tenantId: string;
     readonly domain: string;
     readonly recommendations: readonly AdaptationRecommendation[];
@@ -60,10 +72,9 @@ export interface ImprovementResult {
         readonly verificationStatus: "VERIFIED" | "PENDING" | "FAILED";
         readonly sourceRef: string;
         readonly calculatedAt: string;
+        readonly measurementTraceId?: string;
     };
 }
-
-const CANONICAL_TIMESTAMP = "2026-01-01T00:00:00Z";
 
 export class ContinuousImprovementEngine {
     readonly capabilityId = "product.continuous-improvement";
@@ -74,30 +85,34 @@ export class ContinuousImprovementEngine {
     }
 
     improve(input: ImprovementInput | null | undefined): ImprovementResult {
-        if (!input?.tenantId?.trim() || !input.domain || !input.actualImpact) {
+        if (!this.validateInput(input)) {
             return this.blocked(input);
         }
 
-        const traceId = `trace-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const traceId = ProvenanceTrace.createTraceId();
         const inputHash = this.hash(input);
-
-        const recommendations = this.generateRecommendations(input);
+        const qualified = this.hasVerifiedMeasurement(input.measurementProvenance);
+        const recommendationCandidates = this.generateRecommendations(input);
+        // Never expose heuristic recommendation confidence while its source
+        // measurement is not qualified.
+        const recommendations = qualified
+            ? recommendationCandidates
+            : recommendationCandidates.map(recommendation => ({ ...recommendation, confidence: 0 }));
         const gapDetected = this.detectGap(input);
         const sustainabilityMet = input.actualImpact.sustainability === "SUSTAINABLE";
         const adaptationRequired = gapDetected || !sustainabilityMet;
-        const confidence = this.computeConfidence(input, gapDetected, sustainabilityMet);
+        const learningQualification: LearningQualification = qualified ? "QUALIFIED" : "REVIEW_REQUIRED";
+        // Heuristic rules do not constitute evidence-backed confidence.
+        const confidence = qualified
+            ? this.computeConfidence(input, gapDetected, sustainabilityMet)
+            : 0;
 
-        const learningSummary = {
-            gapDetected,
-            sustainabilityMet,
-            adaptationRequired,
-            confidence
-        };
-
-        const outputHash = this.hash({ recommendations, learningSummary });
+        const learningSummary = { gapDetected, sustainabilityMet, adaptationRequired, confidence };
+        const outputHash = this.hash({ recommendations, learningSummary, learningQualification });
 
         return {
             status: "READY",
+            learningQualification,
             tenantId: input.tenantId,
             domain: input.domain,
             recommendations: Object.freeze(recommendations),
@@ -106,11 +121,87 @@ export class ContinuousImprovementEngine {
                 traceId,
                 inputHash,
                 outputHash,
-                verificationStatus: "VERIFIED",
+                verificationStatus: qualified ? "VERIFIED" : "PENDING",
                 sourceRef: "ContinuousImprovementEngine",
-                calculatedAt: CANONICAL_TIMESTAMP
+                calculatedAt: new Date().toISOString(),
+                measurementTraceId: input.measurementProvenance?.traceId
             })
         };
+    }
+
+    /**
+     * Use measured before/after impact as the source of learning inputs.
+     * Tenant scope must match exactly. Pending source evidence can produce
+     * candidate recommendations for review, never a qualified learning claim.
+     */
+    improveFromMeasurement(
+        measurement: ImpactMeasurementResult | null | undefined,
+        currentState: ImprovementInput["currentState"],
+        tenantId: string
+    ): ImprovementResult {
+        if (!measurement || measurement.status !== "READY"
+            || typeof tenantId !== "string" || !tenantId.trim()
+            || measurement.tenantId !== tenantId) {
+            return this.blocked({ tenantId: typeof tenantId === "string" ? tenantId : "" });
+        }
+
+        return this.improve({
+            tenantId,
+            domain: "operational",
+            actualImpact: {
+                timeSaved: measurement.actualImpact.timeSaved,
+                operatingCostReduced: measurement.actualImpact.operatingCostReduced,
+                actualFinancialValue: measurement.actualImpact.actualFinancialValue,
+                actualROI: measurement.actualImpact.actualROI,
+                sustainability: measurement.actualImpact.sustainability
+            },
+            ...(measurement.expectedImpact ? {
+                expectedImpact: {
+                    timeSaved: measurement.expectedImpact.timeSaved,
+                    costReduced: measurement.expectedImpact.costReduced,
+                    financialValue: measurement.expectedImpact.financialValue,
+                    roi: measurement.expectedImpact.roi
+                }
+            } : {}),
+            currentState,
+            measurementProvenance: measurement.provenance
+        });
+    }
+
+    private validateInput(input: ImprovementInput | null | undefined): input is ImprovementInput {
+        if (!input || typeof input.tenantId !== "string" || !input.tenantId.trim()) return false;
+        if (!["financial", "operational", "strategic", "technology"].includes(input.domain)) return false;
+        if (!input.actualImpact || !input.currentState) return false;
+
+        const actualFields = ["timeSaved", "operatingCostReduced", "actualFinancialValue", "actualROI"];
+        const actual = input.actualImpact as unknown as Record<string, number>;
+        if (!actualFields.every(field => Number.isFinite(actual[field]))) return false;
+        if (input.actualImpact.timeSaved < 0 || input.actualImpact.operatingCostReduced < 0
+            || input.actualImpact.actualFinancialValue < 0) return false;
+        if (!["SUSTAINABLE", "PARTIAL", "NOT_SUSTAINABLE"].includes(input.actualImpact.sustainability)) return false;
+
+        const stateFields = ["revenue", "profit", "riskScore", "decisionLatency"];
+        const state = input.currentState as unknown as Record<string, number>;
+        if (!stateFields.every(field => Number.isFinite(state[field]))) return false;
+        if (input.currentState.riskScore < 0 || input.currentState.decisionLatency < 0) return false;
+
+        if (input.expectedImpact) {
+            const expectedFields = ["timeSaved", "costReduced", "financialValue", "roi"];
+            const expected = input.expectedImpact as unknown as Record<string, number>;
+            if (!expectedFields.every(field => Number.isFinite(expected[field]))) return false;
+            if (input.expectedImpact.timeSaved < 0 || input.expectedImpact.costReduced < 0) return false;
+        }
+        return true;
+    }
+
+    private hasVerifiedMeasurement(provenance?: MeasurementProvenance): boolean {
+        return !!provenance
+            && provenance.verificationStatus === "VERIFIED"
+            && !!provenance.traceId?.trim()
+            && /^[a-f0-9]{64}$/i.test(provenance.inputHash)
+            && /^[a-f0-9]{64}$/i.test(provenance.outputHash)
+            && !!provenance.sourceRef?.trim()
+            && Number.isFinite(Date.parse(provenance.calculatedAt));
     }
 
     private generateRecommendations(input: ImprovementInput): readonly AdaptationRecommendation[] {
@@ -212,10 +303,12 @@ export class ContinuousImprovementEngine {
         return Math.min(1, Math.max(0, confidence));
     }
 
-    private blocked(input: ImprovementInput | null | undefined): ImprovementResult {
+    private blocked(input: Partial<ImprovementInput> | null | undefined): ImprovementResult {
+        const traceId = ProvenanceTrace.createTraceId();
         return {
             status: "NEEDS_DATA",
-            tenantId: input?.tenantId ?? "",
+            learningQualification: "NEEDS_DATA",
+            tenantId: typeof input?.tenantId === "string" ? input.tenantId : "",
             domain: input?.domain ?? "unknown",
             recommendations: Object.freeze([]),
             learningSummary: {
@@ -225,17 +318,18 @@ export class ContinuousImprovementEngine {
                 confidence: 0
             },
             provenance: Object.freeze({
-                traceId: `trace-${Date.now()}-failed`,
-                inputHash: "",
-                outputHash: "",
+                traceId,
+                inputHash: input ? this.hash(input) : "",
+                outputHash: this.hash({ status: "NEEDS_DATA", traceId }),
                 verificationStatus: "FAILED",
                 sourceRef: "ContinuousImprovementEngine",
-                calculatedAt: CANONICAL_TIMESTAMP
+                calculatedAt: new Date().toISOString(),
+                measurementTraceId: input?.measurementProvenance?.traceId
             })
         };
     }
 
     private hash(obj: unknown): string {
-        return `hash-${JSON.stringify(obj).length}`;
+        return ProvenanceTrace.hashInput(JSON.stringify(obj) ?? "null");
     }
 }

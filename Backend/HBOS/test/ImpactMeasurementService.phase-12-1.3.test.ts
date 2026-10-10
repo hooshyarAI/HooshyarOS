@@ -135,9 +135,35 @@ describe("ImpactMeasurementService", () => {
         const result = service.measure(baseline, post);
 
         expect(result.provenance.traceId).toBeDefined();
-        expect(result.provenance.inputHash).toBeDefined();
-        expect(result.provenance.outputHash).toBeDefined();
-        expect(result.provenance.verificationStatus).toBe("VERIFIED");
+        expect(result.provenance.inputHash).toMatch(/^[a-f0-9]{64}$/);
+        expect(result.provenance.outputHash).toMatch(/^[a-f0-9]{64}$/);
+        expect(result.provenance.verificationStatus).toBe("PENDING");
+        expect(Number.isFinite(Date.parse(result.provenance.calculatedAt))).toBe(true);
+        expect(result.provenance.traceId).toBe(result.measurementId);
         expect(result.provenance.sourceRef).toBe("ImpactMeasurementService");
     });
+    test("allows negative profit and margin while validating other measurements", () => {
+        const result = service.measure(
+            { ...baseline, profit: -100, profitMargin: -0.1 },
+            { ...post, profit: -50, profitMargin: -0.04 }
+        );
+        expect(result.status).toBe("READY");
+        expect(result.deltas.profit).toBe(50);
+        expect(result.deltas.profitMargin).toBeCloseTo(0.06, 8);
+    });
+
+    test("rejects malformed timestamps and unowned tenant scope", () => {
+        expect(service.measure({ ...baseline, recordedAt: "not-a-date" }, post).status).toBe("NEEDS_DATA");
+        expect(service.measure({ ...baseline, tenantId: " " }, post).status).toBe("NEEDS_DATA");
+    });
+
+    test("rejects non-finite expected impact", () => {
+        const result = service.measure(baseline, post, {
+            timeSaved: 1, costReduced: 1, capacityRelease: 1,
+            qualityImprovement: 0, riskReduction: 0, financialValue: Number.NaN, roi: 0.2
+        });
+        expect(result.status).toBe("NEEDS_DATA");
+        expect(result.provenance.verificationStatus).toBe("FAILED");
+    });
+
 });

@@ -71,7 +71,7 @@ describe("HooshyarOS Autonomous Assistant", () => {
         expect(result.improvement.provenance.verificationStatus).toBe("FAILED");
     });
 
-    test("invokes continuous improvement with canonical evidence when supplied", async () => {
+    test("keeps manually supplied impact values unqualified without source measurement provenance", async () => {
         const assistant = new HooshyarAutonomousAssistant(daemon());
         const result = await assistant.execute(
             "Complete HooshyarOS autonomous development",
@@ -82,7 +82,10 @@ describe("HooshyarOS Autonomous Assistant", () => {
         expect(result.improvement.tenantId).toBe(canonicalEvidence.tenantId);
         expect(result.improvement.domain).toBe(canonicalEvidence.domain);
         expect(result.improvement.recommendations.length).toBeGreaterThan(0);
-        expect(result.improvement.provenance.verificationStatus).toBe("VERIFIED");
+        expect(result.improvement.learningQualification).toBe("REVIEW_REQUIRED");
+        expect(result.improvement.learningSummary.confidence).toBe(0);
+        expect(result.improvement.recommendations.every(recommendation => recommendation.confidence === 0)).toBe(true);
+        expect(result.improvement.provenance.verificationStatus).toBe("PENDING");
         expect(result.improvement.provenance.sourceRef).toBe("ContinuousImprovementEngine");
         expect(result.construction.status).toBe("completed");
     });
