@@ -54,7 +54,7 @@ if ! timeout 5s "$ADB" wait-for-device; then
 fi
 
 echo "=== Waiting for ADB device to become online and Android to boot ==="
-for i in $(seq 1 180); do
+for i in $(seq 1 90); do
   state="$(get_state)"
   boot=""
   if [[ "$state" == "device" ]]; then
@@ -73,36 +73,36 @@ test "$(get_boot)" = "1"
 record_step android-booted
 
 echo "=== Waiting for Package Manager ==="
-for i in $(seq 1 60); do
-  if "$ADB" shell cmd package list packages >/dev/null 2>&1; then
+for i in $(seq 1 30); do
+  if timeout 3s "$ADB" shell cmd package list packages >/dev/null 2>&1; then
     echo "Package Manager ready (attempt ${i})"
     break
   fi
-  echo "Package Manager not ready (attempt ${i}/60)"
+  echo "Package Manager not ready (attempt ${i}/30)"
   sleep 2
 done
-"$ADB" shell cmd package list packages >/dev/null
+timeout 3s "$ADB" shell cmd package list packages >/dev/null
 record_step package-manager-ready
 
 echo "=== Installing APK ==="
-"$ADB" install -r "$APK"
+timeout 120s "$ADB" install -r "$APK"
 record_step apk-installed
 
 echo "=== Launching application ==="
-"$ADB" shell am force-stop "$PACKAGE"
-"$ADB" shell am start -n "$ACTIVITY"
+timeout 20s "$ADB" shell am force-stop "$PACKAGE"
+timeout 20s "$ADB" shell am start -n "$ACTIVITY"
 record_step launcher-start
 sleep 5
 
 echo "=== Runtime diagnostics ==="
-"$ADB" logcat -d AndroidRuntime:E '*:S' | tail -n 100 || true
-"$ADB" shell pidof "$PACKAGE" || true
-"$ADB" shell dumpsys activity top | grep -i -A 12 -B 12 "$PACKAGE" || true
+timeout 10s "$ADB" logcat -d AndroidRuntime:E '*:S' | tail -n 100 || true
+timeout 5s "$ADB" shell pidof "$PACKAGE" || true
+timeout 10s "$ADB" shell dumpsys activity top | grep -i -A 12 -B 12 "$PACKAGE" || true
 
 echo "=== Verifying process liveness ==="
 PID=""
 for i in $(seq 1 20); do
-  PID="$("$ADB" shell pidof "$PACKAGE" 2>/dev/null | tr -d '\r' || true)"
+  PID="$(timeout 5s "$ADB" shell pidof "$PACKAGE" 2>/dev/null | tr -d '\r' || true)"
   echo "pidof attempt ${i}/20: ${PID}"
   if [[ -n "$PID" ]]; then
     break
@@ -114,7 +114,7 @@ test -n "$PID"
 record_step process-alive
 
 echo "=== Verifying MainActivity is foreground ==="
-TOP="$("$ADB" shell dumpsys activity activities 2>/dev/null | tr -d '\r' || true)"
+TOP="$(timeout 10s "$ADB" shell dumpsys activity activities 2>/dev/null | tr -d '\r' || true)"
 [[ "$TOP" == *"$ACTIVITY"* ]]
 record_step main-activity-visible
 
