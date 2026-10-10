@@ -310,7 +310,7 @@ describe("Phase 08-09 Operational Closure", () => {
     const assistant = new AssistantEngine({ orchestrated });
     const fullResult = assistant.analyzeAcquisitionOpportunity("Evaluate acquisition", orchestratedInput);
     expect(fullResult.response.project.name).toBe("Evaluate acquisition");
-    expect(fullResult.response.traceId).toBe(orchestratedResult.quality.provenance.traceId);
+    expect(fullResult.response.traceId).toBe(fullResult.orchestrated.quality.provenance.traceId);
     expect(fullResult.response.confidence).toBeUndefined();
     expect(fullResult.response.message).toContain("Quality: REVIEW_REQUIRED");
     expect(fullResult.orchestrated.tenantId).toBe("tenant-a");
