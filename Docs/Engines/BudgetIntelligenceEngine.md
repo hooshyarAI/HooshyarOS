@@ -25,3 +25,11 @@ This is budget-versus-actual variance analysis by cost center/category, not a co
 ## Architecture and reuse
 
 The existing `BudgetIntelligenceEngine` remains the sole calculation owner. No new engine, dependency or alternate calculation service was introduced. The KnowledgeEngine cost-management domain maps to this implemented operation.
+
+
+## Commercial runtime surface — cost-center analysis
+
+The authenticated runtime exposes `POST /api/budget/cost-breakdown` and `GET /api/budget/cost-breakdown/latest`. The write endpoint requires a tenant-owned uploaded source SHA-256, the `INGEST_DATA` permission and 1–5,000 explicit cost lines. It persists the latest result under the caller's tenant and supports the canonical `Idempotency-Key` mechanism. The read endpoint requires `READ_DASHBOARD` and returns only the current tenant's result.
+
+The Persian web workspace accepts one row per line in this format:
+`cost center;category;planned;actual`. The selected canonical upload is linked to the result for traceability; because budget/actual line mappings are entered manually in this version, the persisted record truthfully keeps `qualification=REVIEW_REQUIRED` and `source.linkStatus=LINKED_NOT_RECONCILED`. It does not present the amounts as independently reconciled facts.

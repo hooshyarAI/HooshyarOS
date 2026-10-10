@@ -196,6 +196,19 @@
             </form><div id="analytics-result" class="result" role="status" aria-live="polite"></div>
           </div></details>
 
+          <details id="cost-management-section" class="tool-panel"><summary>مدیریت هزینه و انحراف بودجه</summary><div class="panel-body">
+            <p>مقادیر بودجه و هزینه واقعی را به تفکیک مرکز هزینه و گروه هزینه وارد کنید. برای ردیابی، منبع باید از قبل بارگذاری شده باشد. پیوند به منبع به‌تنهایی تطبیق سطرها را ثابت نمی‌کند؛ نتیجه برای تصمیم نهایی نیازمند بازبینی است. مبالغ در یک ارز/واحد یکسان وارد شوند.</p>
+            <form id="budget-cost-form">
+              <label>منبع مرتبط<select id="budget-cost-source" required><option value="">— انتخاب منبع بارگذاری‌شده —</option></select></label>
+              <label>ارز/واحد مبالغ<input id="budget-cost-currency" required placeholder="مثلاً IRR یا تومان" /></label>
+              <label class="analytics-wide">سطرهای هزینه<textarea id="budget-cost-lines" rows="6" required placeholder="کارخانه؛مواد اولیه؛1000000؛1200000&#10;کارخانه؛دستمزد؛500000؛300000&#10;اداری؛مواد اولیه؛250000؛250000"></textarea></label>
+              <p class="analytics-wide">هر سطر باید چهار مقدار جداشده با «؛» یا «;» داشته باشد: مرکز هزینه؛ گروه هزینه؛ بودجه؛ هزینه واقعی.</p>
+              <button class="primary-button" type="submit">محاسبه و ذخیره انحراف هزینه</button>
+            </form>
+            <div id="budget-cost-result" class="result" role="status" aria-live="polite"></div>
+            <div id="budget-cost-latest" class="execution-list" aria-live="polite"></div>
+          </div></details>
+
           <details id="execution-tools" class="tool-panel"><summary>اجرای سازمانی</summary><div class="panel-body">
             <p>تصمیم تأییدشده را به کار واگذارشده با مسئول، موعد، KPI، شواهد و بازخورد تبدیل کنید.</p>
             <form id="execution-form">

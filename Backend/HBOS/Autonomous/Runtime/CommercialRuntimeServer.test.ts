@@ -34,7 +34,7 @@ describe("CommercialRuntimeServer security headers", () => {
         expect(res.status).toBe(204);
         expect(res.headers["access-control-allow-origin"]).toBe(CORS_ORIGIN);
         expect(res.headers["access-control-allow-methods"]).toBe("GET, POST, OPTIONS");
-        expect(res.headers["access-control-allow-headers"]).toBe("Content-Type, Cookie");
+        expect(res.headers["access-control-allow-headers"]).toBe("Content-Type, Cookie, Idempotency-Key");
     });
 
     it("attaches CORS headers to API responses", async () => {
@@ -44,7 +44,7 @@ describe("CommercialRuntimeServer security headers", () => {
         expect(res.status).toBe(200);
         expect(res.headers["access-control-allow-origin"]).toBe(CORS_ORIGIN);
         expect(res.headers["access-control-allow-methods"]).toBe("GET, POST, OPTIONS");
-        expect(res.headers["access-control-allow-headers"]).toBe("Content-Type, Cookie");
+        expect(res.headers["access-control-allow-headers"]).toBe("Content-Type, Cookie, Idempotency-Key");
     });
 
     it("attaches X-Content-Type-Options and X-Frame-Options to API responses", async () => {

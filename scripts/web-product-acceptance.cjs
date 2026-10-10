@@ -217,6 +217,23 @@ async function main() {
     await sleep(1100);
     const analytics = await request('/api/financial/insights', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceSha256: structuredIngest.body.evidence.sha256, breakEven: { fixedCosts: 1000, variableCostPerUnit: 5, pricePerUnit: 10, unitsSold: 300 } }) });
     if (analytics.status !== 200 || analytics.body.status !== 'READY' || analytics.body.capabilityId !== 'product.financial-analytics' || analytics.body.targetEngine !== 'Financial Intelligence Engine' || analytics.body.breakEven?.breakEvenUnits !== 200 || !Array.isArray(analytics.body.anomalies?.zscore?.points) || analytics.body.source?.sha256 !== structuredIngest.body.evidence.sha256) throw new Error(`WEB_ACCEPTANCE_ANALYTICS_FAILED:${analytics.status}:${JSON.stringify(analytics.body)}`);
+
+    // Budget-vs-actual cost analysis: real authenticated route + tenant-scoped persistence.
+    await sleep(1100);
+    const costBreakdown = await request('/api/budget/cost-breakdown', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie, 'idempotency-key': 'acceptance:cost-breakdown' },
+      body: JSON.stringify({
+        sourceSha256: structuredIngest.body.evidence.sha256,
+        lines: [
+          { lineId: 'line-1', costCenterId: 'factory', category: 'materials', currency: 'IRR', planned: 1000, actual: 1200 },
+          { lineId: 'line-2', costCenterId: 'factory', category: 'labor', currency: 'IRR', planned: 500, actual: 300 }
+        ]
+      })
+    });
+    if (costBreakdown.status !== 200 || costBreakdown.body.capabilityId !== 'product.cost-management' || costBreakdown.body.status !== 'READY' || costBreakdown.body.total?.planned !== 1500 || costBreakdown.body.total?.actual !== 1500 || costBreakdown.body.qualification !== 'REVIEW_REQUIRED' || costBreakdown.body.source?.linkStatus !== 'LINKED_NOT_RECONCILED') throw new Error(`WEB_ACCEPTANCE_COST_BREAKDOWN_FAILED:${costBreakdown.status}:${JSON.stringify(costBreakdown.body)}`);
+    const latestCostBreakdown = await request('/api/budget/cost-breakdown/latest', { headers: { cookie } });
+    if (latestCostBreakdown.status !== 200 || latestCostBreakdown.body.tenantId !== session.body.tenantId || latestCostBreakdown.body.total?.variance !== 0) throw new Error(`WEB_ACCEPTANCE_COST_BREAKDOWN_LATEST_FAILED:${latestCostBreakdown.status}`);
     const analyticsLatest = await request('/api/financial/insights/latest', { headers: { cookie } });
     if (analyticsLatest.status !== 200 || analyticsLatest.body.capabilityId !== 'product.financial-analytics' || analyticsLatest.body.tenantId !== session.body.tenantId) throw new Error(`WEB_ACCEPTANCE_ANALYTICS_LATEST_FAILED:${analyticsLatest.status}`);
     const enrichedReport = await request('/api/report', { headers: { cookie } });
