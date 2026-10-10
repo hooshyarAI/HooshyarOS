@@ -7,7 +7,7 @@ describe("InterdisciplinaryDecisionKnowledgeService", () => {
     const catalogue = knowledge.getCatalogue();
     const ids = catalogue.domains.map((domain) => domain.id);
 
-    expect(catalogue.version).toBe("interdisciplinary-decision-knowledge-2026-10-10.v1");
+    expect(catalogue.version).toBe("interdisciplinary-decision-knowledge-2026-10-10.v2");
     expect(catalogue.domainCount).toBeGreaterThanOrEqual(12);
     expect(ids).toContain("data-analytics-science");
     expect(ids).toContain("data-analytics-management-and-governance");
