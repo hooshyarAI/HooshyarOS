@@ -5,17 +5,16 @@ import {
 } from "../Engines/FinancialIntelligenceEngine";
 import { ReasoningEngine, ReasoningResult } from "../Engines/ReasoningEngine";
 import { FinancialSourceEvidence } from "./FinancialDataIngestionAdapter";
+import { InterdisciplinaryDecisionKnowledgeService } from "./InterdisciplinaryDecisionKnowledgeService";
 
 export interface FinancialStatementAnalysisInput extends FinancialAnalysisInput {
   readonly tenantId: string;
   readonly source: FinancialSourceEvidence;
 }
-
 export interface FinancialObservation {
   readonly code: "LOSS" | "PROFITABLE";
   readonly message: string;
 }
-
 export interface FinancialStatementAnalysisResult {
   readonly capabilityId: "product.financial-statement-analysis";
   readonly targetEngine: "Financial Intelligence Engine";
@@ -27,13 +26,11 @@ export interface FinancialStatementAnalysisResult {
   readonly status: "READY" | "BLOCKED";
 }
 
-/**
- * Canonical product boundary for financial statement analysis.
- * It composes existing engine contracts and does not create a second financial engine.
- */
+/** Canonical product boundary: verified metrics plus task-relevant domain knowledge. */
 export class FinancialStatementAnalysisService {
   readonly capabilityId = "product.financial-statement-analysis" as const;
   readonly targetEngine = "Financial Intelligence Engine" as const;
+  private readonly interdisciplinaryKnowledge = new InterdisciplinaryDecisionKnowledgeService();
 
   constructor(
     private readonly financialIntelligence: FinancialIntelligenceEngine,
@@ -46,7 +43,6 @@ export class FinancialStatementAnalysisService {
 
   execute(input: FinancialStatementAnalysisInput): FinancialStatementAnalysisResult {
     this.assertBoundaryInput(input);
-
     const metrics = this.financialIntelligence.analyze({
       revenue: input.revenue,
       expenses: input.expenses,
@@ -55,12 +51,11 @@ export class FinancialStatementAnalysisService {
     });
 
     if (metrics.status !== "READY") {
-      return this.blocked(input, metrics, "financial-analysis-blocked");
+      return this.blocked(input, metrics, metrics.reason ?? "financial-analysis-blocked");
     }
 
     const observations = this.observations(metrics);
     const reasoningResult = this.reasoning.reason(this.reasoningPrompt(input, metrics, observations));
-
     if (!reasoningResult.success) {
       return this.blocked(input, metrics, reasoningResult.status, reasoningResult);
     }
@@ -88,8 +83,16 @@ export class FinancialStatementAnalysisService {
     metrics: FinancialAnalysisResult,
     observations: readonly FinancialObservation[],
   ): string {
+    const knowledge = this.interdisciplinaryKnowledge.composeForTask({
+      task: "FINANCIAL_STATEMENT_ANALYSIS",
+      objective: "Explain financial metrics only to the level supported by classified data and source evidence.",
+      evidenceAvailable: [input.source.sourceName, input.source.sourceType, input.source.sha256],
+    });
     return [
-      "Explain verified financial statement analysis from repository-owned metrics; do not invent thresholds or business rules.",
+      "Explain repository-owned financial metrics; do not invent thresholds or business rules.",
+      `interdisciplinaryKnowledgeVersion=${knowledge.version}`,
+      `interdisciplinaryDomains=${knowledge.domainIds.join(",")}`,
+      knowledge.reasoningContext,
       `tenant=${input.tenantId.trim()}`,
       `source=${input.source.sourceName}`,
       `profit=${metrics.profit}`,
@@ -112,19 +115,13 @@ export class FinancialStatementAnalysisService {
       source: input.source,
       metrics,
       observations: [],
-      reasoningEvidence: {
-        status: reasoning?.status ?? reason,
-        success: false,
-      },
+      reasoningEvidence: { status: reasoning?.status ?? reason, success: false },
       status: "BLOCKED",
     };
   }
 
   private assertBoundaryInput(input: FinancialStatementAnalysisInput): void {
-    if (!input?.tenantId?.trim()) {
-      throw new Error("financial-statement-analysis-tenant-required");
-    }
-
+    if (!input?.tenantId?.trim()) throw new Error("financial-statement-analysis-tenant-required");
     const source = input.source;
     if (
       !source?.sourceName?.trim() ||

@@ -53,7 +53,7 @@ describe("Final Product Runtime Qualification", () => {
     const session = await request(server, "/api/session", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ username: "مدیرعامل", organization: "شرکت پذیرش نهایی" }),
+      body: JSON.stringify({ mode: "register", username: "مدیرعامل", organization: "شرکت پذیرش نهایی", password: "Strong-Demo-Password-2026!" }),
     });
     expect(session.status).toBe(201);
     const cookie = cookieFrom(session);
@@ -108,6 +108,33 @@ describe("Final Product Runtime Qualification", () => {
     expect(dashboardBody.tenantId).toBe(sessionBody.tenantId);
     expect(dashboardBody.analysisAvailable).toBe(true);
     expect(dashboardBody.metrics).toEqual({ revenue: 1500, profit: 200, risk: 25 });
+
+    const logout = await request(server, "/api/logout", { method: "POST", headers: { cookie } });
+    expect(logout.status).toBe(200);
+    const anonymousAfterLogout = await request(server, "/api/dashboard", { headers: { cookie } });
+    expect(anonymousAfterLogout.status).toBe(401);
+
+    const login = await request(server, "/api/session", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        mode: "login",
+        username: "مدیرعامل",
+        organization: "شرکت پذیرش نهایی",
+        password: "Strong-Demo-Password-2026!",
+      }),
+    });
+    expect(login.status).toBe(200);
+    const newCookie = cookieFrom(login);
+    const loginBody = await login.json() as { authenticated: boolean; tenantId: string };
+    expect(loginBody.authenticated).toBe(true);
+    expect(loginBody.tenantId).toBe(sessionBody.tenantId);
+
+    const restoredDashboard = await request(server, "/api/dashboard", { headers: { cookie: newCookie } });
+    expect(restoredDashboard.status).toBe(200);
+    const restored = await restoredDashboard.json() as { analysisAvailable: boolean; tenantId: string };
+    expect(restored.analysisAvailable).toBe(true);
+    expect(restored.tenantId).toBe(sessionBody.tenantId);
   });
 
   test("rejects invalid business input and keeps the authentication boundary fail-closed", async () => {
@@ -128,7 +155,7 @@ describe("Final Product Runtime Qualification", () => {
     const sessionA = await request(server, "/api/session", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ username: "a", organization: "Tenant A" }),
+      body: JSON.stringify({ mode: "register", username: "a", organization: "Tenant A", password: "Strong-Demo-Password-2026!" }),
     });
     const cookieA = cookieFrom(sessionA);
 

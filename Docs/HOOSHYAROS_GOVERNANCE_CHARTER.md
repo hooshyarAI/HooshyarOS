@@ -218,6 +218,12 @@ The ultimate product outcomes are improvement in:
 
 These principles guide construction decisions without changing the Assistant's role: the Assistant builds the platform; the finished platform provides the future domain intelligence and advisory capabilities.
 
+### Unified intelligence and organism-inspired coordination
+
+Use the human organism only as an engineering analogy for coordinated perception, memory, reasoning, control, action and feedback—not as a claim of machine consciousness. HooshyarOS must create coherent end-to-end behavior from existing engines and approved contracts, without introducing duplicate engines or changing Architecture Freeze V4.
+
+For every cross-component capability, verify that context and source evidence reach the correct owner, outputs are composed without contradictory semantics, failures and uncertainty remain visible, actions stay governed, and outcomes are measurable. Unit tests alone are insufficient: require integration evidence and application/acceptance evidence for the affected user journey. Learning must be based on verified outcomes, remain auditable/reversible, and respect tenant boundaries.
+
 ---
 
 ## 10. Anti-Drift Rules
@@ -283,6 +289,8 @@ For the autonomous Assistant itself, DONE additionally means the verified comple
 
 ---
 
+
+For capabilities that coordinate multiple engines or product surfaces, completion also requires evidence of the end-to-end contract: the correct tenant/context is preserved; upstream evidence and downstream status are traceable; invalid, missing or conflicting inputs fail safely; and the user-facing result reflects the integrated output. Where the behavior is user-facing, add application-level interaction/acceptance coverage; do not promote unit-test success to whole-system completion.
 ## 13. Status
 
 **GOVERNANCE CHARTER: ACTIVE**

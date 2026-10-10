@@ -80,6 +80,12 @@ Target outcomes:
 
 These principles guide the product being built; they do not turn the construction Assistant into the product's end-user advisor.
 
+### Permanent decision: intelligence must be integrated, not merely accumulated
+
+HooshyarOS must behave as one coherent, evidence-based and feedback-driven system. Inspired by the coordination of a human organism, existing components must cooperate across context, memory, reasoning, governance, action, monitoring and verified learning. This is a system-design analogy, not a claim of human-like consciousness.
+
+The canonical behavior loop is **Evidence and context → interpretation → cross-engine reasoning → governed decision → authorized action → outcome measurement → verified learning**. Preserve Architecture Freeze V4 and all existing engine ownership. Do not create duplicate brain, nervous-system or orchestration engines. Test cross-engine contracts and complete user workflows; distinguish evidence from assumptions; fail safely on missing/conflicting data; and make learning auditable, reversible and tenant-safe.
+
 ## 5. Permanent Engineering Optimization
 
 Construction decisions must optimize the system as a whole:
@@ -264,6 +270,11 @@ Before changing code:
 - [ ] Python/GitHub construction path confirmed
 - [ ] No prohibited external coding agent selected
 - [ ] Security/governance/observability implications checked
+- [ ] Cross-engine handoffs and result composition reviewed for this change
+- [ ] Evidence, assumptions, uncertainty and failure states remain distinguishable
+- [ ] Integration tests cover affected engine/runtime contracts
+- [ ] Application/acceptance evidence exists when a user-facing flow changes
+- [ ] Any learning/feedback path preserves provenance, reversibility and tenant boundaries
 
 Before finalization:
 

@@ -57,6 +57,8 @@ Required capabilities:
 
 The existence of `UserManagementEngine` alone is not sufficient evidence of commercial identity readiness.
 
+The current runtime has a password-backed registration/login path, a random persistent organization/tenant identifier, single-use expiring membership invitations, role-gated runtime routes, session expiry/logout and identity audit events. Password recovery, stronger account recovery, deployment-grade rate limiting, multi-factor authentication and independent security review remain separate completion requirements; this partial implementation must not be reported as full commercial identity readiness.
+
 ### 3. Multi-tenancy and authorization
 
 Every organization-owned resource must have an explicit ownership/scope rule.
@@ -334,3 +336,18 @@ Human action is reserved for:
 - acceptance of consequential external operations
 
 All other safe work remains autonomous.
+
+
+## Versioned accounting, audit and financial-reporting knowledge
+The platform exposes the reviewed knowledge snapshot at `GET /api/knowledge/financial-standards`, backed by `FinancialStandardsKnowledgeService` and documented in `Docs/Knowledge/FINANCIAL_STANDARDS_AND_REPORTING_KNOWLEDGE_FA.md`.
+
+This is a versioned knowledge index and application-control set, not a full copy of copyrighted standards. It separates issued, effective, locally adopted, and entity-applicable requirements. Where the official Iranian issuer's current final text/effective date was not obtained, entries remain explicitly review-required and cannot authorize a final compliance conclusion. The snapshot date is 2026-10-10; the full official Iranian catalogue remains a named follow-up, not a completed claim.
+
+
+## Task-oriented interdisciplinary knowledge and analytics management
+The versioned interdisciplinary catalogue is `interdisciplinary-decision-knowledge-2026-10-10.v2`, served by `GET /api/knowledge/interdisciplinary?task=...`. Its 13 knowledge domains explicitly separate data analytics science from data analytics management/data governance and separately cover financial management and quantitative finance/financial engineering.
+
+The existing financial statement analysis boundary passes a task-composed knowledge context into the existing ReasoningEngine. The catalogue defines data prerequisites, quality gates, safeguards and outcome measures; adding an entry does not claim that its algorithm is production-implemented. Sources include DAMA-DMBOK, IFAC audit data analytics guidance, NIST AI RMF, OECD principles, COSO ERM and production ML engineering guidance. Their authority and applicability types remain distinct.
+
+
+The current version additionally exposes explicit task profiles for `DATA_ANALYTICS` and `DATA_ANALYTICS_MANAGEMENT`. Its reference list includes EDM Council DCAM v3, ISO 8000 data-quality references, W3C PROV and Kimball dimensional-modeling guidance. The catalogue documents a review policy but does not claim automatic continuous web crawling or automatic production adoption.

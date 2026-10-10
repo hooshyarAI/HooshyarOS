@@ -78,6 +78,14 @@ The platform must ultimately improve:
 9. Organization Must Survive Individuals
 10. Systems Before Heroes
 
+### Unified-intelligence operating rule
+
+Build HooshyarOS as one coordinated system inspired by the human organism's integration and feedback—not as a claim of biological or conscious behavior. Compose existing engines through explicit contracts. Do not add a duplicate brain, nervous-system or orchestration engine, and do not alter Architecture Freeze V4.
+
+For cross-component work, trace the complete applicable loop: **evidence/context → interpretation → reasoning → governance → authorized action → measured outcome → verified learning**. Preserve provenance, organization boundaries and approved decisions. Separate facts, derived values, assumptions and uncertainty. If evidence or dependencies are insufficient, qualify or block the result safely.
+
+Before claiming completion, verify the relevant engine contracts, integration handoffs and—when a user-facing path changes—the actual application workflow. Unit tests or visual polish alone do not prove integrated behavior. Learning must be traceable, reviewable and reversible; speed must never be achieved by bypassing correctness, security or governance.
+
 ---
 
 ## Permanent Rules
@@ -302,6 +310,16 @@ Write code that can still be understood five years later.
 Prefer one coherent capability at a time, with its implementation contract and verification evidence committed together.
 
 Do not make the human repeatedly perform mechanical file creation, test execution, diagnosis and repair when those actions can be safely automated by the construction fabric.
+
+---
+
+## Data Analytics and Analytics Management
+
+Before analytics, BI, KPI interpretation or trend analysis, retrieve `GET /api/knowledge/interdisciplinary?task=DATA_ANALYTICS`. For data ownership, KPI definitions, source lineage, quality rules, access, lifecycle and reporting operations, retrieve `...?task=DATA_ANALYTICS_MANAGEMENT`. Treat these as distinct capabilities from predictive ML and from accounting-standard compliance.
+
+Before analysis, establish the question, metric definition, numerator/denominator, units, period, source, coverage, missingness and lineage. Do not infer causality from association. Explain uncertainty and sample limitations. Every production KPI needs an owner, definition, source of record, refresh cadence and change history; dashboards require reconciliation and permission checks.
+
+New methods and sources require source/version and applicability checks, a measurable baseline, relevant tests and versioned approval. The current knowledge service does not perform automatic background web crawling. Architecture Freeze V4 remains unchanged; no new engine is to be created for data analysis or data analysis management.
 
 ---
 

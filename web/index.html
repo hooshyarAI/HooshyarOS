@@ -3,60 +3,255 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="theme-color" content="#0f172a" />
+  <meta name="theme-color" content="#101b31" />
   <meta name="description" content="هوشیار.ai — داشبورد هوشمند مالی و مدیریتی" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="stylesheet" href="/styles.css" />
-  <title>هوشیار.ai</title>
+  <title>هوشیار.ai — فضای هوشمند مالی و مدیریتی</title>
 </head>
 <body>
-  <main class="shell">
-    <header class="hero">
-      <div>
-        <p class="eyebrow">Hooshyar.ai</p>
-        <h1>مرکز هوشمندی مالی و مدیریتی</h1>
-        <p class="subtitle">از داده مالی معتبر تا داشبورد، بینش و تصمیم قابل اجرا.</p>
-      </div>
-      <a class="primary" href="#workspace">شروع کار</a>
-    </header>
-
-    <section id="workspace" class="grid">
-      <article class="card">
-        <h2>وضعیت سامانه</h2>
-        <p id="readiness">در حال بررسی...</p>
-      </article>
-      <article class="card">
-        <h2>داشبورد مالی</h2>
-        <div class="metrics">
-          <div><span>درآمد</span><strong id="revenue">—</strong></div>
-          <div><span>سود</span><strong id="profit">—</strong></div>
-          <div><span>ریسک بدهی</span><strong id="risk">—</strong></div>
+  <a class="skip-link" href="#main">پرش به محتوای اصلی</a>
+  <div class="layout">
+    <aside class="sidebar" aria-label="ناوبری">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">ه</span>
+        <div>
+          <p class="brand-name">هوشیار.ai</p>
+          <p class="brand-sub">هوشمندی مالی و مدیریتی</p>
         </div>
-      </article>
-    </section>
+      </div>
+      <nav>
+        <ul class="nav">
+          <li><a href="#overview" aria-current="page">نمای کلی</a></li>
+          <li><a href="#session">نشست</a></li>
+          <li><a href="#analysis">تحلیل صورت مالی</a></li>
+          <li><a href="#executive">ارزیابی مدیریتی</a></li>
+          <li><a href="#findings">یافته‌ها و منبع داده</a></li>
+        </ul>
+      </nav>
+      <p class="sidebar-note">داده‌ها فقط از Backend هوشیار خوانده می‌شوند. عدد نمونه یا ساختگی نمایش داده نمی‌شود.</p>
+    </aside>
 
-    <section class="card onboarding">
-      <h2>ایجاد نشست</h2>
-      <form id="session-form">
-        <label>نام کاربری<input id="username" value="مدیرعامل" required /></label>
-        <label>سازمان<input id="organization" value="تست هوشیار" required /></label>
-        <button class="primary" type="submit">ایجاد نشست</button>
-      </form>
-      <p id="session-result" class="result" aria-live="polite"></p>
-    </section>
+    <div class="content">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Hooshyar.ai</p>
+          <h1>داشبورد مالی</h1>
+        </div>
+        <div class="status-group" role="status" aria-live="polite">
+          <span id="connection-status" class="pill pill-pending"><span class="dot" aria-hidden="true"></span><span class="pill-text">در حال بررسی اتصال…</span></span>
+          <span id="session-status" class="pill pill-muted"><span class="dot" aria-hidden="true"></span><span class="pill-text">نشست: نامشخص</span></span>
+        </div>
+      </header>
 
-    <section class="card onboarding">
-      <h2>تحلیل واقعی صورت مالی</h2>
-      <p>یک فایل CSV با ستون‌های date, account, debit, credit, currency انتخاب کنید.</p>
-      <form id="analysis-form">
-        <label>فایل CSV<input id="csv-file" type="file" accept=".csv,text/csv" required /></label>
-        <label>دارایی‌ها<input id="assets" type="number" min="0" step="0.01" value="1000" required /></label>
-        <label>بدهی‌ها<input id="liabilities" type="number" min="0" step="0.01" value="250" required /></label>
-        <button class="primary" type="submit">تحلیل کن</button>
-      </form>
-      <p id="analysis-result" class="result" aria-live="polite"></p>
-    </section>
-  </main>
+      <main id="main">
+        <div id="global-alert" class="alert" role="alert" hidden>
+          <p id="global-alert-text"></p>
+          <button id="retry-button" class="btn btn-secondary" type="button">تلاش دوباره</button>
+        </div>
+
+        <section class="welcome-panel" aria-label="معرفی داشبورد">
+          <div class="welcome-copy">
+            <span class="welcome-kicker"><span class="welcome-kicker-dot"></span> فضای یکپارچه هوشیار</span>
+            <h2>از داده‌های مالی تا <span>تصمیم بهتر</span></h2>
+            <p>وضعیت مالی را در یک نگاه ببینید، منبع هر عدد را دنبال کنید و تصمیم‌ها را بر پایه داده‌های واقعی بگیرید.</p>
+            <div class="welcome-points">
+              <span><span class="point-check">✓</span> تحلیل مستند</span>
+              <span><span class="point-check">✓</span> منبع قابل ردیابی</span>
+              <span><span class="point-check">✓</span> بدون اعداد ساختگی</span>
+            </div>
+          </div>
+          <div class="welcome-art" aria-hidden="true">
+            <div class="art-orbit orbit-one"></div>
+            <div class="art-orbit orbit-two"></div>
+            <div class="art-core"><span>ه</span></div>
+            <span class="art-node node-top">داده</span>
+            <span class="art-node node-bottom">بینش</span>
+            <span class="art-node node-side">تصمیم</span>
+          </div>
+        </section>
+
+        <section id="overview" class="section" aria-labelledby="overview-title">
+          <div class="section-head">
+            <h2 id="overview-title">شاخص‌های آخرین تحلیل</h2>
+            <p id="dashboard-meta" class="meta">—</p>
+          </div>
+
+          <div id="dashboard-empty" class="empty" hidden>
+            <p class="empty-title" id="dashboard-empty-title">هنوز تحلیلی انجام نشده است</p>
+            <p id="dashboard-empty-text" class="empty-text">برای دیدن شاخص‌ها، ابتدا نشست ایجاد کنید و یک فایل CSV دفتر حساب را تحلیل کنید.</p>
+          </div>
+
+          <div class="kpis" id="kpis" aria-busy="true">
+            <article class="kpi">
+              <p class="kpi-label">درآمد</p>
+              <p class="kpi-value" id="revenue" data-state="loading"><span class="skeleton" aria-hidden="true"></span><span class="sr-only">در حال بارگذاری</span></p>
+              <p class="kpi-hint">جمع بستانکار دفتر حساب</p>
+            </article>
+            <article class="kpi">
+              <p class="kpi-label">سود</p>
+              <p class="kpi-value" id="profit" data-state="loading"><span class="skeleton" aria-hidden="true"></span><span class="sr-only">در حال بارگذاری</span></p>
+              <p class="kpi-hint">درآمد منهای هزینه</p>
+            </article>
+            <article class="kpi">
+              <p class="kpi-label">ریسک بدهی</p>
+              <p class="kpi-value" id="risk" data-state="loading"><span class="skeleton" aria-hidden="true"></span><span class="sr-only">در حال بارگذاری</span></p>
+              <p class="kpi-hint">نسبت بدهی به دارایی</p>
+            </article>
+          </div>
+        </section>
+
+        <section id="trends" class="card trend-card" aria-labelledby="trends-title">
+          <div class="trend-heading">
+            <div>
+              <h2 id="trends-title">روند شاخص‌های مالی</h2>
+              <p class="card-text">نمودار فقط از تحلیل‌های موفق ثبت‌شده در همین سازمان ساخته می‌شود؛ داده نمونه ندارد.</p>
+            </div>
+            <label class="field trend-select">
+              <span>شاخص مورد بررسی</span>
+              <select id="trend-metric">
+                <option value="revenue">درآمد</option>
+                <option value="profit">سود</option>
+                <option value="risk">ریسک بدهی</option>
+              </select>
+            </label>
+          </div>
+          <div class="trend-plot" dir="ltr">
+            <svg id="trend-chart" viewBox="0 0 800 260" role="img" aria-label="پس از ثبت تحلیل‌ها، نمودار روند نمایش داده می‌شود"></svg>
+          </div>
+          <p id="trend-summary" class="trend-summary" aria-live="polite">پس از ثبت دست‌کم دو تحلیل موفق، روند واقعی این شاخص نمایش داده می‌شود.</p>
+        </section>
+
+        <section id="executive" class="card executive-card" aria-labelledby="executive-title">
+          <div class="section-head">
+            <div>
+              <h2 id="executive-title">ارزیابی اهداف مدیریتی</h2>
+              <p class="card-text">هدف‌ها را از برنامه مصوب سازمان وارد کنید. هوشیار برای تکمیل فرم هدف یا آستانه ساختگی نمی‌سازد.</p>
+            </div>
+          </div>
+          <form id="targets-form" class="form executive-target-form" novalidate>
+            <label class="field">
+              <span>هدف درآمد (همان واحد فایل)</span>
+              <input id="target-revenue" name="targetRevenue" type="number" inputmode="decimal" min="0.000001" step="any" placeholder="هدف درآمد" required />
+            </label>
+            <label class="field">
+              <span>هدف سود (همان واحد فایل)</span>
+              <input id="target-profit" name="targetProfit" type="number" inputmode="decimal" min="0.000001" step="any" placeholder="هدف سود" required />
+            </label>
+            <label class="field">
+              <span>هدف حاشیه سود (درصد)</span>
+              <input id="target-profit-margin" name="targetProfitMargin" type="number" inputmode="decimal" min="0.000001" step="any" placeholder="درصد هدف مصوب" required />
+            </label>
+            <label class="field">
+              <span>حد هدف نسبت بدهی (درصد)</span>
+              <input id="target-debt-ratio" name="targetDebtRatio" type="number" inputmode="decimal" min="0.000001" step="any" placeholder="کمتر بودن نسبت مطلوب است" required />
+            </label>
+            <button class="btn btn-primary" type="submit">ثبت هدف‌ها و ارزیابی</button>
+          </form>
+          <p id="target-config-status" class="card-text" aria-live="polite">هنوز هدفی ثبت نشده است؛ هوشیار هدف پیش‌فرض یا ساختگی ایجاد نمی‌کند.</p>
+          <p id="targets-result" class="result" aria-live="polite"></p>
+          <h3 class="executive-subtitle">نتیجه مقایسه شاخص‌ها با هدف سازمان</h3>
+          <ul id="executive-findings" class="list">
+            <li class="muted">بدون هدف مصوب، وضعیت مدیریتی اعلام نمی‌شود.</li>
+          </ul>
+          <p id="executive-evaluation-note" class="trend-summary" aria-live="polite">ابتدا هدف‌های واقعی سازمان را ثبت کنید.</p>
+        </section>
+
+        <div class="columns">
+          <section id="session" class="card" aria-labelledby="session-title">
+            <h2 id="session-title">ورود امن به فضای سازمان</h2>
+            <p class="card-text">برای حفظ تاریخچه و محرمانگی، از حساب سازمانی استفاده کنید. ساخت سازمان فقط برای سازمانی مجاز است که هنوز ثبت نشده؛ اعضای دیگر با کد دعوت وارد می‌شوند.</p>
+            <form id="session-form" class="form" novalidate>
+              <label class="field">
+                <span>نوع عملیات</span>
+                <select id="session-mode" name="mode">
+                  <option value="register">ساخت سازمان و حساب مالک</option>
+                  <option value="login">ورود به حساب موجود</option>
+                  <option value="join">پیوستن با کد دعوت</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>نام کاربری</span>
+                <input id="username" name="username" autocomplete="username" placeholder="نام کاربری" maxlength="120" required />
+              </label>
+              <label id="organization-field" class="field">
+                <span>نام سازمان</span>
+                <input id="organization" name="organization" autocomplete="organization" placeholder="نام ثبت‌شده سازمان" maxlength="120" required />
+              </label>
+              <label class="field">
+                <span>رمز عبور</span>
+                <input id="password" name="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" placeholder="حداقل ۱۲ نویسه" required />
+              </label>
+              <label id="invite-code-field" class="field" hidden>
+                <span>کد دعوت یک‌بارمصرف</span>
+                <input id="invitation-code" name="invitationCode" autocomplete="off" placeholder="کد دعوت را وارد کنید" maxlength="200" />
+              </label>
+              <button class="btn btn-primary" type="submit">ادامه</button>
+            </form>
+            <p id="session-result" class="result" aria-live="polite"></p>
+            <button id="logout-button" class="btn btn-secondary identity-extra" type="button" hidden>خروج از حساب</button>
+            <form id="invite-form" class="form identity-extra" novalidate hidden>
+              <h3>دعوت عضو جدید</h3>
+              <label class="field">
+                <span>نقش عضو</span>
+                <select id="invite-role" name="role">
+                  <option value="VIEWER">مشاهده‌گر</option>
+                  <option value="MANAGER">مدیر</option>
+                  <option value="ADMIN">مدیر سامانه</option>
+                </select>
+              </label>
+              <button class="btn btn-secondary" type="submit">ساخت کد دعوت</button>
+              <p id="invite-result" class="result" aria-live="polite"></p>
+            </form>
+          </section>
+
+          <section id="analysis" class="card" aria-labelledby="analysis-title">
+            <h2 id="analysis-title">تحلیل واقعی صورت مالی</h2>
+            <p class="card-text">یک فایل CSV با ستون‌های <code dir="ltr">date, account, debit, credit, currency</code> انتخاب کنید و مانده دارایی و بدهی را وارد کنید.</p>
+            <form id="analysis-form" class="form" novalidate>
+              <label class="field field-wide">
+                <span>فایل CSV</span>
+                <input id="csv-file" name="csv" type="file" accept=".csv,text/csv" required />
+              </label>
+              <label class="field">
+                <span>دارایی‌ها</span>
+                <input id="assets" name="assets" type="number" inputmode="decimal" min="0" step="0.01" placeholder="مجموع دارایی‌ها" required />
+              </label>
+              <label class="field">
+                <span>بدهی‌ها</span>
+                <input id="liabilities" name="liabilities" type="number" inputmode="decimal" min="0" step="0.01" placeholder="مجموع بدهی‌ها" required />
+              </label>
+              <button class="btn btn-primary" type="submit">تحلیل کن</button>
+            </form>
+            <p id="analysis-result" class="result" aria-live="polite"></p>
+          </section>
+        </div>
+
+        <section id="findings" class="columns" aria-label="یافته‌ها و منبع داده">
+          <article class="card">
+            <h2>یافته‌های تحلیل</h2>
+            <ul id="observations" class="list"><li class="muted">پس از تحلیل نمایش داده می‌شود.</li></ul>
+          </article>
+          <article class="card">
+            <h2>منبع داده</h2>
+            <dl id="source" class="details"><div><dt>وضعیت</dt><dd class="muted">پس از تحلیل نمایش داده می‌شود.</dd></div></dl>
+          </article>
+        </section>
+
+        <section class="card card-quiet" aria-labelledby="missing-title">
+          <h2 id="missing-title">قابلیت‌های در حال تکمیل</h2>
+          <p class="card-text">این موارد هنوز به قواعد معتبر و داده کافی متصل نشده‌اند و نباید به‌عنوان خروجی آماده معرفی شوند:</p>
+          <ul class="tags">
+            <li>هشدارهای مدیریتی مستند</li>
+            <li>گزارش‌های رسمی و قابل ارائه</li>
+            <li>مقایسه چند دوره مالی هم‌مبنا</li>
+            <li>تحلیل علل انحراف و سناریوها</li>
+          </ul>
+        </section>
+      </main>
+    </div>
+  </div>
+  <script src="/executive-evaluation-view-model.js" defer></script>
   <script src="/app.js" defer></script>
 </body>
 </html>

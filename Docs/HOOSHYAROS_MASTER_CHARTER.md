@@ -118,11 +118,43 @@ The platform ultimately seeks measurable improvement in:
 
 These principles define what the platform is being built to accomplish. They do not turn the construction Assistant into an end-user advisor.
 
+### Unified Intelligence Principle — coordinated system behavior inspired by the human organism
+
+The human organism is an engineering inspiration for coordination, balance, adaptation and feedback. This analogy describes observable system behavior; it does **not** claim that HooshyarOS possesses human consciousness or biological understanding.
+
+The intelligence of HooshyarOS must emerge from the disciplined cooperation of its approved components—not from the number of engines, features, agents or files. The platform must behave as one coherent decision-support system across ingestion, understanding, reasoning, governance, execution, monitoring and learning.
+
+The target operating loop is:
+
+**Evidence and context → semantic interpretation → cross-engine reasoning → governed decision → authorized action → outcome measurement → verified learning.**
+
+The existing architecture owns this loop:
+
+- **Perception and context:** approved ingestion paths, source provenance, canonical data and domain context.
+- **Memory and knowledge:** existing memory, knowledge and persistence capabilities, scoped to the correct organization and purpose.
+- **Reasoning and synthesis:** the existing Reasoning Engine and relevant approved domain engines compose their results through explicit contracts; the five canonical intelligence engines remain governed by Architecture Freeze V4.
+- **Nervous-system coordination:** contracts, dependencies, events, state transitions, health signals and traceable handoffs communicate what each component knows, needs, has decided and has completed.
+- **Governed action:** existing decision, governance, workflow and autonomous-operation capabilities act only within authorization and approval constraints.
+- **Feedback and learning:** observed outcomes and explicit user feedback may improve later behavior only when provenance, relevance, tenant boundaries and validity are preserved.
+
+Permanent requirements:
+
+1. Reuse the existing owning engines and contracts. This principle is not permission to add a parallel “brain,” “nervous system,” orchestration engine or duplicate business semantics.
+2. Important conclusions must distinguish verified facts, derived calculations, interpretations, assumptions, missing information and uncertainty. Where evidence is insufficient, qualify or block the conclusion instead of inventing information.
+3. Cross-engine results must be composed coherently; conflicting results, failed dependencies and stale context must be surfaced rather than silently ignored.
+4. Consequential actions remain subject to governance, authorization and required human approval. Intelligence never bypasses controls for convenience or speed.
+5. Learning must be evidence-backed, reviewable and reversible. It must not silently rewrite the frozen architecture, approved decisions, security boundaries or a tenant's data.
+6. Optimize end-to-end user value and correctness, not a component's isolated score. Performance improvements must preserve correctness, traceability and recovery.
+
+A capability that crosses component boundaries is not complete merely because its individual engines pass unit tests. Its acceptance evidence must include the relevant integration path and, where a user-facing workflow is affected, application-level interaction and acceptance evidence. Measure behavior such as result consistency, evidence traceability, failure handling, tenant isolation, recovery and response time where applicable. A test is evidence only for the behavior it actually exercises.
+
 ---
 
 ## 5. Core Decision Logic
 
-Construction decisions must optimize the whole system rather than a single metric. The permanent engineering objective is a balanced optimization of:
+Construction decisions must optimize the whole system rather than a single metric. Engine presence, a green unit test or a polished screen is not evidence that the end-to-end product behavior is integrated or correct. For cross-component work, identify the contracts and handoffs, then verify the behavior across the complete relevant path.
+
+The permanent engineering objective is a balanced optimization of:
 
 **Speed + Quality + Scalability + Maintainability + Security + Explainability + Ethics + Resilience**
 
@@ -518,3 +550,12 @@ When a more specific technical contract defines an implementation detail, follow
 **ASSISTANT ROLE: CONSTRUCTION INTELLIGENCE ONLY**
 
 **PLATFORM CONTINUATION AFTER ASSISTANT COMPLETION: REQUIRED**
+
+
+## 20. Data Analytics and Analytics-Management Knowledge
+
+HooshyarOS explicitly distinguishes **data analytics science** from **analytics management/data governance**. Analytics science covers question-led exploratory, descriptive, diagnostic, inferential, predictive/prescriptive analysis and BI communication. Analytics management governs data strategy and operating model, ownership/stewardship, catalogue/glossary, lineage, data quality, KPI/metric semantics, data contracts, access, lifecycle, reporting changes and the analytics backlog.
+
+Both are versioned knowledge domains routed through the existing interdisciplinary service and frozen engine owners. Financial, forecast, risk, portfolio, process, HR and executive profiles select them where relevant. Neither domain creates a new engine.
+
+The reference catalogue includes professional data-management frameworks, ISO 8000 data-quality references, W3C PROV provenance guidance and dimensional-modeling guidance. A revision project is not a released standard, and a voluntary framework is not automatically local law. The service does not claim automatic background web crawling; new methods require source/scope verification, baseline/benchmark, tests and versioned approval.
