@@ -84,6 +84,8 @@ describe("KnowledgeEngine science registry", () => {
 
         expect(engine.getScienceDomain("budget-management")?.availableOperations)
             .toContain("BudgetIntelligenceEngine.analyzeBudget");
+        expect(engine.getScienceDomain("cost-management")?.availableOperations)
+            .toContain("BudgetIntelligenceEngine.analyzeCostBreakdown");
         expect(engine.getScienceDomain("fundamental-analysis")?.availableOperations)
             .toContain("FinancialStatementAnalysisService.execute");
         expect(engine.getScienceDomain("tax-accounting-audit")?.availableOperations)
