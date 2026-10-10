@@ -7,7 +7,7 @@ describe("FinancialStandardsKnowledgeService", () => {
     const catalogue = knowledge.getCatalogue();
     const ids = catalogue.standardEntries.map((entry) => entry.id);
 
-    expect(catalogue.version).toBe("financial-standards-2026-10-10.v1");
+    expect(catalogue.version).toBe("financial-standards-2026-10-10.v2");
     expect(catalogue.snapshotDate).toBe("2026-10-10");
     expect(ids).toContain("IR-NAS-43");
     expect(ids).toContain("IR-NAS-44");
@@ -19,6 +19,14 @@ describe("FinancialStandardsKnowledgeService", () => {
     expect(catalogue.principles.auditingAndAssurance.length).toBeGreaterThanOrEqual(8);
     expect(catalogue.principles.coverageDomains.length).toBeGreaterThanOrEqual(10);
     expect(catalogue.applicabilityRequired).toBe(true);
+    expect(catalogue.iranianNationalStandardInventory.length).toBeGreaterThanOrEqual(45);
+    expect(catalogue.iranianNationalStandardInventory.some((entry) => entry.number === 44 && entry.id === "IR-NAS-44")).toBe(true);
+    expect(catalogue.iranianNationalStandardInventory.some((entry) => entry.id === "IR-NAS-03-OLD" && entry.lifecycleStatus === "REPORTED_WITHDRAWN")).toBe(true);
+    expect(catalogue.internationalAccountingStandardIndex.some((entry) => entry.id === "IFRS 18" && entry.status === "ISSUED_NOT_YET_EFFECTIVE")).toBe(true);
+    expect(catalogue.internationalAccountingStandardIndex.some((entry) => entry.id === "IAS 11" && entry.status === "SUPERSEDED_FOR_MAIN_SCOPE_BY_IFRS_15")).toBe(true);
+    expect(catalogue.internationalAuditStandardIndex.some((entry) => entry.identifiers.includes("ISA 240"))).toBe(true);
+    expect(catalogue.internationalAuditStandardIndex.some((entry) => entry.identifiers.includes("ISRE 2400 (Revised)"))).toBe(true);
+    expect(catalogue.iranianNationalStandardInventory.every((entry) => entry.verificationStatus !== undefined)).toBe(true);
 
     const ifrs18 = catalogue.standardEntries.find((entry) => entry.id === "IFRS-18");
     expect(ifrs18?.status).toBe("ISSUED_NOT_YET_EFFECTIVE");

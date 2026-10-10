@@ -36,7 +36,7 @@ describe("Commercial runtime real business flow", () => {
         principles: { accountingAndReporting: string[]; auditingAndAssurance: string[] };
       };
     };
-    expect(standardsPayload.catalogue.version).toBe("financial-standards-2026-10-10.v1");
+    expect(standardsPayload.catalogue.version).toBe("financial-standards-2026-10-10.v2");
     expect(standardsPayload.catalogue.standardEntries.map((entry) => entry.id)).toContain("IR-NAS-44");
     expect(standardsPayload.catalogue.standardEntries.map((entry) => entry.id)).toContain("IFRS-18");
     expect(standardsPayload.catalogue.principles.accountingAndReporting.length).toBeGreaterThanOrEqual(10);
