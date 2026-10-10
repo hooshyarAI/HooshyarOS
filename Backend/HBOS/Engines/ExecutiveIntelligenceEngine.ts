@@ -98,10 +98,15 @@ export class ExecutiveIntelligenceEngine implements Engine {
         target: number,
         direction: ExecutiveKpiDirection = "higher-is-better",
     ): ExecutivePerformance {
-        if (!Number.isFinite(actual) || !Number.isFinite(target) || target <= 0) {
+        if (!Number.isFinite(actual) || !Number.isFinite(target) || target <= 0 ||
+            (direction !== "higher-is-better" && direction !== "lower-is-better") ||
+            (direction === "lower-is-better" && actual < 0)) {
             return { status: "BLOCKED", achievementRate: 0 };
         }
         const achievementRate = this.calculateAchievement(actual, target, direction);
+        if (!Number.isFinite(achievementRate)) {
+            return { status: "BLOCKED", achievementRate: 0 };
+        }
         return {
             status: achievementRate >= 100 ? "ON_TRACK" : "BELOW_TARGET",
             achievementRate,
@@ -113,10 +118,12 @@ export class ExecutiveIntelligenceEngine implements Engine {
         target: number,
         direction: ExecutiveKpiDirection,
     ): number {
-        if (!Number.isFinite(actual) || !Number.isFinite(target) || target <= 0) return 0;
+        if (!Number.isFinite(actual) || !Number.isFinite(target) || target <= 0 ||
+            (direction !== "higher-is-better" && direction !== "lower-is-better")) return Number.NaN;
         if (direction === "lower-is-better") {
-            // A zero or negative observed ratio is not worse than a positive target.
-            return actual <= 0 ? 100 : (target / actual) * 100;
+            // Zero is a valid best-case ratio; a negative debt ratio is invalid financial evidence.
+            if (actual < 0) return Number.NaN;
+            return actual === 0 ? 100 : (target / actual) * 100;
         }
         return (actual / target) * 100;
     }

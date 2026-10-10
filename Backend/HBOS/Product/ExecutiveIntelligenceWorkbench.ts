@@ -81,5 +81,8 @@ export class ExecutiveIntelligenceWorkbench {
         throw new Error(`executive-intelligence-workbench-target-invalid:${name}`);
       }
     }
+    if (input.metrics.debtRatio < 0) {
+      throw new Error("executive-intelligence-workbench-metric-invalid:debtRatio");
+    }
   }
 }

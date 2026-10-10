@@ -1,4 +1,4 @@
-import { ExecutiveIntelligenceEngine } from "../Engines/ExecutiveIntelligenceEngine";
+import { ExecutiveIntelligenceEngine, ExecutiveKpiDirection } from "../Engines/ExecutiveIntelligenceEngine";
 
 describe("ExecutiveIntelligenceEngine", () => {
     it("implements the canonical HBOS engine contract", () => {
@@ -43,6 +43,20 @@ describe("ExecutiveIntelligenceEngine", () => {
         expect(engine.recommend(aboveTarget).status).toBe("AT_RISK");
         expect(engine.recommend(aboveTarget).actionCode).toBe("INVESTIGATE_TARGET_EXCEEDANCE");
         expect(engine.evaluatePerformance(0.45, 0.4, "lower-is-better").status).toBe("BELOW_TARGET");
+    });
+
+    it("blocks negative lower-is-better values and unknown runtime directions", () => {
+        const engine = new ExecutiveIntelligenceEngine();
+        const negativeDebt = engine.analyzeKpi("debtRatio", -0.1, 0.4, "lower-is-better");
+        expect(Number.isNaN(negativeDebt.achievementRate)).toBe(true);
+        expect(engine.recommend(negativeDebt).status).toBe("BLOCKED");
+        expect(engine.evaluatePerformance(-0.1, 0.4, "lower-is-better").status).toBe("BLOCKED");
+
+        const unknownDirection = "sideways" as unknown as ExecutiveKpiDirection;
+        const invalidKpi = engine.analyzeKpi("revenue", 100, 100, unknownDirection);
+        expect(Number.isNaN(invalidKpi.achievementRate)).toBe(true);
+        expect(engine.recommend(invalidKpi).status).toBe("BLOCKED");
+        expect(engine.evaluatePerformance(100, 100, unknownDirection).status).toBe("BLOCKED");
     });
 
     it("blocks a lower-is-better KPI with a non-positive target", () => {

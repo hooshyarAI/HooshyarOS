@@ -30,6 +30,15 @@ describe("ExecutiveIntelligenceWorkbench runtime contract", () => {
     expect(result.performance[debtIndex].status).toBe("ON_TRACK");
   });
 
+  it("rejects a negative observed debt ratio rather than awarding perfect achievement", () => {
+    const workbench = new ExecutiveIntelligenceWorkbench(new ExecutiveIntelligenceEngine());
+    expect(() => workbench.execute({
+      tenantId: "tenant:runtime-test",
+      metrics: { revenue: 1200, profit: 240, profitMargin: 0.2, debtRatio: -0.1 },
+      targets: { revenue: 1000, profit: 200, profitMargin: 0.18, debtRatio: 0.4 },
+    })).toThrow("executive-intelligence-workbench-metric-invalid:debtRatio");
+  });
+
   it("rejects a non-positive debt-ratio target rather than producing a misleading result", () => {
     const workbench = new ExecutiveIntelligenceWorkbench(new ExecutiveIntelligenceEngine());
     expect(() => workbench.execute({
