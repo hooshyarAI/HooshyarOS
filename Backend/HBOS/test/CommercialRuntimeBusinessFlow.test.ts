@@ -65,7 +65,7 @@ describe("Commercial runtime real business flow", () => {
       const response = await request(server, "/api/analyze", {
         method: "POST",
         headers: { "content-type": "application/json", cookie },
-        body: JSON.stringify({ csv, sourceName: \`ledger-\${i}.csv\`, assets: 1000, liabilities: 250 }),
+        body: JSON.stringify({ csv, sourceName: "ledger-" + i + ".csv", assets: 1000, liabilities: 250 }),
       });
       expect(response.status).toBe(200);
     }
