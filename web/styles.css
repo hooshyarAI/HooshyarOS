@@ -180,3 +180,16 @@ input:focus-visible, .btn:focus-visible, .nav a:focus-visible { outline: 3px sol
   .welcome-copy p { font-size: .87rem; }
   .welcome-points { flex-direction: column; }
 }
+
+.trend-card { margin-block: 18px; }
+.trend-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.trend-heading h2 { margin-bottom: 7px; }
+.trend-select { min-width: 180px; }
+select { width: 100%; padding: 11px 13px; border: 1px solid #d7e0ea; border-radius: 11px; font: inherit; background: #fbfcfe; color: var(--ink); }
+select:focus-visible { outline: 3px solid rgba(22,125,117,.28); outline-offset: 2px; }
+.trend-plot { width: 100%; overflow-x: auto; margin-top: 12px; }
+#trend-chart { display: block; width: 100%; min-width: 520px; height: auto; }
+.trend-grid { stroke: #e8edf3; stroke-width: 1; }
+.trend-axis-label { fill: #728197; font-size: 12px; }
+.trend-summary { color: var(--muted); font-size: .88rem; margin-top: 8px; }
+@media (max-width: 650px) { .trend-heading { flex-direction: column; } .trend-select { width: 100%; } }

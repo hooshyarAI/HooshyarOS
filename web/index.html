@@ -100,6 +100,27 @@
           </div>
         </section>
 
+        <section id="trends" class="card trend-card" aria-labelledby="trends-title">
+          <div class="trend-heading">
+            <div>
+              <h2 id="trends-title">روند شاخص‌های مالی</h2>
+              <p class="card-text">نمودار فقط از تحلیل‌های موفق ثبت‌شده در همین سازمان ساخته می‌شود؛ داده نمونه ندارد.</p>
+            </div>
+            <label class="field trend-select">
+              <span>شاخص مورد بررسی</span>
+              <select id="trend-metric">
+                <option value="revenue">درآمد</option>
+                <option value="profit">سود</option>
+                <option value="risk">ریسک بدهی</option>
+              </select>
+            </label>
+          </div>
+          <div class="trend-plot" dir="ltr">
+            <svg id="trend-chart" viewBox="0 0 800 260" role="img" aria-label="پس از ثبت تحلیل‌ها، نمودار روند نمایش داده می‌شود"></svg>
+          </div>
+          <p id="trend-summary" class="trend-summary" aria-live="polite">پس از ثبت دست‌کم دو تحلیل موفق، روند واقعی این شاخص نمایش داده می‌شود.</p>
+        </section>
+
         <div class="columns">
           <section id="session" class="card" aria-labelledby="session-title">
             <h2 id="session-title">ایجاد نشست</h2>
@@ -152,8 +173,8 @@
         </section>
 
         <section class="card card-quiet" aria-labelledby="missing-title">
-          <h2 id="missing-title">قابلیت‌های در دسترس نیست</h2>
-          <p class="card-text">این بخش‌ها هنوز API در Backend ندارند و به همین دلیل نمایش داده نمی‌شوند:</p>
+          <h2 id="missing-title">قابلیت‌های تکمیل‌نشده</h2>
+          <p class="card-text">این بخش‌ها تا زمان اتصال به داده و قواعد معتبر، به‌عنوان قابلیت آماده نمایش داده نمی‌شوند:</p>
           <ul class="tags">
             <li>روند زمانی و نمودار روند</li>
             <li>هشدارها</li>

@@ -91,6 +91,72 @@ function setKpisLoading() {
   }
 }
 
+let currentHistory = [];
+
+const TREND_METRICS = {
+  revenue: { label: 'درآمد', color: '#167d75', value: item => item.metrics?.revenue },
+  profit: { label: 'سود', color: '#4774bd', value: item => item.metrics?.profit },
+  risk: { label: 'ریسک بدهی', color: '#c07828', value: item => item.metrics?.risk }
+};
+
+function renderTrend(history = currentHistory) {
+  currentHistory = Array.isArray(history) ? history : [];
+  const svg = $('#trend-chart');
+  const summary = $('#trend-summary');
+  svg.replaceChildren();
+  const metric = TREND_METRICS[$('#trend-metric').value] ?? TREND_METRICS.revenue;
+  const points = currentHistory
+    .map(item => ({ date: item.analyzedAt, value: metric.value(item) }))
+    .filter(item => Number.isFinite(item.value));
+  if (points.length < 2) {
+    summary.textContent = points.length === 1
+      ? 'یک تحلیل ثبت شده است؛ برای نمایش روند، یک تحلیل دیگر لازم است.'
+      : 'پس از ثبت دست‌کم دو تحلیل موفق، روند واقعی این شاخص نمایش داده می‌شود.';
+    svg.setAttribute('aria-label', summary.textContent);
+    return;
+  }
+
+  const width = 800, height = 260, left = 72, right = 24, top = 18, bottom = 42;
+  const values = points.map(point => point.value);
+  let min = Math.min(...values), max = Math.max(...values);
+  if (min === max) { const pad = Math.abs(min) * 0.08 || 1; min -= pad; max += pad; }
+  else { const pad = (max - min) * 0.12; min -= pad; max += pad; }
+  const x = index => left + index * (width - left - right) / (points.length - 1);
+  const y = value => top + (max - value) * (height - top - bottom) / (max - min);
+  const node = (tag, attrs = {}, text = null) => {
+    const element = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (const [key, value] of Object.entries(attrs)) element.setAttribute(key, String(value));
+    if (text !== null) element.textContent = text;
+    svg.append(element);
+    return element;
+  };
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', `روند ${metric.label} بر اساس ${points.length} تحلیل ثبت‌شده`);
+  for (let i = 0; i < 4; i += 1) {
+    const value = max - i * (max - min) / 3;
+    const gy = y(value);
+    node('line', { x1: left, y1: gy, x2: width - right, y2: gy, class: 'trend-grid' });
+    node('text', { x: left - 10, y: gy + 4, 'text-anchor': 'end', class: 'trend-axis-label' }, faNumber.format(value));
+  }
+  node('polyline', {
+    points: points.map((point, index) => `${x(index)},${y(point.value)}`).join(' '),
+    fill: 'none', stroke: metric.color, 'stroke-width': 3, 'stroke-linecap': 'round', 'stroke-linejoin': 'round'
+  });
+  points.forEach((point, index) => {
+    node('circle', { cx: x(index), cy: y(point.value), r: 4.5, fill: metric.color, stroke: '#fff', 'stroke-width': 2 });
+    const date = point.date ? new Date(point.date) : null;
+    const label = date && Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat('fa-IR', { month: 'short', day: 'numeric' }).format(date) : '—';
+    if (index === 0 || index === points.length - 1 || points.length <= 6) {
+      node('text', { x: x(index), y: height - 14, 'text-anchor': 'middle', class: 'trend-axis-label' }, label);
+    }
+  });
+  const first = points[0].value, last = points[points.length - 1].value;
+  const delta = last - first;
+  const direction = delta > 0 ? 'افزایش' : delta < 0 ? 'کاهش' : 'بدون تغییر';
+  summary.textContent = `روند ${metric.label}: ${direction} ${faNumber.format(Math.abs(delta))} از اولین تا آخرین تحلیل؛ بر پایه ${points.length} تحلیل ثبت‌شده.`;
+}
+
 function renderUnavailable(title, text) {
   $('#kpis').setAttribute('aria-busy', 'false');
   setKpi('#revenue', null);
@@ -102,6 +168,7 @@ function renderUnavailable(title, text) {
   $('#dashboard-meta').textContent = '—';
   renderObservations(null);
   renderSource(null);
+  renderTrend([]);
 }
 
 function renderObservations(observations) {
@@ -163,6 +230,7 @@ function renderDashboard(dashboard) {
   $('#dashboard-meta').textContent = received ? `آخرین به‌روزرسانی: ${received}` : 'زمان به‌روزرسانی ثبت نشده است';
   renderObservations(dashboard.observations ?? []);
   renderSource(dashboard.source ?? null);
+  renderTrend(dashboard.history ?? []);
 }
 
 async function refreshDashboard() {
@@ -288,6 +356,7 @@ $('#analysis-form').addEventListener('submit', async event => {
   }
 });
 
+$('#trend-metric').addEventListener('change', () => renderTrend(currentHistory));
 $('#retry-button').addEventListener('click', () => refreshDashboard());
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => undefined);
