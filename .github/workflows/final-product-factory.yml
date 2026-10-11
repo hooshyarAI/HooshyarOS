@@ -187,33 +187,40 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: hooshyar-final-product-factory-evidence
-          path: .
+          path: ./.hooshyar
           merge-multiple: true
       - name: Download Web acceptance evidence
         uses: actions/download-artifact@v4
         with:
           name: hooshyar-web-product-acceptance-evidence
-          path: .
+          path: ./.hooshyar
           merge-multiple: true
       - name: Download Android acceptance evidence
         uses: actions/download-artifact@v4
         with:
           name: hooshyar-android-product-acceptance-evidence
-          path: .
+          path: ./.hooshyar
           merge-multiple: true
       - name: Download security acceptance evidence
         uses: actions/download-artifact@v4
         with:
           name: hooshyar-security-tenant-evidence
-          path: .
+          path: ./.hooshyar
           merge-multiple: true
+      - name: Verify canonical evidence paths
+        shell: bash
+        run: |
+          test -f .hooshyar/factory-success.json
+          test -f .hooshyar/web-acceptance-success.json
+          test -f .hooshyar/android-acceptance-success.json
+          test -f .hooshyar/security-acceptance-success.json
       - name: Run Cline runtime evidence collector
         run: npm run product:cline:evidence
       - name: Upload consolidated qualification evidence
         uses: actions/upload-artifact@v4
         with:
           name: hooshyar-cline-runtime-evidence
-          path: ./cline-runtime-evidence.json
+          path: ./.hooshyar/cline-runtime-evidence.json
           retention-days: 14
 
   release-gate:
