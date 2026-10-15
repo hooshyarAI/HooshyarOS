@@ -1,0 +1,222 @@
+name: npm SemVer-compatible remediation candidate
+
+on:
+  push:
+    branches:
+      - security/npm-dependency-remediation-candidate-2026-10-15
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  apply-and-verify:
+    name: Apply compatible fixes in isolated runner and verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout candidate branch without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Capture baseline audit
+        shell: bash
+        run: |
+          set +e
+          npm audit --json > npm-audit-before.json
+          baseline_exit=$?
+          set -e
+          echo "BASELINE_NPM_AUDIT_EXIT_CODE=$baseline_exit"
+          node <<'NODE'
+          const fs = require('node:fs');
+          const report = JSON.parse(fs.readFileSync('npm-audit-before.json', 'utf8'));
+          if (!report.metadata?.vulnerabilities || !report.vulnerabilities) {
+            throw new Error('Baseline npm audit JSON is incomplete.');
+          }
+          console.log('BASELINE_AUDIT_COUNTS ' + JSON.stringify(report.metadata.vulnerabilities));
+          NODE
+
+      - name: Apply npm audit fixes without force or manifest changes
+        shell: bash
+        run: |
+          set +e
+          npm audit fix --no-fund > npm-audit-fix-output.txt 2>&1
+          fix_exit=$?
+          set -e
+          echo "NPM_AUDIT_FIX_EXIT_CODE=$fix_exit"
+          if ! git diff --quiet -- package.json; then
+            echo "::error::npm audit fix changed package.json; candidate must not alter declared dependency ranges."
+            exit 2
+          fi
+          if git diff --quiet -- package-lock.json; then
+            echo "::warning::npm audit fix produced no package-lock changes; audit gate will determine whether this candidate is useful."
+          else
+            git diff --stat -- package-lock.json
+          fi
+
+      - name: Require a safer lockfile candidate
+        shell: bash
+        run: |
+          set +e
+          npm audit --json > npm-audit-after.json
+          after_exit=$?
+          set -e
+          echo "POST_REMEDIATION_NPM_AUDIT_EXIT_CODE=$after_exit"
+          node <<'NODE'
+          const fs = require('node:fs');
+          const { execFileSync } = require('node:child_process');
+
+          function readAudit(file) {
+            const report = JSON.parse(fs.readFileSync(file, 'utf8'));
+            if (!report.metadata?.vulnerabilities || !report.vulnerabilities) {
+              throw new Error('Incomplete npm audit JSON: ' + file);
+            }
+            return report;
+          }
+          function major(version) {
+            const match = /^\s*(\d+)/.exec(version || '');
+            return match ? Number(match[1]) : null;
+          }
+
+          const before = readAudit('npm-audit-before.json');
+          const after = readAudit('npm-audit-after.json');
+          const beforeCounts = before.metadata.vulnerabilities;
+          const afterCounts = after.metadata.vulnerabilities;
+          const baselineLock = JSON.parse(execFileSync('git', ['show', 'HEAD:package-lock.json'], { encoding: 'utf8' }));
+          const candidateLock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+          const protectedMajors = ['jest', 'ts-jest', 'mammoth'];
+          const versionChanges = [];
+
+          for (const name of protectedMajors) {
+            const key = 'node_modules/' + name;
+            const oldVersion = baselineLock.packages?.[key]?.version;
+            const newVersion = candidateLock.packages?.[key]?.version;
+            if (!oldVersion || !newVersion) throw new Error('Could not verify protected package: ' + name);
+            if (major(oldVersion) !== major(newVersion)) {
+              throw new Error(name + ' major changed unexpectedly: ' + oldVersion + ' -> ' + newVersion);
+            }
+          }
+          const oldExcel = baselineLock.packages?.['node_modules/exceljs-hardened']?.version;
+          const newExcel = candidateLock.packages?.['node_modules/exceljs-hardened']?.version;
+          if (!oldExcel || oldExcel !== newExcel) {
+            throw new Error('exceljs-hardened must remain unchanged: ' + oldExcel + ' -> ' + newExcel);
+          }
+
+          for (const [key, value] of Object.entries(candidateLock.packages || {})) {
+            if (!key.startsWith('node_modules/')) continue;
+            const oldVersion = baselineLock.packages?.[key]?.version;
+            if (oldVersion && value.version && oldVersion !== value.version) {
+              versionChanges.push({ path: key, from: oldVersion, to: value.version });
+            }
+          }
+
+          const severityKeys = ['info', 'low', 'moderate', 'high'];
+          const noSeverityRegression = severityKeys.every(key =>
+            (afterCounts[key] || 0) <= (beforeCounts[key] || 0)
+          );
+          console.log('REMEDIATION_AUDIT_COMPARISON ' + JSON.stringify({
+            before: beforeCounts,
+            after: afterCounts,
+            versionChangeCount: versionChanges.length,
+            versionChanges: versionChanges.slice(0, 100),
+            protectedMajorsUnchanged: true,
+            exceljsHardenedUnchanged: true,
+            noSeverityRegression
+          }, null, 2));
+
+          if (afterCounts.critical !== 0) {
+            throw new Error('Candidate still has critical npm advisories.');
+          }
+          if (afterCounts.total >= beforeCounts.total) {
+            throw new Error('Candidate did not reduce the total npm advisory count.');
+          }
+          if (!noSeverityRegression) {
+            throw new Error('Candidate increased a non-critical severity count.');
+          }
+          if (versionChanges.length === 0) {
+            throw new Error('Candidate lockfile has no version changes to review.');
+          }
+
+          fs.writeFileSync('package-lock.sha256', require('node:crypto')
+            .createHash('sha256').update(fs.readFileSync('package-lock.json')).digest('hex') + '\n');
+          NODE
+
+      - name: Run complete Jest suite
+        run: npm test -- --runInBand --ci
+
+      - name: Upload candidate and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hooshyar-npm-remediation-candidate
+          path: |
+            package-lock.json
+            package-lock.sha256
+            npm-audit-before.json
+            npm-audit-after.json
+            npm-audit-fix-output.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+  commit-tested-lockfile:
+    name: Commit only the exact tested lockfile
+    needs: apply-and-verify
+    if: needs.apply-and-verify.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout candidate branch
+        uses: actions/checkout@v4
+
+      - name: Download verified candidate artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: hooshyar-npm-remediation-candidate
+          path: candidate-artifact
+
+      - name: Verify artifact identity and commit only package-lock.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f candidate-artifact/package-lock.json
+          test -f candidate-artifact/package-lock.sha256
+          expected="$(cat candidate-artifact/package-lock.sha256)"
+          actual="$(sha256sum candidate-artifact/package-lock.json | cut -d' ' -f1)"
+          if [[ "$expected" != "$actual" ]]; then
+            echo "::error::Candidate lockfile hash does not match the tested artifact."
+            exit 2
+          fi
+
+          cp candidate-artifact/package-lock.json package-lock.json
+          if ! git diff --quiet -- package.json; then
+            echo "::error::package.json changed unexpectedly."
+            exit 2
+          fi
+          if git diff --quiet -- package-lock.json; then
+            echo "No lockfile delta to commit."
+            exit 0
+          fi
+
+          git diff --check
+          changed_files="$(git diff --name-only)"
+          if [[ "$changed_files" != "package-lock.json" ]]; then
+            echo "::error::Refusing to commit unexpected files: $changed_files"
+            exit 2
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "security: apply verified semver-compatible npm fixes"
+          git push origin "HEAD:$GITHUB_REF_NAME"
