@@ -85,12 +85,13 @@ jobs:
           after_manifest_hash="$(sha256sum package.json package-lock.json | sha256sum | cut -d' ' -f1)"
 
           echo "audit_fix_dry_run_exit_code=$audit_fix_exit" >> "$GITHUB_OUTPUT"
+          echo "AUDIT_FIX_DRY_RUN_EXIT_CODE=$audit_fix_exit"
           if [[ "$before_manifest_hash" != "$after_manifest_hash" ]]; then
             echo "::error::Dry-run changed package.json or package-lock.json unexpectedly."
             exit 2
           fi
 
-          node <<'NODE'
+          AUDIT_FIX_EXIT_CODE="$audit_fix_exit" node <<'NODE'
           const fs = require('node:fs');
           const path = require('node:path');
 
