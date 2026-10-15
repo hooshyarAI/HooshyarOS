@@ -3,6 +3,11 @@ name: Final Product Factory
 on:
   pull_request:
     branches: [main]
+  # Run the full factory on this isolated repair branch so the PR revision
+  # is tested directly rather than re-running the older base-branch workflow.
+  push:
+    branches:
+      - fix/ci-hidden-evidence-artifacts
   workflow_dispatch:
 
 concurrency:
