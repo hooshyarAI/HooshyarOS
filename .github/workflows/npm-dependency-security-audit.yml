@@ -77,24 +77,112 @@ jobs:
         id: remediation
         shell: bash
         run: |
+          before_manifest_hash="$(sha256sum package.json package-lock.json | sha256sum | cut -d' ' -f1)"
           set +e
-          npm audit fix --dry-run --json > npm-audit-fix-dry-run.json
+          npm audit fix --dry-run --json > npm-audit-fix-dry-run.json 2>&1
           audit_fix_exit=$?
           set -e
+          after_manifest_hash="$(sha256sum package.json package-lock.json | sha256sum | cut -d' ' -f1)"
 
           echo "audit_fix_dry_run_exit_code=$audit_fix_exit" >> "$GITHUB_OUTPUT"
+          if [[ "$before_manifest_hash" != "$after_manifest_hash" ]]; then
+            echo "::error::Dry-run changed package.json or package-lock.json unexpectedly."
+            exit 2
+          fi
+
           node <<'NODE'
           const fs = require('node:fs');
-          const report = JSON.parse(fs.readFileSync('npm-audit-fix-dry-run.json', 'utf8'));
+          const path = require('node:path');
+
+          const raw = fs.readFileSync('npm-audit-fix-dry-run.json', 'utf8');
+          // npm 11 may print "add <package> <version>" install-plan lines
+          // before the JSON payload, so parsing the entire file directly fails.
+          const jsonStart = raw.indexOf('{');
+          if (jsonStart < 0) {
+            console.error('npm audit fix --dry-run emitted no JSON object.');
+            console.error('Output prefix:', raw.slice(0, 800));
+            process.exit(2);
+          }
+
+          let report;
+          try {
+            report = JSON.parse(raw.slice(jsonStart));
+          } catch (error) {
+            console.error('Could not parse the JSON payload from npm dry-run output:', error.message);
+            console.error('Output prefix:', raw.slice(0, 800));
+            process.exit(2);
+          }
+
+          if (!Array.isArray(report.add) || !report.audit?.metadata?.vulnerabilities) {
+            console.error('Dry-run JSON is missing expected install-plan or audit metadata.');
+            console.error(JSON.stringify(Object.keys(report)));
+            process.exit(2);
+          }
+
+          const workspace = process.env.GITHUB_WORKSPACE || process.cwd();
+          const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+          const lockedPackages = lock.packages || {};
+          const plannedByPath = new Map();
+
+          for (const item of report.add) {
+            if (!item?.path || typeof item.version !== 'string') continue;
+            const relativePath = path.relative(workspace, item.path).split(path.sep).join('/');
+            if (relativePath.startsWith('node_modules/')) {
+              plannedByPath.set(relativePath, { name: item.name, version: item.version });
+            }
+          }
+
+          const versionChanges = [];
+          const plannedOnlyPaths = [];
+          for (const [packagePath, planned] of plannedByPath) {
+            const locked = lockedPackages[packagePath];
+            if (!locked) {
+              plannedOnlyPaths.push({ path: packagePath, name: planned.name, planned: planned.version });
+            } else if (locked.version && locked.version !== planned.version) {
+              versionChanges.push({
+                path: packagePath,
+                name: planned.name,
+                locked: locked.version,
+                planned: planned.version
+              });
+            }
+          }
+
+          const vulnerabilities = report.audit.vulnerabilities || {};
+          const majorFixes = [];
+          const noAutomaticFix = [];
+          for (const [name, item] of Object.entries(vulnerabilities)) {
+            if (item.fixAvailable && typeof item.fixAvailable === 'object') {
+              majorFixes.push({
+                package: name,
+                severity: item.severity,
+                target: item.fixAvailable.name,
+                targetVersion: item.fixAvailable.version,
+                isSemVerMajor: Boolean(item.fixAvailable.isSemVerMajor)
+              });
+            } else if (item.fixAvailable === false) {
+              noAutomaticFix.push({ package: name, severity: item.severity, range: item.range });
+            }
+          }
+
           console.log('AUDIT_FIX_DRY_RUN_SUMMARY ' + JSON.stringify({
-            added: report.added,
-            removed: report.removed,
-            changed: report.changed,
-            audited: report.audited,
-            audit: report.audit?.metadata?.vulnerabilities,
-            error: report.error
-          }));
-          console.log('DRY_RUN_ONLY=true; package.json and package-lock.json are not changed by this step.');
+            commandExitCode: Number(process.env.AUDIT_FIX_EXIT_CODE || '0'),
+            installPlanCounts: {
+              added: report.added,
+              removed: report.removed,
+              changed: report.changed,
+              audited: report.audited
+            },
+            currentAuditCounts: report.audit.metadata.vulnerabilities,
+            lockfileVersionChanges: versionChanges.length,
+            lockfileVersionChangeSamples: versionChanges.slice(0, 100),
+            plannedPathsNotInLockfileCount: plannedOnlyPaths.length,
+            plannedPathsNotInLockfileSamples: plannedOnlyPaths.slice(0, 30),
+            majorOrNamedFixRecommendations: majorFixes,
+            noAutomaticFix
+          }, null, 2));
+          console.log('DRY_RUN_ONLY=true; package.json and package-lock.json hashes verified unchanged.');
+          console.log('AUDIT_METADATA_IS_NOT_POST_REMEDIATION_PROOF=true; re-audit a separately applied candidate before claiming vulnerabilities are fixed.');
           NODE
 
       - name: Upload remediation preview
