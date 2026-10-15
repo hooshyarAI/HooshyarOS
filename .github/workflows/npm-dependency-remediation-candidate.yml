@@ -14,6 +14,9 @@ jobs:
     name: Apply compatible fixes in isolated runner and verify
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    outputs:
+      security_gate_pass: ${{ steps.security_gate.outputs.security_gate_pass }}
+      tested_head_sha: ${{ steps.baseline.outputs.tested_head_sha }}
     permissions:
       contents: read
     steps:
@@ -29,8 +32,11 @@ jobs:
           cache: npm
 
       - name: Capture baseline audit
+        id: baseline
         shell: bash
         run: |
+          echo "tested_head_sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          cp package-lock.json package-lock-before.json
           set +e
           npm audit --json > npm-audit-before.json
           baseline_exit=$?
@@ -63,7 +69,8 @@ jobs:
             git diff --stat -- package-lock.json
           fi
 
-      - name: Require a safer lockfile candidate
+      - name: Evaluate the security gate without skipping functional tests
+        id: security_gate
         shell: bash
         run: |
           set +e
@@ -133,21 +140,51 @@ jobs:
             noSeverityRegression
           }, null, 2));
 
-          if (afterCounts.critical !== 0) {
-            throw new Error('Candidate still has critical npm advisories.');
-          }
-          if (afterCounts.total >= beforeCounts.total) {
-            throw new Error('Candidate did not reduce the total npm advisory count.');
-          }
-          if (!noSeverityRegression) {
-            throw new Error('Candidate increased a non-critical severity count.');
-          }
-          if (versionChanges.length === 0) {
-            throw new Error('Candidate lockfile has no version changes to review.');
-          }
+          const baselinePaths = new Set(Object.keys(baselineLock.packages || {}));
+          const candidatePaths = new Set(Object.keys(candidateLock.packages || {}));
+          const addedPaths = [...candidatePaths].filter(key => !baselinePaths.has(key)).sort();
+          const removedPaths = [...baselinePaths].filter(key => !candidatePaths.has(key)).sort();
+          const securityGatePass =
+            afterCounts.critical === 0 &&
+            afterCounts.total < beforeCounts.total &&
+            noSeverityRegression &&
+            versionChanges.length > 0;
 
+          const lockDiff = {
+            baselineHeadSha: process.env.GITHUB_SHA,
+            baselinePackageCount: baselinePaths.size,
+            candidatePackageCount: candidatePaths.size,
+            addedPathCount: addedPaths.length,
+            removedPathCount: removedPaths.length,
+            versionChangeCount: versionChanges.length,
+            addedPathSamples: addedPaths.slice(0, 100),
+            removedPathSamples: removedPaths.slice(0, 100),
+            versionChanges: versionChanges.slice(0, 200),
+            auditBefore: beforeCounts,
+            auditAfter: afterCounts,
+            protectedMajorsUnchanged: true,
+            exceljsHardenedUnchanged: true,
+            noSeverityRegression,
+            securityGatePass
+          };
+          fs.writeFileSync('npm-lock-diff-summary.json', JSON.stringify(lockDiff, null, 2) + '\n');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `security_gate_pass=${securityGatePass}\n`);
           fs.writeFileSync('package-lock.sha256', require('node:crypto')
             .createHash('sha256').update(fs.readFileSync('package-lock.json')).digest('hex') + '\n');
+
+          const summary = process.env.GITHUB_STEP_SUMMARY;
+          const status = securityGatePass ? 'PASS' : 'BLOCKED';
+          fs.appendFileSync(summary, `## Dependency security gate: ${status}\n\n`);
+          fs.appendFileSync(summary, `- Audit findings: ${beforeCounts.total} → ${afterCounts.total}\n`);
+          fs.appendFileSync(summary, `- Critical: ${beforeCounts.critical} → ${afterCounts.critical}\n`);
+          fs.appendFileSync(summary, `- High: ${beforeCounts.high} → ${afterCounts.high}\n`);
+          fs.appendFileSync(summary, `- Moderate: ${beforeCounts.moderate} → ${afterCounts.moderate}\n`);
+          fs.appendFileSync(summary, `- Lockfile package paths added/removed: ${addedPaths.length}/${removedPaths.length}\n`);
+          fs.appendFileSync(summary, `- Jest suite will run even when the security gate is blocked; blocked candidates will not be committed.\n`);
+          console.log('SECURITY_GATE_PASS=' + securityGatePass);
+          if (!securityGatePass) {
+            console.log('SECURITY_GATE_BLOCKED=true; continuing to the full Jest suite for compatibility evidence only. No candidate lockfile commit will be permitted.');
+          }
           NODE
 
       - name: Run complete Jest suite
@@ -161,6 +198,8 @@ jobs:
           path: |
             package-lock.json
             package-lock.sha256
+            package-lock-before.json
+            npm-lock-diff-summary.json
             npm-audit-before.json
             npm-audit-after.json
             npm-audit-fix-output.txt
@@ -170,7 +209,7 @@ jobs:
   commit-tested-lockfile:
     name: Commit only the exact tested lockfile
     needs: apply-and-verify
-    if: needs.apply-and-verify.result == 'success'
+    if: needs.apply-and-verify.result == 'success' && needs.apply-and-verify.outputs.security_gate_pass == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -185,10 +224,19 @@ jobs:
           name: hooshyar-npm-remediation-candidate
           path: candidate-artifact
 
-      - name: Verify artifact identity and commit only package-lock.json
+      - name: Verify tested base ref, artifact identity, and exact commit scope
         shell: bash
+        env:
+          EXPECTED_TESTED_HEAD_SHA: ${{ needs.apply-and-verify.outputs.tested_head_sha }}
         run: |
           set -euo pipefail
+          actual_head_sha="$(git rev-parse HEAD)"
+          if [[ "$actual_head_sha" != "$EXPECTED_TESTED_HEAD_SHA" ]]; then
+            echo "::error::Branch head changed after tests; refusing to apply a stale lockfile candidate."
+            echo "Expected tested head: $EXPECTED_TESTED_HEAD_SHA"
+            echo "Current branch head: $actual_head_sha"
+            exit 2
+          fi
           test -f candidate-artifact/package-lock.json
           test -f candidate-artifact/package-lock.sha256
           expected="$(cat candidate-artifact/package-lock.sha256)"
