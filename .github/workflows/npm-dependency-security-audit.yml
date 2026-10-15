@@ -1,0 +1,83 @@
+name: npm Dependency Security Audit Report
+
+on:
+  push:
+    branches:
+      - audit/npm-dependency-advisory-report-2026-10-15
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  npm-audit-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Generate read-only npm audit report
+        id: audit
+        shell: bash
+        run: |
+          set +e
+          npm audit --json > npm-audit-report.json
+          audit_exit=$?
+          set -e
+
+          echo "audit_exit_code=$audit_exit" >> "$GITHUB_OUTPUT"
+          echo "npm audit exit code: $audit_exit (1 is expected when vulnerabilities are reported)"
+          node <<'NODE'
+          const fs = require('node:fs');
+          const report = JSON.parse(fs.readFileSync('npm-audit-report.json', 'utf8'));
+          if (!report.metadata?.vulnerabilities || !report.vulnerabilities) {
+            console.error('npm audit did not return a complete vulnerability report.');
+            console.error(JSON.stringify(report, null, 2).slice(0, 5000));
+            process.exit(2);
+          }
+
+          const counts = report.metadata.vulnerabilities;
+          console.log('AUDIT_COUNTS ' + JSON.stringify(counts));
+          const severityOrder = { critical: 0, high: 1, moderate: 2, low: 3, info: 4 };
+          const findings = Object.entries(report.vulnerabilities)
+            .map(([name, v]) => ({
+              package: name,
+              severity: v.severity,
+              direct: v.isDirect,
+              installedNodes: v.nodes,
+              affectedRange: v.range,
+              effects: v.effects,
+              fixAvailable: v.fixAvailable,
+              advisories: (v.via || []).filter(x => typeof x === 'object').map(x => ({
+                title: x.title,
+                url: x.url,
+                severity: x.severity,
+                range: x.range,
+                cwe: x.cwe,
+                cvss: x.cvss?.score
+              }))
+            }))
+            .sort((a, b) =>
+              (severityOrder[a.severity] ?? 9) - (severityOrder[b.severity] ?? 9) ||
+              a.package.localeCompare(b.package)
+            );
+          console.log('AUDIT_FINDINGS_BEGIN');
+          console.log(JSON.stringify(findings, null, 2));
+          console.log('AUDIT_FINDINGS_END');
+          NODE
+
+      - name: Upload full npm audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hooshyar-npm-audit-report
+          path: npm-audit-report.json
+          if-no-files-found: error
+          retention-days: 14
