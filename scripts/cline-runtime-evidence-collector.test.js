@@ -115,7 +115,7 @@ describe("runtime evidence collector CI regression", () => {
     const workflow = fs.readFileSync(WORKFLOW_PATH, "utf8");
     const evidenceScript = fs.readFileSync(EVIDENCE_SCRIPT_PATH, "utf8");
     // The canonical android evidence artifact is written by the harness to .hooshyar/android-acceptance-success.json.
-    // With the download destination fixed to the workspace root, the artifact lands at that exact path.
+    // The workflow downloads the single-file artifact into .hooshyar, matching the harness's canonical evidence path.
     expect(evidenceScript).toContain("DEFAULT_EVIDENCE_PATH = path.join(ROOT, '.hooshyar', 'android-acceptance-success.json')");
     expect(workflow).toContain('name: hooshyar-android-product-acceptance-evidence');
   });
