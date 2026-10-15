@@ -73,6 +73,39 @@ jobs:
           console.log('AUDIT_FINDINGS_END');
           NODE
 
+      - name: Preview safe semver-compatible remediation (dry run only)
+        id: remediation
+        shell: bash
+        run: |
+          set +e
+          npm audit fix --dry-run --json > npm-audit-fix-dry-run.json
+          audit_fix_exit=$?
+          set -e
+
+          echo "audit_fix_dry_run_exit_code=$audit_fix_exit" >> "$GITHUB_OUTPUT"
+          node <<'NODE'
+          const fs = require('node:fs');
+          const report = JSON.parse(fs.readFileSync('npm-audit-fix-dry-run.json', 'utf8'));
+          console.log('AUDIT_FIX_DRY_RUN_SUMMARY ' + JSON.stringify({
+            added: report.added,
+            removed: report.removed,
+            changed: report.changed,
+            audited: report.audited,
+            audit: report.audit?.metadata?.vulnerabilities,
+            error: report.error
+          }));
+          console.log('DRY_RUN_ONLY=true; package.json and package-lock.json are not changed by this step.');
+          NODE
+
+      - name: Upload remediation preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hooshyar-npm-audit-remediation-preview
+          path: npm-audit-fix-dry-run.json
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Upload full npm audit report
         if: always()
         uses: actions/upload-artifact@v4
