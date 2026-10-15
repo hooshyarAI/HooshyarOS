@@ -80,6 +80,7 @@ jobs:
         with:
           name: hooshyar-web-product-acceptance-evidence
           path: ./.hooshyar/web-acceptance-success.json
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 14
 
@@ -103,6 +104,7 @@ jobs:
         with:
           name: hooshyar-security-tenant-evidence
           path: ./.hooshyar/security-acceptance-success.json
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 14
 
@@ -145,6 +147,7 @@ jobs:
         with:
           name: hooshyar-android-product-acceptance-evidence
           path: ./.hooshyar/android-acceptance-success.json
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 14
       - name: Publish installable Android APK
@@ -221,6 +224,7 @@ jobs:
         with:
           name: hooshyar-cline-runtime-evidence
           path: ./.hooshyar/cline-runtime-evidence.json
+          include-hidden-files: true
           retention-days: 14
 
   release-gate:
