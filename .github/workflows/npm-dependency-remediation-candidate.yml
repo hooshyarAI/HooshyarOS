@@ -1,9 +1,6 @@
 name: npm SemVer-compatible remediation candidate
 
 on:
-  push:
-    branches:
-      - security/npm-dependency-remediation-candidate-2026-10-15
   workflow_dispatch:
 
 permissions:
