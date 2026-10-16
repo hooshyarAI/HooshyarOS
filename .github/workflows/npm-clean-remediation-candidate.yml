@@ -133,10 +133,18 @@ jobs:
           const afterV = after.vulnerabilities || {};
           const resolved = Object.keys(beforeV).filter(n => !afterV[n]);
           const introduced = Object.keys(afterV).filter(n => !beforeV[n]);
+          // Count advisory identities separately from affected package paths. A dependency-tree
+          // reshuffle can introduce package-path rows for an advisory that already existed.
+          const advisoryIds = report => new Set(Object.values(report.vulnerabilities || {}).flatMap(v =>
+            (v.via || []).filter(x => typeof x === 'object').map(x => x.url || x.title).filter(Boolean)));
+          const beforeAdvisoryIds = advisoryIds(before);
+          const afterAdvisoryIds = advisoryIds(after);
+          const introducedAdvisories = [...afterAdvisoryIds].filter(id => !beforeAdvisoryIds.has(id));
+          const resolvedAdvisories = [...beforeAdvisoryIds].filter(id => !afterAdvisoryIds.has(id));
           const b = before.metadata.vulnerabilities;
           const a = after.metadata.vulnerabilities;
           const gate = a.critical === 0 && a.high === 0 &&
-            a.total < b.total && introduced.length === 0 &&
+            a.total < b.total && introducedAdvisories.length === 0 &&
             unexpected.length === 0 &&
             !afterV.uuid && !afterV['exceljs-hardened'];
           const remainingRootAdvisories = Object.entries(afterV)
@@ -147,6 +155,10 @@ jobs:
             auditBefore:b, auditAfter:a,
             resolvedPackageFindings:resolved,
             introducedPackageFindings:introduced,
+            baselineUniqueAdvisories:[...beforeAdvisoryIds].sort(),
+            remainingUniqueAdvisories:[...afterAdvisoryIds].sort(),
+            resolvedAdvisories:resolvedAdvisories.sort(),
+            introducedAdvisories:introducedAdvisories.sort(),
             unexpectedDirectDependencyChanges:unexpected,
             intentionalDirectDependencyChanges:directChanges.filter(x =>
               x.group === 'devDependencies' && ['jest', 'ts-jest'].includes(x.name)),
