@@ -57,8 +57,6 @@
       "fast-csv": "5.0.8"
     },
     "argparse": "2.0.1",
-    "babel-plugin-istanbul": {
-      "test-exclude": "8.0.0"
-    }
+    "test-exclude": "8.0.0"
   }
 }
