@@ -57,6 +57,9 @@
       "fast-csv": "5.0.8"
     },
     "argparse": "2.0.1",
-    "test-exclude": "8.0.0"
+    "test-exclude": "8.0.0",
+    "archiver-utils": {
+      "glob": "13.0.6"
+    }
   }
 }
