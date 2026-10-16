@@ -46,7 +46,7 @@ describe("runtime evidence collector CI regression", () => {
       const artifactNamePos = workflow.indexOf(`name: ${artifactName}`);
       expect(artifactNamePos).toBeGreaterThanOrEqual(0);
 
-      const uploadStart = workflow.lastIndexOf("uses: actions/upload-artifact@v\d+", artifactNamePos);
+      const uploadStart = workflow.lastIndexOf("uses: actions/upload-artifact@", artifactNamePos);
       expect(uploadStart).toBeGreaterThanOrEqual(0);
 
       const nextStep = workflow.indexOf("\n      - ", artifactNamePos);
