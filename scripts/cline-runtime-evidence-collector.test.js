@@ -26,18 +26,34 @@ describe("runtime evidence collector CI regression", () => {
     try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch {}
   });
 
-  test("workflow downloads evidence artifacts to the workspace root so the collector finds them at .hooshyar/<name>.json", () => {
+  test("workflow uploads hidden evidence explicitly and downloads every evidence artifact to the canonical directory", () => {
     const workflow = fs.readFileSync(WORKFLOW_PATH, "utf8").replace(/\r\n/g, "\n");
-    // artifact payloads carry the internal path .hooshyar/<name>.json (upload path);
-    // actions/download-artifact@v4 preserves that internal structure, so the download
-    // destination must be the workspace root (".") so the final path is .hooshyar/<name>.json.
-    // A download destination of ".hooshyar" nests the path at .hooshyar/.hooshyar/<name>.json
-    // and the collector (which reads .hooshyar/<name>.json) would never find it.
-    expect(workflow).toContain("path: .\n");
-    expect(workflow).not.toContain("path: .hooshyar\n");
-    // sanity: each evidence artifact is downloaded exactly once into the workspace root
-    // (download paths are bare "path: ." while upload paths are "path: ./<name>")
-    expect(workflow.match(/path: \.\n/g).length).toBe(4);
+    const downloadPaths = [...workflow.matchAll(
+      /- name: Download [^\n]+\n\s+uses: actions\/download-artifact@v4\n\s+with:\n\s+name: [^\n]+\n\s+path: ([^\n]+)/g
+    )].map((match) => match[1].trim());
+
+    expect(downloadPaths).toHaveLength(4);
+    expect(downloadPaths).toEqual(Array(4).fill("./.hooshyar"));
+
+    const requiredUploads = [
+      ["hooshyar-web-product-acceptance-evidence", "web-acceptance-success.json"],
+      ["hooshyar-security-tenant-evidence", "security-acceptance-success.json"],
+      ["hooshyar-android-product-acceptance-evidence", "android-acceptance-success.json"],
+      ["hooshyar-cline-runtime-evidence", "cline-runtime-evidence.json"],
+    ];
+
+    for (const [artifactName, filename] of requiredUploads) {
+      const artifactNamePos = workflow.indexOf(`name: ${artifactName}`);
+      expect(artifactNamePos).toBeGreaterThanOrEqual(0);
+
+      const uploadStart = workflow.lastIndexOf("uses: actions/upload-artifact@v4", artifactNamePos);
+      expect(uploadStart).toBeGreaterThanOrEqual(0);
+
+      const nextStep = workflow.indexOf("\n      - ", artifactNamePos);
+      const uploadBlock = workflow.slice(uploadStart, nextStep === -1 ? workflow.length : nextStep);
+      expect(uploadBlock).toContain(`path: ./.hooshyar/${filename}`);
+      expect(uploadBlock).toContain("include-hidden-files: true");
+    }
   });
 
   test("evidence collector returns QUALIFICATION_COMPLETE when all evidence is present, valid and commit-bound", () => {
@@ -99,7 +115,7 @@ describe("runtime evidence collector CI regression", () => {
     const workflow = fs.readFileSync(WORKFLOW_PATH, "utf8");
     const evidenceScript = fs.readFileSync(EVIDENCE_SCRIPT_PATH, "utf8");
     // The canonical android evidence artifact is written by the harness to .hooshyar/android-acceptance-success.json.
-    // With the download destination fixed to the workspace root, the artifact lands at that exact path.
+    // The workflow downloads the single-file artifact into .hooshyar, matching the harness's canonical evidence path.
     expect(evidenceScript).toContain("DEFAULT_EVIDENCE_PATH = path.join(ROOT, '.hooshyar', 'android-acceptance-success.json')");
     expect(workflow).toContain('name: hooshyar-android-product-acceptance-evidence');
   });
