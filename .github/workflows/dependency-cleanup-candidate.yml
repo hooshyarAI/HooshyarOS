@@ -6,7 +6,6 @@ on:
       - chore/deprecated-zip-dependency-cleanup
     paths:
       - package.json
-      - .github/workflows/dependency-cleanup-candidate.yml
 
 permissions:
   contents: write
@@ -33,6 +32,26 @@ jobs:
       - name: Install from regenerated lock
         run: npm ci
 
+      - name: Verify archiver-utils glob sync compatibility
+        run: |
+          node <<'NODE'
+          const assert = require('node:assert/strict');
+          const fs = require('node:fs');
+          const os = require('node:os');
+          const path = require('node:path');
+          const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'hooshyar-glob-'));
+          try {
+            fs.writeFileSync(path.join(fixture, 'proof.txt'), 'ok');
+            const globApi = require('glob');
+            assert.equal(typeof globApi.sync, 'function', 'glob.sync compatibility export must exist');
+            const matches = require('archiver-utils').file.expand({ cwd: fixture }, ['*.txt']);
+            assert(matches.some(file => file.replace(/\\\\/g, '/') === 'proof.txt'), 'archiver-utils must expand fixture glob');
+            console.log('PASS: archiver-utils file.expand works with the resolved glob implementation.');
+          } finally {
+            fs.rmSync(fixture, { recursive: true, force: true });
+          }
+          NODE
+
       - name: Assert the lockfile has no declared deprecated packages
         shell: bash
         run: |
@@ -47,14 +66,11 @@ jobs:
             .filter(([, item]) => Boolean(item.deprecated))
             .map(([path, item]) => ({ path, version: item.version, deprecated: item.deprecated }));
           console.log('RESOLVED_DEPENDENCY_EVIDENCE=' + JSON.stringify({ packageRows, deprecated }, null, 2));
-          const blocked = deprecated.filter(item =>
-            ['fstream', 'rimraf', 'inflight', 'lodash.isequal'].some(name => item.path.endsWith('node_modules/' + name))
-          );
-          if (blocked.length) {
-            console.error('Deprecated ZIP/CSV packages remain: ' + JSON.stringify(blocked));
+          if (deprecated.length) {
+            console.error('Deprecated packages remain: ' + JSON.stringify(deprecated, null, 2));
             process.exit(1);
           }
-          console.log('PASS: deprecated ZIP and CSV packages are absent; full dependency inventory recorded above.');
+          console.log('PASS: package-lock.json has no declared deprecated packages.');
           NODE
 
       - name: Run complete Jest suite
