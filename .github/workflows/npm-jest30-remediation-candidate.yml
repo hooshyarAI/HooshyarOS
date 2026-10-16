@@ -11,7 +11,6 @@ permissions:
 
 jobs:
   candidate:
-    if: ${{ !startsWith(github.event.head_commit.message || '', 'security: commit verified Jest 30 dependency candidate') }}
     name: Build, audit and test isolated dependency candidate
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -129,7 +128,9 @@ jobs:
           ]);
           const unexpectedManifestChanges = [];
           for (const key of allKeys) {
-            const [group, name] = key.split('.', 2);
+            const separator = key.indexOf('.');
+            const group = key.slice(0, separator);
+            const name = key.slice(separator + 1);
             const oldValue = beforePkg[group]?.[name];
             const newValue = afterPkg[group]?.[name];
             if (oldValue !== newValue && !allowedManifestChanges.has(key)) {
