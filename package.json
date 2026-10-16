@@ -28,7 +28,8 @@
     "autonomous:factory-loop": "python Backend/AI_Runtime/hooshyar_build.py commercial",
     "autonomous:ci-repair": "node scripts/autonomous-ci-repair-loop.cjs",
     "autonomous:assistant": "python Backend/AI_Runtime/hooshyar_build.py assistant",
-    "autonomous:platform": "python Backend/AI_Runtime/hooshyar_build.py platform"
+    "autonomous:platform": "python Backend/AI_Runtime/hooshyar_build.py platform",
+    "deps:verify": "node scripts/verify-dependency-hygiene.cjs"
   },
   "devDependencies": {
     "@napi-rs/canvas": "^0.1.80",
@@ -43,7 +44,7 @@
     "@tesseract.js-data/eng": "^1.0.0",
     "@tesseract.js-data/fas": "^1.0.0",
     "better-sqlite3": "^13.0.3",
-    "exceljs-hardened": "5.0.0",
+    "exceljs-hardened": "5.0.2",
     "mammoth": "^1.12.2",
     "pdf-parse": "^2.4.5",
     "tesseract.js": "^7.0.0",
@@ -53,6 +54,7 @@
     "exceljs-hardened": {
       "uuid": "11.1.1"
     },
-    "argparse": "2.0.1"
+    "argparse": "2.0.1",
+    "test-exclude": "8.0.0"
   }
 }
