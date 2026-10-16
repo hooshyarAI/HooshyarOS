@@ -29,7 +29,7 @@ describe("runtime evidence collector CI regression", () => {
   test("workflow uploads hidden evidence explicitly and downloads every evidence artifact to the canonical directory", () => {
     const workflow = fs.readFileSync(WORKFLOW_PATH, "utf8").replace(/\r\n/g, "\n");
     const downloadPaths = [...workflow.matchAll(
-      /- name: Download [^\n]+\n\s+uses: actions\/download-artifact@v4\n\s+with:\n\s+name: [^\n]+\n\s+path: ([^\n]+)/g
+      /- name: Download [^\n]+\n\s+uses: actions\/download-artifact@v\d+\n\s+with:\n\s+name: [^\n]+\n\s+path: ([^\n]+)/g
     )].map((match) => match[1].trim());
 
     expect(downloadPaths).toHaveLength(4);
@@ -46,7 +46,7 @@ describe("runtime evidence collector CI regression", () => {
       const artifactNamePos = workflow.indexOf(`name: ${artifactName}`);
       expect(artifactNamePos).toBeGreaterThanOrEqual(0);
 
-      const uploadStart = workflow.lastIndexOf("uses: actions/upload-artifact@v4", artifactNamePos);
+      const uploadStart = workflow.lastIndexOf("uses: actions/upload-artifact@", artifactNamePos);
       expect(uploadStart).toBeGreaterThanOrEqual(0);
 
       const nextStep = workflow.indexOf("\n      - ", artifactNamePos);
