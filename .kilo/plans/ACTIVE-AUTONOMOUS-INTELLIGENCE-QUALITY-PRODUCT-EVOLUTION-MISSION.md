@@ -421,14 +421,25 @@ V4/V4.1 is unchanged. No memory ledger was edited by this synthesis step.
 ## Owner-Directed Audit Reconciliation — 2026-10-16
 
 **Checkpoint:** `Docs/HOOSHYAROS_POST_RECOVERY_AUDIT_RECONCILIATION_2026-10-16.md`  
-**Status:** `PARTIALLY_VERIFIED / IN_PROGRESS`  
+**Status:** `RECONCILIATION_CHECKPOINT_COMPLETE / REMEDIATION_PENDING`  
 **Trusted baseline:** `fix/autonomous-product-factory @ 4cf9a0cd093dca4a9d0a3c3eb43d3b2439f74a25`
 
-- Phase 00 is now in reconciliation, not `READY_TO_START`.
-- Do not perform product-code implementation during this reconciliation stage.
+- Phase 00 reconciliation is complete as a documented checkpoint; product remediation is pending.
+- The no-product-implementation rule applied during Phase 00; the next stage is a separately bounded acceptance-fixture repair.
 - The current owner-directed operator boundary is: retain Kilo as a bounded local operator; keep OpenCode, Team V2 and worker dispatch stopped. This supersedes the earlier stale next-state line asking to execute the Team V2 bootstrap wave; historical records are retained as evidence and are not erased.
 - The baseline KnowledgeEngine catalogue has 33 domains: 22 `PARTIAL`, 11 `REGISTERED_ONLY`, and zero `EXECUTABLE`. PR #141 proposes the AI CFO skill integration separately and is not considered merged product behavior.
-- The latest Final Product Factory evidence (run 38942764002) is blocking: Web analysis HTTP 422, security/tenant acceptance error for Org A, Windows factory analysis HTTP 422, release gate failed.
+- The latest Final Product Factory evidence (run 38942764002) is blocking. Code review traced Web, security and factory 422s to fixtures that omit explicit `revenue`/`expenses`; runtime correctly returns `LEDGER_ACCOUNT_CLASSIFICATION_REQUIRED` because debit/credit totals do not establish income-statement classification. Keep runtime fail-closed and fix the synthetic fixture semantics.
 - Do not guess the 422 root cause from status alone. Preserve the real, sanitized response and identify whether it is a data contract, runtime or test-harness fault.
 - Continue with one evidence-backed checkpoint/change/test at a time. Do not touch `main` or build the final Windows installer until the qualification matrix passes.
 
+## Phase 00 Closure — 2026-10-16
+
+PHASE_00_STATUS = COMPLETED
+CHECKPOINT = Docs/HOOSHYAROS_POST_RECOVERY_AUDIT_RECONCILIATION_2026-10-16.md
+AUDIT_PROGRAM = Docs/HOOSHYAROS_PLATFORM_EVOLUTION_AUDIT.md
+NEXT_REQUIRED_STATE = PHASE_16_PRIORITIZED_REMEDIATION_BACKLOG
+NEXT_GAP = ALIGN_ACCEPTANCE_FIXTURES_WITH_EXPLICIT_REVENUE_EXPENSE_CONTRACT
+NEXT_GAP_SCOPE = scripts/web-product-acceptance.cjs; scripts/security-tenant-acceptance.cjs; Backend/HBOS/Autonomous/Product/FinalProductFactoryRunner.ts
+SAFETY_RULE = Keep /api/analyze fail-closed; never derive revenue/expenses from raw ledger debit/credit totals.
+EXPECTED_FIXTURE_SEMANTICS = Sales revenue 1500 - Expense 300 = profit 1200 for the web/factory synthetic case; tenant-isolation fixtures must supply their own explicit P&L values and correct tenant-specific expected profit.
+VERIFICATION = Run the three affected acceptance paths first, then requalify the release gates. No Windows package build before the full qualification matrix passes.

@@ -1,6 +1,6 @@
 # چک‌پوینت ممیزی پس از بازیابی — ۱۶ اکتبر ۲۰۲۶
 
-**وضعیت:** `PARTIALLY_VERIFIED / IN_PROGRESS`
+**وضعیت:** `RECONCILIATION_CHECKPOINT_COMPLETE / REMEDIATION_PENDING`
 **شاخه و مبنای ممیزی:** `fix/autonomous-product-factory` @ `4cf9a0cd093dca4a9d0a3c3eb43d3b2439f74a25`
 **دامنه:** ممیزی و تطبیق منشور، مموری، معماری، فهرست علوم، مسیر شناختی، فراگشت و شواهد پذیرش محصول
 **محدودیت این مرحله:** فقط اسناد و مموری مهندسی به‌روزرسانی می‌شوند؛ کد محصول و شاخهٔ `main` تغییر نمی‌کند.
@@ -131,7 +131,7 @@
 | Release Gate | نتیجهٔ `failure` | انتشار مجاز نیست. |
 | Android Product Acceptance | نتیجهٔ `success` | فقط همین job موفق است؛ جایگزین قبولی محصول کامل نیست. |
 
-**شکاف شواهد:** لاگ‌های حاضر کد خطا را ثبت می‌کنند، اما بدنهٔ پاسخ HTTP و جزئیات اعتبارسنجی که علت 422 را تعیین کند نگه نمی‌دارند. بنابراین قبل از هر اصلاح عملکردی باید درخواست/پاسخ نامحسوس‌سازی‌شده در شواهد پذیرش ثبت شود؛ بعد فقط ریشهٔ تأییدشده اصلاح گردد. علت خطا در این چک‌پوینت حدس زده نشده است.
+**شکاف شواهد:** بازبینی کد مسیر علت را روشن کرد: سه fixture پذیرش در `scripts/web-product-acceptance.cjs`، `scripts/security-tenant-acceptance.cjs` و `Backend/HBOS/Autonomous/Product/FinalProductFactoryRunner.ts` به `/api/analyze` درخواست می‌فرستند اما `revenue` و `expenses` صریح ندارند. `CommercialRuntimeServer.ts` عمداً با `422 LEDGER_ACCOUNT_CLASSIFICATION_REQUIRED` برمی‌گردد، چون جمع بدهکار/بستانکار به‌تنهایی درآمد/هزینه را ثابت نمی‌کند. این رفتار fail-closed باید حفظ شود؛ اصلاح بعدی fixtureهاست، نه شل‌کردن دروازهٔ runtime. لاگ‌های پذیرش نیز باید کد خطای sanitized را ثبت کنند تا شکست آینده قابل تشخیص باشد.
 
 ماتریس پذیرش محصول ۱۰ دروازهٔ ضروری را تعیین می‌کند: Windows runtime/business/recovery/security، Web runtime/business، Android release، tenant isolation، CI feedback و full suite. همه باید با شاهد `PASS` باشند؛ `BLOCKED/FAIL/UNKNOWN` دروازهٔ انتشار را می‌بندد.
 
@@ -146,6 +146,52 @@
 | معماری فرایند | Organizational Intelligence و Autonomous Operations در مرزهای موجود | چرخهٔ AS-IS، اصطکاک، ریشه‌یابی، TO-BE، مقایسه، تصویب، اجرا و سنجش هنوز از ثبت علم به‌تنهایی اثبات نمی‌شود. |
 | نمودارها | `web/result-charts.js` طبق قرارداد جاری، نمایش‌محور و مصرف‌کنندهٔ مقادیر سرور | بازسازی ممنوع؛ فقط اگر آزمون/شاهد جاری شکاف واقعی نشان دهد، همان شکاف اصلاح شود. |
 | AI CFO | بستهٔ مهارتی داخل KnowledgeEngine و استفاده از مالکان فعلی | از افزودن CFO Engine یا محاسبات مالی تکراری پرهیز شود؛ مسیرهای قصد، داده و اجرا جداگانه آزمون شوند. |
+
+
+## ۷الف. نقشهٔ مالکیت و جریان داده (شاخهٔ مبنا)
+
+این نقشه مرزهای اعلام‌شده و مسیرهای بررسی‌شده را نشان می‌دهد؛ خط‌چین‌ها یعنی اتصال کامل هنوز تأیید نشده است.
+
+```text
+CSV/Structured/XLSX/PDF
+        |
+        v
+FinancialIngestionService + FinancialDataIngestionAdapter
+        |
+        +--> POST /api/analyze
+        |       -> require explicit revenue + expenses
+        |       -> canonical financial analysis
+        |       -> tenant-scoped persistence
+        |       -> dashboard/report consumers
+        |
+        +--> POST /api/financial/analyze
+                -> tenant-owned source lookup
+                -> canonical document/readiness gate
+                -> financial analysis + evidence/provenance
+                -> tenant-scoped result persistence
+
+/api/assistant -> question-intent analysis / cognitive orchestration
+        |       -> Reasoning / Governance
+        |       -> Financial / Risk / Decision / Executive / Organizational owners
+        |       -> existing workbench/operations contracts
+        |
+        +--> [current baseline: KnowledgeEngine science-selection metadata
+              is not yet wired into this full cognitive path]
+
+KnowledgeEngine.planScienceSelection
+        -> explicit signals
+        -> domain owner + operations + readiness + limitations
+        - - PR #141 proposes CFO/science selection into cognition - -
+        -> canonical domain owners still perform all calculations
+
+Verified result -> decision/action -> outcome measurement -> learning/adaptation
+                                                ^
+                                                |
+                  EvolutionEngine is a placeholder here; complete closed-loop
+                  product evolution is NOT behaviorally verified.
+```
+
+Ownership constraint: FinancialIntelligenceEngine owns financial math; BudgetIntelligenceEngine owns budget/variance math; RiskIntelligenceEngine owns risk/sensitivity/scenario math; GovernanceEngine owns policy/authorization; Reasoning/Intelligence compose interpretation; Executive and Organizational Intelligence retain their frozen scopes. KnowledgeEngine catalogs/selects science—it does not replace those owners.
 
 ## ۷. موجودی کارهای باقی‌مانده و ترتیب اجرا
 
@@ -184,6 +230,6 @@
 
 ## ۸. شکاف بعدیِ پیشنهادی
 
-**نخستین قابلیت اصلاحی بعد از پایان تطبیق Phase 00:** تشخیص و رفع مستندشدهٔ شکست تحلیل در پذیرش (422 / Org A)، با ثبت پاسخ واقعی، تست بازتولید و حداقل تغییر در مالک کاننیکال. این انتخاب به دلیل مسدودبودن دروازهٔ انتشار و امکان اثرگذاری بر Web و Windows است؛ نه به خاطر حدس دربارهٔ علت خطا.
+**نخستین اصلاح بعد از پایان تطبیق Phase 00:** همسان‌سازی fixtureهای سه harness با قرارداد صریح درآمد/هزینه و انتظار سود درست، همراه با پیام خطای تشخیصیِ sanitized. برای نمونهٔ Web/Factory، درآمد حساب Sales برابر ۱٬۵۰۰ و هزینهٔ حساب Expense برابر ۳۰۰ است؛ سود صحیح ۱٬۲۰۰ است، نه ۱٬۰۰۰ حاصل از جمع کل بستانکار منهای بدهکار. رفتار fail-closed موتور تغییر نمی‌کند.
 
 تا این نقطه هیچ کد محصولی تغییر نکرده، `main` دست‌نخورده است و تکمیل محصول اعلام نمی‌شود.
