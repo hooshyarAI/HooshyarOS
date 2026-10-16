@@ -7,6 +7,7 @@ import { KnowledgeItem } from '../Core/IntelligenceContract';
 export type ScienceReadiness = 'EXECUTABLE' | 'PARTIAL' | 'REGISTERED_ONLY';
 
 export type ScienceSignal =
+    | 'cfo-advisory'
     | 'financial-performance'
     | 'capital-allocation'
     | 'investment-evaluation'
@@ -577,6 +578,41 @@ const SCIENCE_DOMAINS: readonly ScienceDomainDefinition[] = [
         ],
         limitations: [
             'امکان‌سنجی مالی اولیه با NPV، IRR، دوره بازگشت و سناریوهای جریان نقدی در محیط کاربری موجود است و مفروضات نیازمند بازبینی علامت می‌خورند؛ مطالعه جامع فنی، بازار، حقوقی، عملیاتی و محیط‌زیستی با داده‌های تأییدشده هنوز کامل نیست.'
+        ]
+    },
+    {
+        id: 'ai-cfo-skill-pack',
+        name: 'بسته مهارت‌های مدیر مالی هوشمند (AI CFO)',
+        purpose: 'انتخاب روشمند مهارت‌های برنامه‌ریزی و تحلیل مالی، نقدینگی و سرمایه در گردش، سودآوری، انحراف بودجه، ارزیابی سرمایه‌گذاری، سناریو و کنترل مالی بر پایه شواهد.',
+        owner: 'KnowledgeEngine (انتخاب مهارت؛ مالکیت محاسبات در موتورهای مالی، بودجه و ریسک موجود باقی می‌ماند)',
+        readiness: 'PARTIAL',
+        signals: ['cfo-advisory', 'financial-performance', 'cash-flow', 'liquidity', 'budget-planning', 'budgeting', 'forecasting', 'scenario-analysis', 'risk-assessment', 'capital-allocation', 'internal-control', 'cost-management', 'executive-management', 'fundamental-analysis', 'applied-analysis'],
+        availableOperations: [
+            'FinancialIntelligenceEngine.analyze',
+            'FinancialIntelligenceEngine.workingCapital',
+            'FinancialIntelligenceEngine.liquidityRatios',
+            'FinancialIntelligenceEngine.roic',
+            'FinancialIntelligenceEngine.eva',
+            'FinancialIntelligenceEngine.wacc',
+            'FinancialIntelligenceEngine.npv',
+            'FinancialIntelligenceEngine.irr',
+            'FinancialIntelligenceEngine.payback',
+            'BudgetIntelligenceEngine.analyze',
+            'BudgetIntelligenceEngine.analyzeBudget',
+            'BudgetIntelligenceEngine.analyzeCostBreakdown',
+            'RiskIntelligenceEngine.assess',
+            'RiskIntelligenceEngine.sensitivity',
+            'RiskIntelligenceEngine.tornado',
+            'RiskIntelligenceEngine.scenario',
+            'FinancialStatementAnalysisService.execute',
+            'AuditAnalyticsService.run'
+        ],
+        limitations: [
+            'این بسته مسیریاب مهارت است، نه موتور یا عامل اجرایی مستقل؛ محاسبات باید فقط توسط مالک کاننیکال مربوط انجام شوند.',
+            'بسته در وضعیت PARTIAL است؛ جامعیت کامل FP&A، خزانه‌داری، ERP، پیش‌بینی نقدینگی چنددوره‌ای و کنترل‌های مالی به‌عنوان قابلیت یکپارچه اثبات نشده است.',
+            'واقعیت، برآورد و فرض باید جدا بمانند؛ نبود دوره، واحد پول، منشأ یا کفایت داده باید به بازبینی یا توقف تحلیل منجر شود.',
+            'انطباق با قوانین جاری مالیاتی و حسابداری ایران بدون قواعد به‌روز و آزمون اختصاصی قابل ادعا نیست.',
+            'هیچ پرداخت، انتقال وجه یا اقدام مالی پیامدمحوری صرفاً بر اساس پیشنهاد AI مجاز نیست؛ سیاست و مجوز باید از مسیر Governance اعمال شود.'
         ]
     }
 ];

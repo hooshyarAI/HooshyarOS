@@ -1,0 +1,50 @@
+name: AI CFO Focused Validation
+
+on:
+  push:
+    paths:
+      - ".github/workflows/ai-cfo-focused-validation.yml"
+      - "Backend/HBOS/Engines/KnowledgeEngine.ts"
+      - "Backend/HBOS/Product/CognitiveOrchestrationService.ts"
+      - "Backend/HBOS/test/KnowledgeEngine.AICFOSkillPack.test.ts"
+      - "Backend/HBOS/test/CognitiveOrchestrationService.AICFOSkillPack.test.ts"
+  pull_request:
+    branches:
+      - fix/autonomous-product-factory
+    paths:
+      - "Backend/HBOS/Engines/KnowledgeEngine.ts"
+      - "Backend/HBOS/Product/CognitiveOrchestrationService.ts"
+      - "Backend/HBOS/test/KnowledgeEngine.AICFOSkillPack.test.ts"
+      - "Backend/HBOS/test/CognitiveOrchestrationService.AICFOSkillPack.test.ts"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-cfo-focused-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ai-cfo-focused-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run focused AI CFO tests
+        run: >-
+          node ./node_modules/jest/bin/jest.js
+          --runInBand
+          --runTestsByPath
+          Backend/HBOS/test/KnowledgeEngine.AICFOSkillPack.test.ts
+          Backend/HBOS/test/CognitiveOrchestrationService.AICFOSkillPack.test.ts
