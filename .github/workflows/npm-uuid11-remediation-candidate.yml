@@ -1,0 +1,225 @@
+name: Targeted npm UUID advisory remediation candidate
+
+on:
+  push:
+    branches:
+      - security/npm-uuid11-moderate-remediation-2026-10-16
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  candidate:
+    name: Override UUID only beneath exceljs-hardened, audit and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    outputs:
+      security_gate_pass: ${{ steps.audit_gate.outputs.security_gate_pass }}
+      tested_head_sha: ${{ steps.baseline.outputs.tested_head_sha }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout with read-only credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Capture current baseline
+        id: baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "tested_head_sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          cp package.json package-json-before.json
+          cp package-lock.json package-lock-before.json
+          set +e
+          npm audit --json > npm-audit-before.json
+          baseline_exit=$?
+          set -e
+          echo "BASELINE_NPM_AUDIT_EXIT_CODE=$baseline_exit"
+          node -e "const r=require('./npm-audit-before.json'); if(!r.metadata?.vulnerabilities) process.exit(2); console.log('BASELINE_AUDIT_COUNTS '+JSON.stringify(r.metadata.vulnerabilities))"
+
+      - name: Apply scoped uuid 11.1.1 override
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          p.overrides ||= {};
+          p.overrides['exceljs-hardened'] = {
+            ...(p.overrides['exceljs-hardened'] || {}),
+            uuid: '11.1.1'
+          };
+          fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
+          NODE
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          set +e
+          npm audit fix --ignore-scripts --no-fund > npm-audit-fix-output.txt 2>&1
+          fix_exit=$?
+          set -e
+          echo "NPM_AUDIT_FIX_EXIT_CODE=$fix_exit"
+
+      - name: Install and evaluate the scoped override
+        id: audit_gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm ls uuid --all > npm-ls-uuid.txt
+          set +e
+          npm audit --json > npm-audit-after.json
+          audit_exit=$?
+          set -e
+          echo "POST_OVERRIDE_NPM_AUDIT_EXIT_CODE=$audit_exit"
+          node <<'NODE'
+          const fs = require('node:fs');
+          const read = p => JSON.parse(fs.readFileSync(p, 'utf8'));
+          const beforePkg = read('package-json-before.json');
+          const afterPkg = read('package.json');
+          const beforeLock = read('package-lock-before.json');
+          const afterLock = read('package-lock.json');
+          const before = read('npm-audit-before.json');
+          const after = read('npm-audit-after.json');
+          if (!before.metadata?.vulnerabilities || !after.metadata?.vulnerabilities) {
+            throw new Error('Incomplete npm audit report.');
+          }
+          if (afterPkg.overrides?.['exceljs-hardened']?.uuid !== '11.1.1') {
+            throw new Error('Scoped uuid override was not preserved.');
+          }
+          const oldExcel = beforeLock.packages?.['node_modules/exceljs-hardened']?.version;
+          const newExcel = afterLock.packages?.['node_modules/exceljs-hardened']?.version;
+          const uuidVersion = afterLock.packages?.['node_modules/uuid']?.version;
+          const oldMammoth = beforeLock.packages?.['node_modules/mammoth']?.version;
+          const newMammoth = afterLock.packages?.['node_modules/mammoth']?.version;
+          if (oldExcel !== '5.0.0' || newExcel !== oldExcel) {
+            throw new Error('exceljs-hardened must stay at 5.0.0.');
+          }
+          if (uuidVersion !== '11.1.1') {
+            throw new Error('Expected root resolved uuid 11.1.1, got ' + uuidVersion);
+          }
+          const major = v => Number(/^\s*(\d+)/.exec(v || '')?.[1] || -1);
+          if (!oldMammoth || major(oldMammoth) !== major(newMammoth)) {
+            throw new Error('Mammoth major version must remain unchanged.');
+          }
+          const allowedOverride = JSON.stringify(afterPkg.overrides?.['exceljs-hardened'] || {});
+          const manifestDependencyChanges = [];
+          for (const group of ['dependencies', 'devDependencies']) {
+            for (const name of new Set([...Object.keys(beforePkg[group] || {}), ...Object.keys(afterPkg[group] || {})])) {
+              if (beforePkg[group]?.[name] !== afterPkg[group]?.[name]) {
+                manifestDependencyChanges.push({group, name, before:beforePkg[group]?.[name], after:afterPkg[group]?.[name]});
+              }
+            }
+          }
+          if (manifestDependencyChanges.length) {
+            throw new Error('Unexpected direct dependency range changes: ' + JSON.stringify(manifestDependencyChanges));
+          }
+          const b = before.metadata.vulnerabilities;
+          const a = after.metadata.vulnerabilities;
+          const beforeV = before.vulnerabilities || {};
+          const afterV = after.vulnerabilities || {};
+          const resolved = Object.keys(beforeV).filter(n => !afterV[n]);
+          const introduced = Object.keys(afterV).filter(n => !beforeV[n]);
+          const gate = a.critical === 0 && a.high === 0 && a.total < b.total &&
+            !afterV.uuid && !afterV['exceljs-hardened'];
+          const summary = {
+            auditBefore:b, auditAfter:a,
+            uuidBefore:beforeLock.packages?.['node_modules/uuid']?.version,
+            uuidAfter:uuidVersion,
+            exceljsHardenedVersion:newExcel,
+            mammothBefore:oldMammoth, mammothAfter:newMammoth,
+            scopedOverride:allowedOverride,
+            resolvedPackageFindings:resolved,
+            introducedPackageFindings:introduced,
+            remainingRootAdvisories:Object.entries(afterV)
+              .filter(([_,v]) => (v.via || []).some(x => typeof x === 'object'))
+              .map(([name,v]) => ({name,severity:v.severity,range:v.range,via:(v.via||[]).filter(x=>typeof x==='object').map(x=>({title:x.title,url:x.url,range:x.range}))})),
+            securityGatePass:gate
+          };
+          fs.writeFileSync('npm-remediation-summary.json', JSON.stringify(summary, null, 2) + '\n');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `security_gate_pass=${gate}\n`);
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
+            `## Scoped UUID override: ${gate ? 'SECURITY GATE PASS' : 'SECURITY GATE BLOCKED'}\n\n- Audit findings: ${b.total} → ${a.total}\n- Critical: ${b.critical} → ${a.critical}\n- High: ${b.high} → ${a.high}\n- Moderate: ${b.moderate} → ${a.moderate}\n- Remaining findings with explicit upstream advisories are recorded in the artifact.\n`);
+          console.log('UUID_OVERRIDE_COMPARISON ' + JSON.stringify(summary, null, 2));
+          if (!gate) console.log('SECURITY_GATE_BLOCKED=true; candidate cannot be committed.');
+          NODE
+
+      - name: Run complete Jest suite
+        run: npm test -- --runInBand --ci
+
+      - name: Create tested candidate hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum package.json | cut -d' ' -f1 > package-json.sha256
+          sha256sum package-lock.json | cut -d' ' -f1 > package-lock.sha256
+          echo "PASS: npm test -- --runInBand --ci" > TEST-PASSED.txt
+
+      - name: Upload candidate and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hooshyar-uuid11-remediation-candidate
+          path: |
+            package.json
+            package-lock.json
+            package-json-before.json
+            package-lock-before.json
+            package-json.sha256
+            package-lock.sha256
+            npm-audit-before.json
+            npm-audit-after.json
+            npm-remediation-summary.json
+            npm-audit-fix-output.txt
+            npm-ls-uuid.txt
+            TEST-PASSED.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+  commit-tested-candidate:
+    name: Commit exact verified UUID override candidate
+    needs: candidate
+    if: needs.candidate.result == 'success' && needs.candidate.outputs.security_gate_pass == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout same tested branch head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Download candidate evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: hooshyar-uuid11-remediation-candidate
+          path: candidate-artifact
+
+      - name: Verify hashes, source head and exact commit scope
+        shell: bash
+        env:
+          EXPECTED_TESTED_HEAD_SHA: ${{ needs.candidate.outputs.tested_head_sha }}
+        run: |
+          set -euo pipefail
+          test -f candidate-artifact/TEST-PASSED.txt
+          [[ "$(git rev-parse HEAD)" == "$EXPECTED_TESTED_HEAD_SHA" ]]
+          [[ "$(cat candidate-artifact/package-json.sha256)" == "$(sha256sum candidate-artifact/package.json | cut -d' ' -f1)" ]]
+          [[ "$(cat candidate-artifact/package-lock.sha256)" == "$(sha256sum candidate-artifact/package-lock.json | cut -d' ' -f1)" ]]
+          cp candidate-artifact/package.json package.json
+          cp candidate-artifact/package-lock.json package-lock.json
+          git diff --check
+          mapfile -t changed_files < <(git diff --name-only | sort)
+          [[ "${changed_files[*]}" == "package-lock.json package.json" ]]
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "security: commit verified uuid 11.1.1 override"
+          git push origin "HEAD:$GITHUB_REF_NAME"
