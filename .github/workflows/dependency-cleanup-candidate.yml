@@ -1,0 +1,63 @@
+name: Remaining deprecation cleanup candidate
+
+on:
+  push:
+    branches:
+      - chore/deprecated-zip-dependency-cleanup
+    paths:
+      - package.json
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate-lock-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout candidate branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Regenerate lock using npm
+        run: npm install --package-lock-only --ignore-scripts
+
+      - name: Install from regenerated lock
+        run: npm ci
+
+      - name: Assert the lockfile has no declared deprecated packages
+        shell: bash
+        run: |
+          node <<'NODE'
+          const lock = require('./package-lock.json');
+          const deprecated = Object.entries(lock.packages)
+            .filter(([, item]) => Boolean(item.deprecated))
+            .map(([path, item]) => ({ path, version: item.version, deprecated: item.deprecated }));
+          if (deprecated.length) {
+            console.error(JSON.stringify(deprecated, null, 2));
+            process.exit(1);
+          }
+          console.log('PASS: package-lock.json has no declared deprecated packages.');
+          NODE
+
+      - name: Run complete Jest suite
+        run: npm test -- --runInBand
+
+      - name: Commit only npm-generated lockfile
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          if git diff --cached --quiet; then
+            echo "package-lock.json is already current."
+          else
+            git commit -m "chore(deps): regenerate lock for current CSV and test-exclude"
+            git push origin HEAD:chore/deprecated-zip-dependency-cleanup
+          fi
