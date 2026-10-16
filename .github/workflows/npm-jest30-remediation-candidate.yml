@@ -1,0 +1,289 @@
+name: Targeted npm security candidate (Jest 30)
+
+on:
+  push:
+    branches:
+      - security/npm-jest30-remediation-2026-10-16
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  candidate:
+    if: ${{ !startsWith(github.event.head_commit.message || '', 'security: commit verified Jest 30 dependency candidate') }}
+    name: Build, audit and test isolated dependency candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      security_gate_pass: ${{ steps.audit_gate.outputs.security_gate_pass }}
+      tested_head_sha: ${{ steps.baseline.outputs.tested_head_sha }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout with read-only credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Capture baseline and preserve exact inputs
+        id: baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "tested_head_sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          cp package.json package-json-before.json
+          cp package-lock.json package-lock-before.json
+          set +e
+          npm audit --json > npm-audit-before.json
+          audit_exit=$?
+          set -e
+          echo "BASELINE_NPM_AUDIT_EXIT_CODE=$audit_exit"
+          node <<'NODE'
+          const fs = require('node:fs');
+          const report = JSON.parse(fs.readFileSync('npm-audit-before.json', 'utf8'));
+          if (!report.metadata?.vulnerabilities || !report.vulnerabilities) {
+            throw new Error('Baseline npm audit JSON is incomplete.');
+          }
+          console.log('BASELINE_AUDIT_COUNTS ' + JSON.stringify(report.metadata.vulnerabilities));
+          NODE
+
+      - name: Upgrade only the Jest toolchain and apply non-breaking fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --save-dev --save-exact --ignore-scripts --no-audit --no-fund jest@30.5.2 ts-jest@29.4.9
+          set +e
+          npm audit fix --ignore-scripts --no-fund > npm-audit-fix-output.txt 2>&1
+          fix_exit=$?
+          set -e
+          echo "NPM_AUDIT_FIX_EXIT_CODE=$fix_exit"
+          node <<'NODE'
+          const fs = require('node:fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          if (pkg.devDependencies?.jest !== '30.5.2') {
+            throw new Error('Jest must remain pinned to the reviewed version 30.5.2.');
+          }
+          if (pkg.devDependencies?.['ts-jest'] !== '29.4.9') {
+            throw new Error('ts-jest must remain pinned to the reviewed compatibility version 29.4.9.');
+          }
+          console.log('TARGET_TOOLCHAIN ' + JSON.stringify({
+            jest: pkg.devDependencies.jest,
+            tsJest: pkg.devDependencies['ts-jest'],
+            typescript: pkg.devDependencies.typescript,
+            typesJest: pkg.devDependencies['@types/jest']
+          }));
+          NODE
+
+      - name: Validate candidate scope and audit delta
+        id: audit_gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          set +e
+          npm audit --json > npm-audit-after.json
+          audit_exit=$?
+          set -e
+          echo "POST_UPGRADE_NPM_AUDIT_EXIT_CODE=$audit_exit"
+          node <<'NODE'
+          const fs = require('node:fs');
+          const { execFileSync } = require('node:child_process');
+
+          function readJson(file) {
+            return JSON.parse(fs.readFileSync(file, 'utf8'));
+          }
+          function readAudit(file) {
+            const value = readJson(file);
+            if (!value.metadata?.vulnerabilities || !value.vulnerabilities) {
+              throw new Error('Incomplete npm audit JSON: ' + file);
+            }
+            return value;
+          }
+          function major(version) {
+            const match = /^\s*(\d+)/.exec(version || '');
+            return match ? Number(match[1]) : null;
+          }
+
+          const beforePkg = readJson('package-json-before.json');
+          const afterPkg = readJson('package.json');
+          const beforeLock = readJson('package-lock-before.json');
+          const afterLock = readJson('package-lock.json');
+          const before = readAudit('npm-audit-before.json');
+          const after = readAudit('npm-audit-after.json');
+          const beforeCounts = before.metadata.vulnerabilities;
+          const afterCounts = after.metadata.vulnerabilities;
+
+          const allowedManifestChanges = new Set(['devDependencies.jest', 'devDependencies.ts-jest']);
+          const allKeys = new Set([
+            ...Object.keys(beforePkg.dependencies || {}).map(k => 'dependencies.' + k),
+            ...Object.keys(afterPkg.dependencies || {}).map(k => 'dependencies.' + k),
+            ...Object.keys(beforePkg.devDependencies || {}).map(k => 'devDependencies.' + k),
+            ...Object.keys(afterPkg.devDependencies || {}).map(k => 'devDependencies.' + k)
+          ]);
+          const unexpectedManifestChanges = [];
+          for (const key of allKeys) {
+            const [group, name] = key.split('.', 2);
+            const oldValue = beforePkg[group]?.[name];
+            const newValue = afterPkg[group]?.[name];
+            if (oldValue !== newValue && !allowedManifestChanges.has(key)) {
+              unexpectedManifestChanges.push({ key, before: oldValue, after: newValue });
+            }
+          }
+          if (unexpectedManifestChanges.length) {
+            throw new Error('Unexpected package.json changes: ' + JSON.stringify(unexpectedManifestChanges));
+          }
+
+          const oldExcel = beforeLock.packages?.['node_modules/exceljs-hardened']?.version;
+          const newExcel = afterLock.packages?.['node_modules/exceljs-hardened']?.version;
+          if (!oldExcel || oldExcel !== newExcel) {
+            throw new Error('exceljs-hardened must stay at its original resolved version: ' + oldExcel + ' -> ' + newExcel);
+          }
+
+          const directRuntime = Object.keys(beforePkg.dependencies || {});
+          const directVersionChanges = [];
+          for (const name of directRuntime) {
+            const key = 'node_modules/' + name;
+            const oldVersion = beforeLock.packages?.[key]?.version;
+            const newVersion = afterLock.packages?.[key]?.version;
+            if (!oldVersion || !newVersion) {
+              directVersionChanges.push({ name, before: oldVersion, after: newVersion, note: 'resolution missing' });
+              continue;
+            }
+            if (major(oldVersion) !== major(newVersion)) {
+              throw new Error('Runtime dependency major changed: ' + name + ' ' + oldVersion + ' -> ' + newVersion);
+            }
+          }
+
+          const beforeV = before.vulnerabilities || {};
+          const afterV = after.vulnerabilities || {};
+          const resolved = Object.keys(beforeV).filter(name => !afterV[name]);
+          const introduced = Object.keys(afterV).filter(name => !beforeV[name]);
+          const severityChanges = [];
+          for (const name of new Set([...Object.keys(beforeV), ...Object.keys(afterV)])) {
+            const b = beforeV[name], a = afterV[name];
+            if (b && a && b.severity !== a.severity) {
+              severityChanges.push({ package: name, before: b.severity, after: a.severity });
+            }
+          }
+
+          const securityGatePass =
+            afterCounts.critical === 0 &&
+            afterCounts.high < beforeCounts.high &&
+            afterCounts.total < beforeCounts.total;
+          const evidence = {
+            baselineHeadSha: process.env.GITHUB_SHA,
+            targetToolchain: {
+              jest: afterPkg.devDependencies?.jest,
+              tsJest: afterPkg.devDependencies?.['ts-jest']
+            },
+            auditBefore: beforeCounts,
+            auditAfter: afterCounts,
+            resolvedPackageFindings: resolved,
+            introducedPackageFindings: introduced,
+            severityChanges,
+            protectedExceljsHardenedVersion: oldExcel,
+            directRuntimeMajorVersionsPreserved: true,
+            unexpectedManifestChanges,
+            securityGatePass
+          };
+          fs.writeFileSync('npm-remediation-summary.json', JSON.stringify(evidence, null, 2) + '\n');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `security_gate_pass=${securityGatePass}\n`);
+          const md = process.env.GITHUB_STEP_SUMMARY;
+          fs.appendFileSync(md, `## Jest 30 dependency candidate: ${securityGatePass ? 'SECURITY GATE PASS' : 'SECURITY GATE BLOCKED'}\n\n`);
+          fs.appendFileSync(md, `- Audit findings: ${beforeCounts.total} → ${afterCounts.total}\n`);
+          fs.appendFileSync(md, `- Critical: ${beforeCounts.critical} → ${afterCounts.critical}\n`);
+          fs.appendFileSync(md, `- High: ${beforeCounts.high} → ${afterCounts.high}\n`);
+          fs.appendFileSync(md, `- Moderate: ${beforeCounts.moderate} → ${afterCounts.moderate}\n`);
+          fs.appendFileSync(md, `- Findings removed / introduced: ${resolved.length} / ${introduced.length}\n`);
+          fs.appendFileSync(md, '- Full Jest suite will run before any commit decision.\n');
+          console.log('REMEDIATION_COMPARISON ' + JSON.stringify(evidence, null, 2));
+          if (!securityGatePass) {
+            console.log('SECURITY_GATE_BLOCKED=true; candidate is retained as evidence only and cannot be committed.');
+          }
+          NODE
+
+      - name: Run complete Jest suite
+        run: npm test -- --runInBand --ci
+
+      - name: Create tested candidate hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum package.json | cut -d' ' -f1 > package-json.sha256
+          sha256sum package-lock.json | cut -d' ' -f1 > package-lock.sha256
+          echo "PASS: npm test -- --runInBand --ci" > TEST-PASSED.txt
+
+      - name: Upload candidate and all evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hooshyar-jest30-remediation-candidate
+          path: |
+            package.json
+            package-lock.json
+            package-json-before.json
+            package-lock-before.json
+            package-json.sha256
+            package-lock.sha256
+            npm-audit-before.json
+            npm-audit-after.json
+            npm-remediation-summary.json
+            npm-audit-fix-output.txt
+            TEST-PASSED.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+  commit-tested-candidate:
+    name: Commit exact security-gated and tested manifests
+    needs: candidate
+    if: needs.candidate.result == 'success' && needs.candidate.outputs.security_gate_pass == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout same tested branch head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Download candidate evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: hooshyar-jest30-remediation-candidate
+          path: candidate-artifact
+
+      - name: Verify artifact hashes, source head and commit scope
+        shell: bash
+        env:
+          EXPECTED_TESTED_HEAD_SHA: ${{ needs.candidate.outputs.tested_head_sha }}
+        run: |
+          set -euo pipefail
+          test -f candidate-artifact/TEST-PASSED.txt
+          actual_head_sha="$(git rev-parse HEAD)"
+          if [[ "$actual_head_sha" != "$EXPECTED_TESTED_HEAD_SHA" ]]; then
+            echo "::error::Branch head changed after tests; refusing stale candidate."
+            exit 2
+          fi
+          test "$(cat candidate-artifact/package-json.sha256)" = "$(sha256sum candidate-artifact/package.json | cut -d' ' -f1)"
+          test "$(cat candidate-artifact/package-lock.sha256)" = "$(sha256sum candidate-artifact/package-lock.json | cut -d' ' -f1)"
+          cp candidate-artifact/package.json package.json
+          cp candidate-artifact/package-lock.json package-lock.json
+          git diff --check
+          mapfile -t changed_files < <(git diff --name-only | sort)
+          if [[ "${changed_files[*]}" != "package-lock.json package.json" ]]; then
+            echo "::error::Refusing unexpected commit scope: ${changed_files[*]}"
+            exit 2
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "security: commit verified Jest 30 dependency candidate"
+          git push origin "HEAD:$GITHUB_REF_NAME"
