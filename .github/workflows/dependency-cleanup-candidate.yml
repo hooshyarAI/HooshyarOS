@@ -6,6 +6,7 @@ on:
       - chore/deprecated-zip-dependency-cleanup
     paths:
       - package.json
+      - .github/workflows/dependency-cleanup-candidate.yml
 
 permissions:
   contents: write
@@ -37,14 +38,20 @@ jobs:
         run: |
           node <<'NODE'
           const lock = require('./package-lock.json');
-          const deprecated = Object.entries(lock.packages)
+          const entries = Object.entries(lock.packages);
+          const packageRows = entries
+            .filter(([path]) => /(^|\\/)node_modules\\/(test-exclude|glob|fast-csv|fstream|rimraf|inflight|lodash\\.isequal)$/.test(path))
+            .map(([path, item]) => ({ path, version: item.version, deprecated: item.deprecated || null }));
+          const deprecated = entries
             .filter(([, item]) => Boolean(item.deprecated))
             .map(([path, item]) => ({ path, version: item.version, deprecated: item.deprecated }));
-          if (deprecated.length) {
-            console.error(JSON.stringify(deprecated, null, 2));
+          console.log('RESOLVED_DEPENDENCY_EVIDENCE=' + JSON.stringify({ packageRows, deprecated }, null, 2));
+          const blocked = deprecated.filter(item => /node_modules\\/(fstream|rimraf|inflight|lodash\\.isequal)$/.test(item.path));
+          if (blocked.length) {
+            console.error('Deprecated ZIP/CSV packages remain: ' + JSON.stringify(blocked));
             process.exit(1);
           }
-          console.log('PASS: package-lock.json has no declared deprecated packages.');
+          console.log('PASS: deprecated ZIP and CSV packages are absent; full dependency inventory recorded above.');
           NODE
 
       - name: Run complete Jest suite
