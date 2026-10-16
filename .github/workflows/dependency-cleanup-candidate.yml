@@ -39,14 +39,17 @@ jobs:
           node <<'NODE'
           const lock = require('./package-lock.json');
           const entries = Object.entries(lock.packages);
+          const relevant = ['test-exclude', 'glob', 'fast-csv', 'fstream', 'rimraf', 'inflight', 'lodash.isequal'];
           const packageRows = entries
-            .filter(([path]) => /(^|\\/)node_modules\\/(test-exclude|glob|fast-csv|fstream|rimraf|inflight|lodash\\.isequal)$/.test(path))
+            .filter(([path]) => relevant.some(name => path.endsWith('node_modules/' + name)))
             .map(([path, item]) => ({ path, version: item.version, deprecated: item.deprecated || null }));
           const deprecated = entries
             .filter(([, item]) => Boolean(item.deprecated))
             .map(([path, item]) => ({ path, version: item.version, deprecated: item.deprecated }));
           console.log('RESOLVED_DEPENDENCY_EVIDENCE=' + JSON.stringify({ packageRows, deprecated }, null, 2));
-          const blocked = deprecated.filter(item => /node_modules\\/(fstream|rimraf|inflight|lodash\\.isequal)$/.test(item.path));
+          const blocked = deprecated.filter(item =>
+            ['fstream', 'rimraf', 'inflight', 'lodash.isequal'].some(name => item.path.endsWith('node_modules/' + name))
+          );
           if (blocked.length) {
             console.error('Deprecated ZIP/CSV packages remain: ' + JSON.stringify(blocked));
             process.exit(1);
