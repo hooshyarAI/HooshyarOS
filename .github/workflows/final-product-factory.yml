@@ -22,7 +22,7 @@ jobs:
           node-version: 24
           cache: npm
       - name: Install dependencies
-        run: npm install
+        run: npm ci
       - name: Validate canonical product assurance contract
         run: npm run product:assurance
       - name: Run executable Windows product factory
@@ -69,7 +69,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm install
+      - run: npm ci
       - name: Validate canonical product assurance contract
         run: npm run product:assurance
       - name: Run executable Web product acceptance
@@ -93,7 +93,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm install
+      - run: npm ci
       - name: Validate canonical product assurance contract
         run: npm run product:assurance
       - name: Run executable security and tenant isolation acceptance
@@ -117,7 +117,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm install
+      - run: npm ci
       - name: Validate canonical product assurance contract
         run: npm run product:assurance
       - uses: actions/setup-java@v6
@@ -169,7 +169,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm install
+      - run: npm ci
       - name: Validate canonical product assurance contract
         run: npm run product:assurance
       - name: Full Jest
@@ -185,7 +185,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm install
+      - run: npm ci
       - name: Download Windows factory evidence
         uses: actions/download-artifact@v8
         with:
