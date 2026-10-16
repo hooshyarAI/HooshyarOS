@@ -348,6 +348,42 @@ describe("FinancialDataIngestionAdapter - XLSX Ingestion", () => {
       database.close();
     });
 
+    test("honors the configured XLSX per-entry uncompressed-size limit", async () => {
+      const sourcePath = join(directory, "entry-limit.xlsx");
+      await createValidXlsxFile(sourcePath);
+
+      const customConfig: SpreadsheetIngestionConfig = {
+        ...DEFAULT_SPREADSHEET_CONFIG,
+        xlsxZipEntryLimitBytes: 1,
+      };
+      const database = new SQLitePersistenceStore({ databasePath: join(directory, "financial.sqlite") });
+      const adapter = new FinancialDataIngestionAdapter(database, customConfig);
+
+      try {
+        await expect(adapter.ingestFile("tenant-a", sourcePath)).rejects.toThrow("ingestion-excel-parse-error");
+      } finally {
+        database.close();
+      }
+    });
+
+    test("honors the configured XLSX total uncompressed-size limit independently", async () => {
+      const sourcePath = join(directory, "total-limit.xlsx");
+      await createValidXlsxFile(sourcePath);
+
+      const customConfig: SpreadsheetIngestionConfig = {
+        ...DEFAULT_SPREADSHEET_CONFIG,
+        xlsxTotalUncompressedLimitBytes: 1,
+      };
+      const database = new SQLitePersistenceStore({ databasePath: join(directory, "financial.sqlite") });
+      const adapter = new FinancialDataIngestionAdapter(database, customConfig);
+
+      try {
+        await expect(adapter.ingestFile("tenant-a", sourcePath)).rejects.toThrow("ingestion-excel-parse-error");
+      } finally {
+        database.close();
+      }
+    });
+
     test("file below custom limit is accepted", async () => {
       const sourcePath = join(directory, "small.xlsx");
       await createValidXlsxFile(sourcePath);
