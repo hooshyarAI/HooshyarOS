@@ -15,14 +15,14 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
       - name: Install dependencies
-        run: npm install
+        run: npm ci
       - name: Validate canonical product assurance contract
         run: npm run product:assurance
       - name: Run executable Windows product factory
@@ -50,7 +50,7 @@ jobs:
           Copy-Item .hooshyar/factory-success.json ./factory-success.json -Force
       - name: Upload product factory evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: hooshyar-final-product-factory-evidence
           path: ./factory-success.json
@@ -64,19 +64,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
-      - run: npm install
+      - run: npm ci
       - name: Validate canonical product assurance contract
         run: npm run product:assurance
       - name: Run executable Web product acceptance
         run: npm run product:web:acceptance
       - name: Upload web acceptance evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: hooshyar-web-product-acceptance-evidence
           path: ./.hooshyar/web-acceptance-success.json
@@ -88,19 +88,23 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
-      - run: npm install
+      - run: npm ci
       - name: Validate canonical product assurance contract
         run: npm run product:assurance
+      - name: Enforce dependency-tree hygiene
+        run: npm run deps:verify
+      - name: Require zero npm advisories
+        run: npm audit --audit-level=low
       - name: Run executable security and tenant isolation acceptance
         run: npm run product:security:acceptance
       - name: Upload security acceptance evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: hooshyar-security-tenant-evidence
           path: ./.hooshyar/security-acceptance-success.json
@@ -112,19 +116,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
-      - run: npm install
+      - run: npm ci
       - name: Validate canonical product assurance contract
         run: npm run product:assurance
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
       - name: Build debug APK
         working-directory: android
         run: gradle :app:assembleDebug --no-daemon
@@ -143,7 +147,7 @@ jobs:
         run: node scripts/android-acceptance-evidence.cjs verify
       - name: Upload Android acceptance evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: hooshyar-android-product-acceptance-evidence
           path: ./.hooshyar/android-acceptance-success.json
@@ -152,7 +156,7 @@ jobs:
           retention-days: 14
       - name: Publish installable Android APK
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: hooshyar-android-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
@@ -164,12 +168,12 @@ jobs:
     timeout-minutes: 30
     needs: [windows-product-factory, web-product-acceptance, security-tenant-acceptance, android-product-acceptance]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
-      - run: npm install
+      - run: npm ci
       - name: Validate canonical product assurance contract
         run: npm run product:assurance
       - name: Full Jest
@@ -180,32 +184,32 @@ jobs:
     timeout-minutes: 15
     needs: [windows-product-factory, web-product-acceptance, security-tenant-acceptance, android-product-acceptance, full-qualification]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
-      - run: npm install
+      - run: npm ci
       - name: Download Windows factory evidence
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: hooshyar-final-product-factory-evidence
           path: ./.hooshyar
           merge-multiple: true
       - name: Download Web acceptance evidence
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: hooshyar-web-product-acceptance-evidence
           path: ./.hooshyar
           merge-multiple: true
       - name: Download Android acceptance evidence
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: hooshyar-android-product-acceptance-evidence
           path: ./.hooshyar
           merge-multiple: true
       - name: Download security acceptance evidence
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: hooshyar-security-tenant-evidence
           path: ./.hooshyar
@@ -220,7 +224,7 @@ jobs:
       - name: Run Cline runtime evidence collector
         run: npm run product:cline:evidence
       - name: Upload consolidated qualification evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: hooshyar-cline-runtime-evidence
           path: ./.hooshyar/cline-runtime-evidence.json
