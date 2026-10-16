@@ -1,0 +1,41 @@
+name: Temporary dependency lock refresh (candidate)
+
+on:
+  push:
+    branches:
+      - fix/ci-dependency-hygiene-2026-10-16
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hooshyaros-dependency-lock-refresh-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    if: ${{ !contains(github.event.head_commit.message, '[lock-refresh]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Regenerate the dependency lockfile
+        run: npm install --package-lock-only --ignore-scripts
+      - name: Enforce dependency-tree hygiene
+        run: node scripts/verify-dependency-hygiene.cjs
+      - name: Require zero npm advisories
+        run: npm audit --audit-level=low
+      - name: Commit the validated lockfile if changed
+        shell: bash
+        run: |
+          git add package-lock.json
+          if git diff --cached --quiet; then
+            echo "LOCKFILE_ALREADY_CURRENT=PASS"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "build: refresh lockfile for hardened dependencies [lock-refresh]"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
