@@ -49,6 +49,7 @@ import type { MemoryEvent } from "../Core/MemoryEvent";
 import type { GovernedLearningLifecycle, LearningArtifact } from "./GovernedLearningLifecycle";
 import type { SecurityContext } from "../Security/SecurityContext";
 import { composeScenarios, analyzeQuestion, type QuestionIntent } from "./FinancialDecisionNarrativeService";
+import { KnowledgeEngine, type ScienceSelectionPlan, type ScienceSignal } from "../Engines/KnowledgeEngine";
 import type { FinancialStatementInsight } from "./FinancialStatementInsight";
 import type { OrganizationalProblemSolvingService } from "./OrganizationalProblemSolvingService";
 import type { DecisionWorkbench } from "./DecisionWorkbench";
@@ -267,6 +268,8 @@ export interface CognitiveOrchestrationResult {
   readonly memory: CognitiveMemoryProvenance;
   /** B-05 tenant-scoped governed-learning retrieval provenance. */
   readonly learning: GovernedLearningProvenance;
+  /** Selected CFO/science skill plan; selection is not proof of operation execution. */
+  readonly scienceSelection: ScienceSelectionPlan | null;
   readonly reasoning: {
     readonly status: "EXECUTED" | "UNAVAILABLE";
     readonly conclusion: string | null;
@@ -352,6 +355,8 @@ const canonicalFinancialValues = (insight: FinancialStatementInsight | null) => 
 });
 
 export class CognitiveOrchestrationService {
+    /** Read-only skill catalogue; it owns selection metadata, not financial calculations. */
+    private readonly knowledge: KnowledgeEngine;
     private readonly financial: FinancialIntelligenceEngine;
     private readonly organizational: OrganizationalIntelligenceEngine;
     private readonly governance: GovernanceEngine;
@@ -384,6 +389,7 @@ export class CognitiveOrchestrationService {
         decisionWorkbench?: DecisionWorkbench,
         autonomousOps?: AutonomousOperationsEngine,
         executiveWorkbench?: ExecutiveIntelligenceWorkbench,
+        knowledge?: KnowledgeEngine,
     ) {
         this.financial = financial ?? new FinancialIntelligenceEngine();
         this.organizational = organizational ?? new OrganizationalIntelligenceEngine();
@@ -395,6 +401,7 @@ export class CognitiveOrchestrationService {
         this.decisionWorkbench = decisionWorkbench;
         this.autonomousOps = autonomousOps;
         this.executiveWorkbench = executiveWorkbench;
+        this.knowledge = knowledge ?? new KnowledgeEngine();
     }
 
     orchestrate(input: CognitiveOrchestrationInput): CognitiveOrchestrationResult {
@@ -411,6 +418,36 @@ export class CognitiveOrchestrationService {
         const intents = intent.answerMode === "COMPOSITE"
             ? [intent.primaryIntent, ...intent.secondaryIntents]
             : [intent.primaryIntent];
+
+        // Structured question intents select finance-specialist knowledge. This is
+        // routing metadata only: canonical engines still own and execute their math.
+        const cfoSignalsByIntent: Partial<Record<QuestionIntent["primaryIntent"], readonly ScienceSignal[]>> = {
+            ANALYZE: ["financial-performance", "cash-flow", "liquidity"],
+            RISK: ["risk-assessment", "liquidity"],
+            PROFIT_CHANGE: ["financial-performance", "historical-analysis"],
+            PRODUCT: ["financial-performance", "cost-management"],
+            SCENARIOS: ["scenario-analysis", "forecasting"],
+            GROWTH: ["scenario-analysis", "capital-allocation", "forecasting"],
+            RESILIENCE: ["cash-flow", "liquidity", "risk-assessment"],
+            DATA_GAPS: ["data-quality", "internal-control"],
+        };
+        const scienceSignals = new Set<ScienceSignal>();
+        for (const selectedIntent of intents) {
+            const mappedSignals = cfoSignalsByIntent[selectedIntent];
+            if (mappedSignals) {
+                scienceSignals.add("cfo-advisory");
+                mappedSignals.forEach(signal => scienceSignals.add(signal));
+            }
+        }
+        const scienceSelection = scienceSignals.size > 0
+            ? this.knowledge.planScienceSelection({ signals: [...scienceSignals] })
+            : null;
+        if (scienceSelection) {
+            this.collectedLimitations.push(
+                "بسته مهارت‌های AI CFO از فهرست دانش انتخاب شد؛ وضعیت آن PARTIAL است و انتخاب مهارت به معنی اجرای محاسبه یا تأیید نتیجه نیست."
+            );
+        }
+
         const selected = new Set<CognitiveCapability>();
         for (const target of intents) {
             for (const capability of CAPABILITY_SELECTION[target]) selected.add(capability);
@@ -458,7 +495,7 @@ export class CognitiveOrchestrationService {
 
         // ---- reasoning over the collected orchestration context -----------
         const limitations = this.collectedLimitations;
-        const reasoning = this.runReasoning({ question, intent, insight, input, executed, limitations, memoryRecords: this.retrievedMemory, learningArtifacts: this.retrievedLearning });
+        const reasoning = this.runReasoning({ question, intent, insight, input, executed, limitations, memoryRecords: this.retrievedMemory, learningArtifacts: this.retrievedLearning, scienceSelection });
 
         const unavailable = executed.filter((entry) => entry.status === "UNAVAILABLE");
         return {
@@ -479,6 +516,7 @@ export class CognitiveOrchestrationService {
             contradictions,
             memory,
             learning,
+            scienceSelection,
             reasoning,
             limitations: Array.from(new Set(limitations)),
             traceId,
@@ -1128,8 +1166,9 @@ export class CognitiveOrchestrationService {
          limitations: string[];
          memoryRecords: readonly MemoryEvent[];
          learningArtifacts?: readonly LearningArtifact[];
+         scienceSelection: ScienceSelectionPlan | null;
      }): CognitiveOrchestrationResult["reasoning"] {
-         const { question, intent, insight, input, executed, limitations, memoryRecords } = ctx;
+         const { question, intent, insight, input, executed, limitations, memoryRecords, scienceSelection } = ctx;
          const learningArtifacts = ctx.learningArtifacts ?? [];
          const evidenceLines: string[] = [];
          for (const entry of executed) {
@@ -1176,6 +1215,14 @@ export class CognitiveOrchestrationService {
               // is never admitted as canonical evidence: the canonical values below
               // remain the authoritative `data` the reasoning layer consumes.
               knowledgeItems: [
+                  ...(scienceSelection?.selected ?? []).slice(0, 8).map((item) => ({
+                      id: `science-selection:${item.domainId}`,
+                      title: `روش منتخب: ${item.name}`,
+                      description: `role=${item.role}; readiness=${item.readiness}; signals=${item.matchingSignals.join(",")}; operations=${item.availableOperations.join(",")}; limitations=${item.limitations.join(" | ")}; selection reason=${item.reason}`,
+                      confidence: item.readiness === "EXECUTABLE" ? 0.8 : 0.5,
+                      source: "KnowledgeEngine.planScienceSelection",
+                      createdAt: new Date().toISOString(),
+                  })),
                   ...memoryRecords.slice(0, 5).map((record) => ({
                       id: record.id,
                       title: record.type,
