@@ -261,6 +261,50 @@ describe("financial report ingestion — runtime HTTP", () => {
     expect((await missing.json()).error).toBe("BALANCE_SHEET_FIELDS_REQUIRED");
   });
 
+  test("raw ledger analysis blocks without explicit revenue/expense mapping", async () => {
+    const cookie = await register("ledger-map-required", "Ledger Org");
+    const csv = "date,account,debit,credit,currency\n2026-08-01,Cash,1000,0,IRR\n2026-08-01,Sales,0,1000,IRR";
+    const ingested = await request("/api/ingest", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ sourceName: "ledger.csv", format: "CSV", content: csv }),
+    });
+    expect(ingested.status).toBe(201);
+    const sha256 = (await ingested.json()).evidence.sha256;
+    const response = await request("/api/financial/analyze", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ sourceSha256: sha256, assets: 1000, liabilities: 250 }),
+    });
+    const body = await response.json();
+    expect(response.status).toBe(422);
+    expect(body.status).toBe("BLOCKED");
+    expect(body.error).toBe("LEDGER_ACCOUNT_CLASSIFICATION_REQUIRED");
+  });
+
+  test("raw ledger analysis accepts explicit P&L amounts and labels them as manual", async () => {
+    const cookie = await register("ledger-mapped", "Mapped Ledger Org");
+    const csv = "date,account,debit,credit,currency\n2026-08-01,Cash,1000,0,IRR\n2026-08-01,Sales,0,1000,IRR";
+    const ingested = await request("/api/ingest", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ sourceName: "ledger.csv", format: "CSV", content: csv }),
+    });
+    expect(ingested.status).toBe(201);
+    const sha256 = (await ingested.json()).evidence.sha256;
+    const response = await request("/api/financial/analyze", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ sourceSha256: sha256, assets: 1000, liabilities: 250, revenue: 1000, expenses: 0 }),
+    });
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.status).toBe("READY");
+    expect(body.metrics.profit).toBe(1000);
+    expect(body.inputProvenance.revenue).toBe("MANUAL");
+    expect(body.inputProvenance.expenses).toBe("MANUAL");
+  });
+
   test("the durable job API reports statement progress and an idempotent replay", async () => {
     const cookie = await register("job-owner", "Job Org");
     const bytes = await buildStatementWorkbook();

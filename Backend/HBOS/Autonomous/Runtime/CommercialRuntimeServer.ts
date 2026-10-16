@@ -189,6 +189,23 @@ const parseExecutiveTargets = (value: unknown): ExecutiveTargets | null => {
     return Object.values(result).every(Number.isFinite) ? result : null;
 };
 
+const LEDGER_ACCOUNT_CLASSIFICATION_REASON = "Raw ledger debit/credit totals do not establish revenue and expenses. Supply explicitly mapped revenue and expense amounts, or ingest a financial statement with canonical statement facts.";
+
+const isNonNegativeFinancialMeasure = (value: unknown): boolean =>
+    (typeof value === "number" || (typeof value === "string" && value.trim().length > 0))
+    && Number.isFinite(Number(value))
+    && Number(value) >= 0;
+
+const validateExplicitProfitLoss = (body: Record<string, unknown>): string | null => {
+    const hasRevenue = body.revenue !== undefined;
+    const hasExpenses = body.expenses !== undefined;
+    if (hasRevenue !== hasExpenses) return "REVENUE_AND_EXPENSES_REQUIRED_TOGETHER";
+    if (hasRevenue && (!isNonNegativeFinancialMeasure(body.revenue) || !isNonNegativeFinancialMeasure(body.expenses))) {
+        return "REVENUE_EXPENSES_MUST_BE_NON_NEGATIVE_NUMBERS";
+    }
+    return null;
+};
+
 const validateAnalyzeBody = (body: Record<string, unknown>): string | null => {
     const csv = String(body.csv ?? "");
     if (!csv.trim()) return "CSV_REQUIRED";
@@ -197,6 +214,8 @@ const validateAnalyzeBody = (body: Record<string, unknown>): string | null => {
     const assets = Number(body.assets);
     const liabilities = Number(body.liabilities);
     if (!Number.isFinite(assets) || !Number.isFinite(liabilities)) return "BALANCE_SHEET_FIELDS_REQUIRED";
+    const profitLossError = validateExplicitProfitLoss(body);
+    if (profitLossError) return profitLossError;
     return null;
 };
 
@@ -263,6 +282,8 @@ const validateFinancialAnalyzeBody = (body: Record<string, unknown>): string | n
     // canonical statement facts; they are then derived from real evidence.
     if (body.assets !== undefined && !Number.isFinite(Number(body.assets))) return "BALANCE_SHEET_FIELDS_REQUIRED";
     if (body.liabilities !== undefined && !Number.isFinite(Number(body.liabilities))) return "BALANCE_SHEET_FIELDS_REQUIRED";
+    const profitLossError = validateExplicitProfitLoss(body);
+    if (profitLossError) return profitLossError;
     return null;
 };
 
@@ -1494,13 +1515,27 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 const sourceName = String(body.sourceName ?? "ledger.csv");
                 const assets = Number(body.assets);
                 const liabilities = Number(body.liabilities);
+                const revenue = body.revenue === undefined ? undefined : Number(body.revenue);
+                const expenses = body.expenses === undefined ? undefined : Number(body.expenses);
                 const ingested = await ingestionService.ingest(session.tenantId, { sourceName, format: "CSV", content: csv });
                 await syncState.recordSuccess(session.tenantId, ingested.result.evidence.sourceName, ingested.rawSourceRef.sha256);
-                const result = analysis.execute({ tenantId: session.tenantId, revenue: ingested.result.model.totals.credit, expenses: ingested.result.model.totals.debit, assets, liabilities, source: ingested.result.evidence });
+                if (revenue === undefined || expenses === undefined) {
+                    return corsJson(422, {
+                        status: "BLOCKED",
+                        error: "LEDGER_ACCOUNT_CLASSIFICATION_REQUIRED",
+                        reason: LEDGER_ACCOUNT_CLASSIFICATION_REASON,
+                        tenantId: session.tenantId,
+                        source: ingested.result.evidence,
+                    });
+                }
+                const result = analysis.execute({ tenantId: session.tenantId, revenue, expenses, assets, liabilities, source: ingested.result.evidence });
                 if (result.status !== "READY") return corsJson(422, result);
                 await persistence.write({ tenantId: session.tenantId }, LATEST_ANALYSIS_KEY, result);
                 latestResults.set(session.tenantId, result);
-                return corsJson(200, result);
+                return corsJson(200, {
+                    ...result,
+                    inputProvenance: { revenue: "MANUAL", expenses: "MANUAL" },
+                });
             }
 
             if (req.method === "POST" && path === "/api/financial/analyze") {
@@ -1537,6 +1572,8 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 }
                 const suppliedAssets = body.assets === undefined ? undefined : Number(body.assets);
                 const suppliedLiabilities = body.liabilities === undefined ? undefined : Number(body.liabilities);
+                const suppliedRevenue = body.revenue === undefined ? undefined : Number(body.revenue);
+                const suppliedExpenses = body.expenses === undefined ? undefined : Number(body.expenses);
                 // Canonical document facts are authoritative. A manually supplied
                 // balance-sheet value is only an explicit fallback for a source
                 // whose evidence is genuinely absent (for example a real ledger).
@@ -1559,10 +1596,22 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                 if (assets === undefined || liabilities === undefined) {
                     return corsJson(400, { error: "BALANCE_SHEET_FIELDS_REQUIRED" });
                 }
+                const revenue = documentRevenue !== undefined ? documentRevenue : suppliedRevenue;
+                const expenses = documentExpenses !== undefined ? documentExpenses : suppliedExpenses;
+                if (revenue === undefined || expenses === undefined) {
+                    return corsJson(422, {
+                        status: "BLOCKED",
+                        error: "LEDGER_ACCOUNT_CLASSIFICATION_REQUIRED",
+                        reason: LEDGER_ACCOUNT_CLASSIFICATION_REASON,
+                        tenantId: session.tenantId,
+                        requiredMeasures: ["revenue", "expenses"],
+                        ingestedSource: ingestedSourceSummary,
+                    });
+                }
                 const result = analysis.execute({
                     tenantId: session.tenantId,
-                    revenue: documentRevenue !== undefined ? documentRevenue : model.totals.credit,
-                    expenses: documentExpenses !== undefined ? documentExpenses : model.totals.debit,
+                    revenue,
+                    expenses,
                     assets,
                     liabilities,
                     source: model.source,
@@ -1582,8 +1631,8 @@ export function createCommercialRuntimeServer(options: CommercialRuntimeOptions 
                     ...result,
                     ingestedSource: ingestedSourceSummary,
                     inputProvenance: {
-                        revenue: documentRevenue !== undefined ? "DOCUMENT" : "LEDGER",
-                        expenses: documentExpenses !== undefined ? "DOCUMENT" : "LEDGER",
+                        revenue: documentRevenue !== undefined ? "DOCUMENT" : "MANUAL",
+                        expenses: documentExpenses !== undefined ? "DOCUMENT" : "MANUAL",
                         assets: documentAssets !== undefined ? "DOCUMENT" : "MANUAL",
                         liabilities: documentLiabilities !== undefined ? "DOCUMENT" : "MANUAL",
                     },

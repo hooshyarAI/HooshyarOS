@@ -4,7 +4,7 @@ import { SQLitePersistenceStore } from "./SQLitePersistenceStore";
 import { FinancialStatementAnalysisService } from "./FinancialStatementAnalysisService";
 
 describe("FinancialStatementAnalysisService production behavioral evidence", () => {
-  test("turns ingested financial data into a customer-usable verified result", async () => {
+  test("turns explicitly mapped ledger measures into a customer-usable verified result", async () => {
     const persistence = new SQLitePersistenceStore({ databasePath: ":memory:" });
     const ingestion = new FinancialDataIngestionAdapter(persistence);
     const source = "date,account,debit,credit,currency\n2026-08-01,Cash,1000,0,IRR\n2026-08-01,Sales,0,1000,IRR";
@@ -14,10 +14,11 @@ describe("FinancialStatementAnalysisService production behavioral evidence", () 
       reason: (problem: string) => ({ problem, status: "verified", success: true as const }),
     };
     const service = new FinancialStatementAnalysisService(new FinancialIntelligenceEngine(), reasoning);
+    // The fixture is explicitly mapped: Sales is revenue; Cash is an asset, not an expense.
     const result = service.execute({
       tenantId: "tenant-a",
-      revenue: ingested.model.totals.credit,
-      expenses: ingested.model.totals.debit,
+      revenue: 1000,
+      expenses: 0,
       assets: 1000,
       liabilities: 250,
       source: ingested.evidence,
@@ -25,7 +26,8 @@ describe("FinancialStatementAnalysisService production behavioral evidence", () 
 
     expect(result.status).toBe("READY");
     expect(result.tenantId).toBe("tenant-a");
-    expect(result.metrics.profit).toBe(0);
+    expect(result.metrics.profit).toBe(1000);
+    expect(result.metrics.profitMargin).toBe(1);
     expect(result.metrics.debtRatio).toBe(0.25);
     expect(result.observations[0]).toMatchObject({ code: "PROFITABLE" });
     expect(result.reasoningEvidence).toEqual({ status: "verified", success: true });

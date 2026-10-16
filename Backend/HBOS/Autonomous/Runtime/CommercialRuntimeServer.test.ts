@@ -157,10 +157,12 @@ describe("CommercialRuntimeServer financial analytics report composition", () =>
 
         // Seed a canonical analysis (CSV ledger) so /api/report has an active result.
         const analyzeRes = await requestJson(server, "POST", "/api/analyze", { cookie }, {
-            csv: "date,account,debit,credit,currency\n2026-08-01,Cash,1000,0,IRR\n2026-08-02,Sales,0,1500,IRR",
+            csv: "date,account,debit,credit,currency\n2026-08-01,Cash,1500,0,IRR\n2026-08-02,Sales,0,1500,IRR",
             sourceName: "qa-ledger.csv",
             assets: 10000,
             liabilities: 4000,
+            revenue: 1500,
+            expenses: 0,
         });
         expect(analyzeRes.status).toBe(200);
         const analyze = JSON.parse(analyzeRes.body);

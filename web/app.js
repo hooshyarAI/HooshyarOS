@@ -89,6 +89,9 @@ function isConnectivityError(error) {
 function describeFailure(error) {
   const kind = classifyErrorKind(error);
   const message = error && error.message ? error.message : String(error);
+  if (message.includes('LEDGER_ACCOUNT_CLASSIFICATION_REQUIRED')) {
+    return 'برای تحلیل دفتر روزنامه، درآمد و هزینه را پس از بررسی و طبقه‌بندی حساب‌ها وارد کنید؛ جمع بدهکار و بستانکار به‌تنهایی درآمد و هزینه نیست.';
+  }
   switch (kind) {
     case 'STORAGE_QUOTA_FAILURE':
       return 'فضای ذخیره‌سازی مرورگر برای صف آفلاین کافی نیست؛ فایل ذخیره نشد. اتصال را برقرار کنید و دوباره تلاش کنید.';
@@ -545,8 +548,12 @@ async function finishIngestJob(job, entry) {
   const analyzeBody = { sourceSha256: job.result.sha256 };
   const assetsInput = document.querySelector('#assets').value.trim();
   const liabilitiesInput = document.querySelector('#liabilities').value.trim();
+  const revenueInput = document.querySelector('#manual-revenue').value.trim();
+  const expensesInput = document.querySelector('#manual-expenses').value.trim();
   if (assetsInput !== '') analyzeBody.assets = Number(assetsInput);
   if (liabilitiesInput !== '') analyzeBody.liabilities = Number(liabilitiesInput);
+  if (revenueInput !== '') analyzeBody.revenue = Number(revenueInput);
+  if (expensesInput !== '') analyzeBody.expenses = Number(expensesInput);
   const analysis = await getJson('/api/financial/analyze', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },

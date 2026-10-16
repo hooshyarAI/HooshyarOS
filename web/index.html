@@ -127,9 +127,11 @@
           <div class="section-heading"><div><span class="section-index">01</span><div><span class="eyebrow">منبع و context</span><h2>یک منبع معتبر اضافه کنید</h2></div></div><span class="trust-pill">منبع → context → نتیجه</span></div>
           <form id="analysis-form" class="source-form">
             <label class="file-input"><span>فایل مالی</span><input id="csv-file" type="file" accept=".csv,.json,.xlsx,.pdf,.txt,text/csv,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/pdf,text/plain" required /><small>CSV، JSON، TXT، XLSX و PDF در مسیر canonical</small></label>
-            <details class="inline-details"><summary>ورودی دستی فقط در نبود شواهد سند</summary><div class="details-grid">
-              <label>دارایی‌ها (اختیاری)<input id="assets" type="number" min="0" step="0.01" placeholder="در صورت وجود در سند، استفاده نمی‌شود" /></label>
-              <label>بدهی‌ها (اختیاری)<input id="liabilities" type="number" min="0" step="0.01" placeholder="در صورت وجود در سند، استفاده نمی‌شود" /></label>
+            <details class="inline-details"><summary>ورودی دستی در نبود ارقام استخراج‌شده از سند</summary><div class="details-grid">
+              <label>دارایی‌ها (اختیاری)<input id="assets" type="number" min="0" step="0.01" placeholder="اگر از سند استخراج نشد" /></label>
+              <label>بدهی‌ها (اختیاری)<input id="liabilities" type="number" min="0" step="0.01" placeholder="اگر از سند استخراج نشد" /></label>
+              <label>درآمد (برای دفتر روزنامه، پس از طبقه‌بندی حساب‌ها)<input id="manual-revenue" type="number" min="0" step="0.01" placeholder="در صورت استخراج از سند، استفاده نمی‌شود" /></label>
+              <label>هزینه‌ها (برای دفتر روزنامه، پس از طبقه‌بندی حساب‌ها)<input id="manual-expenses" type="number" min="0" step="0.01" placeholder="در صورت استخراج از سند، استفاده نمی‌شود" /></label>
             </div></details>
             <div class="form-actions"><button class="primary-button" type="submit">دریافت و تحلیل منبع</button><button class="secondary-button" type="button" data-focus-target="#assistant-question">فقط سؤال بپرس</button></div>
           </form>

@@ -97,12 +97,30 @@ describe("CommercialRuntimeServer E2E", () => {
       const response = await request(server, "/api/analyze", {
         method: "POST",
         headers: { "content-type": "application/json", cookie },
-        body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250 }),
+        body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250, revenue: 1000, expenses: 0 }),
       });
       expect(response.status).toBe(200);
       const body = await response.json();
       expect(body.status).toBe("READY");
       expect(body.tenantId).toBeDefined();
+    });
+
+    test("POST /api/analyze without explicit revenue/expense mapping fails closed", async () => {
+      const session = await request(server, "/api/session", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ username: "mapping-required", organization: "Mapping Org" }),
+      });
+      const cookie = cookieFrom(session);
+      const response = await request(server, "/api/analyze", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie },
+        body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250 }),
+      });
+      const body = await response.json();
+      expect(response.status).toBe(422);
+      expect(body.status).toBe("BLOCKED");
+      expect(body.error).toBe("LEDGER_ACCOUNT_CLASSIFICATION_REQUIRED");
     });
 
     test("POST /api/analyze with missing CSV returns 400", async () => {
@@ -134,7 +152,7 @@ describe("CommercialRuntimeServer E2E", () => {
       await request(server, "/api/analyze", {
         method: "POST",
         headers: { "content-type": "application/json", cookie },
-        body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250 }),
+        body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250, revenue: 1000, expenses: 0 }),
       });
       const response = await request(server, "/api/executive/workbench", {
         method: "POST",
@@ -175,7 +193,7 @@ describe("CommercialRuntimeServer E2E", () => {
       await request(server, "/api/analyze", {
         method: "POST",
         headers: { "content-type": "application/json", cookie },
-        body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250 }),
+        body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250, revenue: 1000, expenses: 0 }),
       });
       const response = await request(server, "/api/assistant", {
         method: "POST",
@@ -222,7 +240,7 @@ describe("CommercialRuntimeServer E2E", () => {
       await request(server, "/api/analyze", {
         method: "POST",
         headers: { "content-type": "application/json", cookie },
-        body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250 }),
+        body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250, revenue: 1000, expenses: 0 }),
       });
       const response = await request(server, "/api/assistant", {
         method: "POST",
@@ -262,7 +280,7 @@ describe("CommercialRuntimeServer E2E", () => {
       await request(server, "/api/analyze", {
         method: "POST",
         headers: { "content-type": "application/json", cookie },
-        body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250 }),
+        body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250, revenue: 1000, expenses: 0 }),
       });
       const response = await request(server, "/api/dashboard", {
         headers: { cookie },
@@ -285,7 +303,7 @@ describe("CommercialRuntimeServer E2E", () => {
       await request(server, "/api/analyze", {
         method: "POST",
         headers: { "content-type": "application/json", cookie },
-        body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250 }),
+        body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250, revenue: 1000, expenses: 0 }),
       });
       const response = await request(server, "/api/report", {
         headers: { cookie },
@@ -366,7 +384,7 @@ describe("CommercialRuntimeServer E2E", () => {
       await request(server, "/api/analyze", {
         method: "POST",
         headers: { "content-type": "application/json", cookie: cookieA },
-        body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250 }),
+        body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250, revenue: 1000, expenses: 0 }),
       });
 
       const sessionB = await request(server, "/api/session", {
