@@ -417,3 +417,18 @@ No QC, integration, acceptance, Gate A verdict, product outcome, mission complet
 readiness is claimed or implied. No accepted F1/F6/CCC/UX work is reopened — no current
 regression/invalidation evidence was found. No new product engine is proposed. Architecture Freeze
 V4/V4.1 is unchanged. No memory ledger was edited by this synthesis step.
+
+## Owner-Directed Audit Reconciliation — 2026-10-16
+
+**Checkpoint:** `Docs/HOOSHYAROS_POST_RECOVERY_AUDIT_RECONCILIATION_2026-10-16.md`  
+**Status:** `PARTIALLY_VERIFIED / IN_PROGRESS`  
+**Trusted baseline:** `fix/autonomous-product-factory @ 4cf9a0cd093dca4a9d0a3c3eb43d3b2439f74a25`
+
+- Phase 00 is now in reconciliation, not `READY_TO_START`.
+- Do not perform product-code implementation during this reconciliation stage.
+- The current owner-directed operator boundary is: retain Kilo as a bounded local operator; keep OpenCode, Team V2 and worker dispatch stopped. This supersedes the earlier stale next-state line asking to execute the Team V2 bootstrap wave; historical records are retained as evidence and are not erased.
+- The baseline KnowledgeEngine catalogue has 33 domains: 22 `PARTIAL`, 11 `REGISTERED_ONLY`, and zero `EXECUTABLE`. PR #141 proposes the AI CFO skill integration separately and is not considered merged product behavior.
+- The latest Final Product Factory evidence (run 38942764002) is blocking: Web analysis HTTP 422, security/tenant acceptance error for Org A, Windows factory analysis HTTP 422, release gate failed.
+- Do not guess the 422 root cause from status alone. Preserve the real, sanitized response and identify whether it is a data contract, runtime or test-harness fault.
+- Continue with one evidence-backed checkpoint/change/test at a time. Do not touch `main` or build the final Windows installer until the qualification matrix passes.
+
