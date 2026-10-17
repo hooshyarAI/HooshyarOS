@@ -58,8 +58,8 @@ function decideQualification(matrix, evidence, currentCommit, evidenceRefIsValid
   if (!matrix || !Array.isArray(matrix.required) || matrix.required.length === 0) {
     return { status: 'BLOCKED', reason: 'QUALIFICATION_MATRIX_MISSING_OR_INVALID', blockers: [] };
   }
-  if (!evidence || typeof evidence !== 'object' || evidence.commitSha !== currentCommit ||
-      !Array.isArray(evidence.cells)) {
+  if (!evidence || typeof evidence !== 'object' || evidence.type !== 'HOOSHYAR_PRODUCT_QUALIFICATION_EVIDENCE_V1' ||
+      evidence.commitSha !== currentCommit || !Array.isArray(evidence.cells)) {
     return {
       status: 'BLOCKED',
       reason: 'CURRENT_COMMIT_QUALIFICATION_EVIDENCE_MISSING_OR_STALE',
@@ -67,7 +67,11 @@ function decideQualification(matrix, evidence, currentCommit, evidenceRefIsValid
     };
   }
 
-  const byId = new Map(evidence.cells.map(cell => [cell && cell.id, cell]));
+  const ids = evidence.cells.map(cell => cell && cell.id);
+  if (ids.some(id => typeof id !== 'string' || !id.trim()) || new Set(ids).size !== ids.length) {
+    return { status: 'BLOCKED', reason: 'QUALIFICATION_EVIDENCE_CELL_IDS_INVALID_OR_DUPLICATED', blockers: matrix.required.map(cell => ({ id: cell.id, status: 'UNKNOWN' })) };
+  }
+  const byId = new Map(evidence.cells.map(cell => [cell.id, cell]));
   const blockers = [];
   for (const required of matrix.required) {
     const cell = byId.get(required.id);
