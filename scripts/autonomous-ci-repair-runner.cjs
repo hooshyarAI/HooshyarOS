@@ -60,11 +60,44 @@ function normalizeCommand(command, args, platform = process.platform) {
   return { command, args };
 }
 
+const GITHUB_CREDENTIAL_ENV_KEYS = [
+  "GITHUB_TOKEN",
+  "GH_TOKEN",
+  "GITHUB_ENTERPRISE_TOKEN",
+  "GH_ENTERPRISE_TOKEN",
+  "ACTIONS_RUNTIME_TOKEN",
+  "ACTIONS_ID_TOKEN_REQUEST_TOKEN",
+  "ACTIONS_ID_TOKEN_REQUEST_URL",
+  "ACTIONS_CACHE_URL",
+  "ACTIONS_RESULTS_URL",
+  "GIT_ASKPASS",
+  "GIT_CONFIG_COUNT",
+  "GIT_CONFIG_KEY_0",
+  "GIT_CONFIG_VALUE_0"
+];
+
+function buildUnprivilegedEnv(sourceEnv = process.env) {
+  const env = { ...sourceEnv };
+  for (const key of GITHUB_CREDENTIAL_ENV_KEYS) delete env[key];
+  return env;
+}
+
+function buildGitPushEnv(sourceEnv = process.env) {
+  const token = sourceEnv.GITHUB_TOKEN || sourceEnv.GH_TOKEN;
+  if (!token) throw new Error("GITHUB_PUSH_TOKEN_MISSING");
+  const env = buildUnprivilegedEnv(sourceEnv);
+  env.GIT_CONFIG_COUNT = "1";
+  env.GIT_CONFIG_KEY_0 = "http.https://github.com/.extraheader";
+  env.GIT_CONFIG_VALUE_0 = "AUTHORIZATION: basic " +
+    Buffer.from("x-access-token:" + token).toString("base64");
+  return env;
+}
+
 function exec(command, args, options = {}) {
   const normalized = normalizeCommand(command, args);
   return cp.spawnSync(normalized.command, normalized.args, {
     cwd: root,
-    env: process.env,
+    env: options.env || buildUnprivilegedEnv(process.env),
     encoding: "utf8",
     stdio: options.stdio || "inherit",
     shell: false,
@@ -236,7 +269,7 @@ function commitPush() {
   if ((status.stdout || "").trim() === "") throw new Error("KILO_PRODUCED_NO_REPOSITORY_CHANGE");
   if ((exec("git", ["add", "--all", "--", ".", ":(exclude).kilo", ":(exclude).hooshyar", ":(exclude)node_modules"]).status ?? 1) !== 0) throw new Error("git add failed");
   if ((exec("git", ["commit", "-m", "fix(autonomous): repair CI failure from feedback"]).status ?? 1) !== 0) throw new Error("git commit failed");
-  if ((exec("git", ["push", "origin", "HEAD:" + branch]).status ?? 1) !== 0) throw new Error("git push failed");
+  if ((exec("git", ["push", "origin", "HEAD:" + branch], { env: buildGitPushEnv() }).status ?? 1) !== 0) throw new Error("git push failed");
   return (exec("git", ["rev-parse", "HEAD"], { stdio: ["ignore", "pipe", "pipe"] }).stdout || "").trim();
 }
 
@@ -327,4 +360,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { normalizeCommand, exec, buildKiloInvocation, assertCleanRepairBaseline };
+module.exports = { normalizeCommand, exec, buildKiloInvocation, assertCleanRepairBaseline, buildUnprivilegedEnv, buildGitPushEnv };
