@@ -215,14 +215,26 @@ function gitStatus() {
     "--untracked-files=all",
     "--",
     ".",
+    ":(exclude).kilo",
+    ":(exclude).hooshyar",
     ":(exclude)node_modules"
   ], { stdio: ["ignore", "pipe", "pipe"] });
+}
+
+function assertCleanRepairBaseline(statusResult) {
+  if (!statusResult || statusResult.status !== 0 || statusResult.error) {
+    throw new Error("AUTONOMOUS_REPAIR_CLEAN_BASELINE_CHECK_FAILED");
+  }
+  if ((statusResult.stdout || "").trim()) {
+    throw new Error("AUTONOMOUS_REPAIR_BLOCKED_PREEXISTING_WORKTREE_CHANGES");
+  }
+  return true;
 }
 
 function commitPush() {
   const status = gitStatus();
   if ((status.stdout || "").trim() === "") throw new Error("KILO_PRODUCED_NO_REPOSITORY_CHANGE");
-  if ((exec("git", ["add", "--all", "--", ".", ":(exclude).kilo", ":(exclude)node_modules"]).status ?? 1) !== 0) throw new Error("git add failed");
+  if ((exec("git", ["add", "--all", "--", ".", ":(exclude).kilo", ":(exclude).hooshyar", ":(exclude)node_modules"]).status ?? 1) !== 0) throw new Error("git add failed");
   if ((exec("git", ["commit", "-m", "fix(autonomous): repair CI failure from feedback"]).status ?? 1) !== 0) throw new Error("git commit failed");
   if ((exec("git", ["push", "origin", "HEAD:" + branch]).status ?? 1) !== 0) throw new Error("git push failed");
   return (exec("git", ["rev-parse", "HEAD"], { stdio: ["ignore", "pipe", "pipe"] }).stdout || "").trim();
@@ -251,6 +263,9 @@ async function main() {
       handoff
     }));
 
+    // Do not let the agent commit changes already present in the checkout.
+    // Ignore only generated local state; fail closed on every other dirty path.
+    assertCleanRepairBaseline(gitStatus());
     const kilo = runKilo(handoff);
     if (kilo.code !== 0) throw new Error("KILO_REPAIR_FAILED:" + kilo.code + "\n" + kilo.output);
 
@@ -312,4 +327,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { normalizeCommand, exec, buildKiloInvocation };
+module.exports = { normalizeCommand, exec, buildKiloInvocation, assertCleanRepairBaseline };
