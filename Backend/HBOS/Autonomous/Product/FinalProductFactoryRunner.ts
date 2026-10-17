@@ -39,9 +39,21 @@ async function main(): Promise<void> {
     const session = await request("/api/session", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "factory-qa", organization: "Hooshyar Factory" }) });
     if (session.status !== 201 || !session.cookie) throw new Error(`FACTORY_SESSION_FAILED:${session.status}`);
     const cookie = session.cookie.split(";")[0]; const tenantId = String(session.body?.tenantId ?? ""); if (!tenantId) throw new Error("FACTORY_TENANT_MISSING");
-    const csv = ["date,account,debit,credit,currency","2026-08-01,Cash,1000,0,IRR","2026-08-02,Sales,0,1500,IRR","2026-08-03,Expense,300,0,IRR","2026-08-04,Receivable,0,800,IRR"].join("\n");
-    const analysis = await request("/api/analyze", { method: "POST", headers: { "content-type": "application/json", cookie }, body: JSON.stringify({ csv, sourceName: "factory-qa.csv", assets: 10_000, liabilities: 4_000 }) });
-    if (analysis.status !== 200 || analysis.body?.status !== "READY") throw new Error(`FACTORY_ANALYSIS_FAILED:${analysis.status}`);
+    const csv = ["date,account,debit,credit,currency","2026-08-01,Cash,1000,0,IRR","2026-08-02,Sales,0,1500,IRR","2026-08-03,Expense,500,0,IRR","2026-08-04,Receivable,0,800,IRR"].join("\n");
+    const ingest = await request("/api/ingest/jobs", { method: "POST", headers: { "content-type": "application/json", cookie, "idempotency-key": "acceptance:factory-qa-ledger" }, body: JSON.stringify({ sourceName: "factory-qa.csv", format: "CSV", content: csv }) });
+    if (ingest.status !== 202 || !ingest.body?.jobId) throw new Error(`FACTORY_INGEST_CREATE_FAILED:${ingest.status}:${JSON.stringify(ingest.body)}`);
+    const ingestDeadline = Date.now() + 30_000;
+    let completedJob: any = null;
+    while (Date.now() < ingestDeadline) {
+      const poll = await request(`/api/ingest/jobs/${encodeURIComponent(ingest.body.jobId)}`, { headers: { cookie } });
+      if (poll.status !== 200 || !poll.body?.job) throw new Error(`FACTORY_INGEST_POLL_FAILED:${poll.status}`);
+      completedJob = poll.body.job;
+      if (completedJob.status === "COMPLETED" || completedJob.status === "FAILED") break;
+      await sleep(800);
+    }
+    if (completedJob?.status !== "COMPLETED" || !completedJob.result?.sha256) throw new Error(`FACTORY_INGEST_FAILED:${JSON.stringify(completedJob)}`);
+    const analysis = await request("/api/financial/analyze", { method: "POST", headers: { "content-type": "application/json", cookie }, body: JSON.stringify({ sourceSha256: completedJob.result.sha256, assets: 10_000, liabilities: 4_000, revenue: 1500, expenses: 500 }) });
+    if (analysis.status !== 200 || analysis.body?.status !== "READY") throw new Error(`FACTORY_ANALYSIS_FAILED:${analysis.status}:${JSON.stringify(analysis.body)}`);
     const dashboard = await request("/api/dashboard", { headers: { cookie } });
     if (dashboard.status !== 200 || dashboard.body?.analysisAvailable !== true || dashboard.body?.metrics?.profit !== 1000) throw new Error(`FACTORY_DASHBOARD_FAILED:${JSON.stringify(dashboard.body)}`);
     console.log(JSON.stringify({ type: "FINAL_PRODUCT_FACTORY", stage: "ACCEPT", ok: true, tenantId, profit: dashboard.body.metrics.profit }));

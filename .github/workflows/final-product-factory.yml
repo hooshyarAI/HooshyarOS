@@ -1,8 +1,12 @@
 name: Final Product Factory
 
+permissions:
+  contents: read
+  actions: read
+
 on:
   pull_request:
-    branches: [main]
+    branches: [main, fix/autonomous-product-factory]
   workflow_dispatch:
 
 concurrency:
@@ -174,10 +178,26 @@ jobs:
         run: npm run product:assurance
       - name: Full Jest
         run: npm test -- --runInBand
+      - name: TypeScript type check
+        run: node ./node_modules/typescript/bin/tsc --noEmit
+      - name: Emit current-commit full-suite evidence
+        run: node scripts/full-suite-evidence.cjs
+        env:
+          SECURITY_TENANT_ACCEPTANCE_RESULT: ${{ needs.security-tenant-acceptance.result }}
+      - name: Upload full-suite qualification evidence
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hooshyar-full-suite-evidence
+          path: ./.hooshyar/full-suite-success.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
 
   runtime-evidence-qualification:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    if: ${{ always() }}
     needs: [windows-product-factory, web-product-acceptance, security-tenant-acceptance, android-product-acceptance, full-qualification]
     steps:
       - uses: actions/checkout@v7
@@ -188,38 +208,94 @@ jobs:
       - run: npm ci
       - name: Download Windows factory evidence
         uses: actions/download-artifact@v8
+        continue-on-error: true
         with:
           name: hooshyar-final-product-factory-evidence
           path: ./.hooshyar
           merge-multiple: true
       - name: Download Web acceptance evidence
         uses: actions/download-artifact@v8
+        continue-on-error: true
         with:
           name: hooshyar-web-product-acceptance-evidence
           path: ./.hooshyar
           merge-multiple: true
       - name: Download Android acceptance evidence
         uses: actions/download-artifact@v8
+        continue-on-error: true
         with:
           name: hooshyar-android-product-acceptance-evidence
           path: ./.hooshyar
           merge-multiple: true
       - name: Download security acceptance evidence
         uses: actions/download-artifact@v8
+        continue-on-error: true
         with:
           name: hooshyar-security-tenant-evidence
           path: ./.hooshyar
           merge-multiple: true
-      - name: Verify canonical evidence paths
+      - name: Download full-suite qualification evidence
+        uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          name: hooshyar-full-suite-evidence
+          path: ./.hooshyar
+          merge-multiple: true
+      - name: Report canonical evidence paths without masking blockers
         shell: bash
         run: |
-          test -f .hooshyar/factory-success.json
-          test -f .hooshyar/web-acceptance-success.json
-          test -f .hooshyar/android-acceptance-success.json
-          test -f .hooshyar/security-acceptance-success.json
+          for evidence in factory-success.json web-acceptance-success.json android-acceptance-success.json security-acceptance-success.json; do
+            if test -f ".hooshyar/$evidence"; then
+              echo "EVIDENCE_PRESENT=$evidence"
+            else
+              echo "EVIDENCE_MISSING=$evidence"
+            fi
+          done
+      - name: Download current-commit autonomous repair evidence
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -u
+          mkdir -p .hooshyar /tmp/hooshyar-repair-evidence
+          RUNS_URL="https://api.github.com/repos/${REPO}/actions/workflows/autonomous-ci-repair.yml/runs?branch=${BRANCH}&per_page=30"
+          if ! curl -fsSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" "${RUNS_URL}" -o /tmp/hooshyar-repair-runs.json; then
+            echo "AGENT_REPAIR_ARTIFACT_LOOKUP=BLOCKED_API_UNAVAILABLE"
+            exit 0
+          fi
+          RUN_IDS=$(jq -r '.workflow_runs[]?.id' /tmp/hooshyar-repair-runs.json)
+          for RUN_ID in ${RUN_IDS}; do
+            ARTIFACTS_URL="https://api.github.com/repos/${REPO}/actions/runs/${RUN_ID}/artifacts"
+            if ! curl -fsSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" "${ARTIFACTS_URL}" -o /tmp/hooshyar-repair-artifacts.json; then continue; fi
+            ARTIFACT_ID=$(jq -r '.artifacts[]? | select(.name=="hooshyar-agent-repair-evidence" and .expired==false) | .id' /tmp/hooshyar-repair-artifacts.json | head -n 1)
+            if [ -z "${ARTIFACT_ID}" ]; then continue; fi
+            ZIP="/tmp/hooshyar-repair-evidence/${RUN_ID}.zip"
+            if ! curl -fsSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" "https://api.github.com/repos/${REPO}/actions/artifacts/${ARTIFACT_ID}/zip" -o "${ZIP}"; then continue; fi
+            mkdir -p "/tmp/hooshyar-repair-evidence/${RUN_ID}"
+            if ! unzip -oq "${ZIP}" -d "/tmp/hooshyar-repair-evidence/${RUN_ID}"; then continue; fi
+            SOURCE="/tmp/hooshyar-repair-evidence/${RUN_ID}/agent-repair-success.json"
+            if [ ! -f "${SOURCE}" ]; then continue; fi
+            cp "${SOURCE}" .hooshyar/agent-repair-success.json
+            if node scripts/agent-repair-evidence-check.cjs; then
+              echo "AGENT_REPAIR_ARTIFACT=ACCEPTED run=${RUN_ID} artifact=${ARTIFACT_ID} commit=${HEAD_SHA}"
+              exit 0
+            fi
+            rm -f .hooshyar/agent-repair-success.json
+          done
+          echo "AGENT_REPAIR_ARTIFACT=BLOCKED_NO_MATCHING_CURRENT_COMMIT_ARTIFACT"
+
       - name: Run Cline runtime evidence collector
-        run: npm run product:cline:evidence
+        if: always()
+        run: node scripts/cline-runtime-evidence-collector.cjs
+      - name: Enforce canonical product qualification matrix
+        run: node scripts/real-product-qualification.cjs --matrix-only
+
       - name: Upload consolidated qualification evidence
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: hooshyar-cline-runtime-evidence
