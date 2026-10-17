@@ -357,7 +357,12 @@ export class IntelligenceEngine {
      * Layer 2: Knowledge-grounded reasoning
      */
     private reasonWithKnowledge(input: IntelligenceInput, context: IntelligenceContext): DomainAlgorithmResult {
-        const knowledgeItems = context.knowledgeItems;
+        // Science-selection records describe routing/planning, not substantive knowledge
+        // or evidence. They must not make a reasoning result appear more confident.
+        const knowledgeItems = context.knowledgeItems.filter(item =>
+            !item.id.startsWith("science-selection:") &&
+            item.source !== "KnowledgeEngine.planScienceSelection"
+        );
         if (knowledgeItems.length === 0) {
             return { applicable: false, conclusion: "", confidence: IntelligencePipeline.unavailable(), reasoningSteps: [], limitations: [] };
         }
