@@ -107,7 +107,7 @@ async function main() {
     // Exercise the same canonical asynchronous-ingestion workflow as the Web UI.
     // The legacy /api/analyze endpoint now fails closed when ledger income/expense
     // classification is omitted, so acceptance must not call that obsolete path.
-    const csv = ['date,account,debit,credit,currency','2026-08-01,Cash,1000,0,IRR','2026-08-02,Sales,0,1500,IRR','2026-08-03,Expense,500,0,IRR','2026-08-04,Receivable,0,800,IRR'].join('\\n');
+    const csv = ['date,account,debit,credit,currency','2026-08-01,Cash,1000,0,IRR','2026-08-02,Sales,0,1500,IRR','2026-08-03,Expense,500,0,IRR','2026-08-04,Receivable,0,800,IRR'].join('\n');
     const ingestJob = await request('/api/ingest/jobs', {
       method: 'POST',
       headers: { 'content-type': 'application/json', cookie, 'idempotency-key': 'acceptance:web-qa-ledger' },
