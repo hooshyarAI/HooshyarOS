@@ -1538,3 +1538,15 @@ A green workflow, worker count or commit count alone is never sufficient.
 
 **V2 TEAM ORGANIZATION: REGISTERED AS A PERMANENT CONSTRUCTION-PROCESS LAW.**
 
+
+
+## Current Recovery Index — 2026-10-17 (supplemental)
+
+This compact index supplements the detailed checkpoint at `Docs/HOOSHYAROS_POST_RECOVERY_AUDIT_RECONCILIATION_2026-10-16.md`; it does not override the source-of-truth hierarchy or rewrite historical audit records.
+
+- Phase 00 reconciliation is complete. Do not repeat the full audit unless new evidence invalidates the checkpoint; use delta audits.
+- The bounded acceptance-fixture correction is in draft PR #142, commit `e85c9a1e34f90d1ed623530e2acb03dfaa2c5e75`. It supplies explicit revenue/expenses and correct expected P&L; production runtime code is unchanged.
+- Runtime/Jest acceptance evidence for PR #142 is still pending. A code commit or patch consistency check is not a passing product gate.
+- Current unresolved audit gaps include science-to-cognition integration, behavioral evolution/metacognition evidence, remaining product qualification gates, and independent final QC.
+- Do not build the final Windows installer or synchronize the local PC to GitHub until the charter/memory review, all remaining audits and edits, focused/integration verification, and every required qualification-matrix cell are complete and evidenced.
+- For this cycle, keep Kilo as a bounded local operator; do not activate OpenCode, Team V2, or worker dispatch. Never touch `main`, weaken fail-closed financial classification, repeat broad scans without a new evidence delta, or claim completion without verifiable evidence.

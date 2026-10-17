@@ -106,7 +106,7 @@ Canonical active state:
 LAST_TRUSTED_TARGET_SHA = 332d798a0e4fbe32d0a431b7d0801a45944ddebd
 LAST_KNOWN_COMPLETED_STAGE = governance(opencode): approve bounded continuous remote operator
 INTERRUPTED_STAGE = POST-RECOVERY / ARCHITECTURE + AUDIT RECONCILIATION (2026-10-07)
-NEXT_REQUIRED_STATE = EXECUTE_TEAM_ORG_V2_BOOTSTRAP_WAVE
+NEXT_REQUIRED_STATE = PHASE_16_PRIORITIZED_REMEDIATION_BACKLOG (supersedes stale historical Team V2 bootstrap instruction)
 CONTROL_PLANE_FIX_REQUIRED = TRUE
 CONTROL_PLANE_NOTE = Prior worker run created 550739d1 but promotion failed because opencode-worker.log remained in the worktree. Temporary logs must live outside the repository worktree and remote promotion must verify committed state.
 

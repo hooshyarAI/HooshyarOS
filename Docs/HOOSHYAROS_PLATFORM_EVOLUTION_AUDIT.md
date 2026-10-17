@@ -134,10 +134,10 @@ No Architecture Freeze V4 or mission-semantics change without explicit human app
 
 ## Current Checkpoint
 
-CURRENT_PHASE: 00
-CURRENT_STATUS: COMPLETED
+CURRENT_PHASE: 16
+CURRENT_STATUS: IN_PROGRESS
 LATEST_CHECKPOINT: POST-RECOVERY-AUDIT-RECONCILIATION-2026-10-16
-NEXT_PHASE: 16 — prioritized remediation backlog, starting with explicit profit/loss test-fixture contract
+NEXT_PHASE: Verify PR #142 acceptance-fixture correction with focused/runtime acceptance; then continue the remaining science/cognition, evolution, integration and independent-QC audits before release requalification
 
 ## Checkpoint — 2026-10-16
 - STATUS: RECONCILIATION_CHECKPOINT_COMPLETE / REMEDIATION_PENDING
@@ -148,4 +148,4 @@ NEXT_PHASE: 16 — prioritized remediation backlog, starting with explicit profi
 - EVOLUTION: Not behaviorally verified; existing Python EvolutionEngine is a placeholder echo.
 - RELEASE: PRODUCT_QUALIFICATION_MATRIX.json remains productComplete=false.
 - OPERATOR_BOUNDARY: Kilo remains the bounded local operator; do not bootstrap Team V2/OpenCode/worker dispatch during this reconciliation.
-- NEXT: Phase 00 reconciliation outputs are recorded; move to Phase 16 to sequence the minimal acceptance-fixture repair, then focused/runtime acceptance. No runtime fail-closed rule may be weakened.
+- NEXT: PR #142 contains the minimal fixture correction, but no passing runtime/CI evidence is available yet. Verify the three acceptance paths first; keep the release blocked until they pass. Then continue remaining science/cognition, evolution, integration and independent-QC audits. No runtime fail-closed rule may be weakened.
