@@ -192,7 +192,7 @@ describe("CommercialRuntimeServer request observability", () => {
       expect(read.status).toBe(200);
     }
 
-    const analysis = await post("/api/analyze", { csv: LEDGER_CSV, sourceName: "card-ledger.csv", assets: 10000, liabilities: 2500 }, cookie);
+    const analysis = await post("/api/analyze", { csv: LEDGER_CSV, sourceName: "card-ledger.csv", assets: 10000, liabilities: 2500, revenue: 1000, expenses: 0 }, cookie);
     expect(analysis.status).toBe(200);
     const artifactIds: string[] = [];
     for (const format of ["TXT", "CSV"]) {

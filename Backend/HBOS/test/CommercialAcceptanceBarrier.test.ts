@@ -127,12 +127,12 @@ describe("commercial acceptance barrier — runtime ingestion (K8)", () => {
     const analysis = await fetch(`${acceptance.base}/api/financial/analyze`, {
       method: "POST",
       headers: { "content-type": "application/json", cookie: acceptance.cookie },
-      body: JSON.stringify({ sourceSha256: acceptedBody.evidence.sha256, assets: 10000, liabilities: 4000 }),
+      body: JSON.stringify({ sourceSha256: acceptedBody.evidence.sha256, assets: 10000, liabilities: 4000, revenue: 1000, expenses: 0 }),
     });
     expect(analysis.status).toBe(200);
     const analysisBody = (await analysis.json()) as { status: string; metrics: { profit: number }; ingestedSource?: { sourceType: string } };
     expect(analysisBody.status).toBe("READY");
-    expect(analysisBody.metrics.profit).toBe(500);
+    expect(analysisBody.metrics.profit).toBe(1000);
     expect(analysisBody.ingestedSource?.sourceType).toBe("XLSX");
   });
 

@@ -154,7 +154,7 @@ describe("standardization.pagination — runtime list routes", () => {
     };
 
     const seedArtifacts = async (cookie: string, formats: string[]) => {
-        const analysis = await jsonPost("/api/analyze", cookie, { csv: csvFor(1), sourceName: "ledger.csv", assets: 10000, liabilities: 2500 });
+        const analysis = await jsonPost("/api/analyze", cookie, { csv: csvFor(1), sourceName: "ledger.csv", assets: 10000, liabilities: 2500, revenue: 1000, expenses: 0 });
         expect(analysis.status).toBe(200);
         for (const format of formats) {
             const response = await request(server, "/api/report/export", {

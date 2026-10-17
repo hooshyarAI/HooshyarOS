@@ -41,7 +41,7 @@ describe("Commercial runtime API validation", () => {
     const response = await request(server, "/api/analyze", {
       method: "POST",
       headers: { "content-type": "application/json", cookie },
-      body: JSON.stringify({ sourceName: "ledger.csv", assets: 1000, liabilities: 250 }),
+      body: JSON.stringify({ sourceName: "ledger.csv", assets: 1000, liabilities: 250, revenue: 1000, expenses: 0 }),
     });
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: "CSV_REQUIRED" });
@@ -73,7 +73,7 @@ describe("Commercial runtime API validation", () => {
     const response = await request(server, "/api/analyze", {
       method: "POST",
       headers: { "content-type": "application/json", cookie },
-      body: JSON.stringify({ csv: "date,account,debit,credit,currency\n2026-08-01,Cash,1000,0,IRR\n2026-08-01,Sales,0,1000,IRR", sourceName: "ledger.csv", assets: 1000, liabilities: 250 }),
+      body: JSON.stringify({ csv: "date,account,debit,credit,currency\n2026-08-01,Cash,1000,0,IRR\n2026-08-01,Sales,0,1000,IRR", sourceName: "ledger.csv", assets: 1000, liabilities: 250, revenue: 1000, expenses: 0 }),
     });
     expect(response.status).toBe(200);
   });

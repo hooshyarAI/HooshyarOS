@@ -76,6 +76,8 @@ describe("Final Product Runtime Qualification", () => {
         csv,
         assets: 2000,
         liabilities: 500,
+        revenue: 1500,
+        expenses: 300,
       }),
     });
     expect(analysis.status).toBe(200);
@@ -89,8 +91,8 @@ describe("Final Product Runtime Qualification", () => {
     expect(result.status).toBe("READY");
     expect(result.tenantId).toBe(sessionBody.tenantId);
     expect(result.metrics.revenue).toBe(1500);
-    expect(result.metrics.expenses).toBe(1300);
-    expect(result.metrics.profit).toBe(200);
+    expect(result.metrics.expenses).toBe(300);
+    expect(result.metrics.profit).toBe(1200);
     expect(result.metrics.debtRatio).toBe(0.25);
     expect(result.reasoningEvidence.success).toBe(true);
     expect(result.source.sourceType).toBe("CSV");
@@ -107,7 +109,7 @@ describe("Final Product Runtime Qualification", () => {
     expect(dashboardBody.status).toBe("READY");
     expect(dashboardBody.tenantId).toBe(sessionBody.tenantId);
     expect(dashboardBody.analysisAvailable).toBe(true);
-    expect(dashboardBody.metrics).toEqual({ revenue: 1500, profit: 200, risk: 25 });
+    expect(dashboardBody.metrics).toEqual({ revenue: 1500, profit: 1200, risk: 25 });
   });
 
   test("rejects invalid business input and keeps the authentication boundary fail-closed", async () => {
