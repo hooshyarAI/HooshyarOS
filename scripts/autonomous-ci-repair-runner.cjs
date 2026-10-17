@@ -271,7 +271,10 @@ async function main() {
 
     await dispatchFactory(branch);
     targetRun = await waitForFactory(currentSha);
-    if (targetRun.conclusion === "success") {
+    const factoryJobs = await getJson("https://api.github.com/repos/" + repo + "/actions/runs/" + targetRun.id + "/jobs?per_page=100");
+    const productFactoryJob = (factoryJobs.jobs || []).find(job => job.name === "windows-product-factory");
+    targetRun.productFactoryConclusion = productFactoryJob?.conclusion || "missing";
+    if (targetRun.productFactoryConclusion === "success") {
       const changed = exec("git", ["diff", "--name-only", mission.commit, currentSha], { stdio: ["ignore", "pipe", "pipe"] });
       if ((changed.status ?? 1) !== 0) throw new Error("REPAIR_CHANGED_FILES_INSPECTION_FAILED");
       const changedPaths = (changed.stdout || "").split(/\r?\n/).map(value => value.trim()).filter(Boolean);
