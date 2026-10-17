@@ -2,6 +2,7 @@ name: Product Qualification Fail-Closed Validation
 
 on:
   push:
+    branches: [main]
     paths:
       - ".github/workflows/product-qualification-fail-closed.yml"
       - ".github/workflows/autonomous-ci-repair.yml"
