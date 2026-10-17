@@ -55,6 +55,7 @@ jobs:
               read -r RUN_ID RUN_STATUS RUN_CONCLUSION <<< "${RUN_INFO}"
               if [ "${RUN_STATUS}" = "completed" ]; then
                 echo "target_run_id=${RUN_ID}" >> "${GITHUB_OUTPUT}"
+                echo "factory_conclusion=${RUN_CONCLUSION}" >> "${GITHUB_OUTPUT}"
                 if [ "${RUN_CONCLUSION}" = "failure" ]; then
                   if FAILED_JOBS_JSON=$(curl -fsSL \
                     -H "Accept: application/vnd.github+json" \
@@ -94,9 +95,13 @@ jobs:
           KILO_CONFIG_CONTENT: '{"model":"kilo-auto/free","agent":{"hooshyar-repair":{"model":"kilo/kilo-auto/free"}}}'
         run: node scripts/autonomous-ci-repair-runner.cjs
 
-      - name: Report no repair required
-        if: steps.wait-for-factory.outputs.repair_needed == 'false'
+      - name: Report successful factory with no repair required
+        if: steps.wait-for-factory.outputs.repair_needed == 'false' && steps.wait-for-factory.outputs.factory_conclusion == 'success'
         run: echo "Final Product Factory passed for this SHA; autonomous repair is not required."
+
+      - name: Report evidence-gate-only blocker without duplicate repair
+        if: steps.wait-for-factory.outputs.repair_needed == 'false' && steps.wait-for-factory.outputs.factory_conclusion == 'failure'
+        run: echo "Only evidence/release-gate jobs failed; no duplicate repair will run while the originating repair workflow publishes its evidence artifact."
       - name: Upload verified autonomous repair evidence
         if: success() && steps.wait-for-factory.outputs.repair_needed == 'true'
         uses: actions/upload-artifact@v4
