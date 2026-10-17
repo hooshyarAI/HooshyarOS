@@ -34,6 +34,7 @@ jobs:
       - name: Run real HTTP web product acceptance
         run: npm run product:web:acceptance
       - name: Run tenant isolation and unauthenticated-access acceptance
+        if: always()
         run: npm run product:security:acceptance
       - name: Upload commit-bound product acceptance evidence
         if: always()
