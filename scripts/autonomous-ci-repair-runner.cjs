@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const cp = require("node:child_process");
 const crypto = require("node:crypto");
+const { buildRepairEvidence, validateRepairEvidence } = require("./agent-repair-evidence-contract.cjs");
 
 const root = process.cwd();
 const repo = process.env.GITHUB_REPOSITORY || "hooshyarAI/HooshyarOS";
@@ -253,9 +254,6 @@ async function main() {
     const kilo = runKilo(handoff);
     if (kilo.code !== 0) throw new Error("KILO_REPAIR_FAILED:" + kilo.code + "\n" + kilo.output);
 
-    const evidence = exec(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "product:agent:evidence"]);
-    if ((evidence.status ?? 1) !== 0) throw new Error("AGENT_REPAIR_EVIDENCE_INVALID");
-
     const py = exec(process.env.HOOSHYAR_PYTHON || "python", ["-m", "compileall", "-q", "Backend/AI_Runtime"]);
     if ((py.status ?? 1) !== 0) throw new Error("PYTHON_SYNTAX_VERIFY_FAILED");
 
@@ -274,6 +272,18 @@ async function main() {
     await dispatchFactory(branch);
     targetRun = await waitForFactory(currentSha);
     if (targetRun.conclusion === "success") {
+      const changed = exec("git", ["diff", "--name-only", mission.commit, currentSha], { stdio: ["ignore", "pipe", "pipe"] });
+      if ((changed.status ?? 1) !== 0) throw new Error("REPAIR_CHANGED_FILES_INSPECTION_FAILED");
+      const changedPaths = (changed.stdout || "").split(/\r?\n/).map(value => value.trim()).filter(Boolean);
+      const evidenceRecord = buildRepairEvidence({ commit: currentSha, previousCommit: mission.commit, mission, missionId: fingerprint, changedFiles: changedPaths.length, regressionStatus: "PASS", pythonSyntaxStatus: "PASS", factoryRun: targetRun });
+      evidenceRecord.repair.changedPaths = changedPaths;
+      const validation = validateRepairEvidence(evidenceRecord, currentSha);
+      if (!validation.valid) throw new Error("AGENT_REPAIR_EVIDENCE_INVALID:" + validation.reason);
+      const evidenceDir = path.join(root, ".hooshyar");
+      fs.mkdirSync(evidenceDir, { recursive: true });
+      fs.writeFileSync(path.join(evidenceDir, "agent-repair-success.json"), JSON.stringify(evidenceRecord, null, 2) + "\n", "utf8");
+      const evidenceCheck = exec(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "product:agent:evidence"]);
+      if ((evidenceCheck.status ?? 1) !== 0) throw new Error("AGENT_REPAIR_EVIDENCE_INVALID_AFTER_FACTORY_ACCEPTANCE");
       console.log(JSON.stringify({
         type: "AUTONOMOUS_CI_REPAIR_COMPLETE",
         attempts: attempt,
