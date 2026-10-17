@@ -59,9 +59,18 @@ function main() {
   const androidPass = androidCurrent && hasAll(android, ['apk-present', 'device-online', 'android-booted', 'package-manager-ready', 'apk-installed', 'launcher-start', 'process-alive', 'main-activity-visible']);
   const securityPass = securityCurrent && hasAll(security, ['unauthenticated-dashboard-denied', 'unauthenticated-analyze-denied']);
   const tenantPass = securityPass && hasAll(security, ['distinct-tenant-identities', 'tenant-a-data-isolated', 'tenant-b-data-isolated', 'analytics-cross-tenant-read-denied', 'report-artifact-cross-tenant-denied']);
+  const requiredRepairJobs = [...new Set((agent?.finding?.failedJobs || [])
+    .filter(name => !['runtime-evidence-qualification', 'release-gate'].includes(name)))];
   const ciFeedbackPass = agentCurrent && agent.type === 'ASSISTANT_REPAIR_MISSION_V1_RESULT' &&
-    agent.regression?.status === 'PASS' && agent.factoryAcceptance?.status === 'PASS' &&
-    Number(agent.repair?.changedFiles) > 0;
+    agent.regression?.status === 'PASS' && agent.regression?.fullJest === 'PASS' &&
+    agent.regression?.pythonSyntax === 'PASS' && agent.factoryAcceptance?.status === 'PASS' &&
+    agent.factoryAcceptance?.commit === commitSha &&
+    agent.factoryAcceptance?.productFactoryJob === 'windows-product-factory' &&
+    agent.factoryAcceptance?.productFactoryConclusion === 'success' &&
+    Number(agent.repair?.changedFiles) > 0 && requiredRepairJobs.length > 0 &&
+    Array.isArray(agent.repair?.repairedJobs) &&
+    requiredRepairJobs.every(name => agent.repair.repairedJobs.some(job =>
+      job?.name === name && job.conclusion === 'success' && job.runId === agent.factoryAcceptance?.runId));
 
   const checks = {
     'win-core': { pass: factoryRuntime, ref: '.hooshyar/factory-success.json', target: 'windows-latest' },

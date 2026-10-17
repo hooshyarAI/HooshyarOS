@@ -23,8 +23,8 @@ try {
   if (evidence.type !== 'ASSISTANT_REPAIR_MISSION_V1_RESULT') throw new Error(`AGENT_REPAIR_EVIDENCE_TYPE_INVALID:${evidence.type}`);
   if (evidence.status !== 'PASS') throw new Error(`AGENT_REPAIR_EVIDENCE_STATUS_INVALID:${evidence.status}`);
   if (evidence.commit !== gitCommit()) throw new Error(`AGENT_REPAIR_EVIDENCE_COMMIT_MISMATCH:${evidence.commit}`);
-  if (evidence.regression?.status !== 'PASS') throw new Error('AGENT_REPAIR_REGRESSION_NOT_PASS');
-  if (evidence.factoryAcceptance?.status !== 'PASS') throw new Error('AGENT_REPAIR_FACTORY_ACCEPTANCE_NOT_PASS');
+  if (evidence.regression?.status !== 'PASS' || evidence.regression?.fullJest !== 'PASS' || evidence.regression?.pythonSyntax !== 'PASS') throw new Error('AGENT_REPAIR_REGRESSION_NOT_PASS');
+  if (evidence.factoryAcceptance?.status !== 'PASS' || evidence.factoryAcceptance?.commit !== evidence.commit || evidence.factoryAcceptance?.productFactoryJob !== 'windows-product-factory' || evidence.factoryAcceptance?.productFactoryConclusion !== 'success') throw new Error('AGENT_REPAIR_FACTORY_ACCEPTANCE_NOT_PASS');
   if (evidence.repair?.changedFiles === undefined || evidence.repair.changedFiles < 1) throw new Error('AGENT_REPAIR_NO_IMPLEMENTATION_CHANGE');\n  const evidenceOnlyJobs = new Set(['runtime-evidence-qualification', 'release-gate']);\n  const requiredJobs = [...new Set((evidence.finding?.failedJobs || []).filter(name => !evidenceOnlyJobs.has(name)))];\n  if (!requiredJobs.length || !Array.isArray(evidence.repair?.repairedJobs) || requiredJobs.some(name => !evidence.repair.repairedJobs.some(job => job?.name === name && job.conclusion === 'success' && job.runId === evidence.factoryAcceptance?.runId))) throw new Error('AGENT_REPAIR_ORIGINAL_FAILURE_NOT_RESOLVED');
   console.log(JSON.stringify({ type: 'AGENT_REPAIR_EVIDENCE', status: 'PASS', commit: evidence.commit, missionId: evidence.missionId }, null, 2));
 } catch (error) {
