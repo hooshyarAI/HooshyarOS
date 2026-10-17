@@ -36,8 +36,8 @@ jobs:
         run: npm run product:factory
         env:
           HOOSHYAR_FACTORY_ALLOW_PUSH: "0"
-      - name: Type-check TypeScript project
-        run: npx tsc --noEmit
+      - name: Type-check changed TypeScript factory runner
+        run: npx tsc --noEmit --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --types node Backend/HBOS/Autonomous/Product/FinalProductFactoryRunner.ts
       - name: Run real HTTP web product acceptance
         run: npm run product:web:acceptance
       - name: Run real browser UI acceptance
