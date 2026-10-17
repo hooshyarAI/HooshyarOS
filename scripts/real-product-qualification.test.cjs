@@ -1,4 +1,6 @@
-const { decideQualification } = require('./real-product-qualification.cjs');
+const fs = require('node:fs');
+const path = require('node:path');
+const { decideQualification, validateEvidenceReference } = require('./real-product-qualification.cjs');
 
 const currentCommit = 'a'.repeat(40);
 const matrix = {
@@ -90,6 +92,24 @@ describe('real product qualification fail-closed contract', () => {
     const result = decideQualification(matrix, passingEvidence(), currentCommit, () => false);
     expect(result.status).toBe('BLOCKED');
     expect(result.blockers).toHaveLength(matrix.required.length);
+  });
+
+
+  test('source references must resolve to a current-commit PASS or ACCEPTED record', () => {
+    const dir = path.join(process.cwd(), '.hooshyar');
+    fs.mkdirSync(dir, { recursive: true });
+    const source = path.join(dir, 'qualification-reference-test.json');
+    const reference = path.relative(process.cwd(), source);
+    try {
+      fs.writeFileSync(source, JSON.stringify({ commit: currentCommit, status: 'PASS' }));
+      expect(validateEvidenceReference(reference, currentCommit)).toBe(true);
+      expect(validateEvidenceReference(reference, 'b'.repeat(40))).toBe(false);
+      fs.writeFileSync(source, JSON.stringify({ commit: currentCommit, status: 'BLOCKED' }));
+      expect(validateEvidenceReference(reference, currentCommit)).toBe(false);
+      expect(validateEvidenceReference('https://example.invalid/evidence.json', currentCommit)).toBe(false);
+    } finally {
+      fs.rmSync(source, { force: true });
+    }
   });
 
   test('duplicate evidence cell IDs are rejected rather than silently overwritten', () => {
