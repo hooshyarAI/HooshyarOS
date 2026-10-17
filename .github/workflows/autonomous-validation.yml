@@ -38,6 +38,8 @@ jobs:
           HOOSHYAR_FACTORY_ALLOW_PUSH: "0"
       - name: Run real HTTP web product acceptance
         run: npm run product:web:acceptance
+      - name: Run real browser UI acceptance
+        run: npm run product:web:browser:acceptance
       - name: Run tenant isolation and unauthenticated-access acceptance
         if: always()
         run: npm run product:security:acceptance
@@ -51,6 +53,7 @@ jobs:
             .hooshyar/factory-failure.json
             .hooshyar/web-acceptance-success.json
             .hooshyar/security-acceptance-success.json
+            .hooshyar/web-browser-acceptance.json
             .hooshyar/npm-audit.json
           if-no-files-found: warn
           retention-days: 14
