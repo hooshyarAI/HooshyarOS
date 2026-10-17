@@ -3,6 +3,7 @@ name: Android Release Verification
 on:
   pull_request:
     paths:
+      - '.github/workflows/android-release.yml'
       - 'android/**'
       - 'web/**'
       - 'Backend/HBOS/Autonomous/Runtime/CommercialRuntimeServer.ts'

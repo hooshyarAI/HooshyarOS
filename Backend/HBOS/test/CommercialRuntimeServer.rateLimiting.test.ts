@@ -45,7 +45,7 @@ describe("CommercialRuntimeServer rate limiting", () => {
       body: JSON.stringify({ username: "qa", organization: "org" }),
     });
     const cookie = cookieFrom(session);
-    const okBody = { csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250 };
+    const okBody = { csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250, revenue: 1000, expenses: 0 };
 
     for (let i = 0; i < 5; i++) {
       const response = await request(server, "/api/analyze", {
@@ -73,7 +73,7 @@ describe("CommercialRuntimeServer rate limiting", () => {
     });
     const cookie = cookieFrom(session);
 
-    const okAnalyze = { csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250 };
+    const okAnalyze = { csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250, revenue: 1000, expenses: 0 };
     await request(server, "/api/analyze", {
       method: "POST",
       headers: { "content-type": "application/json", cookie },
@@ -107,7 +107,7 @@ describe("CommercialRuntimeServer rate limiting", () => {
     });
     const cookie = cookieFrom(session);
 
-    const okAnalyze = { csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250 };
+    const okAnalyze = { csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250, revenue: 1000, expenses: 0 };
     await request(server, "/api/analyze", {
       method: "POST",
       headers: { "content-type": "application/json", cookie },
@@ -148,7 +148,7 @@ describe("CommercialRuntimeServer rate limiting", () => {
     });
     const cookieB = cookieFrom(sessionB);
 
-    const okBody = { csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250 };
+    const okBody = { csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250, revenue: 1000, expenses: 0 };
 
     for (let i = 0; i < 5; i++) {
       const responseA = await request(server, "/api/analyze", {

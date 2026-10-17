@@ -37,7 +37,7 @@ describe("Phase 12 E2E: resilience, impact, improvement", () => {
     const analysis = await request(server, "/api/analyze", {
       method: "POST",
       headers: { "content-type": "application/json", cookie: cookie!.split(";")[0] },
-      body: JSON.stringify({ csv, sourceName: "ledger.csv", assets: 1000, liabilities: 250 }),
+      body: JSON.stringify({ csv, sourceName: "ledger.csv", assets: 1000, liabilities: 250, revenue: 1000, expenses: 0 }),
     });
     expect(analysis.status).toBe(200);
     const analysisJson = await analysis.json();

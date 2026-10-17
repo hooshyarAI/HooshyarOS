@@ -64,7 +64,7 @@ describe("Phase 13 E2E — authentication, RBAC and tenant isolation", () => {
         const viewerAnalyze = await request(server, "/api/analyze", {
             method: "POST",
             headers: { "content-type": "application/json", cookie: viewerCookie },
-            body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250 }),
+            body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250, revenue: 1000, expenses: 0 }),
         });
         expect(viewerAnalyze.status).toBe(403);
         expect((await viewerAnalyze.json()).error).toBe("INSUFFICIENT_PERMISSIONS");
@@ -75,7 +75,7 @@ describe("Phase 13 E2E — authentication, RBAC and tenant isolation", () => {
         const ownerAnalyze = await request(server, "/api/analyze", {
             method: "POST",
             headers: { "content-type": "application/json", cookie: ownerCookie },
-            body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250 }),
+            body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250, revenue: 1000, expenses: 0 }),
         });
         expect(ownerAnalyze.status).toBe(200);
         expect((await ownerAnalyze.json()).status).toBe("READY");
@@ -113,7 +113,7 @@ describe("Phase 13 E2E — authentication, RBAC and tenant isolation", () => {
         await request(server, "/api/analyze", {
             method: "POST",
             headers: { "content-type": "application/json", cookie: acmeCookie },
-            body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250 }),
+            body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250, revenue: 1000, expenses: 0 }),
         });
 
         const other = await register("other-owner", "Sup3rSecret!", "Other");
