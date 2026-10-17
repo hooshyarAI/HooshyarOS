@@ -15,11 +15,6 @@ const branch = (branchResult.stdout || "").trim();
 const maxAttempts = Number(process.env.HOOSHYAR_CI_REPAIR_MAX_ATTEMPTS || 12);
 const pollSeconds = Number(process.env.HOOSHYAR_CI_REPAIR_POLL_SECONDS || 15);
 
-if (!branch || branch === "main" || branch === "master") {
-    console.error(JSON.stringify({ type: "AUTONOMOUS_CI_REPAIR_BLOCKED", reason: "UNSAFE_BRANCH", branch }));
-    process.exit(2);
-}
-
 function stateRead() {
     try { return JSON.parse(fs.readFileSync(statePath, "utf8")); }
     catch { return { processedRuns: [], lastFailureFingerprint: null }; }
@@ -186,6 +181,11 @@ function commitAndPush() {
 }
 
 async function main() {
+    // Keep the safety guard in the CLI entrypoint, not module scope: Jest imports this file to test failureMission.
+    if (!branch || branch === "main" || branch === "master") {
+        console.error(JSON.stringify({ type: "AUTONOMOUS_CI_REPAIR_BLOCKED", reason: "UNSAFE_BRANCH", branch }));
+        process.exit(2);
+    }
     const state = stateRead();
     fs.mkdirSync(dir, { recursive: true });
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
