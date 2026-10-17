@@ -6,6 +6,7 @@ on:
       - ".github/workflows/product-qualification-fail-closed.yml"
       - "scripts/real-product-qualification.cjs"
       - "scripts/real-product-qualification.test.cjs"
+      - "scripts/cline-runtime-evidence-collector.cjs"
       - "Docs/Product/PRODUCT_QUALIFICATION_MATRIX.json"
   pull_request:
     branches:
@@ -14,6 +15,7 @@ on:
       - ".github/workflows/product-qualification-fail-closed.yml"
       - "scripts/real-product-qualification.cjs"
       - "scripts/real-product-qualification.test.cjs"
+      - "scripts/cline-runtime-evidence-collector.cjs"
       - "Docs/Product/PRODUCT_QUALIFICATION_MATRIX.json"
 
 permissions:
