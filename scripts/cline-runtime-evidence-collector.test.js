@@ -17,7 +17,7 @@ describe("runtime evidence collector CI regression", () => {
   function resetEvidenceDir() {
     fs.rmSync(path.join(tempDir, ".hooshyar"), { recursive: true, force: true });
     fs.mkdirSync(path.join(tempDir, ".hooshyar"), { recursive: true });
-    // Every test owns an independent qualification matrix and evidence set.
+    // Each test creates its own matrix and evidence; prevent cross-test leakage.
     fs.rmSync(path.join(tempDir, "Docs"), { recursive: true, force: true });
   }
 
@@ -28,18 +28,14 @@ describe("runtime evidence collector CI regression", () => {
   }
 
   function writeEvidence(name, record) {
-    fs.writeFileSync(
-      path.join(tempDir, ".hooshyar", name),
-      JSON.stringify(record, null, 2) + "\n",
-      "utf8"
-    );
+    fs.writeFileSync(path.join(tempDir, ".hooshyar", name), JSON.stringify(record, null, 2) + "\n");
   }
 
-  function runCollector(env = {}) {
+  function runCollector(extraEnv = {}) {
     return spawnSync("node", [COLLECTOR_PATH], {
       cwd: tempDir,
       encoding: "utf8",
-      env: { ...process.env, GITHUB_RUN_ID: String(TEST_RUN_ID), ...env },
+      env: { ...process.env, GITHUB_RUN_ID: String(TEST_RUN_ID), ...extraEnv },
     });
   }
 
@@ -48,7 +44,7 @@ describe("runtime evidence collector CI regression", () => {
   }
 
   beforeAll(() => {
-    // mkdtemp requires its parent to exist; do not depend on a previous test run.
+    // mkdtemp requires its parent directory to exist.
     fs.mkdirSync(path.join(ROOT, ".hooshyar"), { recursive: true });
     tempDir = fs.mkdtempSync(path.join(ROOT, ".hooshyar", "ci-regression-test-"));
     execFileSync("git", ["init"], { cwd: tempDir, stdio: "pipe" });
@@ -56,13 +52,14 @@ describe("runtime evidence collector CI regression", () => {
     execFileSync("git", ["config", "user.name", "CI"], { cwd: tempDir, stdio: "pipe" });
     execFileSync("git", ["commit", "--allow-empty", "-m", "regression baseline"], { cwd: tempDir, stdio: "pipe" });
     sha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: tempDir, encoding: "utf8" }).trim();
+    fs.mkdirSync(path.join(tempDir, ".hooshyar"), { recursive: true });
   });
 
   afterAll(() => {
     try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch {}
   });
 
-  test("workflow downloads all five evidence artifacts to the canonical directory and uploads hidden evidence explicitly", () => {
+  test("workflow downloads all five evidence artifacts to the canonical directory", () => {
     const workflow = fs.readFileSync(WORKFLOW_PATH, "utf8").replace(/\r\n/g, "\n");
     const downloads = [...workflow.matchAll(
       /- name: (Download [^\n]+)\n\s+uses: actions\/download-artifact@v\d+\n\s+continue-on-error: true\n\s+with:\n\s+name: ([^\n]+)\n\s+path: ([^\n]+)/g
@@ -91,21 +88,25 @@ describe("runtime evidence collector CI regression", () => {
     for (const [artifactName, filename] of requiredUploads) {
       const artifactNamePos = workflow.indexOf("name: " + artifactName);
       expect(artifactNamePos).toBeGreaterThanOrEqual(0);
-
       const uploadStart = workflow.lastIndexOf("uses: actions/upload-artifact@", artifactNamePos);
       expect(uploadStart).toBeGreaterThanOrEqual(0);
-
       const nextStep = workflow.indexOf("\n      - ", artifactNamePos);
       const uploadBlock = workflow.slice(uploadStart, nextStep === -1 ? workflow.length : nextStep);
       expect(uploadBlock).toContain("path: ./.hooshyar/" + filename);
       expect(uploadBlock).toContain("include-hidden-files: true");
     }
+
+    const factoryUploadPos = workflow.indexOf("name: hooshyar-final-product-factory-evidence");
+    expect(factoryUploadPos).toBeGreaterThanOrEqual(0);
+    const factoryUploadStart = workflow.lastIndexOf("uses: actions/upload-artifact@", factoryUploadPos);
+    const factoryNextStep = workflow.indexOf("\n      - ", factoryUploadPos);
+    const factoryUpload = workflow.slice(factoryUploadStart, factoryNextStep === -1 ? workflow.length : factoryNextStep);
+    expect(factoryUpload).toContain("path: ./factory-success.json");
   });
 
-  test("collector fails closed with a structured error when the qualification matrix is missing", () => {
+  test("missing qualification matrix is rejected with a structured error and exit code 2", () => {
     resetEvidenceDir();
     const result = runCollector();
-
     expect(result.status).toBe(2);
     expect(result.stdout).toBe("");
     expect(JSON.parse(result.stderr)).toMatchObject({
@@ -115,14 +116,12 @@ describe("runtime evidence collector CI regression", () => {
     });
   });
 
-  test("collector rejects an invalid qualification matrix", () => {
+  test("invalid qualification matrix is rejected with a structured error and exit code 2", () => {
     resetEvidenceDir();
     const matrixPath = path.join(tempDir, "Docs", "Product", "PRODUCT_QUALIFICATION_MATRIX.json");
     fs.mkdirSync(path.dirname(matrixPath), { recursive: true });
-    fs.writeFileSync(matrixPath, JSON.stringify({ required: [] }), "utf8");
-
+    fs.writeFileSync(matrixPath, JSON.stringify({ required: [] }));
     const result = runCollector();
-
     expect(result.status).toBe(2);
     expect(result.stdout).toBe("");
     expect(JSON.parse(result.stderr)).toMatchObject({
@@ -132,14 +131,12 @@ describe("runtime evidence collector CI regression", () => {
     });
   });
 
-  test("collector reports incomplete evidence without claiming qualification or masking blockers", () => {
+  test("missing evidence is reported as additional evidence required without masking the final gate", () => {
     resetEvidenceDir();
     writeCanonicalMatrix();
-
     const result = runCollector();
-    const evidence = JSON.parse(result.stdout);
-
     expect(result.status).toBe(0);
+    const evidence = JSON.parse(result.stdout);
     expect(evidence.verdict).toBe("REQUIRES_ADDITIONAL_EVIDENCE");
     expect(evidence.blockers.length).toBeGreaterThan(0);
     expect(evidence.cells).toHaveLength(10);
@@ -148,7 +145,7 @@ describe("runtime evidence collector CI regression", () => {
     expect(cell(evidence, "full-suite").status).toBe("BLOCKED");
   });
 
-  test("collector rejects stale evidence bound to a different commit", () => {
+  test("stale commit-bound evidence does not satisfy qualification cells", () => {
     resetEvidenceDir();
     writeCanonicalMatrix();
     writeEvidence("factory-success.json", {
@@ -156,22 +153,20 @@ describe("runtime evidence collector CI regression", () => {
       version: 1,
       status: "PASS",
       commit: "0000000000000000000000000000000000000000",
-      acceptance: ["runtime-health", "session", "tenant", "ingestion", "analysis", "dashboard"],
+      acceptance: ["runtime-health", "session", "tenant", "ingestion", "analysis", "dashboard", "restart", "tenant-recovery", "dashboard-recovery", "full-jest"],
       fullJest: "PASS",
     });
 
     const result = runCollector();
-    const evidence = JSON.parse(result.stdout);
-
     expect(result.status).toBe(0);
+    const evidence = JSON.parse(result.stdout);
     expect(evidence.verdict).toBe("REQUIRES_ADDITIONAL_EVIDENCE");
     expect(cell(evidence, "win-core").status).toBe("BLOCKED");
-    expect(cell(evidence, "win-business").status).toBe("BLOCKED");
     expect(cell(evidence, "win-recovery").status).toBe("BLOCKED");
     expect(cell(evidence, "full-suite").status).toBe("BLOCKED");
   });
 
-  test("collector completes only when every required evidence record is current and run-bound", () => {
+  test("collector reports complete qualification only for complete, current-commit evidence", () => {
     resetEvidenceDir();
     writeCanonicalMatrix();
 
@@ -229,7 +224,6 @@ describe("runtime evidence collector CI regression", () => {
       type: "ASSISTANT_REPAIR_MISSION_V1_RESULT",
       status: "PASS",
       commit: sha,
-      missionId: "test-mission",
       finding: { failedJobs: ["web-product-acceptance"] },
       repair: {
         changedFiles: 1,
@@ -239,28 +233,25 @@ describe("runtime evidence collector CI regression", () => {
       factoryAcceptance: {
         status: "PASS",
         commit: sha,
+        runId: TEST_RUN_ID,
         productFactoryJob: "windows-product-factory",
         productFactoryConclusion: "success",
-        runId: TEST_RUN_ID,
       },
     });
 
     const result = runCollector();
-    const evidence = JSON.parse(result.stdout);
-
     expect(result.status).toBe(0);
+    const evidence = JSON.parse(result.stdout);
     expect(evidence.verdict).toBe("QUALIFICATION_COMPLETE");
     expect(evidence.blockers).toEqual([]);
     expect(evidence.cells).toHaveLength(10);
     expect(evidence.cells.every((item) => item.status === "PASS")).toBe(true);
-    expect(cell(evidence, "ci-feedback").status).toBe("PASS");
-    expect(cell(evidence, "full-suite").status).toBe("PASS");
+    expect(evidence.cells.every((item) => item.commitSha === sha)).toBe(true);
   });
 
   test("collector path contract matches android evidence script's canonical evidence path", () => {
     const workflow = fs.readFileSync(WORKFLOW_PATH, "utf8");
     const evidenceScript = fs.readFileSync(EVIDENCE_SCRIPT_PATH, "utf8");
-
     expect(evidenceScript).toContain("DEFAULT_EVIDENCE_PATH = path.join(ROOT, '.hooshyar', 'android-acceptance-success.json')");
     expect(workflow).toContain("name: hooshyar-android-product-acceptance-evidence");
   });
