@@ -1,0 +1,46 @@
+name: Truthful Confidence Validation
+
+on:
+  push:
+    paths:
+      - ".github/workflows/truthful-confidence-validation.yml"
+      - "Backend/HBOS/Engines/IntelligenceEngine.ts"
+      - "Backend/HBOS/test/IntelligenceEngine.ScienceSelectionConfidence.test.ts"
+  pull_request:
+    branches:
+      - fix/autonomous-product-factory
+    paths:
+      - ".github/workflows/truthful-confidence-validation.yml"
+      - "Backend/HBOS/Engines/IntelligenceEngine.ts"
+      - "Backend/HBOS/test/IntelligenceEngine.ScienceSelectionConfidence.test.ts"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: truthful-confidence-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  truthful-confidence-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run focused truthful-confidence tests
+        run: >-
+          node ./node_modules/jest/bin/jest.js
+          --runInBand
+          --runTestsByPath
+          Backend/HBOS/test/IntelligenceEngine.ScienceSelectionConfidence.test.ts
