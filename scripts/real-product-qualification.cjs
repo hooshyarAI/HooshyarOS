@@ -1,5 +1,6 @@
 const { spawnSync } = require('node:child_process');
 const path = require('node:path');
+const fs = require('node:fs');
 
 const root = process.cwd();
 const steps = [
@@ -8,10 +9,6 @@ const steps = [
   ['factory', ['run', 'product:factory']],
   ['cline-evidence', ['run', 'product:cline:evidence']]
 ];
-// Node refuses to spawn a `.cmd`/`.bat` file with `shell: false` on Windows (it
-// reports EINVAL before the child starts), so the npm CLI is launched through the
-// platform command processor there — the convention used by the other
-// qualification harnesses under scripts/.
 const shell = process.platform === 'win32' ? (process.env.ComSpec || 'cmd.exe') : null;
 
 function launchNpm(args, stdio = 'inherit') {
@@ -44,7 +41,20 @@ function run(label, args, stdio = 'inherit') {
   return 0;
 }
 
-function decideQualification(matrix, evidence, currentCommit) {
+function validateEvidenceReference(reference, currentCommit) {
+  if (typeof reference !== 'string' || !reference.trim() || path.isAbsolute(reference) || reference.includes('://')) return false;
+  const resolved = path.resolve(root, reference);
+  const relative = path.relative(root, resolved);
+  if (!relative || relative.startsWith('..') || path.isAbsolute(relative) || !fs.existsSync(resolved)) return false;
+  try {
+    const record = JSON.parse(fs.readFileSync(resolved, 'utf8'));
+    return record && record.commit === currentCommit && ['PASS', 'ACCEPTED'].includes(record.status);
+  } catch {
+    return false;
+  }
+}
+
+function decideQualification(matrix, evidence, currentCommit, evidenceRefIsValid = () => true) {
   if (!matrix || !Array.isArray(matrix.required) || matrix.required.length === 0) {
     return { status: 'BLOCKED', reason: 'QUALIFICATION_MATRIX_MISSING_OR_INVALID', blockers: [] };
   }
@@ -68,7 +78,8 @@ function decideQualification(matrix, evidence, currentCommit) {
       cell.workflow === required.workflow &&
       cell.evidenceKind === required.evidence &&
       typeof cell.target === 'string' && cell.target.trim().length > 0 &&
-      typeof cell.evidenceRef === 'string' && cell.evidenceRef.trim().length > 0;
+      typeof cell.evidenceRef === 'string' && cell.evidenceRef.trim().length > 0 &&
+      evidenceRefIsValid(cell.evidenceRef, currentCommit, required, cell);
     if (!valid) blockers.push({
       id: required.id,
       status: cell && typeof cell.status === 'string' ? cell.status : 'UNKNOWN'
@@ -80,11 +91,8 @@ function decideQualification(matrix, evidence, currentCommit) {
 }
 
 function readJsonIfPresent(file) {
-  try {
-    return JSON.parse(require('node:fs').readFileSync(file, 'utf8'));
-  } catch {
-    return null;
-  }
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
+  catch { return null; }
 }
 
 function main() {
@@ -99,16 +107,15 @@ function main() {
     if (exitCode !== 0) return exitCode;
   }
 
-  const fs = require('node:fs');
   const matrixPath = path.join(root, 'Docs', 'Product', 'PRODUCT_QUALIFICATION_MATRIX.json');
   const evidencePath = process.env.HOOSHYAR_PRODUCT_QUALIFICATION_EVIDENCE ||
-    path.join(root, 'artifacts', 'product-qualification-evidence.json');
+    path.join(root, '.hooshyar', 'cline-runtime-evidence.json');
   const matrix = readJsonIfPresent(matrixPath);
   const evidence = readJsonIfPresent(evidencePath);
-  const commitResult = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' });
+  const commitResult = spawnSync(process.platform === 'win32' ? 'git.exe' : 'git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' });
   const currentCommit = commitResult.status === 0 ? commitResult.stdout.trim() : null;
   const decision = currentCommit
-    ? decideQualification(matrix, evidence, currentCommit)
+    ? decideQualification(matrix, evidence, currentCommit, validateEvidenceReference)
     : { status: 'BLOCKED', reason: 'CURRENT_COMMIT_UNAVAILABLE', blockers: [] };
 
   console.log(JSON.stringify({
@@ -126,7 +133,7 @@ function main() {
       type: 'REAL_PRODUCT_QUALIFICATION',
       stage: 'COMPLETE',
       status: 'BLOCKED',
-      details: 'Preliminary acceptance commands passed, but required product qualification cells are not all proven for the current commit.'
+      details: 'Acceptance commands passed, but one or more required cells lack verifiable, current-commit evidence.'
     }));
     return 2;
   }
@@ -136,11 +143,11 @@ function main() {
     stage: 'COMPLETE',
     status: 'PASS',
     commitSha: currentCommit,
-    details: 'All required qualification matrix cells have PASS evidence bound to the current commit.'
+    details: 'All required qualification matrix cells have verifiable evidence bound to the current commit.'
   }));
   return 0;
 }
 
 if (require.main === module) process.exit(main());
 
-module.exports = { launchNpm, run, steps, main, decideQualification };
+module.exports = { launchNpm, run, steps, main, decideQualification, validateEvidenceReference };
