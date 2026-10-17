@@ -4,6 +4,9 @@ on:
   push:
     paths:
       - ".github/workflows/product-qualification-fail-closed.yml"
+      - ".github/workflows/autonomous-ci-repair.yml"
+      - ".github/workflows/final-product-factory.yml"
+      - "scripts/autonomous-ci-repair-runner.cjs"
       - "scripts/real-product-qualification.cjs"
       - "scripts/real-product-qualification.test.cjs"
       - "scripts/cline-runtime-evidence-collector.cjs"
@@ -17,6 +20,9 @@ on:
       - fix/autonomous-product-factory
     paths:
       - ".github/workflows/product-qualification-fail-closed.yml"
+      - ".github/workflows/autonomous-ci-repair.yml"
+      - ".github/workflows/final-product-factory.yml"
+      - "scripts/autonomous-ci-repair-runner.cjs"
       - "scripts/real-product-qualification.cjs"
       - "scripts/real-product-qualification.test.cjs"
       - "scripts/cline-runtime-evidence-collector.cjs"
