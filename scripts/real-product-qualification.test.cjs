@@ -11,6 +11,7 @@ const matrix = {
 
 function passingEvidence() {
   return {
+    type: 'HOOSHYAR_PRODUCT_QUALIFICATION_EVIDENCE_V1',
     commitSha: currentCommit,
     cells: matrix.required.map(cell => ({
       id: cell.id,
@@ -21,7 +22,7 @@ function passingEvidence() {
       workflow: cell.workflow,
       evidenceKind: cell.evidence,
       target: cell.environment === 'windows' ? 'Windows runner' : 'Web CI runner',
-      evidenceRef: `artifact://${cell.id}`
+      evidenceRef: `.hooshyar/${cell.id}.json`
     }))
   };
 }
@@ -44,6 +45,12 @@ describe('real product qualification fail-closed contract', () => {
     const result = decideQualification(matrix, evidence, currentCommit);
     expect(result.status).toBe('BLOCKED');
     expect(result.reason).toBe('CURRENT_COMMIT_QUALIFICATION_EVIDENCE_MISSING_OR_STALE');
+  });
+
+  test('wrong evidence schema blocks completion', () => {
+    const evidence = passingEvidence();
+    evidence.type = 'UNTRUSTED_OR_UNKNOWN_SCHEMA';
+    expect(decideQualification(matrix, evidence, currentCommit).status).toBe('BLOCKED');
   });
 
   test('any required cell without current PASS evidence blocks completion', () => {
@@ -77,5 +84,19 @@ describe('real product qualification fail-closed contract', () => {
     const result = decideQualification(matrix, evidence, currentCommit);
     expect(result.status).toBe('BLOCKED');
     expect(result.blockers).toContainEqual({ id: 'win-business', status: 'PASS' });
+  });
+
+  test('a non-resolving evidence reference cannot qualify a cell', () => {
+    const result = decideQualification(matrix, passingEvidence(), currentCommit, () => false);
+    expect(result.status).toBe('BLOCKED');
+    expect(result.blockers).toHaveLength(matrix.required.length);
+  });
+
+  test('duplicate evidence cell IDs are rejected rather than silently overwritten', () => {
+    const evidence = passingEvidence();
+    evidence.cells.push({ ...evidence.cells[0], status: 'PASS' });
+    const result = decideQualification(matrix, evidence, currentCommit);
+    expect(result.status).toBe('BLOCKED');
+    expect(result.reason).toBe('QUALIFICATION_EVIDENCE_CELL_IDS_INVALID_OR_DUPLICATED');
   });
 });
