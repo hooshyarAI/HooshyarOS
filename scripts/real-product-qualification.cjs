@@ -54,7 +54,7 @@ function validateEvidenceReference(reference, currentCommit) {
   }
 }
 
-function decideQualification(matrix, evidence, currentCommit, evidenceRefIsValid = () => true) {
+function decideQualification(matrix, evidence, currentCommit, evidenceRefIsValid = () => false) {
   if (!matrix || !Array.isArray(matrix.required) || matrix.required.length === 0) {
     return { status: 'BLOCKED', reason: 'QUALIFICATION_MATRIX_MISSING_OR_INVALID', blockers: [] };
   }

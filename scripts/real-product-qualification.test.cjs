@@ -63,8 +63,15 @@ describe('real product qualification fail-closed contract', () => {
     expect(result.blockers).toContainEqual({ id: 'win-core', status: 'BLOCKED' });
   });
 
-  test('PASS requires every required cell to have current commit, target and evidence reference', () => {
+  test('omitting the evidence reference validator cannot qualify any cell', () => {
     const result = decideQualification(matrix, passingEvidence(), currentCommit);
+    expect(result.status).toBe('BLOCKED');
+    expect(result.reason).toBe('REQUIRED_QUALIFICATION_CELLS_NOT_PROVEN');
+    expect(result.blockers.map(cell => cell.id)).toEqual(matrix.required.map(cell => cell.id));
+  });
+
+  test('PASS requires every required cell to have current commit, target and evidence reference when validator explicitly confirms them', () => {
+    const result = decideQualification(matrix, passingEvidence(), currentCommit, () => true);
     expect(result).toEqual({
       status: 'PASS',
       reason: 'ALL_REQUIRED_CELLS_HAVE_CURRENT_COMMIT_EVIDENCE',
