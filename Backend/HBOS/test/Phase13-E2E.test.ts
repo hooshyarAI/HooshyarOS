@@ -125,7 +125,7 @@ describe("Phase 13 E2E — authentication, RBAC and tenant isolation", () => {
         expect(otherDashboard.status).toBe(200);
         const dashboard = await otherDashboard.json();
         expect(dashboard.analysisAvailable).toBe(false);
-        expect(dashboard.metrics.revenue).toBe(1000);
+        expect(dashboard.metrics.revenue).toBe(0);
     });
 
     test("requires a real password and never authenticates the wrong tenant", async () => {
