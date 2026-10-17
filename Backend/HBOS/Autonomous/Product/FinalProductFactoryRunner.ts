@@ -40,16 +40,16 @@ async function main(): Promise<void> {
     if (session.status !== 201 || !session.cookie) throw new Error(`FACTORY_SESSION_FAILED:${session.status}`);
     const cookie = session.cookie.split(";")[0]; const tenantId = String(session.body?.tenantId ?? ""); if (!tenantId) throw new Error("FACTORY_TENANT_MISSING");
     const csv = ["date,account,debit,credit,currency","2026-08-01,Cash,1000,0,IRR","2026-08-02,Sales,0,1500,IRR","2026-08-03,Expense,300,0,IRR","2026-08-04,Receivable,0,800,IRR"].join("\n");
-    const analysis = await request("/api/analyze", { method: "POST", headers: { "content-type": "application/json", cookie }, body: JSON.stringify({ csv, sourceName: "factory-qa.csv", assets: 10_000, liabilities: 4_000 }) });
-    if (analysis.status !== 200 || analysis.body?.status !== "READY") throw new Error(`FACTORY_ANALYSIS_FAILED:${analysis.status}`);
+    const analysis = await request("/api/analyze", { method: "POST", headers: { "content-type": "application/json", cookie }, body: JSON.stringify({ csv, sourceName: "factory-qa.csv", assets: 10_000, liabilities: 4_000, revenue: 1_500, expenses: 300 }) });
+    if (analysis.status !== 200 || analysis.body?.status !== "READY") throw new Error(`FACTORY_ANALYSIS_FAILED:${analysis.status}:${analysis.body?.error ?? "UNKNOWN"}`);
     const dashboard = await request("/api/dashboard", { headers: { cookie } });
-    if (dashboard.status !== 200 || dashboard.body?.analysisAvailable !== true || dashboard.body?.metrics?.profit !== 1000) throw new Error(`FACTORY_DASHBOARD_FAILED:${JSON.stringify(dashboard.body)}`);
+    if (dashboard.status !== 200 || dashboard.body?.analysisAvailable !== true || dashboard.body?.metrics?.profit !== 1200) throw new Error(`FACTORY_DASHBOARD_FAILED:${JSON.stringify(dashboard.body)}`);
     console.log(JSON.stringify({ type: "FINAL_PRODUCT_FACTORY", stage: "ACCEPT", ok: true, tenantId, profit: dashboard.body.metrics.profit }));
     await stopRuntime(runtime); runtime = await startRuntime();
     const session2 = await request("/api/session", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "factory-qa", organization: "Hooshyar Factory" }) });
     if (session2.status !== 201 || !session2.cookie || session2.body?.tenantId !== tenantId) throw new Error(`FACTORY_TENANT_RECOVERY_FAILED:${JSON.stringify(session2.body)}`);
     const dashboard2 = await request("/api/dashboard", { headers: { cookie: session2.cookie.split(";")[0] } });
-    if (dashboard2.status !== 200 || dashboard2.body?.analysisAvailable !== true || dashboard2.body?.metrics?.profit !== 1000) throw new Error(`FACTORY_RECOVERY_FAILED:${JSON.stringify(dashboard2.body)}`);
+    if (dashboard2.status !== 200 || dashboard2.body?.analysisAvailable !== true || dashboard2.body?.metrics?.profit !== 1200) throw new Error(`FACTORY_RECOVERY_FAILED:${JSON.stringify(dashboard2.body)}`);
     console.log(JSON.stringify({ type: "FINAL_PRODUCT_FACTORY", stage: "RECOVERY", ok: true, tenantId, profit: dashboard2.body.metrics.profit }));
   } catch (error) {
     const failure = error instanceof Error ? error.message : String(error);

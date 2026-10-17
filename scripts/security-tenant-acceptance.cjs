@@ -85,7 +85,7 @@ async function main() {
       throw new Error(`SECURITY_UNAUTHENTICATED_ACCESS_NOT_DENIED:${unauthDashboard.status}/${unauthAnalyze.status}`);
     }
 
-    const createTenant = async (username, organization, sourceName, debit, credit) => {
+    const createTenant = async (username, organization, sourceName, revenue, expenses) => {
       const session = await request('/api/session', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -95,20 +95,22 @@ async function main() {
       const cookie = session.cookie.split(';')[0];
       const csv = [
         'date,account,debit,credit,currency',
-        `2026-08-01,Cash,${debit},0,IRR`,
-        `2026-08-02,Sales,0,${credit},IRR`
+        `2026-08-01,Cash,${revenue},0,IRR`,
+        `2026-08-02,Sales,0,${revenue},IRR`,
+        `2026-08-03,Expense,${expenses},0,IRR`,
+        `2026-08-04,Payable,0,${expenses},IRR`
       ].join('\n');
       const analysis = await request('/api/analyze', {
         method: 'POST',
         headers: { 'content-type': 'application/json', cookie },
-        body: JSON.stringify({ csv, sourceName, assets: 10000, liabilities: 2500 })
+        body: JSON.stringify({ csv, sourceName, assets: 10000, liabilities: 2500, revenue, expenses })
       });
-      if (analysis.status !== 200 || analysis.body.status !== 'READY') throw new Error(`SECURITY_ANALYSIS_FAILED:${organization}`);
-      return { tenantId: session.body.tenantId, cookie, expectedProfit: credit - debit };
+      if (analysis.status !== 200 || analysis.body.status !== 'READY') throw new Error(`SECURITY_ANALYSIS_FAILED:${organization}:${analysis.status}:${analysis.body.error || 'UNKNOWN'}`);
+      return { tenantId: session.body.tenantId, cookie, expectedProfit: revenue - expenses };
     };
 
-    const tenantA = await createTenant('security-a', 'Org A', 'tenant-a.csv', 100, 500);
-    const tenantB = await createTenant('security-b', 'Org B', 'tenant-b.csv', 50, 900);
+    const tenantA = await createTenant('security-a', 'Org A', 'tenant-a.csv', 500, 100);
+    const tenantB = await createTenant('security-b', 'Org B', 'tenant-b.csv', 900, 50);
 
     if (tenantA.tenantId === tenantB.tenantId) throw new Error('TENANT_IDS_NOT_UNIQUE');
 

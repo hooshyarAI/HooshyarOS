@@ -105,16 +105,16 @@ async function main() {
     if (session.status !== 201 || !session.body.tenantId || !session.setCookie) throw new Error(`WEB_ACCEPTANCE_SESSION_FAILED:${session.status}`);
     const cookie = session.setCookie.split(';')[0];
     const csv = ['date,account,debit,credit,currency','2026-08-01,Cash,1000,0,IRR','2026-08-02,Sales,0,1500,IRR','2026-08-03,Expense,300,0,IRR','2026-08-04,Receivable,0,800,IRR'].join('\n');
-    const analysis = await request('/api/analyze', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ csv, sourceName: 'web-qa.csv', assets: 10000, liabilities: 4000 }) });
-    if (analysis.status !== 200 || analysis.body.status !== 'READY' || analysis.body.metrics.profit !== 1000) throw new Error(`WEB_ACCEPTANCE_ANALYSIS_FAILED:${analysis.status}`);
+    const analysis = await request('/api/analyze', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ csv, sourceName: 'web-qa.csv', assets: 10000, liabilities: 4000, revenue: 1500, expenses: 300 }) });
+    if (analysis.status !== 200 || analysis.body.status !== 'READY' || analysis.body.metrics.profit !== 1200) throw new Error(`WEB_ACCEPTANCE_ANALYSIS_FAILED:${analysis.status}:${analysis.body.error || "UNKNOWN"}`);
     const executive = await request('/api/executive/workbench', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ targets: { revenue: 2000, profit: 1200, profitMargin: 0.3, debtRatio: 0.25 } }) });
     if (executive.status !== 200 || executive.body.status !== 'READY' || !Array.isArray(executive.body.recommendations) || executive.body.recommendations.length !== 4) throw new Error(`WEB_ACCEPTANCE_EXECUTIVE_FAILED:${executive.status}`);
     const report = await request('/api/report', { headers: { cookie } });
     if (report.status !== 200 || report.body.status !== 'READY' || !Array.isArray(report.body.sections) || report.body.sections.length < 7) throw new Error(`WEB_ACCEPTANCE_REPORT_FAILED:${report.status}`);
     const assistant = await request('/api/assistant', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ question: 'وضعیت سود و درآمد من چیست؟' }) });
-    if (assistant.status !== 200 || assistant.body.status !== 'READY' || typeof assistant.body.answer !== 'string' || !assistant.body.answer.includes('1000')) throw new Error(`WEB_ACCEPTANCE_ASSISTANT_FAILED:${assistant.status}`);
+    if (assistant.status !== 200 || assistant.body.status !== 'READY' || typeof assistant.body.answer !== 'string' || !assistant.body.answer.includes('1200')) throw new Error(`WEB_ACCEPTANCE_ASSISTANT_FAILED:${assistant.status}`);
     const dashboard = await request('/api/dashboard', { headers: { cookie } });
-    if (dashboard.status !== 200 || dashboard.body.analysisAvailable !== true || dashboard.body.metrics.profit !== 1000 || dashboard.body.executiveIntelligence?.status !== 'READY') throw new Error(`WEB_ACCEPTANCE_DASHBOARD_FAILED:${JSON.stringify(dashboard.body)}`);
+    if (dashboard.status !== 200 || dashboard.body.analysisAvailable !== true || dashboard.body.metrics.profit !== 1200 || dashboard.body.executiveIntelligence?.status !== 'READY') throw new Error(`WEB_ACCEPTANCE_DASHBOARD_FAILED:${JSON.stringify(dashboard.body)}`);
 
     // Phase 14: governed multi-format ingestion through the canonical runtime path.
     const structured = JSON.stringify({ transactions: [
