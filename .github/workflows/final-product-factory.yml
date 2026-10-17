@@ -178,6 +178,21 @@ jobs:
         run: npm run product:assurance
       - name: Full Jest
         run: npm test -- --runInBand
+      - name: TypeScript type check
+        run: node ./node_modules/typescript/bin/tsc --noEmit
+      - name: Emit current-commit full-suite evidence
+        run: node scripts/full-suite-evidence.cjs
+        env:
+          SECURITY_TENANT_ACCEPTANCE_RESULT: ${{ needs.security-tenant-acceptance.result }}
+      - name: Upload full-suite qualification evidence
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hooshyar-full-suite-evidence
+          path: ./.hooshyar/full-suite-success.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
 
   runtime-evidence-qualification:
     runs-on: ubuntu-latest
@@ -217,6 +232,13 @@ jobs:
         continue-on-error: true
         with:
           name: hooshyar-security-tenant-evidence
+          path: ./.hooshyar
+          merge-multiple: true
+      - name: Download full-suite qualification evidence
+        uses: actions/download-artifact@v8
+        continue-on-error: true
+        with:
+          name: hooshyar-full-suite-evidence
           path: ./.hooshyar
           merge-multiple: true
       - name: Report canonical evidence paths without masking blockers

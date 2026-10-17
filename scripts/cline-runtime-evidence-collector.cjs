@@ -43,12 +43,17 @@ function main() {
   const web = read('web-acceptance-success.json');
   const android = read('android-acceptance-success.json');
   const security = read('security-acceptance-success.json');
+  const fullSuite = read('full-suite-success.json');
   const agent = read('agent-repair-success.json');
 
   const factoryCurrent = current(factory);
   const webCurrent = current(web);
   const androidCurrent = current(android);
   const securityCurrent = current(security);
+  const fullSuiteCurrent = current(fullSuite) &&
+    fullSuite.type === 'HOOSHYAR_FULL_SUITE_EVIDENCE_V1' &&
+    fullSuite.runId === Number(process.env.GITHUB_RUN_ID) &&
+    hasAll(fullSuite, ['full-jest', 'typescript', 'security-tenant-acceptance']);
   const agentCurrent = current(agent);
 
   const factoryRuntime = factoryCurrent && hasAll(factory, ['runtime-health', 'session', 'tenant', 'ingestion', 'analysis', 'dashboard']);
@@ -82,10 +87,9 @@ function main() {
     'android-release': { pass: androidPass, ref: '.hooshyar/android-acceptance-success.json', target: 'ubuntu-latest / Android emulator API 35' },
     'tenant-isolation': { pass: tenantPass, ref: '.hooshyar/security-acceptance-success.json', target: 'windows-latest' },
     'ci-feedback': { pass: ciFeedbackPass, ref: '.hooshyar/agent-repair-success.json', target: 'GitHub Actions agent-repair workflow' },
-    // A successful Jest run alone does not prove the matrix's combined
-    // full-jest + TypeScript + security contract. Keep this cell blocked until
-    // a dedicated, current-commit evidence artifact proves all three.
-    'full-suite': { pass: false, ref: null, target: 'GitHub Actions full qualification' }
+    // This cell passes only from a same-commit, same-workflow-run artifact
+    // emitted after full Jest and TypeScript pass and security acceptance succeeds.
+    'full-suite': { pass: fullSuiteCurrent, ref: fullSuiteCurrent ? '.hooshyar/full-suite-success.json' : null, target: 'GitHub Actions full qualification' }
   };
 
   const cells = matrix.required.map(required => {
