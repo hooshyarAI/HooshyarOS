@@ -53,6 +53,7 @@ const SESSION_RATE_LIMITED_POST_PATHS = new Set([
     "/api/analyze",
     "/api/financial/analyze",
     "/api/ingest",
+    "/api/ingest/jobs",
     "/api/executive/workbench",
     "/api/decision/workbench",
     "/api/financial/insights",

@@ -10,6 +10,8 @@ on:
       - "scripts/autonomous-ci-repair-runner.cjs"
       - "scripts/autonomous-ci-repair-runner.test.cjs"
       - "scripts/real-product-qualification.cjs"
+      - "scripts/session-rate-limit-pacer.cjs"
+      - "scripts/session-rate-limit-pacer.test.cjs"
       - "scripts/full-suite-evidence.cjs"
       - "scripts/full-suite-evidence.test.cjs"
       - "scripts/real-product-qualification.test.cjs"
@@ -30,6 +32,8 @@ on:
       - "scripts/autonomous-ci-repair-runner.cjs"
       - "scripts/autonomous-ci-repair-runner.test.cjs"
       - "scripts/real-product-qualification.cjs"
+      - "scripts/session-rate-limit-pacer.cjs"
+      - "scripts/session-rate-limit-pacer.test.cjs"
       - "scripts/full-suite-evidence.cjs"
       - "scripts/full-suite-evidence.test.cjs"
       - "scripts/real-product-qualification.test.cjs"
@@ -72,6 +76,7 @@ jobs:
           scripts/full-suite-evidence.test.cjs
           scripts/agent-repair-evidence-contract.test.cjs
           scripts/autonomous-ci-repair-policy.test.cjs
+          scripts/session-rate-limit-pacer.test.cjs
           scripts/autonomous-ci-repair-runner.test.cjs
       - name: Syntax-check evidence pipeline
         run: >-
