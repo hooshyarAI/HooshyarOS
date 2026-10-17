@@ -277,7 +277,7 @@ describe("Phase 14-1.3 — ingestion to canonical financial intelligence", () =>
         const analysis = await request(server, "/api/financial/analyze", {
             method: "POST",
             headers: { "content-type": "application/json", cookie },
-            body: JSON.stringify({ sourceSha256: ingestedBody.evidence.sha256, assets: 4000, liabilities: 1000 }),
+            body: JSON.stringify({ sourceSha256: ingestedBody.evidence.sha256, assets: 4000, liabilities: 1000, revenue: 1000, expenses: 0 }),
         });
         expect(analysis.status).toBe(200);
         const analysisBody = await analysis.json();
@@ -338,7 +338,7 @@ describe("Phase 14-1.3 — ingestion to canonical financial intelligence", () =>
         const analysis = await request(server, "/api/analyze", {
             method: "POST",
             headers: { "content-type": "application/json", cookie },
-            body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 4000, liabilities: 1000 }),
+            body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 4000, liabilities: 1000, revenue: 1250, expenses: 0 }),
         });
         expect(analysis.status).toBe(200);
         expect((await analysis.json()).status).toBe("READY");
