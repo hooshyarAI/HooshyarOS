@@ -52,7 +52,7 @@ describe("product.reports-export — commercial runtime path", () => {
         const analysis = await request(server, "/api/analyze", {
             method: "POST",
             headers: { "content-type": "application/json", cookie },
-            body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 10000, liabilities: 2500, revenue: 1000, expenses: 0 }),
+            body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 10000, liabilities: 2500, revenue: 1500, expenses: 300 }),
         });
         expect(analysis.status).toBe(200);
         return analysis;
