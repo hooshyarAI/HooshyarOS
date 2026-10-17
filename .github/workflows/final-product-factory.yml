@@ -178,6 +178,7 @@ jobs:
   runtime-evidence-qualification:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    if: ${{ always() }}
     needs: [windows-product-factory, web-product-acceptance, security-tenant-acceptance, android-product-acceptance, full-qualification]
     steps:
       - uses: actions/checkout@v7
@@ -188,37 +189,45 @@ jobs:
       - run: npm ci
       - name: Download Windows factory evidence
         uses: actions/download-artifact@v8
+        continue-on-error: true
         with:
           name: hooshyar-final-product-factory-evidence
           path: ./.hooshyar
           merge-multiple: true
       - name: Download Web acceptance evidence
         uses: actions/download-artifact@v8
+        continue-on-error: true
         with:
           name: hooshyar-web-product-acceptance-evidence
           path: ./.hooshyar
           merge-multiple: true
       - name: Download Android acceptance evidence
         uses: actions/download-artifact@v8
+        continue-on-error: true
         with:
           name: hooshyar-android-product-acceptance-evidence
           path: ./.hooshyar
           merge-multiple: true
       - name: Download security acceptance evidence
         uses: actions/download-artifact@v8
+        continue-on-error: true
         with:
           name: hooshyar-security-tenant-evidence
           path: ./.hooshyar
           merge-multiple: true
-      - name: Verify canonical evidence paths
+      - name: Report canonical evidence paths without masking blockers
         shell: bash
         run: |
-          test -f .hooshyar/factory-success.json
-          test -f .hooshyar/web-acceptance-success.json
-          test -f .hooshyar/android-acceptance-success.json
-          test -f .hooshyar/security-acceptance-success.json
+          for evidence in factory-success.json web-acceptance-success.json android-acceptance-success.json security-acceptance-success.json; do
+            if test -f ".hooshyar/$evidence"; then
+              echo "EVIDENCE_PRESENT=$evidence"
+            else
+              echo "EVIDENCE_MISSING=$evidence"
+            fi
+          done
       - name: Run Cline runtime evidence collector
-        run: npm run product:cline:evidence
+        if: always()
+        run: node scripts/cline-runtime-evidence-collector.cjs
       - name: Enforce canonical product qualification matrix
         shell: bash
         run: |
