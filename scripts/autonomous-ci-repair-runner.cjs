@@ -274,7 +274,13 @@ async function main() {
     const factoryJobs = await getJson("https://api.github.com/repos/" + repo + "/actions/runs/" + targetRun.id + "/jobs?per_page=100");
     const productFactoryJob = (factoryJobs.jobs || []).find(job => job.name === "windows-product-factory");
     targetRun.productFactoryConclusion = productFactoryJob?.conclusion || "missing";
-    if (targetRun.productFactoryConclusion === "success") {
+    const evidenceOnlyJobs = new Set(["runtime-evidence-qualification", "release-gate"]);
+    const requiredRepairJobs = [...new Set(mission.failure.failedJobs.filter(name => !evidenceOnlyJobs.has(name)))];
+    targetRun.repairedJobs = requiredRepairJobs.map(name => {
+      const rerunJob = (factoryJobs.jobs || []).find(job => job.name === name);
+      return { name, conclusion: rerunJob?.conclusion || "missing", runId: Number(targetRun.id) };
+    });
+    if (targetRun.productFactoryConclusion === "success" && requiredRepairJobs.length > 0 && targetRun.repairedJobs.every(job => job.conclusion === "success")) {
       const changed = exec("git", ["diff", "--name-only", mission.commit, currentSha], { stdio: ["ignore", "pipe", "pipe"] });
       if ((changed.status ?? 1) !== 0) throw new Error("REPAIR_CHANGED_FILES_INSPECTION_FAILED");
       const changedPaths = (changed.stdout || "").split(/\r?\n/).map(value => value.trim()).filter(Boolean);

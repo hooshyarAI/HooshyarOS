@@ -257,7 +257,7 @@ jobs:
             if ! unzip -oq "${ZIP}" -d "/tmp/hooshyar-repair-evidence/${RUN_ID}"; then continue; fi
             SOURCE="/tmp/hooshyar-repair-evidence/${RUN_ID}/agent-repair-success.json"
             if [ ! -f "${SOURCE}" ]; then continue; fi
-            if jq -e --arg sha "${HEAD_SHA}" '.type=="ASSISTANT_REPAIR_MISSION_V1_RESULT" and .status=="PASS" and .commit==$sha and .repair.commit==$sha and .regression.status=="PASS" and .regression.fullJest=="PASS" and .regression.pythonSyntax=="PASS" and .factoryAcceptance.status=="PASS" and .factoryAcceptance.commit==$sha and .factoryAcceptance.productFactoryJob=="windows-product-factory" and .factoryAcceptance.productFactoryConclusion=="success" and .repair.changedFiles>0' "${SOURCE}" >/dev/null; then
+            if jq -e --arg sha "${HEAD_SHA}" '.type=="ASSISTANT_REPAIR_MISSION_V1_RESULT" and .status=="PASS" and .commit==$sha and .repair.commit==$sha and .regression.status=="PASS" and .regression.fullJest=="PASS" and .regression.pythonSyntax=="PASS" and .factoryAcceptance.status=="PASS" and .factoryAcceptance.commit==$sha and .factoryAcceptance.productFactoryJob=="windows-product-factory" and .factoryAcceptance.productFactoryConclusion=="success" and .repair.changedFiles>0 and ([.finding.failedJobs[] | select(. != "runtime-evidence-qualification" and . != "release-gate")] as $required | . as $e | ($required | length)>0 and all($required[]; . as $name | any($e.repair.repairedJobs[]?; .name==$name and .conclusion=="success" and .runId==$e.factoryAcceptance.runId)))' "${SOURCE}" >/dev/null; then
               cp "${SOURCE}" .hooshyar/agent-repair-success.json
               echo "AGENT_REPAIR_ARTIFACT=ACCEPTED run=${RUN_ID} artifact=${ARTIFACT_ID} commit=${HEAD_SHA}"
               exit 0
