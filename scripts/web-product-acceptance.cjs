@@ -154,12 +154,12 @@ async function main() {
     ]});
     const structuredIngest = await request('/api/ingest', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceName: 'web-qa.json', format: 'STRUCTURED', content: structured }) });
     if (structuredIngest.status !== 201 || structuredIngest.body.evidence?.sourceType !== 'STRUCTURED' || structuredIngest.body.source?.persisted !== true) throw new Error(`WEB_ACCEPTANCE_STRUCTURED_INGEST_FAILED:${structuredIngest.status}`);
-    const structuredAnalysis = await request('/api/financial/analyze', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceSha256: structuredIngest.body.evidence.sha256, assets: 10000, liabilities: 4000 }) });
+    const structuredAnalysis = await request('/api/financial/analyze', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceSha256: structuredIngest.body.evidence.sha256, assets: 10000, liabilities: 4000, revenue: 700, expenses: 0 }) });
     if (structuredAnalysis.status !== 200 || structuredAnalysis.body.status !== 'READY' || structuredAnalysis.body.targetEngine !== 'Financial Intelligence Engine') throw new Error(`WEB_ACCEPTANCE_STRUCTURED_ANALYSIS_FAILED:${structuredAnalysis.status}`);
 
     const xlsxIngest = await request('/api/ingest', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceName: 'web-qa.xlsx', format: 'XLSX', contentBase64: await createXlsxBase64() }) });
     if (xlsxIngest.status !== 201 || xlsxIngest.body.evidence?.sourceType !== 'XLSX' || xlsxIngest.body.totals?.debit !== 500 || xlsxIngest.body.totals?.credit !== 1500) throw new Error(`WEB_ACCEPTANCE_XLSX_INGEST_FAILED:${xlsxIngest.status}`);
-    const xlsxAnalysis = await request('/api/financial/analyze', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceSha256: xlsxIngest.body.evidence.sha256, assets: 10000, liabilities: 4000 }) });
+    const xlsxAnalysis = await request('/api/financial/analyze', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceSha256: xlsxIngest.body.evidence.sha256, assets: 10000, liabilities: 4000, revenue: 1000, expenses: 0 }) });
     if (xlsxAnalysis.status !== 200 || xlsxAnalysis.body.ingestedSource?.sourceType !== 'XLSX' || xlsxAnalysis.body.metrics?.profit !== 1000) throw new Error(`WEB_ACCEPTANCE_XLSX_ANALYSIS_FAILED:${xlsxAnalysis.status}`);
 
     // PDF capability: a real text-native PDF must ingest through the canonical
@@ -174,7 +174,7 @@ async function main() {
     const pdfIngest = await request('/api/ingest', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceName: 'web-qa.pdf', format: 'PDF', contentBase64: pdfBytes.toString('base64') }) });
     if (pdfIngest.status !== 201 || pdfIngest.body.evidence?.sourceType !== 'PDF' || pdfIngest.body.source?.sha256 !== pdfSha) throw new Error(`WEB_ACCEPTANCE_PDF_INGEST_FAILED:${pdfIngest.status}:${JSON.stringify(pdfIngest.body)}`);
     await sleep(1100);
-    const pdfAnalysis = await request('/api/financial/analyze', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceSha256: pdfIngest.body.evidence.sha256, assets: 10000, liabilities: 4000 }) });
+    const pdfAnalysis = await request('/api/financial/analyze', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceSha256: pdfIngest.body.evidence.sha256, assets: 10000, liabilities: 4000, revenue: 400, expenses: 0 }) });
     if (pdfAnalysis.status !== 200 || pdfAnalysis.body.status !== 'READY' || pdfAnalysis.body.ingestedSource?.sourceType !== 'PDF') throw new Error(`WEB_ACCEPTANCE_PDF_ANALYSIS_FAILED:${pdfAnalysis.status}:${JSON.stringify(pdfAnalysis.body)}`);
 
     const scannedBytes = buildLedgerScannedPdf(pdfCsv.split('\n'));
@@ -243,7 +243,7 @@ async function main() {
     // source before exercising analytics/report composition; otherwise later PDF
     // acceptance fixtures would make a correct source-isolation guard look broken.
     await sleep(1100);
-    const structuredSourceAnalysis = await request('/api/financial/analyze', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceSha256: structuredIngest.body.evidence.sha256, assets: 10000, liabilities: 4000 }) });
+    const structuredSourceAnalysis = await request('/api/financial/analyze', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceSha256: structuredIngest.body.evidence.sha256, assets: 10000, liabilities: 4000, revenue: 700, expenses: 0 }) });
     if (structuredSourceAnalysis.status !== 200 || structuredSourceAnalysis.body.status !== 'READY' || structuredSourceAnalysis.body.source?.sha256 !== structuredIngest.body.evidence.sha256) throw new Error(`WEB_ACCEPTANCE_ANALYTICS_SOURCE_RESELECT_FAILED:${structuredSourceAnalysis.status}:${JSON.stringify(structuredSourceAnalysis.body)}`);
     await sleep(1100);
     const analytics = await request('/api/financial/insights', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceSha256: structuredIngest.body.evidence.sha256, breakEven: { fixedCosts: 1000, variableCostPerUnit: 5, pricePerUnit: 10, unitsSold: 300 } }) });
