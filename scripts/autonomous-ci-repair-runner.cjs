@@ -284,7 +284,7 @@ async function main() {
       const changed = exec("git", ["diff", "--name-only", mission.commit, currentSha], { stdio: ["ignore", "pipe", "pipe"] });
       if ((changed.status ?? 1) !== 0) throw new Error("REPAIR_CHANGED_FILES_INSPECTION_FAILED");
       const changedPaths = (changed.stdout || "").split(/\r?\n/).map(value => value.trim()).filter(Boolean);
-      const evidenceRecord = buildRepairEvidence({ commit: currentSha, previousCommit: mission.commit, mission, missionId: fingerprint, changedFiles: changedPaths.length, regressionStatus: "PASS", pythonSyntaxStatus: "PASS", factoryRun: targetRun });
+      const evidenceRecord = buildRepairEvidence({ commit: currentSha, previousCommit: mission.commit, mission, missionId: fingerprint, changedFiles: changedPaths.length, regressionStatus: "PASS", pythonSyntaxStatus: "PASS", factoryRun: targetRun, repairedJobs: targetRun.repairedJobs });
       evidenceRecord.repair.changedPaths = changedPaths;
       const validation = validateRepairEvidence(evidenceRecord, currentSha);
       if (!validation.valid) throw new Error("AGENT_REPAIR_EVIDENCE_INVALID:" + validation.reason);
