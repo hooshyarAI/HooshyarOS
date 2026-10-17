@@ -104,9 +104,40 @@ async function main() {
     const session = await request('/api/session', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'web-qa', organization: 'Hooshyar Web QA' }) });
     if (session.status !== 201 || !session.body.tenantId || !session.setCookie) throw new Error(`WEB_ACCEPTANCE_SESSION_FAILED:${session.status}`);
     const cookie = session.setCookie.split(';')[0];
-    const csv = ['date,account,debit,credit,currency','2026-08-01,Cash,1000,0,IRR','2026-08-02,Sales,0,1500,IRR','2026-08-03,Expense,300,0,IRR','2026-08-04,Receivable,0,800,IRR'].join('\n');
-    const analysis = await request('/api/analyze', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ csv, sourceName: 'web-qa.csv', assets: 10000, liabilities: 4000 }) });
-    if (analysis.status !== 200 || analysis.body.status !== 'READY' || analysis.body.metrics.profit !== 1000) throw new Error(`WEB_ACCEPTANCE_ANALYSIS_FAILED:${analysis.status}`);
+    // Exercise the same canonical asynchronous-ingestion workflow as the Web UI.
+    // The legacy /api/analyze endpoint now fails closed when ledger income/expense
+    // classification is omitted, so acceptance must not call that obsolete path.
+    const csv = ['date,account,debit,credit,currency','2026-08-01,Cash,1000,0,IRR','2026-08-02,Sales,0,1500,IRR','2026-08-03,Expense,500,0,IRR','2026-08-04,Receivable,0,800,IRR'].join('\\n');
+    const ingestJob = await request('/api/ingest/jobs', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie, 'idempotency-key': 'acceptance:web-qa-ledger' },
+      body: JSON.stringify({ sourceName: 'web-qa.csv', format: 'CSV', content: csv })
+    });
+    if (ingestJob.status !== 202 || !ingestJob.body.jobId) {
+      throw new Error(`WEB_ACCEPTANCE_INGEST_JOB_CREATE_FAILED:${ingestJob.status}:${JSON.stringify(ingestJob.body)}`);
+    }
+    const ingestDeadline = Date.now() + 30000;
+    let completedJob = null;
+    while (Date.now() < ingestDeadline) {
+      const poll = await request(`/api/ingest/jobs/${encodeURIComponent(ingestJob.body.jobId)}`, { headers: { cookie } });
+      if (poll.status !== 200 || !poll.body.job) {
+        throw new Error(`WEB_ACCEPTANCE_INGEST_JOB_POLL_FAILED:${poll.status}:${JSON.stringify(poll.body)}`);
+      }
+      completedJob = poll.body.job;
+      if (completedJob.status === 'COMPLETED' || completedJob.status === 'FAILED') break;
+      await sleep(800);
+    }
+    if (!completedJob || completedJob.status !== 'COMPLETED' || !completedJob.result?.sha256) {
+      throw new Error(`WEB_ACCEPTANCE_INGEST_JOB_FAILED:${JSON.stringify(completedJob)}`);
+    }
+    const analysis = await request('/api/financial/analyze', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie },
+      body: JSON.stringify({ sourceSha256: completedJob.result.sha256, assets: 10000, liabilities: 4000, revenue: 1500, expenses: 500 })
+    });
+    if (analysis.status !== 200 || analysis.body.status !== 'READY' || analysis.body.metrics.profit !== 1000) {
+      throw new Error(`WEB_ACCEPTANCE_ANALYSIS_FAILED:${analysis.status}:${JSON.stringify(analysis.body)}`);
+    }
     const executive = await request('/api/executive/workbench', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ targets: { revenue: 2000, profit: 1200, profitMargin: 0.3, debtRatio: 0.25 } }) });
     if (executive.status !== 200 || executive.body.status !== 'READY' || !Array.isArray(executive.body.recommendations) || executive.body.recommendations.length !== 4) throw new Error(`WEB_ACCEPTANCE_EXECUTIVE_FAILED:${executive.status}`);
     const report = await request('/api/report', { headers: { cookie } });
