@@ -63,6 +63,10 @@ function decideQualification(matrix, evidence, currentCommit) {
     const cell = byId.get(required.id);
     const valid = cell && cell.status === 'PASS' &&
       cell.commitSha === currentCommit &&
+      cell.capability === required.capability &&
+      cell.environment === required.environment &&
+      cell.workflow === required.workflow &&
+      cell.evidenceKind === required.evidence &&
       typeof cell.target === 'string' && cell.target.trim().length > 0 &&
       typeof cell.evidenceRef === 'string' && cell.evidenceRef.trim().length > 0;
     if (!valid) blockers.push({
