@@ -47,7 +47,14 @@ function validateEvidenceReference(reference, currentCommit) {
   const relative = path.relative(root, resolved);
   if (!relative || relative.startsWith('..') || path.isAbsolute(relative) || !fs.existsSync(resolved)) return false;
   try {
-    const record = JSON.parse(fs.readFileSync(resolved, 'utf8'));
+    // Lexical containment does not stop an in-repository symlink from escaping
+    // the repository. Validate and read the canonical target path instead.
+    const realRoot = fs.realpathSync(root);
+    const realResolved = fs.realpathSync(resolved);
+    const realRelative = path.relative(realRoot, realResolved);
+    if (!realRelative || realRelative === '..' ||
+        realRelative.startsWith(`..${path.sep}`) || path.isAbsolute(realRelative)) return false;
+    const record = JSON.parse(fs.readFileSync(realResolved, 'utf8'));
     return record && record.commit === currentCommit && ['PASS', 'ACCEPTED'].includes(record.status);
   } catch {
     return false;

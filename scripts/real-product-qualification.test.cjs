@@ -1,5 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const { decideQualification, validateEvidenceReference } = require('./real-product-qualification.cjs');
 
 const currentCommit = 'a'.repeat(40);
@@ -116,6 +117,40 @@ describe('real product qualification fail-closed contract', () => {
       expect(validateEvidenceReference('https://example.invalid/evidence.json', currentCommit)).toBe(false);
     } finally {
       fs.rmSync(source, { force: true });
+    }
+  });
+
+  test('a symlink inside the repository cannot validate evidence outside it', () => {
+    const repoRoot = fs.realpathSync(process.cwd());
+    const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hooshyar-evidence-outside-'));
+    const outsideRoot = fs.realpathSync(outsideDir);
+    const outsideRelative = path.relative(repoRoot, outsideRoot);
+    const outsideIsWithinRepo = !outsideRelative ||
+      (!outsideRelative.startsWith('..') && !path.isAbsolute(outsideRelative));
+    if (outsideIsWithinRepo) {
+      fs.rmSync(outsideDir, { recursive: true, force: true });
+      throw new Error('Could not create an outside-repository fixture for symlink containment test');
+    }
+
+    const insideDir = path.join(process.cwd(), '.hooshyar');
+    fs.mkdirSync(insideDir, { recursive: true });
+    const linkPath = path.join(insideDir, 'qualification-reference-escape');
+    fs.writeFileSync(
+      path.join(outsideDir, 'outside-evidence.json'),
+      JSON.stringify({ commit: currentCommit, status: 'PASS' })
+    );
+    let linkCreated = false;
+    try {
+      fs.symlinkSync(outsideDir, linkPath, process.platform === 'win32' ? 'junction' : 'dir');
+      linkCreated = true;
+      const reference = path.relative(
+        process.cwd(),
+        path.join(linkPath, 'outside-evidence.json')
+      );
+      expect(validateEvidenceReference(reference, currentCommit)).toBe(false);
+    } finally {
+      if (linkCreated) fs.rmSync(linkPath, { recursive: true, force: true });
+      fs.rmSync(outsideDir, { recursive: true, force: true });
     }
   });
 
