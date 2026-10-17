@@ -3,9 +3,9 @@ const { decideQualification } = require('./real-product-qualification.cjs');
 const currentCommit = 'a'.repeat(40);
 const matrix = {
   required: [
-    { id: 'win-core' },
-    { id: 'win-business' },
-    { id: 'web-core' }
+    { id: 'win-core', capability: 'commercial-runtime', environment: 'windows', workflow: 'launch-health-ready', evidence: 'runtime' },
+    { id: 'win-business', capability: 'financial-platform', environment: 'windows', workflow: 'login-tenant-ingest-analyze-dashboard', evidence: 'application' },
+    { id: 'web-core', capability: 'commercial-runtime', environment: 'web', workflow: 'launch-health-ready-ui', evidence: 'runtime' }
   ]
 };
 
@@ -16,7 +16,11 @@ function passingEvidence() {
       id: cell.id,
       status: 'PASS',
       commitSha: currentCommit,
-      target: 'CI acceptance runner',
+      capability: cell.capability,
+      environment: cell.environment,
+      workflow: cell.workflow,
+      evidenceKind: cell.evidence,
+      target: cell.environment === 'windows' ? 'Windows runner' : 'Web CI runner',
       evidenceRef: `artifact://${cell.id}`
     }))
   };
@@ -57,6 +61,14 @@ describe('real product qualification fail-closed contract', () => {
       reason: 'ALL_REQUIRED_CELLS_HAVE_CURRENT_COMMIT_EVIDENCE',
       blockers: []
     });
+  });
+
+  test('evidence for a different matrix workflow cannot satisfy a required cell', () => {
+    const evidence = passingEvidence();
+    evidence.cells[0].workflow = 'unrelated-check';
+    const result = decideQualification(matrix, evidence, currentCommit);
+    expect(result.status).toBe('BLOCKED');
+    expect(result.blockers).toContainEqual({ id: 'win-core', status: 'PASS' });
   });
 
   test('missing target or evidence reference cannot qualify a cell', () => {
