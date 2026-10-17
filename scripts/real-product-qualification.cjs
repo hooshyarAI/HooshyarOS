@@ -106,16 +106,18 @@ function readJsonIfPresent(file) {
   catch { return null; }
 }
 
-function main() {
+function main(options = {}) {
   console.log(JSON.stringify({
     type: 'REAL_PRODUCT_QUALIFICATION_START',
     repository: root,
     law: path.join(root, 'Docs', 'REAL_PRODUCT_OPERATION_LAW.md')
   }));
 
-  for (const [label, args] of steps) {
-    const exitCode = run(label, args);
-    if (exitCode !== 0) return exitCode;
+  if (options.runAcceptanceSteps !== false) {
+    for (const [label, args] of steps) {
+      const exitCode = run(label, args);
+      if (exitCode !== 0) return exitCode;
+    }
   }
 
   const matrixPath = path.join(root, 'Docs', 'Product', 'PRODUCT_QUALIFICATION_MATRIX.json');
@@ -159,6 +161,9 @@ function main() {
   return 0;
 }
 
-if (require.main === module) process.exit(main());
+if (require.main === module) {
+  const matrixOnly = process.argv.includes('--matrix-only');
+  process.exit(main({ runAcceptanceSteps: !matrixOnly }));
+}
 
 module.exports = { launchNpm, run, steps, main, decideQualification, validateEvidenceReference };

@@ -270,28 +270,8 @@ jobs:
         if: always()
         run: node scripts/cline-runtime-evidence-collector.cjs
       - name: Enforce canonical product qualification matrix
-        shell: bash
-        run: |
-          node <<'NODE'
-          const fs = require('node:fs');
-          const cp = require('node:child_process');
-          const matrix = JSON.parse(fs.readFileSync('Docs/Product/PRODUCT_QUALIFICATION_MATRIX.json', 'utf8'));
-          const evidence = JSON.parse(fs.readFileSync('.hooshyar/cline-runtime-evidence.json', 'utf8'));
-          const commit = cp.execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-          const cells = Array.isArray(evidence.cells) ? evidence.cells : [];
-          const byId = new Map(cells.map(cell => [cell && cell.id, cell]));
-          const blockers = matrix.required.filter(required => {
-            const cell = byId.get(required.id);
-            return !cell || cell.status !== 'PASS' || cell.commitSha !== commit ||
-              cell.capability !== required.capability || cell.environment !== required.environment ||
-              cell.workflow !== required.workflow || cell.evidenceKind !== required.evidence ||
-              typeof cell.target !== 'string' || !cell.target.trim() ||
-              typeof cell.evidenceRef !== 'string' || !cell.evidenceRef.trim();
-          }).map(cell => cell.id);
-          const decision = { status: blockers.length === 0 && evidence.commitSha === commit ? 'PASS' : 'BLOCKED', commit, blockers };
-          console.log(JSON.stringify({ type: 'PRODUCT_QUALIFICATION_MATRIX', ...decision }, null, 2));
-          if (decision.status !== 'PASS') process.exit(2);
-          NODE
+        run: node scripts/real-product-qualification.cjs --matrix-only
+
       - name: Upload consolidated qualification evidence
         if: always()
         uses: actions/upload-artifact@v7
