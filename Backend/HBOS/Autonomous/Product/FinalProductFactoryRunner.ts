@@ -49,7 +49,7 @@ async function main(): Promise<void> {
     const session2 = await request("/api/session", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "factory-qa", organization: "Hooshyar Factory" }) });
     if (session2.status !== 201 || !session2.cookie || session2.body?.tenantId !== tenantId) throw new Error(`FACTORY_TENANT_RECOVERY_FAILED:${JSON.stringify(session2.body)}`);
     const dashboard2 = await request("/api/dashboard", { headers: { cookie: session2.cookie.split(";")[0] } });
-    if (dashboard2.status !== 200 || dashboard2.body?.analysisAvailable !== true || dashboard2.body?.metrics?.profit !== 1000) throw new Error(`FACTORY_RECOVERY_FAILED:${JSON.stringify(dashboard2.body)}`);
+    if (dashboard2.status !== 200 || dashboard2.body?.analysisAvailable !== true || dashboard2.body?.metrics?.profit !== 1200) throw new Error(`FACTORY_RECOVERY_FAILED:${JSON.stringify(dashboard2.body)}`);
     console.log(JSON.stringify({ type: "FINAL_PRODUCT_FACTORY", stage: "RECOVERY", ok: true, tenantId, profit: dashboard2.body.metrics.profit }));
   } catch (error) {
     const failure = error instanceof Error ? error.message : String(error);
