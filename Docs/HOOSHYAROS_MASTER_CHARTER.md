@@ -448,6 +448,26 @@ Unapproved external coding assistants and code-generation providers remain prohi
 
 Provider-facing abstractions may exist inside the finished product where an approved runtime architecture requires them, but such providers must never become dependencies of the autonomous construction fabric.
 
+### Specialist Capability Routing and Evidence-First Use — PERMANENT
+
+**Mandatory entry gate.** Before any substantive audit, diagnosis, edit, repair, test, review or release-readiness judgment in an AI-assisted engineering session, complete a task-specific capability-routing check before acting.
+
+**Scope.** When the host environment exposes specialist plugins, skills or tools, the Assistant must actively use relevant capabilities where they materially improve correctness, speed or quality. This is a session-workflow rule: it does not add construction authorities, approve an unapproved external coding agent, change the canonical Python/GitHub/Assistant construction toolchain, or make plugins product-runtime dependencies.
+
+**Required method:**
+
+1. **Recover authority and scope.** Establish the user's present objective, current work mode, scope and authorization. Read the governing charter and applicable repository instructions; use current branch, commit, diff, test and provider state where available. Repository/project authorities and explicit user decisions outrank conversational recollection and model inference.
+2. **Inspect real capabilities.** Inspect the currently available plugin/skill/tool catalog relevant to this host and read the instructions for each materially relevant specialist capability. Do not infer capability from a name, marketing description, historical use or model memory.
+3. **Route the smallest sufficient set.** Choose only the specialist capabilities that materially serve this task—such as project/session orchestration, code/security review, repository operations, implementation, focused testing, performance measurement or evidence stewardship. Do not invoke every plugin ceremonially. Parallelize only independent work that preserves evidence quality; serialize conflicting writes and stateful provider operations.
+4. **Use, do not merely name.** Invoke the selected capabilities for real task work. Reading a skill's instructions is preparation, not proof that its plugin was used. Cross-check plugin/model conclusions against current repository or provider output, exact diffs, and fresh executable evidence where available.
+5. **Replace guesswork with bounded diagnosis.** Each diagnostic experiment must state its hypothesis, expected observation, allowed scope and stop/acceptance condition. No unbounded trial-and-error, repeated unchanged retries, or speculative edits. Change the next action only when new evidence justifies it.
+6. **Keep evidence categories separate.** Distinguish FACT, ASSUMPTION, HYPOTHESIS, DECISION and MEASURED RESULT. Preserve contradictions and uncertainty rather than filling evidence gaps with plausible inference. A plugin's conclusion is not, by itself, authoritative proof.
+7. **Edit and verify proportionally.** For an authorized change, make the smallest coherent diff, preserve unrelated work, run risk-proportional independent verification and inspect the final diff/state. Never claim that a tool was used, a test passed, a defect was fixed, or a commit/push/completion occurred unless direct evidence supports that exact claim.
+8. **Handle limits honestly.** If a relevant plugin is unavailable, lacks permission, cannot reach the required source, or adds no material value, record the limitation briefly and use the safest useful alternative. Never invent tool access or tool use. Do not install another plugin or introduce a new service/dependency without the required authorization.
+9. **Preserve human and repository authority.** Plugin/tool availability is capability, not permission. It does not independently authorize source changes, dependency installation, commits, pushes, pull requests, CI cancellation, merges, deployments or other consequential actions. Follow the current user authorization and repository contracts. Specialist plugins remain subordinate capabilities and may not override Architecture Freeze V4, governance, security, product semantics, approved tooling boundaries or evidence integrity.
+
+**Efficient continuity.** Once routing is established for a continuing task, retain the selected capabilities while its objective, scope, risk, authority and available tools remain stable. Re-check when one of those materially changes; do not rescan the entire catalog or repeat completed checks without a decision-relevant reason.
+
 ---
 
 ## 10. Self-Healing Algorithm

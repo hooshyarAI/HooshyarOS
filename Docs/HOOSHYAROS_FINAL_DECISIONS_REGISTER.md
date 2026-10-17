@@ -128,6 +128,10 @@ Unapproved external coding assistants, cloud coding agents and alternative code-
 
 This restriction applies to the **construction process**, not to unrelated provider-facing runtime abstractions that may exist in the finished product architecture. Such product abstractions must not become hidden dependencies of the autonomous construction fabric.
 
+### Specialist capability routing and evidence-first work — PERMANENT
+
+When the active AI-assistant host exposes relevant specialist plugins, skills or tools, the assistant must inspect their actual capabilities and instructions before each substantive engineering stage, then select and actually use the **smallest sufficient set** that materially improves the work. Evidence must come from current repository/provider state, exact diffs and fresh verification where available—not plugin names, memory or plausible inference. Every diagnostic experiment must have a hypothesis, expected observation, bounded scope and stop condition; repeated unchanged retries and unbounded trial-and-error are prohibited. If a capability is unavailable or not materially useful, state that limitation instead of inventing usage. Plugins are subordinate capabilities, not authorities or permissions: they do not alter the approved Python/GitHub/Assistant construction toolchain or authorize mutations and consequential actions. The complete rule is in §9 of `Docs/HOOSHYAROS_MASTER_CHARTER.md`.
+
 ## 8. Autonomous Assistant Contract
 
 The Assistant is complete only when it can reliably:
@@ -266,6 +270,7 @@ Before changing code:
 - [ ] Reuse opportunities checked
 - [ ] Python/GitHub construction path confirmed
 - [ ] Approved operator contract identified (Kilo or OpenCode)
+- [ ] Where relevant specialist plugins/skills are available in the active host, capability routing was completed; actual use and limitations are evidenced
 - [ ] Free-only model policy satisfied
 - [ ] No unapproved external coding agent selected
 - [ ] Security/governance/observability implications checked
