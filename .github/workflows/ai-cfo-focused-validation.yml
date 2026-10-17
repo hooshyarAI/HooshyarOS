@@ -5,6 +5,7 @@ on:
     paths:
       - ".github/workflows/ai-cfo-focused-validation.yml"
       - "Backend/HBOS/Engines/KnowledgeEngine.ts"
+      - "Backend/HBOS/Engines/IntelligenceEngine.ts"
       - "Backend/HBOS/Product/CognitiveOrchestrationService.ts"
       - "Backend/HBOS/test/KnowledgeEngine.AICFOSkillPack.test.ts"
       - "Backend/HBOS/test/CognitiveOrchestrationService.AICFOSkillPack.test.ts"
@@ -13,6 +14,7 @@ on:
       - fix/autonomous-product-factory
     paths:
       - "Backend/HBOS/Engines/KnowledgeEngine.ts"
+      - "Backend/HBOS/Engines/IntelligenceEngine.ts"
       - "Backend/HBOS/Product/CognitiveOrchestrationService.ts"
       - "Backend/HBOS/test/KnowledgeEngine.AICFOSkillPack.test.ts"
       - "Backend/HBOS/test/CognitiveOrchestrationService.AICFOSkillPack.test.ts"
