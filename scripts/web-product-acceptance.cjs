@@ -128,8 +128,8 @@ async function main() {
 
     const xlsxIngest = await request('/api/ingest', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceName: 'web-qa.xlsx', format: 'XLSX', contentBase64: await createXlsxBase64() }) });
     if (xlsxIngest.status !== 201 || xlsxIngest.body.evidence?.sourceType !== 'XLSX' || xlsxIngest.body.totals?.debit !== 500 || xlsxIngest.body.totals?.credit !== 1500) throw new Error(`WEB_ACCEPTANCE_XLSX_INGEST_FAILED:${xlsxIngest.status}`);
-    const xlsxAnalysis = await request('/api/financial/analyze', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceSha256: xlsxIngest.body.evidence.sha256, assets: 10000, liabilities: 4000, revenue: 1500, expenses: 500 }) });
-    if (xlsxAnalysis.status !== 200 || xlsxAnalysis.body.ingestedSource?.sourceType !== 'XLSX' || xlsxAnalysis.body.metrics?.profit !== 1000) throw new Error(`WEB_ACCEPTANCE_XLSX_ANALYSIS_FAILED:${xlsxAnalysis.status}`);
+    const xlsxAnalysis = await request('/api/financial/analyze', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ sourceSha256: xlsxIngest.body.evidence.sha256, assets: 10000, liabilities: 4000, revenue: 1000, expenses: 500 }) });
+    if (xlsxAnalysis.status !== 200 || xlsxAnalysis.body.ingestedSource?.sourceType !== 'XLSX' || xlsxAnalysis.body.metrics?.profit !== 500) throw new Error(`WEB_ACCEPTANCE_XLSX_ANALYSIS_FAILED:${xlsxAnalysis.status}`);
 
     // PDF capability: a real text-native PDF must ingest through the canonical
     // runtime and reach canonical financial analysis; a real scanned/image-only
