@@ -95,13 +95,13 @@ async function main() {
       const cookie = session.cookie.split(';')[0];
       const csv = [
         'date,account,debit,credit,currency',
-        `2026-08-01,Cash,${debit},0,IRR`,
+        `2026-08-01,Expense,${debit},0,IRR`,
         `2026-08-02,Sales,0,${credit},IRR`
       ].join('\n');
       const analysis = await request('/api/analyze', {
         method: 'POST',
         headers: { 'content-type': 'application/json', cookie },
-        body: JSON.stringify({ csv, sourceName, assets: 10000, liabilities: 2500 })
+        body: JSON.stringify({ csv, sourceName, assets: 10000, liabilities: 2500, revenue: credit, expenses: debit })
       });
       if (analysis.status !== 200 || analysis.body.status !== 'READY') throw new Error(`SECURITY_ANALYSIS_FAILED:${organization}`);
       return { tenantId: session.body.tenantId, cookie, expectedProfit: credit - debit };

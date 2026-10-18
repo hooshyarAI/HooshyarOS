@@ -347,7 +347,7 @@ describe("Phase 08-09 Operational Closure", () => {
       const analysis = await fetch(`http://127.0.0.1:${address.port}/api/analyze`, {
         method: "POST",
         headers: { "content-type": "application/json", cookie: cookie!.split(";")[0] },
-        body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250 }),
+        body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 1000, liabilities: 250, revenue: 1250, expenses: 0 }),
       });
       expect(analysis.status).toBe(200);
       const result = await analysis.json() as { status: string; tenantId: string; metrics: { profit: number; debtRatio: number } };
