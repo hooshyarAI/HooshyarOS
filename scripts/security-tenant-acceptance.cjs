@@ -95,7 +95,7 @@ async function main() {
       const cookie = session.cookie.split(';')[0];
       const csv = [
         'date,account,debit,credit,currency',
-        `2026-08-01,Cash,${debit},0,IRR`,
+        `2026-08-01,Expense,${debit},0,IRR`,
         `2026-08-02,Sales,0,${credit},IRR`
       ].join('\n');
       const analysis = await request('/api/analyze', {
