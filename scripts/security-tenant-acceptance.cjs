@@ -98,12 +98,28 @@ async function main() {
         `2026-08-01,Cash,${debit},0,IRR`,
         `2026-08-02,Sales,0,${credit},IRR`
       ].join('\n');
-      const analysis = await request('/api/analyze', {
+      const ingest = await request('/api/ingest/jobs', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', cookie, 'idempotency-key': `acceptance:${username}-ledger` },
+        body: JSON.stringify({ sourceName, format: 'CSV', content: csv })
+      });
+      if (ingest.status !== 202 || !ingest.body.jobId) throw new Error(`SECURITY_INGEST_CREATE_FAILED:${organization}:${ingest.status}`);
+      const deadline = Date.now() + 30000;
+      let completedJob = null;
+      while (Date.now() < deadline) {
+        const poll = await request(`/api/ingest/jobs/${encodeURIComponent(ingest.body.jobId)}`, { headers: { cookie } });
+        if (poll.status !== 200 || !poll.body.job) throw new Error(`SECURITY_INGEST_POLL_FAILED:${organization}:${poll.status}`);
+        completedJob = poll.body.job;
+        if (completedJob.status === 'COMPLETED' || completedJob.status === 'FAILED') break;
+        await sleep(800);
+      }
+      if (!completedJob || completedJob.status !== 'COMPLETED' || !completedJob.result?.sha256) throw new Error(`SECURITY_INGEST_FAILED:${organization}:${JSON.stringify(completedJob)}`);
+      const analysis = await request('/api/financial/analyze', {
         method: 'POST',
         headers: { 'content-type': 'application/json', cookie },
-        body: JSON.stringify({ csv, sourceName, assets: 10000, liabilities: 2500 })
+        body: JSON.stringify({ sourceSha256: completedJob.result.sha256, assets: 10000, liabilities: 2500, revenue: credit, expenses: debit })
       });
-      if (analysis.status !== 200 || analysis.body.status !== 'READY') throw new Error(`SECURITY_ANALYSIS_FAILED:${organization}`);
+      if (analysis.status !== 200 || analysis.body.status !== 'READY') throw new Error(`SECURITY_ANALYSIS_FAILED:${organization}:${analysis.status}:${JSON.stringify(analysis.body)}`);
       return { tenantId: session.body.tenantId, cookie, expectedProfit: credit - debit };
     };
 

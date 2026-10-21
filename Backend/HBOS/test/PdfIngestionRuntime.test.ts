@@ -353,7 +353,7 @@ describe("PDF ingestion — real HTTP runtime endpoints", () => {
     const analysis = await request("/api/financial/analyze", {
       method: "POST",
       headers: { "content-type": "application/json", cookie },
-      body: JSON.stringify({ sourceSha256: body.evidence.sha256, assets: 5000, liabilities: 1000 }),
+      body: JSON.stringify({ sourceSha256: body.evidence.sha256, assets: 5000, liabilities: 1000, revenue: 1250, expenses: 0 }),
     });
     expect(analysis.status).toBe(200);
     const analysisBody = await analysis.json();

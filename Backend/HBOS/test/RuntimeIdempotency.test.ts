@@ -115,7 +115,7 @@ describe("standardization.idempotency — runtime mutation contract", () => {
     };
 
     const seedAnalysis = async (cookie: string) => {
-        const analysis = await postWithKey("/api/analyze", cookie, { csv: CSV, sourceName: "ledger.csv", assets: 10000, liabilities: 2500 });
+        const analysis = await postWithKey("/api/analyze", cookie, { csv: CSV, sourceName: "ledger.csv", assets: 10000, liabilities: 2500, revenue: 1000, expenses: 0 });
         expect(analysis.status).toBe(200);
     };
 
@@ -303,7 +303,7 @@ describe("standardization.idempotency — durable replay across restart", () => 
             const analysis = await request(first, "/api/analyze", {
                 method: "POST",
                 headers: { "content-type": "application/json", cookie },
-                body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 10000, liabilities: 2500 }),
+                body: JSON.stringify({ csv: CSV, sourceName: "ledger.csv", assets: 10000, liabilities: 2500, revenue: 1000, expenses: 0 }),
             });
             expect(analysis.status).toBe(200);
 

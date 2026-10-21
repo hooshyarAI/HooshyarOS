@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const cp = require("node:child_process");
 const crypto = require("node:crypto");
+const { buildRepairEvidence, validateRepairEvidence } = require("./agent-repair-evidence-contract.cjs");
 
 const root = process.cwd();
 const repo = process.env.GITHUB_REPOSITORY || "hooshyarAI/HooshyarOS";
@@ -59,11 +60,44 @@ function normalizeCommand(command, args, platform = process.platform) {
   return { command, args };
 }
 
+const GITHUB_CREDENTIAL_ENV_KEYS = [
+  "GITHUB_TOKEN",
+  "GH_TOKEN",
+  "GITHUB_ENTERPRISE_TOKEN",
+  "GH_ENTERPRISE_TOKEN",
+  "ACTIONS_RUNTIME_TOKEN",
+  "ACTIONS_ID_TOKEN_REQUEST_TOKEN",
+  "ACTIONS_ID_TOKEN_REQUEST_URL",
+  "ACTIONS_CACHE_URL",
+  "ACTIONS_RESULTS_URL",
+  "GIT_ASKPASS",
+  "GIT_CONFIG_COUNT",
+  "GIT_CONFIG_KEY_0",
+  "GIT_CONFIG_VALUE_0"
+];
+
+function buildUnprivilegedEnv(sourceEnv = process.env) {
+  const env = { ...sourceEnv };
+  for (const key of GITHUB_CREDENTIAL_ENV_KEYS) delete env[key];
+  return env;
+}
+
+function buildGitPushEnv(sourceEnv = process.env) {
+  const token = sourceEnv.GITHUB_TOKEN || sourceEnv.GH_TOKEN;
+  if (!token) throw new Error("GITHUB_PUSH_TOKEN_MISSING");
+  const env = buildUnprivilegedEnv(sourceEnv);
+  env.GIT_CONFIG_COUNT = "1";
+  env.GIT_CONFIG_KEY_0 = "http.https://github.com/.extraheader";
+  env.GIT_CONFIG_VALUE_0 = "AUTHORIZATION: basic " +
+    Buffer.from("x-access-token:" + token).toString("base64");
+  return env;
+}
+
 function exec(command, args, options = {}) {
   const normalized = normalizeCommand(command, args);
   return cp.spawnSync(normalized.command, normalized.args, {
     cwd: root,
-    env: process.env,
+    env: options.env || buildUnprivilegedEnv(process.env),
     encoding: "utf8",
     stdio: options.stdio || "inherit",
     shell: false,
@@ -214,16 +248,28 @@ function gitStatus() {
     "--untracked-files=all",
     "--",
     ".",
+    ":(exclude).kilo",
+    ":(exclude).hooshyar",
     ":(exclude)node_modules"
   ], { stdio: ["ignore", "pipe", "pipe"] });
+}
+
+function assertCleanRepairBaseline(statusResult) {
+  if (!statusResult || statusResult.status !== 0 || statusResult.error) {
+    throw new Error("AUTONOMOUS_REPAIR_CLEAN_BASELINE_CHECK_FAILED");
+  }
+  if ((statusResult.stdout || "").trim()) {
+    throw new Error("AUTONOMOUS_REPAIR_BLOCKED_PREEXISTING_WORKTREE_CHANGES");
+  }
+  return true;
 }
 
 function commitPush() {
   const status = gitStatus();
   if ((status.stdout || "").trim() === "") throw new Error("KILO_PRODUCED_NO_REPOSITORY_CHANGE");
-  if ((exec("git", ["add", "--all", "--", ".", ":(exclude).kilo", ":(exclude)node_modules"]).status ?? 1) !== 0) throw new Error("git add failed");
+  if ((exec("git", ["add", "--all", "--", ".", ":(exclude).kilo", ":(exclude).hooshyar", ":(exclude)node_modules"]).status ?? 1) !== 0) throw new Error("git add failed");
   if ((exec("git", ["commit", "-m", "fix(autonomous): repair CI failure from feedback"]).status ?? 1) !== 0) throw new Error("git commit failed");
-  if ((exec("git", ["push", "origin", "HEAD:" + branch]).status ?? 1) !== 0) throw new Error("git push failed");
+  if ((exec("git", ["push", "origin", "HEAD:" + branch], { env: buildGitPushEnv() }).status ?? 1) !== 0) throw new Error("git push failed");
   return (exec("git", ["rev-parse", "HEAD"], { stdio: ["ignore", "pipe", "pipe"] }).stdout || "").trim();
 }
 
@@ -250,11 +296,11 @@ async function main() {
       handoff
     }));
 
+    // Do not let the agent commit changes already present in the checkout.
+    // Ignore only generated local state; fail closed on every other dirty path.
+    assertCleanRepairBaseline(gitStatus());
     const kilo = runKilo(handoff);
     if (kilo.code !== 0) throw new Error("KILO_REPAIR_FAILED:" + kilo.code + "\n" + kilo.output);
-
-    const evidence = exec(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "product:agent:evidence"]);
-    if ((evidence.status ?? 1) !== 0) throw new Error("AGENT_REPAIR_EVIDENCE_INVALID");
 
     const py = exec(process.env.HOOSHYAR_PYTHON || "python", ["-m", "compileall", "-q", "Backend/AI_Runtime"]);
     if ((py.status ?? 1) !== 0) throw new Error("PYTHON_SYNTAX_VERIFY_FAILED");
@@ -273,7 +319,28 @@ async function main() {
 
     await dispatchFactory(branch);
     targetRun = await waitForFactory(currentSha);
-    if (targetRun.conclusion === "success") {
+    const factoryJobs = await getJson("https://api.github.com/repos/" + repo + "/actions/runs/" + targetRun.id + "/jobs?per_page=100");
+    const productFactoryJob = (factoryJobs.jobs || []).find(job => job.name === "windows-product-factory");
+    targetRun.productFactoryConclusion = productFactoryJob?.conclusion || "missing";
+    const evidenceOnlyJobs = new Set(["runtime-evidence-qualification", "release-gate"]);
+    const requiredRepairJobs = [...new Set(mission.failure.failedJobs.filter(name => !evidenceOnlyJobs.has(name)))];
+    targetRun.repairedJobs = requiredRepairJobs.map(name => {
+      const rerunJob = (factoryJobs.jobs || []).find(job => job.name === name);
+      return { name, conclusion: rerunJob?.conclusion || "missing", runId: Number(targetRun.id) };
+    });
+    if (targetRun.productFactoryConclusion === "success" && requiredRepairJobs.length > 0 && targetRun.repairedJobs.every(job => job.conclusion === "success")) {
+      const changed = exec("git", ["diff", "--name-only", mission.commit, currentSha], { stdio: ["ignore", "pipe", "pipe"] });
+      if ((changed.status ?? 1) !== 0) throw new Error("REPAIR_CHANGED_FILES_INSPECTION_FAILED");
+      const changedPaths = (changed.stdout || "").split(/\r?\n/).map(value => value.trim()).filter(Boolean);
+      const evidenceRecord = buildRepairEvidence({ commit: currentSha, previousCommit: mission.commit, mission, missionId: fingerprint, changedFiles: changedPaths.length, regressionStatus: "PASS", pythonSyntaxStatus: "PASS", factoryRun: targetRun, repairedJobs: targetRun.repairedJobs });
+      evidenceRecord.repair.changedPaths = changedPaths;
+      const validation = validateRepairEvidence(evidenceRecord, currentSha);
+      if (!validation.valid) throw new Error("AGENT_REPAIR_EVIDENCE_INVALID:" + validation.reason);
+      const evidenceDir = path.join(root, ".hooshyar");
+      fs.mkdirSync(evidenceDir, { recursive: true });
+      fs.writeFileSync(path.join(evidenceDir, "agent-repair-success.json"), JSON.stringify(evidenceRecord, null, 2) + "\n", "utf8");
+      const evidenceCheck = exec(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "product:agent:evidence"]);
+      if ((evidenceCheck.status ?? 1) !== 0) throw new Error("AGENT_REPAIR_EVIDENCE_INVALID_AFTER_FACTORY_ACCEPTANCE");
       console.log(JSON.stringify({
         type: "AUTONOMOUS_CI_REPAIR_COMPLETE",
         attempts: attempt,
@@ -293,4 +360,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { normalizeCommand, exec, buildKiloInvocation };
+module.exports = { normalizeCommand, exec, buildKiloInvocation, assertCleanRepairBaseline, buildUnprivilegedEnv, buildGitPushEnv };

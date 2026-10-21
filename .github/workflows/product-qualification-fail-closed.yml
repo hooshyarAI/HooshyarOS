@@ -1,0 +1,89 @@
+name: Product Qualification Fail-Closed Validation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/product-qualification-fail-closed.yml"
+      - ".github/workflows/autonomous-ci-repair.yml"
+      - ".github/workflows/final-product-factory.yml"
+      - "scripts/autonomous-ci-repair-runner.cjs"
+      - "scripts/autonomous-ci-repair-runner.test.cjs"
+      - "scripts/real-product-qualification.cjs"
+      - "scripts/session-rate-limit-pacer.cjs"
+      - "scripts/session-rate-limit-pacer.test.cjs"
+      - "scripts/full-suite-evidence.cjs"
+      - "scripts/full-suite-evidence.test.cjs"
+      - "scripts/real-product-qualification.test.cjs"
+      - "scripts/cline-runtime-evidence-collector.cjs"
+      - "scripts/cline-runtime-evidence-collector.test.js"
+      - "scripts/agent-repair-evidence-contract.cjs"
+      - "scripts/agent-repair-evidence-contract.test.cjs"
+      - "scripts/agent-repair-evidence-check.cjs"
+      - "scripts/autonomous-ci-repair-policy.cjs"
+      - "scripts/autonomous-ci-repair-policy.test.cjs"
+      - "Docs/Product/PRODUCT_QUALIFICATION_MATRIX.json"
+  pull_request:
+    branches:
+      - fix/autonomous-product-factory
+    paths:
+      - ".github/workflows/product-qualification-fail-closed.yml"
+      - ".github/workflows/autonomous-ci-repair.yml"
+      - ".github/workflows/final-product-factory.yml"
+      - "scripts/autonomous-ci-repair-runner.cjs"
+      - "scripts/autonomous-ci-repair-runner.test.cjs"
+      - "scripts/real-product-qualification.cjs"
+      - "scripts/session-rate-limit-pacer.cjs"
+      - "scripts/session-rate-limit-pacer.test.cjs"
+      - "scripts/full-suite-evidence.cjs"
+      - "scripts/full-suite-evidence.test.cjs"
+      - "scripts/real-product-qualification.test.cjs"
+      - "scripts/cline-runtime-evidence-collector.cjs"
+      - "scripts/cline-runtime-evidence-collector.test.js"
+      - "scripts/agent-repair-evidence-contract.cjs"
+      - "scripts/agent-repair-evidence-contract.test.cjs"
+      - "scripts/agent-repair-evidence-check.cjs"
+      - "Docs/Product/PRODUCT_QUALIFICATION_MATRIX.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: product-qualification-fail-closed-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualification-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Test fail-closed qualification contract
+        run: >-
+          node ./node_modules/jest/bin/jest.js
+          --runInBand
+          --runTestsByPath
+          scripts/real-product-qualification.test.cjs
+          scripts/cline-runtime-evidence-collector.test.js
+          scripts/full-suite-evidence.test.cjs
+          scripts/agent-repair-evidence-contract.test.cjs
+          scripts/autonomous-ci-repair-policy.test.cjs
+          scripts/session-rate-limit-pacer.test.cjs
+          scripts/autonomous-ci-repair-runner.test.cjs
+      - name: Syntax-check evidence pipeline
+        run: >-
+          node --check scripts/agent-repair-evidence-check.cjs &&
+          node --check scripts/agent-repair-evidence-contract.cjs &&
+          node --check scripts/cline-runtime-evidence-collector.cjs &&
+          node --check scripts/autonomous-ci-repair-runner.cjs

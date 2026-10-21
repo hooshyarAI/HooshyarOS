@@ -15,7 +15,7 @@ const branch = (branchResult.stdout || "").trim();
 const maxAttempts = Number(process.env.HOOSHYAR_CI_REPAIR_MAX_ATTEMPTS || 12);
 const pollSeconds = Number(process.env.HOOSHYAR_CI_REPAIR_POLL_SECONDS || 15);
 
-if (!branch || branch === "main" || branch === "master") {
+if (require.main === module && (!branch || branch === "main" || branch === "master")) {
     console.error(JSON.stringify({ type: "AUTONOMOUS_CI_REPAIR_BLOCKED", reason: "UNSAFE_BRANCH", branch }));
     process.exit(2);
 }
