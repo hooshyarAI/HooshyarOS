@@ -6,8 +6,19 @@ permissions:
 
 on:
   pull_request:
-    branches: [main, fix/autonomous-product-factory]
+    branches: [main, fix/autonomous-product-factory, fix/qualification-runner-fail-closed]
   workflow_dispatch:
+    inputs:
+      agent_repair_run_id:
+        description: "Trusted, active opt-in repair workflow run ID for evidence-bound requalification."
+        type: string
+        required: false
+        default: ""
+      expected_head_sha:
+        description: "Exact target branch SHA to qualify during opt-in requalification."
+        type: string
+        required: false
+        default: ""
 
 concurrency:
   group: hooshyaros-final-product-factory-${{ github.ref }}
@@ -259,16 +270,69 @@ jobs:
           REPO: ${{ github.repository }}
           BRANCH: ${{ github.head_ref || github.ref_name }}
           HEAD_SHA: ${{ github.sha }}
+          EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha || '' }}
+          REPAIR_RUN_ID: ${{ inputs.agent_repair_run_id || '' }}
         run: |
-          set -u
+          set -euo pipefail
           mkdir -p .hooshyar /tmp/hooshyar-repair-evidence
-          RUNS_URL="https://api.github.com/repos/${REPO}/actions/workflows/autonomous-ci-repair.yml/runs?branch=${BRANCH}&per_page=30"
-          if ! curl -fsSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" "${RUNS_URL}" -o /tmp/hooshyar-repair-runs.json; then
-            echo "AGENT_REPAIR_ARTIFACT_LOOKUP=BLOCKED_API_UNAVAILABLE"
-            exit 0
+          ACTUAL_SHA="$(git rev-parse HEAD)"
+          if [ -n "$EXPECTED_HEAD_SHA" ] && [ "$ACTUAL_SHA" != "$EXPECTED_HEAD_SHA" ]; then
+            echo "AGENT_REPAIR_ARTIFACT=BLOCKED_TARGET_SHA_CHANGED expected=$EXPECTED_HEAD_SHA actual=$ACTUAL_SHA"
+            exit 1
           fi
-          RUN_IDS=$(jq -r '.workflow_runs[]?.id' /tmp/hooshyar-repair-runs.json)
+          OPTIN_URL="https://api.github.com/repos/${REPO}/actions/workflows/autonomous-ci-repair-optin.yml/runs?per_page=100"
+          LEGACY_URL="https://api.github.com/repos/${REPO}/actions/workflows/autonomous-ci-repair.yml/runs?branch=${BRANCH}&per_page=30"
+          if [ -n "$REPAIR_RUN_ID" ]; then
+            RUN_INFO_URL="https://api.github.com/repos/${REPO}/actions/runs/${REPAIR_RUN_ID}"
+            if ! curl -fsSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" "$RUN_INFO_URL" -o /tmp/hooshyar-repair-run.json; then
+              echo "AGENT_REPAIR_ARTIFACT=BLOCKED_RUN_LOOKUP_FAILED"
+              exit 1
+            fi
+            node -e 'const r=JSON.parse(require("fs").readFileSync("/tmp/hooshyar-repair-run.json","utf8"));const ok=r.path===".github/workflows/autonomous-ci-repair-optin.yml"&&r.event==="workflow_dispatch"&&r.head_branch==="main"&&r.status==="in_progress"&&r.head_repository?.full_name===process.env.REPO;if(!ok){console.error("OPT_IN_REPAIR_RUN_NOT_TRUSTED_OR_ACTIVE");process.exit(2)}'
+            RUN_IDS="${REPAIR_RUN_ID}"
+          else
+            OPTIN_RUN_IDS=""
+            LEGACY_RUN_IDS=""
+            if curl -fsSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" "${OPTIN_URL}" -o /tmp/hooshyar-optin-runs.json; then
+              OPTIN_RUN_IDS=$(jq -r '.workflow_runs[]?.id' /tmp/hooshyar-optin-runs.json)
+            else
+              echo "OPT_IN_REPAIR_RUN_DISCOVERY=UNAVAILABLE"
+            fi
+            if curl -fsSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" "${LEGACY_URL}" -o /tmp/hooshyar-legacy-runs.json; then
+              LEGACY_RUN_IDS=$(jq -r '.workflow_runs[]?.id' /tmp/hooshyar-legacy-runs.json)
+            else
+              echo "LEGACY_REPAIR_RUN_DISCOVERY=UNAVAILABLE"
+            fi
+            RUN_IDS=$(printf '%s\n%s\n' "${OPTIN_RUN_IDS}" "${LEGACY_RUN_IDS}" | awk 'NF && !seen[$0]++')
+          fi
           for RUN_ID in ${RUN_IDS}; do
+            RUN_INFO_URL="https://api.github.com/repos/${REPO}/actions/runs/${RUN_ID}"
+            if ! curl -fsSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" "${RUN_INFO_URL}" -o /tmp/hooshyar-repair-run.json; then continue; fi
+            RUN_PATH=$(jq -r '.path // ""' /tmp/hooshyar-repair-run.json)
+            RUN_BRANCH=$(jq -r '.head_branch // ""' /tmp/hooshyar-repair-run.json)
+            RUN_EVENT=$(jq -r '.event // ""' /tmp/hooshyar-repair-run.json)
+            RUN_STATUS=$(jq -r '.status // ""' /tmp/hooshyar-repair-run.json)
+            RUN_CONCLUSION=$(jq -r '.conclusion // ""' /tmp/hooshyar-repair-run.json)
+            if [ "${RUN_PATH}" = ".github/workflows/autonomous-ci-repair-optin.yml" ]; then
+              if [ "${RUN_BRANCH}" != "main" ] || [ "${RUN_EVENT}" != "workflow_dispatch" ] ||
+                 { [ "${RUN_STATUS}" != "in_progress" ] && { [ "${RUN_STATUS}" != "completed" ] || [ "${RUN_CONCLUSION}" != "success" ]; }; }; then
+                continue
+              fi
+              JOBS_URL="https://api.github.com/repos/${REPO}/actions/runs/${RUN_ID}/jobs?per_page=100"
+              if ! curl -fsSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" "${JOBS_URL}" -o /tmp/hooshyar-optin-jobs.json; then continue; fi
+              REPAIR_JOB_CONCLUSION=$(jq -r '.jobs[]? | select(.name=="repair-drill") | .conclusion // ""' /tmp/hooshyar-optin-jobs.json | head -n 1)
+              if [ "${REPAIR_JOB_CONCLUSION}" != "success" ]; then
+                if [ -n "$REPAIR_RUN_ID" ]; then echo "OPT_IN_REPAIR_DRILL_JOB_NOT_SUCCESS"; exit 1; else continue; fi
+              fi
+            elif [ "${RUN_PATH}" = ".github/workflows/autonomous-ci-repair.yml" ]; then
+              if [ "${RUN_BRANCH}" != "${BRANCH}" ] ||
+                 { [ "${RUN_STATUS}" != "in_progress" ] && { [ "${RUN_STATUS}" != "completed" ] || [ "${RUN_CONCLUSION}" != "success" ]; }; }; then
+                continue
+              fi
+            else
+              continue
+            fi
+
             ARTIFACTS_URL="https://api.github.com/repos/${REPO}/actions/runs/${RUN_ID}/artifacts"
             if ! curl -fsSL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${GH_TOKEN}" "${ARTIFACTS_URL}" -o /tmp/hooshyar-repair-artifacts.json; then continue; fi
             ARTIFACT_ID=$(jq -r '.artifacts[]? | select(.name=="hooshyar-agent-repair-evidence" and .expired==false) | .id' /tmp/hooshyar-repair-artifacts.json | head -n 1)

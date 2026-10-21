@@ -4,6 +4,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const cp = require('node:child_process');
+const { validateControlledDrillEvidence } = require('./agent-repair-optin-policy.cjs');
 
 const root = process.cwd();
 const dir = path.join(root, '.hooshyar');
@@ -25,6 +26,24 @@ function hasAll(record, required) {
   return !!record && Array.isArray(record.acceptance) && required.every(item => record.acceptance.includes(item));
 }
 function cellStatus(ok) { return ok ? 'PASS' : 'BLOCKED'; }
+
+function isCiFeedbackPass(agent, commitSha) {
+  if (!agent || agent.commit !== commitSha || !['PASS', 'ACCEPTED'].includes(agent.status)) return false;
+  if (agent.mode === 'controlled-drill') return validateControlledDrillEvidence(agent, commitSha).valid;
+
+  const requiredRepairJobs = [...new Set((agent.finding?.failedJobs || [])
+    .filter(name => !['runtime-evidence-qualification', 'release-gate'].includes(name)))];
+  return agent.type === 'ASSISTANT_REPAIR_MISSION_V1_RESULT' &&
+    agent.regression?.status === 'PASS' && agent.regression?.fullJest === 'PASS' &&
+    agent.regression?.pythonSyntax === 'PASS' && agent.factoryAcceptance?.status === 'PASS' &&
+    agent.factoryAcceptance?.commit === commitSha &&
+    agent.factoryAcceptance?.productFactoryJob === 'windows-product-factory' &&
+    agent.factoryAcceptance?.productFactoryConclusion === 'success' &&
+    Number(agent.repair?.changedFiles) > 0 && requiredRepairJobs.length > 0 &&
+    Array.isArray(agent.repair?.repairedJobs) &&
+    requiredRepairJobs.every(name => agent.repair.repairedJobs.some(job =>
+      job?.name === name && job.conclusion === 'success' && job.runId === agent.factoryAcceptance?.runId));
+}
 
 function main() {
   const commitSha = gitCommit();
@@ -64,18 +83,7 @@ function main() {
   const androidPass = androidCurrent && hasAll(android, ['apk-present', 'device-online', 'android-booted', 'package-manager-ready', 'apk-installed', 'launcher-start', 'process-alive', 'main-activity-visible']);
   const securityPass = securityCurrent && hasAll(security, ['unauthenticated-dashboard-denied', 'unauthenticated-analyze-denied']);
   const tenantPass = securityPass && hasAll(security, ['distinct-tenant-identities', 'tenant-a-data-isolated', 'tenant-b-data-isolated', 'analytics-cross-tenant-read-denied', 'report-artifact-cross-tenant-denied']);
-  const requiredRepairJobs = [...new Set((agent?.finding?.failedJobs || [])
-    .filter(name => !['runtime-evidence-qualification', 'release-gate'].includes(name)))];
-  const ciFeedbackPass = agentCurrent && agent.type === 'ASSISTANT_REPAIR_MISSION_V1_RESULT' &&
-    agent.regression?.status === 'PASS' && agent.regression?.fullJest === 'PASS' &&
-    agent.regression?.pythonSyntax === 'PASS' && agent.factoryAcceptance?.status === 'PASS' &&
-    agent.factoryAcceptance?.commit === commitSha &&
-    agent.factoryAcceptance?.productFactoryJob === 'windows-product-factory' &&
-    agent.factoryAcceptance?.productFactoryConclusion === 'success' &&
-    Number(agent.repair?.changedFiles) > 0 && requiredRepairJobs.length > 0 &&
-    Array.isArray(agent.repair?.repairedJobs) &&
-    requiredRepairJobs.every(name => agent.repair.repairedJobs.some(job =>
-      job?.name === name && job.conclusion === 'success' && job.runId === agent.factoryAcceptance?.runId));
+  const ciFeedbackPass = isCiFeedbackPass(agent, commitSha);
 
   const checks = {
     'win-core': { pass: factoryRuntime, ref: '.hooshyar/factory-success.json', target: 'windows-latest' },
@@ -125,4 +133,4 @@ function main() {
 }
 
 if (require.main === module) process.exitCode = main();
-module.exports = { current, hasAll, main };
+module.exports = { current, hasAll, isCiFeedbackPass, main };

@@ -1,0 +1,213 @@
+#!/usr/bin/env node
+'use strict';
+
+const fs = require('node:fs');
+const path = require('node:path');
+const crypto = require('node:crypto');
+const cp = require('node:child_process');
+const {
+  DRILL_PATH,
+  injectControlledDefect,
+  buildControlledDrillEvidence,
+  validateControlledDrillEvidence
+} = require('./agent-repair-optin-policy.cjs');
+
+const CREDENTIAL_KEYS = [
+  'GITHUB_TOKEN', 'GH_TOKEN', 'GITHUB_ENTERPRISE_TOKEN', 'GH_ENTERPRISE_TOKEN',
+  'ACTIONS_RUNTIME_TOKEN', 'ACTIONS_ID_TOKEN_REQUEST_TOKEN', 'ACTIONS_ID_TOKEN_REQUEST_URL',
+  'ACTIONS_CACHE_URL', 'ACTIONS_RESULTS_URL', 'GIT_ASKPASS', 'GIT_CONFIG_COUNT',
+  'GIT_CONFIG_KEY_0', 'GIT_CONFIG_VALUE_0'
+];
+
+function buildUnprivilegedEnv(source = process.env) {
+  const env = { ...source };
+  for (const key of CREDENTIAL_KEYS) delete env[key];
+  return env;
+}
+
+function run(command, args, options = {}) {
+  const result = cp.spawnSync(command, args, {
+    cwd: options.cwd || process.cwd(),
+    encoding: 'utf8',
+    env: options.env || buildUnprivilegedEnv(process.env),
+    stdio: options.stdio || 'pipe',
+    windowsHide: true,
+    shell: false
+  });
+  if (result.error) throw new Error(command + '_LAUNCH_FAILED:' + result.error.message);
+  return {
+    status: result.status === null ? 1 : result.status,
+    stdout: result.stdout || '',
+    stderr: result.stderr || ''
+  };
+}
+
+function gitStatus(sourceDir) {
+  return run('git', [
+    'status', '--porcelain=v1', '--untracked-files=all', '--',
+    '.', ':(exclude).kilo', ':(exclude).hooshyar', ':(exclude)node_modules'
+  ], { cwd: sourceDir });
+}
+
+function parseResult(result, expectedExitCode) {
+  const lines = result.stdout.trim().split(/\r?\n/).filter(Boolean);
+  let record = null;
+  try { record = lines.length ? JSON.parse(lines[lines.length - 1]) : null; } catch {}
+  if (result.status !== expectedExitCode || !record || record.net === undefined) {
+    throw new Error('DRILL_RESULT_INVALID:exit=' + result.status +
+      ':stdout=' + result.stdout + ':stderr=' + result.stderr);
+  }
+  return record;
+}
+
+function main() {
+  const sourceDir = path.resolve(process.env.HOOSHYAR_SOURCE_DIR || 'source');
+  const targetSha = process.env.TARGET_HEAD_SHA;
+  const sourceRunId = Number(process.env.BASELINE_FACTORY_RUN_ID || process.env.FAILED_FACTORY_RUN_ID);
+  const preflightRunId = Number(process.env.FAILED_FACTORY_RUN_ID);
+  const sourceRunUrl = process.env.BASELINE_FACTORY_RUN_URL || process.env.FAILED_FACTORY_RUN_URL;
+  const drillRunId = Number(process.env.GITHUB_RUN_ID);
+  if (!/^[0-9a-f]{40}$/i.test(targetSha || '') ||
+      !Number.isSafeInteger(sourceRunId) || sourceRunId < 1 ||
+      !Number.isSafeInteger(preflightRunId) || preflightRunId < 1 ||
+      !Number.isSafeInteger(drillRunId) || drillRunId < 1 ||
+      typeof sourceRunUrl !== 'string' || !sourceRunUrl.startsWith('https://github.com/')) {
+    throw new Error('DRILL_CONTEXT_INVALID');
+  }
+
+  const checkedOutSha = run('git', ['rev-parse', 'HEAD'], { cwd: sourceDir });
+  if (checkedOutSha.status !== 0 || checkedOutSha.stdout.trim() !== targetSha) {
+    throw new Error('TARGET_CHECKOUT_SHA_MISMATCH');
+  }
+  const initialStatus = gitStatus(sourceDir);
+  if (initialStatus.status !== 0 || initialStatus.stdout.trim()) {
+    throw new Error('TARGET_WORKTREE_NOT_CLEAN');
+  }
+
+  const fixturePath = path.join(sourceDir, 'qa', 'agent-repair-drill', 'repair-target.cjs');
+  const fixture = fs.readFileSync(fixturePath, 'utf8');
+  const injected = injectControlledDefect(fixture);
+  const drillDir = path.join(sourceDir, '.hooshyar', 'repair-drill');
+  fs.mkdirSync(drillDir, { recursive: true });
+  const scratchPath = path.join(drillDir, 'repair-target.cjs');
+  const missionPath = path.join(drillDir, 'mission.json');
+  fs.writeFileSync(scratchPath, injected, 'utf8');
+
+  const before = run(process.execPath, [scratchPath], { cwd: drillDir });
+  const beforeRecord = parseResult(before, 1);
+  if (beforeRecord.net === 1200 || !before.stderr.includes('expected net=1200')) {
+    throw new Error('CONTROLLED_FAILURE_NOT_OBSERVED');
+  }
+
+  const mission = {
+    type: 'ASSISTANT_REPAIR_MISSION_V1',
+    mode: 'controlled-drill',
+    status: 'BLOCKED',
+    repository: process.env.GITHUB_REPOSITORY,
+    branch: process.env.TARGET_BRANCH,
+    commit: targetSha,
+    sourceFactoryRunId: sourceRunId,
+    target: DRILL_PATH,
+    observedFailure: {
+      command: 'node ' + DRILL_PATH,
+      exitCode: before.status,
+      output: before.stdout.trim(),
+      error: before.stderr.trim()
+    },
+    expected: 'The scratch fixture must calculate revenue + negative expense = 1200.',
+    rules: [
+      'Edit only .hooshyar/repair-drill/repair-target.cjs.',
+      'Do not edit tracked files, workflows, tests, or production code.',
+      'Do not commit, push, or change git configuration.',
+      'Run the scratch fixture and leave it returning JSON with net=1200 and exit code 0.'
+    ]
+  };
+  fs.writeFileSync(missionPath, JSON.stringify(mission, null, 2) + '\n', 'utf8');
+
+  const prompt = [
+    'You are the bounded HooshyarOS autonomous CI repair operator.',
+    'Read .hooshyar/repair-drill/mission.json.',
+    'Repair only .hooshyar/repair-drill/repair-target.cjs.',
+    'This is an intentionally fault-injected scratch copy. Do not edit tracked files, tests, workflows, or production code.',
+    'Do not commit, push, change git configuration, or broaden scope.',
+    'Run the scratch file and require the JSON result net=1200 with exit code 0.',
+    'Stop after that focused repair.'
+  ].join(' ');
+
+  const kilo = run(process.env.HOOSHYAR_KILO_COMMAND || 'kilo', [
+    'run', '--auto', '--agent', 'hooshyar-repair', prompt, '--file', missionPath
+  ], { cwd: sourceDir, stdio: 'inherit', env: buildUnprivilegedEnv(process.env) });
+  if (kilo.status !== 0) throw new Error('KILO_CONTROLLED_REPAIR_FAILED:' + kilo.status);
+
+  const finalStatus = gitStatus(sourceDir);
+  if (finalStatus.status !== 0 || finalStatus.stdout.trim()) {
+    throw new Error('CONTROLLED_REPAIR_TOUCHED_TRACKED_OR_UNRELATED_FILES:' + finalStatus.stdout);
+  }
+
+  const after = run(process.execPath, [scratchPath], { cwd: drillDir });
+  const afterRecord = parseResult(after, 0);
+  if (afterRecord.net !== 1200 || injected === fs.readFileSync(scratchPath, 'utf8')) {
+    throw new Error('CONTROLLED_REPAIR_NOT_EFFECTIVE');
+  }
+
+  const jest = run(process.execPath, [path.join(sourceDir, 'node_modules', 'jest', 'bin', 'jest.js'), '--runInBand'], {
+    cwd: sourceDir,
+    stdio: 'inherit',
+    env: buildUnprivilegedEnv(process.env)
+  });
+  if (jest.status !== 0) throw new Error('FULL_JEST_FAILED:' + jest.status);
+
+  const python = run(process.env.HOOSHYAR_PYTHON || 'python', ['-m', 'compileall', '-q', 'Backend/AI_Runtime'], {
+    cwd: sourceDir,
+    stdio: 'inherit',
+    env: buildUnprivilegedEnv(process.env)
+  });
+  if (python.status !== 0) throw new Error('PYTHON_SYNTAX_FAILED:' + python.status);
+
+  const sourceRun = { id: sourceRunId, html_url: sourceRunUrl };
+  const missionId = crypto.createHash('sha256').update(JSON.stringify({
+    repository: process.env.GITHUB_REPOSITORY,
+    branch: process.env.TARGET_BRANCH,
+    targetSha,
+    sourceRunId,
+    drillRunId,
+    injected: beforeRecord,
+    repaired: afterRecord
+  })).digest('hex');
+
+  const evidence = buildControlledDrillEvidence({
+    commit: targetSha,
+    missionId,
+    triggerRun: sourceRun,
+    preflightRunId,
+    drillRunId,
+    injectedResult: beforeRecord.net,
+    repairedResult: afterRecord.net
+  });
+  const validation = validateControlledDrillEvidence(evidence, targetSha);
+  if (!validation.valid) throw new Error('CONTROLLED_DRILL_EVIDENCE_INVALID:' + validation.reason);
+
+  const evidencePath = path.join(sourceDir, '.hooshyar', 'agent-repair-success.json');
+  fs.writeFileSync(evidencePath, JSON.stringify(evidence, null, 2) + '\n', 'utf8');
+  console.log(JSON.stringify({
+    type: 'AUTONOMOUS_REPAIR_OPT_IN',
+    status: 'PASS',
+    mode: 'controlled-drill',
+    targetSha,
+    sourceFactoryRunId: sourceRunId,
+    drillRunId,
+    fullJest: 'PASS',
+    pythonSyntax: 'PASS',
+    evidencePath: '.hooshyar/agent-repair-success.json'
+  }, null, 2));
+}
+
+if (require.main === module) {
+  try { main(); }
+  catch (error) {
+    console.error(JSON.stringify({ type: 'AUTONOMOUS_REPAIR_OPT_IN', status: 'BLOCKED', error: error.message }));
+    process.exit(2);
+  }
+}
+
+module.exports = { buildUnprivilegedEnv, injectControlledDefect, parseResult };
