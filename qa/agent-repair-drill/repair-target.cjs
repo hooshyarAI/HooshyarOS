@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 function calculateNet(revenue, expense) {
-  return revenue + expense;
+  return revenue - expense;
 }
 
 const result = calculateNet(1500, -300);

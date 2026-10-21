@@ -8,6 +8,12 @@ on:
   pull_request:
     branches: [main, fix/autonomous-product-factory]
   workflow_dispatch:
+    inputs:
+      ci_repair_drill:
+        description: "Run the isolated agent-repair drill for an explicitly opted-in PR"
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: hooshyaros-final-product-factory-${{ github.ref }}
@@ -162,6 +168,23 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
+
+  agent-repair-drill:
+    if: >-
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.base.ref == 'fix/autonomous-product-factory' &&
+       contains(github.event.pull_request.body, 'ci-repair-opt-in: true')) ||
+      (github.event_name == 'workflow_dispatch' && inputs.ci_repair_drill)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - name: Run isolated agent-repair drill
+        run: node qa/agent-repair-drill/repair-target.cjs
 
   full-qualification:
     runs-on: ubuntu-latest

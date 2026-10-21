@@ -105,11 +105,41 @@ function exec(command, args, options = {}) {
   });
 }
 
+function buildFactoryDispatchPayload(ref, drillEnabled = process.env.HOOSHYAR_CI_REPAIR_DRILL === "true") {
+  if (typeof ref !== "string" || !ref.trim()) throw new Error("FACTORY_DISPATCH_REF_REQUIRED");
+  return drillEnabled ? { ref, inputs: { ci_repair_drill: true } } : { ref };
+}
+
+function prioritizeFailedJobs(jobs) {
+  const evidenceOnlyJobs = new Set(["runtime-evidence-qualification", "release-gate"]);
+  const startedAt = (job) => {
+    const value = Date.parse(job?.started_at || "");
+    return Number.isFinite(value) ? value : Number.MAX_SAFE_INTEGER;
+  };
+  return [...jobs].sort((a, b) => {
+    const aPriority = evidenceOnlyJobs.has(a?.name) ? 1 : 0;
+    const bPriority = evidenceOnlyJobs.has(b?.name) ? 1 : 0;
+    return aPriority - bPriority ||
+      startedAt(a) - startedAt(b) ||
+      String(a?.name || "").localeCompare(String(b?.name || ""));
+  });
+}
+
+function assertFailedRunForHead(expectedSha, run) {
+  if (!/^[0-9a-f]{40}$/i.test(expectedSha || "") || run?.head_sha !== expectedSha) {
+    throw new Error("AUTONOMOUS_CI_REPAIR_TARGET_SHA_MISMATCH");
+  }
+  if (run?.conclusion !== "failure") {
+    throw new Error("AUTONOMOUS_CI_REPAIR_TARGET_RUN_NOT_FAILED");
+  }
+  return true;
+}
+
 async function dispatchFactory(ref) {
   const url = "https://api.github.com/repos/" + repo + "/actions/workflows/final-product-factory.yml/dispatches";
   const response = await request(url, {
     method: "POST",
-    body: JSON.stringify({ ref })
+    body: JSON.stringify(buildFactoryDispatchPayload(ref))
   });
   if (!response.ok && response.status !== 204) {
     throw new Error("GitHub workflow dispatch " + response.status + ": " + await response.text());
@@ -139,10 +169,14 @@ async function waitForFactory(refSha) {
 }
 
 async function missionForRun(targetRun) {
+  const runUrl = "https://api.github.com/repos/" + repo + "/actions/runs/" + targetRun.id;
+  const sourceRun = await getJson(runUrl);
+  assertFailedRunForHead(targetRun.head_sha, sourceRun);
   const jobsUrl = "https://api.github.com/repos/" + repo + "/actions/runs/" + targetRun.id + "/jobs?per_page=100";
   const jobs = await getJson(jobsUrl);
   const failures = [];
-  for (const job of (jobs.jobs || []).filter(item => item.conclusion === "failure")) {
+  const failedJobs = prioritizeFailedJobs((jobs.jobs || []).filter(item => item.conclusion === "failure"));
+  for (const job of failedJobs) {
     let log = "";
     try {
       log = await getText("https://api.github.com/repos/" + repo + "/actions/jobs/" + job.id + "/logs");
@@ -166,16 +200,16 @@ async function missionForRun(targetRun) {
     status: "BLOCKED",
     repository: repo,
     branch,
-    commit: targetRun.head_sha,
+    commit: sourceRun.head_sha,
     workflow: {
       name: "Final Product Factory",
-      runId: Number(targetRun.id),
-      url: targetRun.html_url,
-      conclusion: targetRun.conclusion
+      runId: Number(sourceRun.id),
+      url: sourceRun.html_url || targetRun.html_url,
+      conclusion: sourceRun.conclusion
     },
     failure: {
       source: "github-actions",
-      runId: Number(targetRun.id),
+      runId: Number(sourceRun.id),
       firstFailedJob: failures[0]?.job || null,
       failedJobs: failures.map(x => x.job),
       failedSteps: failures.flatMap(x => x.failedSteps.map(s => x.job + ":" + s.name)),
@@ -360,4 +394,14 @@ if (require.main === module) {
   });
 }
 
-module.exports = { normalizeCommand, exec, buildKiloInvocation, assertCleanRepairBaseline, buildUnprivilegedEnv, buildGitPushEnv };
+module.exports = {
+  normalizeCommand,
+  exec,
+  buildKiloInvocation,
+  assertCleanRepairBaseline,
+  buildUnprivilegedEnv,
+  buildGitPushEnv,
+  buildFactoryDispatchPayload,
+  prioritizeFailedJobs,
+  assertFailedRunForHead
+};
