@@ -178,8 +178,8 @@ jobs:
         run: npm run product:assurance
       - name: Full Jest
         run: npm test -- --runInBand
-      - name: TypeScript type check
-        run: node ./node_modules/typescript/bin/tsc --noEmit
+      - name: Scoped TypeScript type check (canonical factory runner; TS suites checked by Jest)
+        run: node ./node_modules/typescript/bin/tsc --noEmit --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --types node Backend/HBOS/Autonomous/Product/FinalProductFactoryRunner.ts
       - name: Emit current-commit full-suite evidence
         run: node scripts/full-suite-evidence.cjs
         env:

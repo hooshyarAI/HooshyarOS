@@ -1,6 +1,6 @@
 'use strict';
 
-const { buildFullSuiteEvidence, TYPE, REQUIRED_ACCEPTANCE } = require('./full-suite-evidence.cjs');
+const { buildFullSuiteEvidence, TYPE, REQUIRED_ACCEPTANCE, TYPESCRIPT_SCOPE } = require('./full-suite-evidence.cjs');
 
 describe('full-suite evidence contract', () => {
   const input = {
@@ -20,7 +20,8 @@ describe('full-suite evidence contract', () => {
         fullJest: 'PASS',
         typescript: 'PASS',
         securityTenantAcceptance: 'success'
-      }
+      },
+      typescriptScope: TYPESCRIPT_SCOPE
     }));
   });
 

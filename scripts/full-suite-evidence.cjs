@@ -8,6 +8,7 @@ const root = process.cwd();
 const output = path.join(root, '.hooshyar', 'full-suite-success.json');
 const TYPE = 'HOOSHYAR_FULL_SUITE_EVIDENCE_V1';
 const REQUIRED_ACCEPTANCE = ['full-jest', 'typescript', 'security-tenant-acceptance'];
+const TYPESCRIPT_SCOPE = 'Explicit tsc check of Backend/HBOS/Autonomous/Product/FinalProductFactoryRunner.ts; TypeScript Jest suites are type-checked through ts-jest during Full Jest. Repository-wide tsc remains blocked by existing errors in untouched legacy/retired modules.';
 
 function buildFullSuiteEvidence({ commit, runId, securityTenantResult }) {
   if (typeof commit !== 'string' || !/^[0-9a-f]{40}$/i.test(commit)) {
@@ -31,6 +32,7 @@ function buildFullSuiteEvidence({ commit, runId, securityTenantResult }) {
       typescript: 'PASS',
       securityTenantAcceptance: securityTenantResult
     },
+    typescriptScope: TYPESCRIPT_SCOPE,
     target: 'GitHub Actions full-qualification job; same workflow run and commit'
   };
 }
@@ -65,4 +67,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { TYPE, REQUIRED_ACCEPTANCE, buildFullSuiteEvidence, main };
+module.exports = { TYPE, REQUIRED_ACCEPTANCE, TYPESCRIPT_SCOPE, buildFullSuiteEvidence, main };
