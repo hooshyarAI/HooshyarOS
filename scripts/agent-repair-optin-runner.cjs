@@ -12,6 +12,8 @@ const {
   validateControlledDrillEvidence
 } = require('./agent-repair-optin-policy.cjs');
 
+const DEFAULT_FREE_MODEL = 'nvidia/nemotron-3.5-super-vl:free';
+
 const CREDENTIAL_KEYS = [
   'GITHUB_TOKEN', 'GH_TOKEN', 'GITHUB_ENTERPRISE_TOKEN', 'GH_ENTERPRISE_TOKEN',
   'ACTIONS_RUNTIME_TOKEN', 'ACTIONS_ID_TOKEN_REQUEST_TOKEN', 'ACTIONS_ID_TOKEN_REQUEST_URL',
@@ -58,6 +60,20 @@ function parseResult(result, expectedExitCode) {
       ':stdout=' + result.stdout + ':stderr=' + result.stderr);
   }
   return record;
+}
+
+function buildKiloInvocation(missionPath, prompt, model = process.env.HOOSHYAR_KILO_MODEL || DEFAULT_FREE_MODEL) {
+  if (typeof model !== 'string' || !/^[a-z0-9._-]+\/[a-z0-9._-]+:free$/i.test(model)) {
+    throw new Error('FREE_MODEL_REQUIRED');
+  }
+  if (typeof missionPath !== 'string' || !path.isAbsolute(missionPath) ||
+      typeof prompt !== 'string' || !prompt.trim()) {
+    throw new Error('KILO_INVOCATION_CONTEXT_INVALID');
+  }
+  return {
+    command: process.env.HOOSHYAR_KILO_COMMAND || 'kilo',
+    args: ['run', '--auto', '--agent', 'hooshyar-repair', '--model', model, prompt, '--file', missionPath]
+  };
 }
 
 function main() {
@@ -134,9 +150,12 @@ function main() {
     'Stop after that focused repair.'
   ].join(' ');
 
-  const kilo = run(process.env.HOOSHYAR_KILO_COMMAND || 'kilo', [
-    'run', '--auto', '--agent', 'hooshyar-repair', prompt, '--file', missionPath
-  ], { cwd: sourceDir, stdio: 'inherit', env: buildUnprivilegedEnv(process.env) });
+  const invocation = buildKiloInvocation(missionPath, prompt);
+  const kilo = run(invocation.command, invocation.args, {
+    cwd: sourceDir,
+    stdio: 'inherit',
+    env: buildUnprivilegedEnv(process.env)
+  });
   if (kilo.status !== 0) throw new Error('KILO_CONTROLLED_REPAIR_FAILED:' + kilo.status);
 
   const finalStatus = gitStatus(sourceDir);
@@ -210,4 +229,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { buildUnprivilegedEnv, injectControlledDefect, parseResult };
+module.exports = { buildUnprivilegedEnv, buildKiloInvocation, injectControlledDefect, parseResult };

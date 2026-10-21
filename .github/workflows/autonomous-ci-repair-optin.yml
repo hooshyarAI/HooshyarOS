@@ -119,7 +119,7 @@ jobs:
         working-directory: source
         run: npm ci
       - name: Install Kilo Code CLI
-        run: npm install --global @kilocode/cli
+        run: npm install --global @kilocode/cli@7.8.15
       - name: Run isolated repair drill, Full Jest and Python syntax checks
         working-directory: trusted
         env:
@@ -133,7 +133,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           HOOSHYAR_AGENT: kilo
           HOOSHYAR_KILO_COMMAND: kilo
-          KILO_CONFIG_CONTENT: '{"model":"kilo/kilo-auto/free","agent":{"hooshyar-repair":{"model":"kilo/kilo-auto/free"}}}'
+          HOOSHYAR_KILO_MODEL: nvidia/nemotron-3.5-super-vl:free
         run: node scripts/agent-repair-optin-runner.cjs
       - name: Upload verified controlled-drill evidence
         uses: actions/upload-artifact@v4

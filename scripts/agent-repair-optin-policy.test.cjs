@@ -11,6 +11,7 @@ const {
   buildControlledDrillEvidence
 } = require('./agent-repair-optin-policy.cjs');
 const { isCiFeedbackPass } = require('./cline-runtime-evidence-collector.cjs');
+const { buildKiloInvocation } = require('./agent-repair-optin-runner.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -129,6 +130,32 @@ describe('autonomous CI repair opt-in policy', () => {
     const evidence = validDrillEvidence();
     expect(isCiFeedbackPass(evidence, SHA)).toBe(true);
     expect(isCiFeedbackPass(evidence, 'f'.repeat(40))).toBe(false);
+  });
+
+  test('Kilo invocation pins an explicit free model and keeps the task attachment bounded', () => {
+    const invocation = buildKiloInvocation(
+      '/tmp/hooshyar-repair-mission.json',
+      'Repair only the scratch fixture.',
+      'nvidia/nemotron-3.5-super-vl:free'
+    );
+    expect(invocation).toEqual({
+      command: 'kilo',
+      args: [
+        'run', '--auto', '--agent', 'hooshyar-repair',
+        '--model', 'nvidia/nemotron-3.5-super-vl:free',
+        'Repair only the scratch fixture.',
+        '--file', '/tmp/hooshyar-repair-mission.json'
+      ]
+    });
+    expect(() => buildKiloInvocation('/tmp/mission.json', 'test', 'kilo/kilo-auto/free')).toThrow('FREE_MODEL_REQUIRED');
+    expect(() => buildKiloInvocation('/tmp/mission.json', 'test', 'anthropic/claude-sonnet')).toThrow('FREE_MODEL_REQUIRED');
+  });
+
+  test('opt-in workflow pins Kilo CLI and the explicit free model without a paid fallback route', () => {
+    const workflow = fs.readFileSync(path.join(process.cwd(), '.github', 'workflows', 'autonomous-ci-repair-optin.yml'), 'utf8');
+    expect(workflow).toContain('npm install --global @kilocode/cli@7.8.15');
+    expect(workflow).toContain('HOOSHYAR_KILO_MODEL: nvidia/nemotron-3.5-super-vl:free');
+    expect(workflow).not.toContain('KILO_CONFIG_CONTENT');
   });
 
   test('opt-in workflow keeps repair execution unprivileged and reserves write permission for trusted dispatch', () => {
