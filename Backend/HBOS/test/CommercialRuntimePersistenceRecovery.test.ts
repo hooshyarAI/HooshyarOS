@@ -42,12 +42,12 @@ describe("Commercial runtime persistence and recovery", () => {
     const analysis = await request(first, "/api/analyze", {
       method: "POST",
       headers: { "content-type": "application/json", cookie: firstCookie },
-      body: JSON.stringify({ csv, sourceName: "recovery-ledger.csv", assets: 2000, liabilities: 500 }),
+      body: JSON.stringify({ csv, sourceName: "recovery-ledger.csv", assets: 2000, liabilities: 500, revenue: 1500, expenses: 300 }),
     });
     expect(analysis.status).toBe(200);
     const beforeRestart = await request(first, "/api/dashboard", { headers: { cookie: firstCookie } });
     const beforePayload = await beforeRestart.json() as { analysisAvailable: boolean; metrics: { revenue: number; profit: number; risk: number } };
-    expect(beforePayload).toMatchObject({ analysisAvailable: true, metrics: { revenue: 1500, profit: 200, risk: 25 } });
+    expect(beforePayload).toMatchObject({ analysisAvailable: true, metrics: { revenue: 1500, profit: 1200, risk: 25 } });
     await close(first);
 
     const second = createCommercialRuntimeServer({ databasePath, reasoning: { reason: (problem: string) => ({ problem, status: "verified", success: true }) } });
@@ -68,7 +68,7 @@ describe("Commercial runtime persistence and recovery", () => {
       status: "READY",
       tenantId: firstBody.tenantId,
       analysisAvailable: true,
-      metrics: { revenue: 1500, profit: 200, risk: 25 },
+      metrics: { revenue: 1500, profit: 1200, risk: 25 },
     });
     await close(second);
     rmSync(directory, { recursive: true, force: true });

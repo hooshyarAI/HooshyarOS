@@ -37,7 +37,7 @@ describe("Executive Intelligence Workbench runtime integration", () => {
     const analysis = await request(server, "/api/analyze", {
       method: "POST",
       headers: { "content-type": "application/json", cookie: sessionCookie },
-      body: JSON.stringify({ csv, sourceName: "executive-ledger.csv", assets: 2000, liabilities: 500 }),
+      body: JSON.stringify({ csv, sourceName: "executive-ledger.csv", assets: 2000, liabilities: 500, revenue: 1000, expenses: 600 }),
     });
     expect(analysis.status).toBe(200);
 

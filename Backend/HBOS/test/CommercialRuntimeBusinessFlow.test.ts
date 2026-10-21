@@ -36,13 +36,13 @@ describe("Commercial runtime real business flow", () => {
     const analysis = await request(server, "/api/analyze", {
       method: "POST",
       headers: { "content-type": "application/json", cookie: cookie!.split(";")[0] },
-      body: JSON.stringify({ csv, sourceName: "ledger.csv", assets: 1000, liabilities: 250 }),
+      body: JSON.stringify({ csv, sourceName: "ledger.csv", assets: 1000, liabilities: 250, revenue: 1000, expenses: 0 }),
     });
     expect(analysis.status).toBe(200);
     const result = await analysis.json() as { status: string; tenantId: string; metrics: { profit: number; debtRatio: number }; source: { sha256: string } };
     expect(result.status).toBe("READY");
     expect(result.tenantId).toMatch(/^tenant:/);
-    expect(result.metrics.profit).toBe(0);
+    expect(result.metrics.profit).toBe(1000);
     expect(result.metrics.debtRatio).toBe(0.25);
     expect(result.source.sha256).toMatch(/^[a-f0-9]{64}$/);
 
@@ -50,7 +50,7 @@ describe("Commercial runtime real business flow", () => {
     expect(dashboard.status).toBe(200);
     const dashboardPayload = await dashboard.json() as { analysisAvailable: boolean; metrics: { revenue: number; profit: number; risk: number } };
     expect(dashboardPayload.analysisAvailable).toBe(true);
-    expect(dashboardPayload.metrics).toEqual({ revenue: 1000, profit: 0, risk: 25 });
+    expect(dashboardPayload.metrics).toEqual({ revenue: 1000, profit: 1000, risk: 25 });
   });
 
   test("fails closed without a session", async () => {
