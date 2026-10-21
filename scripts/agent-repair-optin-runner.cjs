@@ -221,7 +221,7 @@ function main() {
     injectedResult: beforeRecord.net,
     repairedResult: afterRecord.net
   });
-  const validation = validateControlledDrillEvidence(evidence, targetSha);
+  const validation = validateControlledDrillEvidence(evidence, targetSha, drillRunId);
   if (!validation.valid) throw new Error('CONTROLLED_DRILL_EVIDENCE_INVALID:' + validation.reason);
 
   const evidencePath = path.join(sourceDir, '.hooshyar', 'agent-repair-success.json');
