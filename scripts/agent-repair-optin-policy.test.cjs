@@ -128,8 +128,10 @@ describe('autonomous CI repair opt-in policy', () => {
 
   test('controlled-drill evidence qualifies ci-feedback only on the exact commit', () => {
     const evidence = validDrillEvidence();
-    expect(isCiFeedbackPass(evidence, SHA)).toBe(true);
-    expect(isCiFeedbackPass(evidence, 'f'.repeat(40))).toBe(false);
+    expect(isCiFeedbackPass(evidence, SHA, evidence.drill.runId)).toBe(true);
+    expect(isCiFeedbackPass(evidence, SHA)).toBe(false);
+    expect(isCiFeedbackPass(evidence, SHA, evidence.drill.runId + 1)).toBe(false);
+    expect(isCiFeedbackPass(evidence, 'f'.repeat(40), evidence.drill.runId)).toBe(false);
   });
 
   test('Kilo invocation pins an explicit free model and keeps the task attachment bounded', () => {
@@ -172,6 +174,7 @@ describe('autonomous CI repair opt-in policy', () => {
     const factoryWorkflow = fs.readFileSync(path.join(process.cwd(), '.github', 'workflows', 'final-product-factory.yml'), 'utf8');
     expect(factoryWorkflow).toContain('autonomous-ci-repair-optin.yml/runs');
     expect(factoryWorkflow).toContain('AGENT_REPAIR_ARTIFACT=ACCEPTED');
+    expect(factoryWorkflow).toContain('HOOSHYAR_EXPECTED_REPAIR_RUN_ID');
   });
 
   test('controlled fault injection requires exactly one known fixture expression', () => {
@@ -182,30 +185,30 @@ describe('autonomous CI repair opt-in policy', () => {
 
   test('controlled drill evidence is accepted only for this commit, observed failure, observed repair and full regressions', () => {
     const evidence = validDrillEvidence();
-    expect(validateControlledDrillEvidence(evidence, SHA)).toEqual({
+    expect(validateControlledDrillEvidence(evidence, SHA, evidence.drill.runId)).toEqual({
       valid: true,
       reason: 'CONTROLLED_REPAIR_DRILL_AND_SAME_COMMIT_PRODUCT_ACCEPTANCE_VERIFIED'
     });
-    expect(validateControlledDrillEvidence(evidence, 'd'.repeat(40)).reason).toBe('EVIDENCE_COMMIT_MISMATCH');
+    expect(validateControlledDrillEvidence(evidence, 'd'.repeat(40), evidence.drill.runId).reason).toBe('EVIDENCE_COMMIT_MISMATCH');
 
     const noRed = validDrillEvidence();
     noRed.drill.injectedExitCode = 0;
-    expect(validateControlledDrillEvidence(noRed, SHA).reason).toBe('CONTROLLED_FAILURE_REPAIR_NOT_PROVEN');
+    expect(validateControlledDrillEvidence(noRed, SHA, noRed.drill.runId).reason).toBe('CONTROLLED_FAILURE_REPAIR_NOT_PROVEN');
 
     const noGreen = validDrillEvidence();
     noGreen.regression.fullJest = 'FAIL';
-    expect(validateControlledDrillEvidence(noGreen, SHA).reason).toBe('REGRESSION_EVIDENCE_NOT_PASS');
+    expect(validateControlledDrillEvidence(noGreen, SHA, noGreen.drill.runId).reason).toBe('REGRESSION_EVIDENCE_NOT_PASS');
 
     const falseFactory = validDrillEvidence();
     falseFactory.factoryAcceptance.productFactoryConclusion = 'failure';
-    expect(validateControlledDrillEvidence(falseFactory, SHA).reason).toBe('SOURCE_FACTORY_ACCEPTANCE_PROVENANCE_INVALID');
+    expect(validateControlledDrillEvidence(falseFactory, SHA, falseFactory.drill.runId).reason).toBe('SOURCE_FACTORY_ACCEPTANCE_PROVENANCE_INVALID');
 
     const wrongScope = validDrillEvidence();
     wrongScope.repair.changedPaths = ['Backend/server.ts'];
-    expect(validateControlledDrillEvidence(wrongScope, SHA).reason).toBe('CONTROLLED_REPAIR_SCOPE_OR_RESULT_INVALID');
+    expect(validateControlledDrillEvidence(wrongScope, SHA, wrongScope.drill.runId).reason).toBe('CONTROLLED_REPAIR_SCOPE_OR_RESULT_INVALID');
 
     const fakeFailureScope = validDrillEvidence();
     fakeFailureScope.finding.failedJobs = ['windows-product-factory'];
-    expect(validateControlledDrillEvidence(fakeFailureScope, SHA).reason).toBe('TRIGGER_RUN_PROVENANCE_INVALID');
+    expect(validateControlledDrillEvidence(fakeFailureScope, SHA, fakeFailureScope.drill.runId).reason).toBe('TRIGGER_RUN_PROVENANCE_INVALID');
   });
 });

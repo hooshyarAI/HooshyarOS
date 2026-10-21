@@ -27,9 +27,9 @@ function hasAll(record, required) {
 }
 function cellStatus(ok) { return ok ? 'PASS' : 'BLOCKED'; }
 
-function isCiFeedbackPass(agent, commitSha) {
+function isCiFeedbackPass(agent, commitSha, expectedDrillRunId) {
   if (!agent || agent.commit !== commitSha || !['PASS', 'ACCEPTED'].includes(agent.status)) return false;
-  if (agent.mode === 'controlled-drill') return validateControlledDrillEvidence(agent, commitSha).valid;
+  if (agent.mode === 'controlled-drill') return validateControlledDrillEvidence(agent, commitSha, expectedDrillRunId).valid;
 
   const requiredRepairJobs = [...new Set((agent.finding?.failedJobs || [])
     .filter(name => !['runtime-evidence-qualification', 'release-gate'].includes(name)))];
@@ -83,7 +83,7 @@ function main() {
   const androidPass = androidCurrent && hasAll(android, ['apk-present', 'device-online', 'android-booted', 'package-manager-ready', 'apk-installed', 'launcher-start', 'process-alive', 'main-activity-visible']);
   const securityPass = securityCurrent && hasAll(security, ['unauthenticated-dashboard-denied', 'unauthenticated-analyze-denied']);
   const tenantPass = securityPass && hasAll(security, ['distinct-tenant-identities', 'tenant-a-data-isolated', 'tenant-b-data-isolated', 'analytics-cross-tenant-read-denied', 'report-artifact-cross-tenant-denied']);
-  const ciFeedbackPass = isCiFeedbackPass(agent, commitSha);
+  const ciFeedbackPass = isCiFeedbackPass(agent, commitSha, process.env.HOOSHYAR_EXPECTED_REPAIR_RUN_ID);
 
   const checks = {
     'win-core': { pass: factoryRuntime, ref: '.hooshyar/factory-success.json', target: 'windows-latest' },

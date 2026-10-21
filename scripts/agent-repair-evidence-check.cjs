@@ -25,7 +25,7 @@ try {
   if (evidence.status !== 'PASS') throw new Error(`AGENT_REPAIR_EVIDENCE_STATUS_INVALID:${evidence.status}`);
   if (evidence.commit !== gitCommit()) throw new Error(`AGENT_REPAIR_EVIDENCE_COMMIT_MISMATCH:${evidence.commit}`);
   if (evidence.mode === 'controlled-drill') {
-    const checked = validateControlledDrillEvidence(evidence, gitCommit());
+    const checked = validateControlledDrillEvidence(evidence, gitCommit(), process.env.HOOSHYAR_EXPECTED_REPAIR_RUN_ID);
     if (!checked.valid) throw new Error('AGENT_REPAIR_CONTROLLED_DRILL_INVALID:' + checked.reason);
     console.log(JSON.stringify({ type: 'AGENT_REPAIR_EVIDENCE', status: 'PASS', mode: evidence.mode, commit: evidence.commit, missionId: evidence.missionId }, null, 2));
     process.exit(0);

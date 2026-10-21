@@ -101,7 +101,7 @@ function injectControlledDefect(sourceContent) {
   return sourceContent.replace(expected, 'return revenue - expense;');
 }
 
-function validateControlledDrillEvidence(evidence, currentCommit) {
+function validateControlledDrillEvidence(evidence, currentCommit, expectedDrillRunId) {
   const reject = reason => ({ valid: false, reason });
   if (!evidence || evidence.type !== TYPE) return reject('EVIDENCE_TYPE_INVALID');
   if (evidence.status !== 'PASS' || evidence.mode !== 'controlled-drill') return reject('CONTROLLED_DRILL_STATUS_INVALID');
@@ -121,6 +121,10 @@ function validateControlledDrillEvidence(evidence, currentCommit) {
   }
 
   const drill = evidence.drill;
+  const expectedRunId = Number(expectedDrillRunId);
+  if (!Number.isSafeInteger(expectedRunId) || expectedRunId < 1 || drill?.runId !== expectedRunId) {
+    return reject('DRILL_RUN_ID_MISMATCH');
+  }
   if (!Number.isSafeInteger(drill?.runId) || drill.runId < 1 ||
       drill.runId === finding.sourceRunId ||
       drill.runId === finding.preflightRunId ||

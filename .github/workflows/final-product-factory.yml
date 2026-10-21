@@ -272,6 +272,7 @@ jobs:
           HEAD_SHA: ${{ github.sha }}
           EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha || '' }}
           REPAIR_RUN_ID: ${{ inputs.agent_repair_run_id || '' }}
+          HOOSHYAR_EXPECTED_REPAIR_RUN_ID: ${{ inputs.agent_repair_run_id || '' }}
         run: |
           set -euo pipefail
           mkdir -p .hooshyar /tmp/hooshyar-repair-evidence
@@ -354,6 +355,8 @@ jobs:
 
       - name: Run Cline runtime evidence collector
         if: always()
+        env:
+          HOOSHYAR_EXPECTED_REPAIR_RUN_ID: ${{ inputs.agent_repair_run_id || '' }}
         run: node scripts/cline-runtime-evidence-collector.cjs
       - name: Enforce canonical product qualification matrix
         run: node scripts/real-product-qualification.cjs --matrix-only
