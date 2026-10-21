@@ -153,7 +153,7 @@ describe('autonomous CI repair opt-in policy', () => {
 
   test('opt-in workflow pins Kilo CLI and the explicit free model without a paid fallback route', () => {
     const workflow = fs.readFileSync(path.join(process.cwd(), '.github', 'workflows', 'autonomous-ci-repair-optin.yml'), 'utf8');
-    expect(workflow).toContain('npm install --global @kilocode/cli@7.8.15');
+    expect(workflow).toContain('npm install --global @kilocode/cli@7.8.12');
     expect(workflow).toContain('HOOSHYAR_KILO_MODEL: nvidia/nemotron-3.5-super-vl:free');
     expect(workflow).not.toContain('KILO_CONFIG_CONTENT');
   });
