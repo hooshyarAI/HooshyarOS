@@ -16,7 +16,7 @@ on:
         default: false
 
 concurrency:
-  group: hooshyaros-final-product-factory-${{ github.ref }}
+  group: hooshyaros-final-product-factory-${{ github.ref }}-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: true
 
 jobs:

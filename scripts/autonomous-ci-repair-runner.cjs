@@ -7,7 +7,7 @@ const { buildRepairEvidence, validateRepairEvidence } = require("./agent-repair-
 
 const root = process.cwd();
 const repo = process.env.GITHUB_REPOSITORY || "hooshyarAI/HooshyarOS";
-const branch = process.env.GITHUB_HEAD_REF || cp.execFileSync("git", ["branch", "--show-current"], { cwd: root, encoding: "utf8" }).trim();
+const branch = process.env.HOOSHYAR_TARGET_BRANCH || process.env.GITHUB_HEAD_REF || cp.execFileSync("git", ["branch", "--show-current"], { cwd: root, encoding: "utf8" }).trim();
 const runId = process.env.HOOSHYAR_TARGET_RUN_ID || process.env.GITHUB_RUN_ID;
 const initialSha = process.env.HOOSHYAR_TARGET_HEAD_SHA || process.env.GITHUB_SHA;
 const maxAttempts = Number(process.env.HOOSHYAR_CI_REPAIR_MAX_ATTEMPTS || 3);
