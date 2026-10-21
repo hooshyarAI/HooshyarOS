@@ -1,92 +1,21 @@
+name: Autonomous CI Repair
+
 on:
   pull_request:
-    branches: [main, fix/autonomous-product-factory]
+    branches: [main]
     types: [opened, reopened, synchronize]
-  push:
-    branches: [fix/qualification-runner-fail-closed]
 
 permissions:
-  contents: read
-  actions: read
+  contents: write
+  actions: write
   pull-requests: read
 
-concurrency:
-  group: hooshyaros-autonomous-ci-repair-${{ github.event.pull_request.head.ref || github.ref_name }}
-  cancel-in-progress: false
-
 jobs:
-  authorize_repair:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      opted_in: ${{ steps.authorization.outputs.opted_in }}
-      repair_drill: ${{ steps.authorization.outputs.repair_drill }}
-    steps:
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-      - name: Verify authorization against the live pull request
-        id: authorization
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          SOURCE_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
-        run: |
-          set -euo pipefail
-          OWNER="${REPO%%/*}"
-          if ! curl -fsSL \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${GH_TOKEN}" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            --get \
-            --data-urlencode "state=open" \
-            --data-urlencode "head=${OWNER}:${SOURCE_BRANCH}" \
-            --data-urlencode "per_page=100" \
-            "https://api.github.com/repos/${REPO}/pulls" \
-            -o /tmp/hooshyar-open-prs.json; then
-            echo "opted_in=false" >> "${GITHUB_OUTPUT}"
-            echo "repair_drill=false" >> "${GITHUB_OUTPUT}"
-            echo "CI repair not authorized: no verifiable open PR for this source branch."
-            exit 0
-          fi
-          AUTH_RESULT=$(REPO="${REPO}" SOURCE_BRANCH="${SOURCE_BRANCH}" node -e '
-            let data = "";
-            process.stdin.on("data", chunk => data += chunk);
-            process.stdin.on("end", () => {
-              let prs = [];
-              try { prs = JSON.parse(data); } catch {}
-              const pr = (Array.isArray(prs) ? prs : []).find(item =>
-                item?.state === "open" &&
-                item?.head?.repo?.full_name === process.env.REPO &&
-                item?.head?.ref === process.env.SOURCE_BRANCH &&
-                (item?.base?.ref === "main" ||
-                  (item?.base?.ref === "fix/autonomous-product-factory" &&
-                   String(item?.body || "").includes("ci-repair-opt-in: true")))
-              );
-              const optedIn = Boolean(pr);
-              const repairDrill = Boolean(pr &&
-                pr.base?.ref === "fix/autonomous-product-factory" &&
-                String(pr.body || "").includes("ci-repair-opt-in: true"));
-              process.stdout.write((optedIn ? "true" : "false") + " " + (repairDrill ? "true" : "false"));
-            });
-          ' < /tmp/hooshyar-open-prs.json)
-          read -r OPTED_IN REPAIR_DRILL <<< "${AUTH_RESULT}"
-          echo "opted_in=${OPTED_IN}" >> "${GITHUB_OUTPUT}"
-          echo "repair_drill=${REPAIR_DRILL}" >> "${GITHUB_OUTPUT}"
-          echo "CI_REPAIR_AUTHORIZATION=${OPTED_IN} REPAIR_DRILL=${REPAIR_DRILL}"
-
   autonomous-ci-repair:
-    needs: authorize_repair
-    if: needs.authorize_repair.outputs.opted_in == 'true'
-    permissions:
-      contents: write
-      actions: write
-      pull-requests: read
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 50
     steps:
-      - name: Checkout autonomous branch
       - name: Checkout autonomous branch
         uses: actions/checkout@v4
         with:
@@ -111,7 +40,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           for i in $(seq 1 120); do
@@ -160,10 +89,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           HOOSHYAR_TARGET_RUN_ID: ${{ steps.wait-for-factory.outputs.target_run_id }}
-          HOOSHYAR_TARGET_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          HOOSHYAR_TARGET_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
           HOOSHYAR_GITHUB_REPOSITORY: ${{ github.repository }}
-          HOOSHYAR_CI_REPAIR_DRILL: ${{ needs.authorize_repair.outputs.repair_drill }}
           HOOSHYAR_AGENT: kilo
           HOOSHYAR_AUTONOMOUS_ALLOW_PUSH: "1"
           KILO_CONFIG_CONTENT: '{"model":"kilo-auto/free","agent":{"hooshyar-repair":{"model":"kilo/kilo-auto/free"}}}'
@@ -192,11 +118,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           REF: ${{ github.event.pull_request.head.ref }}
-          HOOSHYAR_CI_REPAIR_DRILL: ${{ needs.authorize_repair.outputs.repair_drill }}
         run: |
           curl --fail-with-body -sS -X POST \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${GH_TOKEN}" \
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/repos/${REPO}/actions/workflows/final-product-factory.yml/dispatches" \
-            -d "$(REF="${REF}" DRILL="${HOOSHYAR_CI_REPAIR_DRILL}" node -e 'const payload={ref:process.env.REF};if(process.env.DRILL==="true")payload.inputs={ci_repair_drill:true};process.stdout.write(JSON.stringify(payload))')"
+            -d "$(REF="${REF}" node -e 'process.stdout.write(JSON.stringify({ref:process.env.REF}))')"

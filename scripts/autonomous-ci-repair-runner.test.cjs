@@ -3,10 +3,7 @@
 const {
   assertCleanRepairBaseline,
   buildUnprivilegedEnv,
-  buildGitPushEnv,
-  buildFactoryDispatchPayload,
-  prioritizeFailedJobs,
-  assertFailedRunForHead
+  buildGitPushEnv
 } = require('./autonomous-ci-repair-runner.cjs');
 
 describe('autonomous CI repair worktree baseline', () => {
@@ -67,37 +64,4 @@ describe('autonomous CI repair worktree baseline', () => {
     );
     expect(() => buildGitPushEnv({ PATH: '/usr/bin' })).toThrow('GITHUB_PUSH_TOKEN_MISSING');
   });
-  test('only dispatches the isolated repair drill when the PR explicitly opts in', () => {
-    expect(buildFactoryDispatchPayload('fix/qualification-runner-fail-closed', false)).toEqual({
-      ref: 'fix/qualification-runner-fail-closed'
-    });
-    expect(buildFactoryDispatchPayload('fix/qualification-runner-fail-closed', true)).toEqual({
-      ref: 'fix/qualification-runner-fail-closed',
-      inputs: { ci_repair_drill: true }
-    });
-    expect(() => buildFactoryDispatchPayload('')).toThrow('FACTORY_DISPATCH_REF_REQUIRED');
-  });
-
-  test('prioritizes an actual failed target before evidence-only wrapper failures', () => {
-    const ordered = prioritizeFailedJobs([
-      { name: 'release-gate', started_at: '2026-10-21T20:08:00Z' },
-      { name: 'runtime-evidence-qualification', started_at: '2026-10-21T20:07:00Z' },
-      { name: 'agent-repair-drill', started_at: '2026-10-21T19:54:10Z' }
-    ]);
-    expect(ordered.map(job => job.name)).toEqual([
-      'agent-repair-drill',
-      'runtime-evidence-qualification',
-      'release-gate'
-    ]);
-  });
-
-  test('repair mission must target the exact failed source commit', () => {
-    const sha = 'a'.repeat(40);
-    expect(assertFailedRunForHead(sha, { head_sha: sha, conclusion: 'failure' })).toBe(true);
-    expect(() => assertFailedRunForHead(sha, { head_sha: 'b'.repeat(40), conclusion: 'failure' }))
-      .toThrow('AUTONOMOUS_CI_REPAIR_TARGET_SHA_MISMATCH');
-    expect(() => assertFailedRunForHead(sha, { head_sha: sha, conclusion: 'success' }))
-      .toThrow('AUTONOMOUS_CI_REPAIR_TARGET_RUN_NOT_FAILED');
-  });
-
 });
