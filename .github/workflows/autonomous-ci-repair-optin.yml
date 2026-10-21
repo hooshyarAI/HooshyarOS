@@ -7,9 +7,9 @@ on:
         description: Explicitly authorize one isolated repair drill and same-commit requalification.
         type: choice
         required: true
-        default: NO
+        default: "NO"
         options:
-          - NO
+          - "NO"
           - I_AUTHORIZE_ONE_CONTROLLED_REPAIR_DRILL
       target_pr_number:
         description: Open same-repository PR number targeting fix/autonomous-product-factory.
