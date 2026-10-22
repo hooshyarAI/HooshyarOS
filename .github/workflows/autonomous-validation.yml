@@ -32,3 +32,7 @@ jobs:
         run: node ./node_modules/jest/bin/jest.js --runInBand Backend/HBOS
       - name: Run opt-in CI repair safety contract tests
         run: node ./node_modules/jest/bin/jest.js --runInBand --runTestsByPath scripts/agent-repair-optin-policy.test.cjs
+      - name: Verify sanitized dependency install and isolated repair contract
+        run: |
+          node scripts/agent-repair-optin-runner.cjs --install-source-dependencies .
+          node ./node_modules/jest/bin/jest.js --runInBand --runTestsByPath scripts/agent-repair-optin-policy.test.cjs

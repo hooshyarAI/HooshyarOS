@@ -188,6 +188,12 @@ describe('autonomous CI repair opt-in policy', () => {
     }
   });
 
+  test('builder validation runs the sanitized install path and focused contract tests', () => {
+    const workflow = fs.readFileSync(path.join(process.cwd(), '.github', 'workflows', 'autonomous-validation.yml'), 'utf8');
+    expect(workflow).toContain('node scripts/agent-repair-optin-runner.cjs --install-source-dependencies .');
+    expect(workflow).toContain('node ./node_modules/jest/bin/jest.js --runInBand --runTestsByPath scripts/agent-repair-optin-policy.test.cjs');
+  });
+
   test('source dependency install disables lifecycle scripts and strips runner control variables', () => {
     const sourceDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hooshyar-safe-npm-ci-'));
     fs.writeFileSync(path.join(sourceDir, 'package.json'), '{"name":"fixture","version":"1.0.0"}\n', 'utf8');
