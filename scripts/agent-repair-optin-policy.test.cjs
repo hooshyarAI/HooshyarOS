@@ -155,7 +155,7 @@ describe('autonomous CI repair opt-in policy', () => {
 
       expect(status.status).toBe(0);
       expect(status.stdout).toContain('.kilo/agents/hooshyar-repair.md');
-      expect(status.stdout).toMatch(/^\\sM \.kilo\\/agents\\/hooshyar-repair\\.md/m);
+      expect(status.stdout).toContain(' M .kilo/agents/hooshyar-repair.md');
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
