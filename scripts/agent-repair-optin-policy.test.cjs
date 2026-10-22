@@ -11,7 +11,7 @@ const {
   buildControlledDrillEvidence
 } = require('./agent-repair-optin-policy.cjs');
 const { isCiFeedbackPass } = require('./cline-runtime-evidence-collector.cjs');
-const { buildKiloInvocation, gitStatus } = require('./agent-repair-optin-runner.cjs');
+const { buildKiloInvocation, buildUnprivilegedEnv, gitStatus, prepareIsolatedKiloWorkspace } = require('./agent-repair-optin-runner.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
@@ -156,6 +156,74 @@ describe('autonomous CI repair opt-in policy', () => {
       expect(status.status).toBe(0);
       expect(status.stdout).toContain('.kilo/agents/hooshyar-repair.md');
       expect(status.stdout).toContain(' M .kilo/agents/hooshyar-repair.md');
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test('untrusted Kilo process does not inherit runner command files, credentials, or config overrides', () => {
+    const env = buildUnprivilegedEnv({
+      PATH: '/usr/bin',
+      HOME: '/tmp/hooshyar-home',
+      GITHUB_TOKEN: 'repository-token',
+      ACTIONS_RUNTIME_TOKEN: 'runtime-token',
+      GITHUB_ENV: '/tmp/set_env',
+      GITHUB_OUTPUT: '/tmp/set_output',
+      GITHUB_PATH: '/tmp/add_path',
+      GITHUB_STATE: '/tmp/save_state',
+      GITHUB_STEP_SUMMARY: '/tmp/summary',
+      GITHUB_EVENT_PATH: '/tmp/event.json',
+      GITHUB_WORKSPACE: '/home/runner/work/HooshyarOS/HooshyarOS',
+      RUNNER_TEMP: '/home/runner/work/_temp',
+      KILO_CONFIG_CONTENT: '{"agent":{"hooshyar-repair":{"permission":{"bash":"allow"}}}}'
+    });
+
+    expect(env).toMatchObject({ PATH: '/usr/bin', HOME: '/tmp/hooshyar-home' });
+    for (const key of [
+      'GITHUB_TOKEN', 'ACTIONS_RUNTIME_TOKEN', 'GITHUB_ENV', 'GITHUB_OUTPUT',
+      'GITHUB_PATH', 'GITHUB_STATE', 'GITHUB_STEP_SUMMARY', 'GITHUB_EVENT_PATH',
+      'GITHUB_WORKSPACE', 'RUNNER_TEMP', 'KILO_CONFIG_CONTENT'
+    ]) {
+      expect(env[key]).toBeUndefined();
+    }
+  });
+
+  test('Kilo runs in an isolated scratch workspace using only the trusted agent policy', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hooshyar-kilo-isolation-test-'));
+    const trustedDir = path.join(root, 'trusted');
+    const sourceDir = path.join(root, 'untrusted-source');
+    const tempRoot = path.join(root, 'temp');
+    const trustedAgent = path.join(trustedDir, '.kilo', 'agents', 'hooshyar-repair.md');
+    const untrustedAgent = path.join(sourceDir, '.kilo', 'agents', 'hooshyar-repair.md');
+    const trustedPolicy = 'trusted workflow policy\n';
+    const untrustedPolicy = 'untrusted PR policy: allow all tools\n';
+
+    try {
+      fs.mkdirSync(path.dirname(trustedAgent), { recursive: true });
+      fs.mkdirSync(path.dirname(untrustedAgent), { recursive: true });
+      fs.mkdirSync(tempRoot, { recursive: true });
+      fs.writeFileSync(trustedAgent, trustedPolicy, 'utf8');
+      fs.writeFileSync(untrustedAgent, untrustedPolicy, 'utf8');
+      fs.writeFileSync(path.join(sourceDir, 'package.json'), '{"private":true}\n', 'utf8');
+
+      const prepared = prepareIsolatedKiloWorkspace({
+        trustedDir,
+        missionText: '{"type":"mission"}\n',
+        scratchContent: 'return revenue - expense;\n',
+        tempRoot
+      });
+      try {
+        expect(prepared.workspaceDir.startsWith(sourceDir + path.sep)).toBe(false);
+        expect(fs.readFileSync(prepared.isolatedAgentPath, 'utf8')).toBe(trustedPolicy);
+        expect(fs.readFileSync(untrustedAgent, 'utf8')).toBe(untrustedPolicy);
+        expect(fs.readdirSync(prepared.workspaceDir).sort()).toEqual(['.hooshyar', '.kilo']);
+        expect(fs.readdirSync(prepared.drillDir).sort()).toEqual(['mission.json', 'repair-target.cjs']);
+        expect(fs.readdirSync(path.join(prepared.workspaceDir, '.kilo')).sort()).toEqual(['agents']);
+        expect(fs.readdirSync(path.dirname(prepared.isolatedAgentPath)).sort()).toEqual(['hooshyar-repair.md']);
+        expect(fs.existsSync(path.join(prepared.workspaceDir, 'package.json'))).toBe(false);
+      } finally {
+        fs.rmSync(prepared.workspaceDir, { recursive: true, force: true });
+      }
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

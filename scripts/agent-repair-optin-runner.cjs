@@ -3,6 +3,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const crypto = require('node:crypto');
 const cp = require('node:child_process');
 const {
@@ -14,17 +15,57 @@ const {
 
 const DEFAULT_FREE_MODEL = 'nvidia/nemotron-3.5-super-vl:free';
 
-const CREDENTIAL_KEYS = [
+const UNTRUSTED_ENV_KEYS = [
   'GITHUB_TOKEN', 'GH_TOKEN', 'GITHUB_ENTERPRISE_TOKEN', 'GH_ENTERPRISE_TOKEN',
   'ACTIONS_RUNTIME_TOKEN', 'ACTIONS_ID_TOKEN_REQUEST_TOKEN', 'ACTIONS_ID_TOKEN_REQUEST_URL',
   'ACTIONS_CACHE_URL', 'ACTIONS_RESULTS_URL', 'GIT_ASKPASS', 'GIT_CONFIG_COUNT',
-  'GIT_CONFIG_KEY_0', 'GIT_CONFIG_VALUE_0'
+  'GIT_CONFIG_KEY_0', 'GIT_CONFIG_VALUE_0', 'KILO_CONFIG_CONTENT',
+  'GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STATE', 'GITHUB_STEP_SUMMARY',
+  'GITHUB_EVENT_PATH', 'GITHUB_WORKSPACE', 'GITHUB_ACTION_PATH',
+  'RUNNER_TEMP', 'RUNNER_TOOL_CACHE', 'RUNNER_WORKSPACE'
 ];
 
 function buildUnprivilegedEnv(source = process.env) {
   const env = { ...source };
-  for (const key of CREDENTIAL_KEYS) delete env[key];
+  for (const key of UNTRUSTED_ENV_KEYS) delete env[key];
   return env;
+}
+
+function prepareIsolatedKiloWorkspace({ trustedDir, missionText, scratchContent, tempRoot = os.tmpdir() }) {
+  if (typeof trustedDir !== 'string' || !trustedDir ||
+      typeof missionText !== 'string' || typeof scratchContent !== 'string' ||
+      typeof tempRoot !== 'string' || !tempRoot) {
+    throw new Error('KILO_WORKSPACE_CONTEXT_INVALID');
+  }
+
+  const trustedAgentPath = path.join(trustedDir, '.kilo', 'agents', 'hooshyar-repair.md');
+  const trustedAgentContent = fs.readFileSync(trustedAgentPath, 'utf8');
+  if (!trustedAgentContent.trim()) throw new Error('TRUSTED_KILO_AGENT_CONFIG_MISSING');
+
+  const workspaceDir = fs.mkdtempSync(path.join(tempRoot, 'hooshyar-kilo-repair-'));
+  try {
+    const drillDir = path.join(workspaceDir, '.hooshyar', 'repair-drill');
+    const agentDir = path.join(workspaceDir, '.kilo', 'agents');
+    fs.mkdirSync(drillDir, { recursive: true });
+    fs.mkdirSync(agentDir, { recursive: true });
+    const missionPath = path.join(drillDir, 'mission.json');
+    const scratchPath = path.join(drillDir, 'repair-target.cjs');
+    const isolatedAgentPath = path.join(agentDir, 'hooshyar-repair.md');
+    fs.writeFileSync(missionPath, missionText, 'utf8');
+    fs.writeFileSync(scratchPath, scratchContent, 'utf8');
+    fs.writeFileSync(isolatedAgentPath, trustedAgentContent, 'utf8');
+    return {
+      workspaceDir,
+      drillDir,
+      missionPath,
+      scratchPath,
+      isolatedAgentPath,
+      trustedAgentContent
+    };
+  } catch (error) {
+    fs.rmSync(workspaceDir, { recursive: true, force: true });
+    throw error;
+  }
 }
 
 function run(command, args, options = {}) {
@@ -146,34 +187,61 @@ function main() {
   fs.writeFileSync(missionPath, missionText, 'utf8');
 
   const prompt = [
-    'You are the bounded HooshyarOS autonomous CI repair operator.',
-    'Read .hooshyar/repair-drill/mission.json.',
-    'Repair only .hooshyar/repair-drill/repair-target.cjs.',
-    'This is an intentionally fault-injected scratch copy. Do not edit tracked files, tests, workflows, or production code.',
-    'Do not commit, push, change git configuration, or broaden scope.',
-    'Run the scratch file and require the JSON result net=1200 with exit code 0.',
-    'Stop after that focused repair.'
+    'You are the HooshyarOS bounded autonomous repair operator.',
+    'Read only .hooshyar/repair-drill/mission.json and repair only .hooshyar/repair-drill/repair-target.cjs.',
+    'This workspace contains a trusted repair-agent policy and only the fault-injected scratch fixture.',
+    'Run exactly node .hooshyar/repair-drill/repair-target.cjs to verify the controlled failure and repair.',
+    'Do not inspect paths outside this isolated workspace, edit other files, commit, push, or change git configuration.',
+    'Stop after the scratch fixture returns JSON with net=1200 and exit code 0.'
   ].join(' ');
 
-  const invocation = buildKiloInvocation(missionPath, prompt);
-  const kilo = run(invocation.command, invocation.args, {
-    cwd: sourceDir,
-    stdio: 'inherit',
-    env: buildUnprivilegedEnv(process.env)
+  const isolated = prepareIsolatedKiloWorkspace({
+    trustedDir: process.cwd(),
+    missionText,
+    scratchContent: injected
   });
-  if (kilo.status !== 0) throw new Error('KILO_CONTROLLED_REPAIR_FAILED:' + kilo.status);
+  try {
+    const invocation = buildKiloInvocation(isolated.missionPath, prompt);
+    const kilo = run(invocation.command, invocation.args, {
+      cwd: isolated.workspaceDir,
+      stdio: 'inherit',
+      env: buildUnprivilegedEnv(process.env)
+    });
+    if (kilo.status !== 0) throw new Error('KILO_CONTROLLED_REPAIR_FAILED:' + kilo.status);
 
-  if (fs.readFileSync(missionPath, 'utf8') !== missionText) {
-    throw new Error('CONTROLLED_REPAIR_MODIFIED_MISSION');
-  }
-  const expectedDrillEntries = ['mission.json', 'repair-target.cjs'];
-  const actualDrillEntries = fs.readdirSync(drillDir).sort();
-  if (JSON.stringify(actualDrillEntries) !== JSON.stringify(expectedDrillEntries)) {
-    throw new Error('CONTROLLED_REPAIR_CREATED_EXTRA_DRILL_FILES:' + actualDrillEntries.join(','));
-  }
-  const actualEvidenceEntries = fs.readdirSync(hooshyarDir).sort();
-  if (JSON.stringify(actualEvidenceEntries) !== JSON.stringify(['repair-drill'])) {
-    throw new Error('CONTROLLED_REPAIR_CREATED_EXTRA_EVIDENCE_FILES:' + actualEvidenceEntries.join(','));
+    if (fs.readFileSync(isolated.missionPath, 'utf8') !== missionText) {
+      throw new Error('CONTROLLED_REPAIR_MODIFIED_MISSION');
+    }
+    const expectedDrillEntries = ['mission.json', 'repair-target.cjs'];
+    const actualDrillEntries = fs.readdirSync(isolated.drillDir).sort();
+    if (JSON.stringify(actualDrillEntries) !== JSON.stringify(expectedDrillEntries)) {
+      throw new Error('CONTROLLED_REPAIR_CREATED_EXTRA_DRILL_FILES:' + actualDrillEntries.join(','));
+    }
+    const actualWorkspaceEntries = fs.readdirSync(isolated.workspaceDir).sort();
+    if (JSON.stringify(actualWorkspaceEntries) !== JSON.stringify(['.hooshyar', '.kilo'])) {
+      throw new Error('CONTROLLED_REPAIR_CREATED_EXTRA_WORKSPACE_FILES:' + actualWorkspaceEntries.join(','));
+    }
+    const actualEvidenceEntries = fs.readdirSync(path.join(isolated.workspaceDir, '.hooshyar')).sort();
+    if (JSON.stringify(actualEvidenceEntries) !== JSON.stringify(['repair-drill'])) {
+      throw new Error('CONTROLLED_REPAIR_CREATED_EXTRA_EVIDENCE_FILES:' + actualEvidenceEntries.join(','));
+    }
+    const actualKiloEntries = fs.readdirSync(path.join(isolated.workspaceDir, '.kilo')).sort();
+    const actualAgentEntries = fs.readdirSync(path.dirname(isolated.isolatedAgentPath)).sort();
+    if (JSON.stringify(actualKiloEntries) !== JSON.stringify(['agents']) ||
+        JSON.stringify(actualAgentEntries) !== JSON.stringify(['hooshyar-repair.md'])) {
+      throw new Error('CONTROLLED_REPAIR_CREATED_EXTRA_AGENT_CONFIG_FILES');
+    }
+    if (fs.readFileSync(isolated.isolatedAgentPath, 'utf8') !== isolated.trustedAgentContent) {
+      throw new Error('CONTROLLED_REPAIR_MODIFIED_TRUSTED_AGENT_CONFIG');
+    }
+
+    const repairedScratch = fs.readFileSync(isolated.scratchPath, 'utf8');
+    if (!repairedScratch.trim() || repairedScratch === injected) {
+      throw new Error('CONTROLLED_REPAIR_NOT_EFFECTIVE');
+    }
+    fs.writeFileSync(scratchPath, repairedScratch, 'utf8');
+  } finally {
+    fs.rmSync(isolated.workspaceDir, { recursive: true, force: true });
   }
 
   const finalStatus = gitStatus(sourceDir);
