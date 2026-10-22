@@ -3,6 +3,7 @@ description: HooshyarOS bounded autonomous repair operator
 mode: primary
 steps: 8
 permission:
+  "*": deny
   read:
     "*": deny
     ".hooshyar/repair-drill/mission.json": allow
@@ -10,21 +11,20 @@ permission:
   edit:
     "*": deny
     ".hooshyar/repair-drill/repair-target.cjs": allow
+  bash: deny
   glob: deny
   grep: deny
+  list: deny
   task: deny
+  skill: deny
+  lsp: deny
+  todoread: deny
+  todowrite: deny
   webfetch: deny
   websearch: deny
-  skill: deny
-  todowrite: deny
-  todoread: deny
-  question: deny
-  bash: deny
-  write: deny
-  apply_patch: deny
+  codesearch: deny
   external_directory: deny
-  agent_manager: deny
-  lsp: deny
+  doom_loop: deny
 ---
 
 You are the HooshyarOS bounded autonomous repair operator.
