@@ -1,0 +1,169 @@
+name: Autonomous CI Repair (Explicit Opt-In)
+
+on:
+  workflow_dispatch:
+    inputs:
+      opt_in:
+        description: Explicitly authorize one isolated repair drill and same-commit requalification.
+        type: choice
+        required: true
+        default: "NO"
+        options:
+          - "NO"
+          - I_AUTHORIZE_ONE_CONTROLLED_REPAIR_DRILL
+      target_pr_number:
+        description: Open same-repository PR number targeting fix/autonomous-product-factory.
+        type: number
+        required: true
+      target_head_sha:
+        description: Exact 40-character head SHA shown on that PR.
+        type: string
+        required: true
+      failed_factory_run_id:
+        description: Failed Final Product Factory run ID whose product jobs passed and only evidence gates failed.
+        type: number
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+concurrency:
+  group: hooshyar-optin-repair-${{ inputs.target_pr_number }}
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      target_branch: ${{ steps.validate.outputs.target_branch }}
+      target_head_sha: ${{ steps.validate.outputs.target_head_sha }}
+      failed_factory_run_id: ${{ steps.validate.outputs.failed_factory_run_id }}
+      failed_factory_run_url: ${{ steps.validate.outputs.failed_factory_run_url }}
+    steps:
+      - name: Checkout the trusted workflow revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Validate explicit consent, PR identity, source SHA and exact failure scope
+        id: validate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF: ${{ github.ref }}
+          INPUT_OPT_IN: ${{ inputs.opt_in }}
+          INPUT_TARGET_PR_NUMBER: ${{ inputs.target_pr_number }}
+          INPUT_TARGET_HEAD_SHA: ${{ inputs.target_head_sha }}
+          INPUT_FAILED_FACTORY_RUN_ID: ${{ inputs.failed_factory_run_id }}
+        run: node scripts/agent-repair-optin-policy.cjs preflight
+
+  baseline-factory:
+    needs: preflight
+    if: needs.preflight.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    permissions:
+      contents: read
+      actions: write
+    outputs:
+      baseline_factory_run_id: ${{ steps.baseline.outputs.baseline_factory_run_id }}
+      baseline_factory_run_url: ${{ steps.baseline.outputs.baseline_factory_run_url }}
+    steps:
+      - name: Checkout trusted orchestration
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: trusted
+          persist-credentials: false
+      - name: Run exact-SHA baseline factory and require evidence-only failure
+        id: baseline
+        working-directory: trusted
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          TARGET_BRANCH: ${{ needs.preflight.outputs.target_branch }}
+          TARGET_HEAD_SHA: ${{ needs.preflight.outputs.target_head_sha }}
+        run: node scripts/agent-repair-optin-policy.cjs baseline-and-wait
+
+  repair-drill:
+    needs: [preflight, baseline-factory]
+    if: needs.preflight.result == 'success' && needs.baseline-factory.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    steps:
+      - name: Checkout trusted orchestration
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: trusted
+          persist-credentials: false
+      - name: Checkout exact target source commit without write credentials
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ needs.preflight.outputs.target_head_sha }}
+          path: source
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Kilo Code CLI
+        run: npm install --global @kilocode/cli@7.8.12
+      - name: Run isolated repair drill, Full Jest and Python syntax checks
+        working-directory: trusted
+        env:
+          HOOSHYAR_SOURCE_DIR: ../source
+          TARGET_BRANCH: ${{ needs.preflight.outputs.target_branch }}
+          TARGET_HEAD_SHA: ${{ needs.preflight.outputs.target_head_sha }}
+          FAILED_FACTORY_RUN_ID: ${{ needs.preflight.outputs.failed_factory_run_id }}
+          FAILED_FACTORY_RUN_URL: ${{ needs.preflight.outputs.failed_factory_run_url }}
+          BASELINE_FACTORY_RUN_ID: ${{ needs.baseline-factory.outputs.baseline_factory_run_id }}
+          BASELINE_FACTORY_RUN_URL: ${{ needs.baseline-factory.outputs.baseline_factory_run_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          HOOSHYAR_AGENT: kilo
+          HOOSHYAR_KILO_COMMAND: kilo
+          HOOSHYAR_KILO_MODEL: nvidia/nemotron-3.5-super-vl:free
+        run: node scripts/agent-repair-optin-runner.cjs
+      - name: Upload verified controlled-drill evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: hooshyar-agent-repair-evidence
+          path: source/.hooshyar/agent-repair-success.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
+
+  dispatch-and-verify:
+    needs: [preflight, baseline-factory, repair-drill]
+    if: needs.preflight.result == 'success' && needs.baseline-factory.result == 'success' && needs.repair-drill.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Checkout the trusted workflow revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Dispatch Final Product Factory with the exact target branch SHA and verify its result
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          TARGET_BRANCH: ${{ needs.preflight.outputs.target_branch }}
+          TARGET_HEAD_SHA: ${{ needs.preflight.outputs.target_head_sha }}
+          REPAIR_WORKFLOW_RUN_ID: ${{ github.run_id }}
+        run: node scripts/agent-repair-optin-policy.cjs dispatch-and-wait

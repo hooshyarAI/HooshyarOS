@@ -2,6 +2,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const cp = require('node:child_process');
+const { validateControlledDrillEvidence } = require('./agent-repair-optin-policy.cjs');
 
 const root = process.cwd();
 const evidencePath = path.join(root, '.hooshyar', 'agent-repair-success.json');
@@ -23,6 +24,12 @@ try {
   if (evidence.type !== 'ASSISTANT_REPAIR_MISSION_V1_RESULT') throw new Error(`AGENT_REPAIR_EVIDENCE_TYPE_INVALID:${evidence.type}`);
   if (evidence.status !== 'PASS') throw new Error(`AGENT_REPAIR_EVIDENCE_STATUS_INVALID:${evidence.status}`);
   if (evidence.commit !== gitCommit()) throw new Error(`AGENT_REPAIR_EVIDENCE_COMMIT_MISMATCH:${evidence.commit}`);
+  if (evidence.mode === 'controlled-drill') {
+    const checked = validateControlledDrillEvidence(evidence, gitCommit(), process.env.HOOSHYAR_EXPECTED_REPAIR_RUN_ID);
+    if (!checked.valid) throw new Error('AGENT_REPAIR_CONTROLLED_DRILL_INVALID:' + checked.reason);
+    console.log(JSON.stringify({ type: 'AGENT_REPAIR_EVIDENCE', status: 'PASS', mode: evidence.mode, commit: evidence.commit, missionId: evidence.missionId }, null, 2));
+    process.exit(0);
+  }
   if (evidence.regression?.status !== 'PASS' || evidence.regression?.fullJest !== 'PASS' || evidence.regression?.pythonSyntax !== 'PASS') throw new Error('AGENT_REPAIR_REGRESSION_NOT_PASS');
   if (evidence.factoryAcceptance?.status !== 'PASS' || evidence.factoryAcceptance?.commit !== evidence.commit || evidence.factoryAcceptance?.productFactoryJob !== 'windows-product-factory' || evidence.factoryAcceptance?.productFactoryConclusion !== 'success') throw new Error('AGENT_REPAIR_FACTORY_ACCEPTANCE_NOT_PASS');
   if (evidence.repair?.changedFiles === undefined || evidence.repair.changedFiles < 1) throw new Error('AGENT_REPAIR_NO_IMPLEMENTATION_CHANGE');
