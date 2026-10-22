@@ -20,6 +20,11 @@ permission:
   todoread: deny
   question: deny
   bash: deny
+  write: deny
+  apply_patch: deny
+  external_directory: deny
+  agent_manager: deny
+  lsp: deny
 ---
 
 You are the HooshyarOS bounded autonomous repair operator.

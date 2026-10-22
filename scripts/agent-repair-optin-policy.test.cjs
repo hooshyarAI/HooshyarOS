@@ -296,6 +296,11 @@ describe('autonomous CI repair opt-in policy', () => {
   test('Kilo cannot execute commands and the runner accepts only the exact trusted fixture', () => {
     const agent = fs.readFileSync(path.join(process.cwd(), '.kilo', 'agents', 'hooshyar-repair.md'), 'utf8');
     expect(agent).toMatch(/^\s*bash:\s*deny\s*$/m);
+    expect(agent).toMatch(/^\s*write:\s*deny\s*$/m);
+    expect(agent).toMatch(/^\s*apply_patch:\s*deny\s*$/m);
+    expect(agent).toMatch(/^\s*external_directory:\s*deny\s*$/m);
+    expect(agent).toMatch(/^\s*agent_manager:\s*deny\s*$/m);
+    expect(agent).toMatch(/^\s*lsp:\s*deny\s*$/m);
     expect(agent).not.toContain('node .hooshyar/repair-drill/repair-target.cjs');
     expect(agent).toContain('Command execution is disabled.');
 
