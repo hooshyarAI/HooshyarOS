@@ -11,7 +11,7 @@ const {
   buildControlledDrillEvidence
 } = require('./agent-repair-optin-policy.cjs');
 const { isCiFeedbackPass } = require('./cline-runtime-evidence-collector.cjs');
-const { buildKiloInvocation, buildUnprivilegedEnv, gitStatus, prepareIsolatedKiloWorkspace } = require('./agent-repair-optin-runner.cjs');
+const { buildKiloInvocation, buildUnprivilegedEnv, installSourceDependencies, gitStatus, prepareIsolatedKiloWorkspace } = require('./agent-repair-optin-runner.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
@@ -188,6 +188,61 @@ describe('autonomous CI repair opt-in policy', () => {
     }
   });
 
+  test('source dependency install disables lifecycle scripts and strips runner control variables', () => {
+    const sourceDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hooshyar-safe-npm-ci-'));
+    fs.writeFileSync(path.join(sourceDir, 'package.json'), '{"name":"fixture","version":"1.0.0"}\n', 'utf8');
+    fs.writeFileSync(path.join(sourceDir, 'package-lock.json'), JSON.stringify({
+      name: 'fixture',
+      version: '1.0.0',
+      lockfileVersion: 3,
+      packages: { '': { name: 'fixture', version: '1.0.0' } }
+    }) + '\n', 'utf8');
+
+    const originalEnv = {
+      PATH: process.env.PATH,
+      HOME: process.env.HOME,
+      GITHUB_TOKEN: 'read-token',
+      ACTIONS_RUNTIME_TOKEN: 'runtime-token',
+      GITHUB_ENV: '/runner/temp/_github_env',
+      GITHUB_OUTPUT: '/runner/temp/_github_output',
+      GITHUB_PATH: '/runner/temp/_github_path',
+      KILO_CONFIG_CONTENT: '{"agent":{"permission":"allow"}}'
+    };
+    let observed;
+    try {
+      installSourceDependencies(sourceDir, originalEnv, (command, args, options) => {
+        observed = { command, args, options };
+        return { status: 0, stdout: '', stderr: '' };
+      });
+
+      expect(observed.command).toBe('npm');
+      expect(observed.args).toEqual(['ci', '--ignore-scripts']);
+      expect(observed.options.cwd).toBe(path.resolve(sourceDir));
+      expect(observed.options.env.PATH).toBe(originalEnv.PATH);
+      expect(observed.options.env.GITHUB_TOKEN).toBeUndefined();
+      expect(observed.options.env.ACTIONS_RUNTIME_TOKEN).toBeUndefined();
+      expect(observed.options.env.GITHUB_ENV).toBeUndefined();
+      expect(observed.options.env.GITHUB_OUTPUT).toBeUndefined();
+      expect(observed.options.env.GITHUB_PATH).toBeUndefined();
+      expect(observed.options.env.KILO_CONFIG_CONTENT).toBeUndefined();
+    } finally {
+      fs.rmSync(sourceDir, { recursive: true, force: true });
+    }
+  });
+
+  test('opt-in workflow installs target dependencies through the trusted wrapper without lifecycle scripts', () => {
+    const workflow = fs.readFileSync(path.join(process.cwd(), '.github', 'workflows', 'autonomous-ci-repair-optin.yml'), 'utf8');
+    const repairJob = workflow.split('  repair-drill:')[1].split('  dispatch-and-verify:')[0];
+
+    expect(repairJob).toContain('working-directory: trusted\n        run: node scripts/agent-repair-optin-runner.cjs --install-source-dependencies ../source');
+    expect(repairJob).not.toContain('working-directory: source\n        run: npm ci');
+    expect(repairJob).toContain('Install locked dependencies without executing untrusted lifecycle scripts');
+
+    const runner = fs.readFileSync(path.join(process.cwd(), 'scripts', 'agent-repair-optin-runner.cjs'), 'utf8');
+    expect(runner).toContain("executor('npm', ['ci', '--ignore-scripts']");
+    expect(runner).toContain('env: buildUnprivilegedEnv(sourceEnv)');
+  });
+
   test('Kilo runs in an isolated scratch workspace using only the trusted agent policy', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hooshyar-kilo-isolation-test-'));
     const trustedDir = path.join(root, 'trusted');
@@ -263,7 +318,7 @@ describe('autonomous CI repair opt-in policy', () => {
 
     const runner = fs.readFileSync(path.join(process.cwd(), 'scripts', 'agent-repair-optin-runner.cjs'), 'utf8');
     const kiloIndex = runner.indexOf('const kilo = run(invocation.command, invocation.args');
-    const dependencyRestoreIndex = runner.indexOf("const dependencyRestore = run('npm', ['ci']");
+    const dependencyRestoreIndex = runner.lastIndexOf('installSourceDependencies(sourceDir)');
     const jestIndex = runner.indexOf('const jest = run(process.execPath');
     expect(kiloIndex).toBeGreaterThanOrEqual(0);
     expect(dependencyRestoreIndex).toBeGreaterThan(kiloIndex);

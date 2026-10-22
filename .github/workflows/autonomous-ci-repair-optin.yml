@@ -119,9 +119,9 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install locked dependencies in the unprivileged target workspace
-        working-directory: source
-        run: npm ci
+      - name: Install locked dependencies without executing untrusted lifecycle scripts
+        working-directory: trusted
+        run: node scripts/agent-repair-optin-runner.cjs --install-source-dependencies ../source
       - name: Install Kilo Code CLI
         run: npm install --global @kilocode/cli@7.8.12
       - name: Run isolated repair drill, Full Jest and Python syntax checks

@@ -85,6 +85,26 @@ function run(command, args, options = {}) {
   };
 }
 
+function installSourceDependencies(sourceDir, sourceEnv = process.env, executor = run) {
+  if (typeof sourceDir !== 'string' || !sourceDir.trim()) {
+    throw new Error('SOURCE_DEPENDENCY_DIRECTORY_INVALID');
+  }
+  const resolvedSourceDir = path.resolve(sourceDir);
+  if (!fs.existsSync(path.join(resolvedSourceDir, 'package.json')) ||
+      !fs.existsSync(path.join(resolvedSourceDir, 'package-lock.json'))) {
+    throw new Error('SOURCE_DEPENDENCY_MANIFEST_MISSING');
+  }
+  const result = executor('npm', ['ci', '--ignore-scripts'], {
+    cwd: resolvedSourceDir,
+    stdio: 'inherit',
+    env: buildUnprivilegedEnv(sourceEnv)
+  });
+  if (!result || result.status !== 0) {
+    throw new Error('DEPENDENCY_INSTALL_FAILED:' + (result?.status ?? 'UNKNOWN'));
+  }
+  return result;
+}
+
 function gitStatus(sourceDir) {
   return run('git', [
     'status', '--porcelain=v1', '--untracked-files=all', '--',
@@ -257,14 +277,7 @@ function main() {
 
   // Kilo is untrusted and could alter ignored node_modules files. Rebuild from
   // the now-verified, clean lockfile before collecting regression evidence.
-  const dependencyRestore = run('npm', ['ci'], {
-    cwd: sourceDir,
-    stdio: 'inherit',
-    env: buildUnprivilegedEnv(process.env)
-  });
-  if (dependencyRestore.status !== 0) {
-    throw new Error('DEPENDENCY_RESTORE_FAILED:' + dependencyRestore.status);
-  }
+  installSourceDependencies(sourceDir);
 
   const jest = run(process.execPath, [path.join(sourceDir, 'node_modules', 'jest', 'bin', 'jest.js'), '--runInBand'], {
     cwd: sourceDir,
@@ -319,11 +332,35 @@ function main() {
 }
 
 if (require.main === module) {
-  try { main(); }
-  catch (error) {
-    console.error(JSON.stringify({ type: 'AUTONOMOUS_REPAIR_OPT_IN', status: 'BLOCKED', error: error.message }));
+  try {
+    if (process.argv[2] === '--install-source-dependencies') {
+      installSourceDependencies(process.argv[3] || '../source');
+      console.log(JSON.stringify({
+        type: 'AUTONOMOUS_REPAIR_DEPENDENCY_INSTALL',
+        status: 'PASS',
+        lifecycleScripts: 'DISABLED'
+      }));
+    } else {
+      main();
+    }
+  } catch (error) {
+    console.error(JSON.stringify({
+      type: process.argv[2] === '--install-source-dependencies'
+        ? 'AUTONOMOUS_REPAIR_DEPENDENCY_INSTALL'
+        : 'AUTONOMOUS_REPAIR_OPT_IN',
+      status: 'BLOCKED',
+      error: error.message
+    }));
     process.exit(2);
   }
 }
 
-module.exports = { buildUnprivilegedEnv, buildKiloInvocation, prepareIsolatedKiloWorkspace, gitStatus, injectControlledDefect, parseResult };
+module.exports = {
+  buildUnprivilegedEnv,
+  buildKiloInvocation,
+  installSourceDependencies,
+  prepareIsolatedKiloWorkspace,
+  gitStatus,
+  injectControlledDefect,
+  parseResult
+};
