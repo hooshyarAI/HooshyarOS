@@ -237,7 +237,7 @@ describe('autonomous CI repair opt-in policy', () => {
   });
 
   test('opt-in workflow installs target dependencies through the trusted wrapper without lifecycle scripts', () => {
-    const workflow = fs.readFileSync(path.join(process.cwd(), '.github', 'workflows', 'autonomous-ci-repair-optin.yml'), 'utf8');
+    const workflow = fs.readFileSync(path.join(process.cwd(), '.github', 'workflows', 'autonomous-ci-repair-optin.yml'), 'utf8').replace(/\r\n/g, '\n');
     const repairJob = workflow.split('  repair-drill:')[1].split('  dispatch-and-verify:')[0];
 
     expect(repairJob).toContain('working-directory: trusted\n        run: node scripts/agent-repair-optin-runner.cjs --install-source-dependencies ../source');
