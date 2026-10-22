@@ -326,4 +326,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { buildUnprivilegedEnv, buildKiloInvocation, gitStatus, injectControlledDefect, parseResult };
+module.exports = { buildUnprivilegedEnv, buildKiloInvocation, prepareIsolatedKiloWorkspace, gitStatus, injectControlledDefect, parseResult };
