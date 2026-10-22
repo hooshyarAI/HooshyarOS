@@ -11,7 +11,7 @@ const {
   buildControlledDrillEvidence
 } = require('./agent-repair-optin-policy.cjs');
 const { isCiFeedbackPass } = require('./cline-runtime-evidence-collector.cjs');
-const { buildKiloInvocation, buildUnprivilegedEnv, installSourceDependencies, gitStatus, prepareIsolatedKiloWorkspace } = require('./agent-repair-optin-runner.cjs');
+const { CONTROLLED_FIXTURE_SOURCE, buildKiloInvocation, buildUnprivilegedEnv, installSourceDependencies, gitStatus, prepareIsolatedKiloWorkspace } = require('./agent-repair-optin-runner.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
@@ -236,15 +236,18 @@ describe('autonomous CI repair opt-in policy', () => {
     }
   });
 
-  test('opt-in workflow installs target dependencies through the trusted wrapper without lifecycle scripts', () => {
+  test('repair drill defers dependency restoration until after the isolated edit', () => {
     const workflow = fs.readFileSync(path.join(process.cwd(), '.github', 'workflows', 'autonomous-ci-repair-optin.yml'), 'utf8').replace(/\r\n/g, '\n');
     const repairJob = workflow.split('  repair-drill:')[1].split('  dispatch-and-verify:')[0];
-
-    expect(repairJob).toContain('working-directory: trusted\n        run: node scripts/agent-repair-optin-runner.cjs --install-source-dependencies ../source');
+    expect(repairJob).not.toContain('Install locked dependencies before the isolated edit');
     expect(repairJob).not.toContain('working-directory: source\n        run: npm ci');
-    expect(repairJob).toContain('Install locked dependencies without executing untrusted lifecycle scripts');
 
     const runner = fs.readFileSync(path.join(process.cwd(), 'scripts', 'agent-repair-optin-runner.cjs'), 'utf8');
+    const kiloIndex = runner.indexOf('const kilo = run(invocation.command, invocation.args');
+    const dependencyRestoreIndex = runner.lastIndexOf('installSourceDependencies(sourceDir)');
+    const jestIndex = runner.indexOf('const jest = run(process.execPath');
+    expect(dependencyRestoreIndex).toBeGreaterThan(kiloIndex);
+    expect(jestIndex).toBeGreaterThan(dependencyRestoreIndex);
     expect(runner).toContain("executor('npm', ['ci', '--ignore-scripts']");
     expect(runner).toContain('env: buildUnprivilegedEnv(sourceEnv)');
   });
@@ -288,6 +291,21 @@ describe('autonomous CI repair opt-in policy', () => {
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  test('Kilo cannot execute commands and the runner accepts only the exact trusted fixture', () => {
+    const agent = fs.readFileSync(path.join(process.cwd(), '.kilo', 'agents', 'hooshyar-repair.md'), 'utf8');
+    expect(agent).toMatch(/^\s*bash:\s*deny\s*$/m);
+    expect(agent).not.toContain('node .hooshyar/repair-drill/repair-target.cjs');
+    expect(agent).toContain('Command execution is disabled.');
+
+    const runner = fs.readFileSync(path.join(process.cwd(), 'scripts', 'agent-repair-optin-runner.cjs'), 'utf8');
+    expect(runner).toContain('const fixture = CONTROLLED_FIXTURE_SOURCE;');
+    expect(runner).toContain("if (repairedScratch !== fixture)");
+    expect(runner).toContain("throw new Error('CONTROLLED_REPAIR_CONTENT_NOT_EXACT')");
+    expect(runner).toContain('Do not execute commands; the trusted outer runner performs the red/green checks after this edit.');
+    expect(CONTROLLED_FIXTURE_SOURCE).toContain('return revenue + expense;');
+    expect(injectControlledDefect(CONTROLLED_FIXTURE_SOURCE)).toContain('return revenue - expense;');
   });
 
   test('Kilo invocation pins an explicit free model and keeps the task attachment bounded', () => {

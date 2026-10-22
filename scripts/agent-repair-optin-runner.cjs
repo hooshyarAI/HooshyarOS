@@ -15,6 +15,8 @@ const {
 
 const DEFAULT_FREE_MODEL = 'nvidia/nemotron-3.5-super-vl:free';
 
+const CONTROLLED_FIXTURE_SOURCE = "#!/usr/bin/env node\n\nfunction calculateNet(revenue, expense) {\n  return revenue + expense;\n}\n\nconst result = calculateNet(1500, -300);\nconsole.log(JSON.stringify({ revenue: 1500, expense: -300, net: result }));\n\nif (result !== 1200) {\n  console.error('AGENT_REPAIR_DRILL_FAIL: expected net=1200');\n  process.exitCode = 1;\n}\n";
+
 const UNTRUSTED_ENV_KEYS = [
   'GITHUB_TOKEN', 'GH_TOKEN', 'GITHUB_ENTERPRISE_TOKEN', 'GH_ENTERPRISE_TOKEN',
   'ACTIONS_RUNTIME_TOKEN', 'ACTIONS_ID_TOKEN_REQUEST_TOKEN', 'ACTIONS_ID_TOKEN_REQUEST_URL',
@@ -161,8 +163,7 @@ function main() {
     throw new Error('TARGET_WORKTREE_NOT_CLEAN');
   }
 
-  const fixturePath = path.join(sourceDir, 'qa', 'agent-repair-drill', 'repair-target.cjs');
-  const fixture = fs.readFileSync(fixturePath, 'utf8');
+  const fixture = CONTROLLED_FIXTURE_SOURCE;
   const injected = injectControlledDefect(fixture);
   const hooshyarDir = path.join(sourceDir, '.hooshyar');
   const drillDir = path.join(hooshyarDir, 'repair-drill');
@@ -200,7 +201,7 @@ function main() {
       'Edit only .hooshyar/repair-drill/repair-target.cjs.',
       'Do not edit tracked files, workflows, tests, or production code.',
       'Do not commit, push, or change git configuration.',
-      'Run the scratch fixture and leave it returning JSON with net=1200 and exit code 0.'
+      'Do not execute commands. The trusted runner will validate the exact repaired fixture and run the green check.'
     ]
   };
   const missionText = JSON.stringify(mission, null, 2) + '\n';
@@ -210,7 +211,7 @@ function main() {
     'You are the HooshyarOS bounded autonomous repair operator.',
     'Read only .hooshyar/repair-drill/mission.json and repair only .hooshyar/repair-drill/repair-target.cjs.',
     'This workspace contains a trusted repair-agent policy and only the fault-injected scratch fixture.',
-    'Run exactly node .hooshyar/repair-drill/repair-target.cjs to verify the controlled failure and repair.',
+    'Do not execute commands; the trusted outer runner performs the red/green checks after this edit.',
     'Do not inspect paths outside this isolated workspace, edit other files, commit, push, or change git configuration.',
     'Stop after the scratch fixture returns JSON with net=1200 and exit code 0.'
   ].join(' ');
@@ -256,8 +257,8 @@ function main() {
     }
 
     const repairedScratch = fs.readFileSync(isolated.scratchPath, 'utf8');
-    if (!repairedScratch.trim() || repairedScratch === injected) {
-      throw new Error('CONTROLLED_REPAIR_NOT_EFFECTIVE');
+    if (repairedScratch !== fixture) {
+      throw new Error('CONTROLLED_REPAIR_CONTENT_NOT_EXACT');
     }
     fs.writeFileSync(scratchPath, repairedScratch, 'utf8');
   } finally {
@@ -271,7 +272,7 @@ function main() {
 
   const after = run(process.execPath, [scratchPath], { cwd: drillDir });
   const afterRecord = parseResult(after, 0);
-  if (afterRecord.net !== 1200 || injected === fs.readFileSync(scratchPath, 'utf8')) {
+  if (afterRecord.net !== 1200 || fs.readFileSync(scratchPath, 'utf8') !== fixture) {
     throw new Error('CONTROLLED_REPAIR_NOT_EFFECTIVE');
   }
 
@@ -356,6 +357,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  CONTROLLED_FIXTURE_SOURCE,
   buildUnprivilegedEnv,
   buildKiloInvocation,
   installSourceDependencies,
