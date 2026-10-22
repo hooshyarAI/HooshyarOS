@@ -187,6 +187,21 @@ describe('autonomous CI repair opt-in policy', () => {
     expect(workflow).not.toContain('KILO_CONFIG_CONTENT');
   });
 
+  test('repair drill provisions Python and reinstalls locked dependencies before regression verification', () => {
+    const workflow = fs.readFileSync(path.join(process.cwd(), '.github', 'workflows', 'autonomous-ci-repair-optin.yml'), 'utf8');
+    const repairJob = workflow.split('  repair-drill:')[1].split('  dispatch-and-verify:')[0];
+    expect(repairJob).toContain('uses: actions/setup-python@v5');
+    expect(repairJob).toContain('python-version: "3.11"');
+
+    const runner = fs.readFileSync(path.join(process.cwd(), 'scripts', 'agent-repair-optin-runner.cjs'), 'utf8');
+    const kiloIndex = runner.indexOf('const kilo = run(invocation.command, invocation.args');
+    const dependencyRestoreIndex = runner.indexOf("const dependencyRestore = run('npm', ['ci']");
+    const jestIndex = runner.indexOf('const jest = run(process.execPath');
+    expect(kiloIndex).toBeGreaterThanOrEqual(0);
+    expect(dependencyRestoreIndex).toBeGreaterThan(kiloIndex);
+    expect(jestIndex).toBeGreaterThan(dependencyRestoreIndex);
+  });
+
   test('opt-in workflow keeps repair execution unprivileged and reserves write permission for trusted dispatch', () => {
     const workflow = fs.readFileSync(path.join(process.cwd(), '.github', 'workflows', 'autonomous-ci-repair-optin.yml'), 'utf8');
     const repairJob = workflow.split('  repair-drill:')[1].split('  dispatch-and-verify:')[0];

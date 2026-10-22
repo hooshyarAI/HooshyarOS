@@ -187,6 +187,17 @@ function main() {
     throw new Error('CONTROLLED_REPAIR_NOT_EFFECTIVE');
   }
 
+  // Kilo is untrusted and could alter ignored node_modules files. Rebuild from
+  // the now-verified, clean lockfile before collecting regression evidence.
+  const dependencyRestore = run('npm', ['ci'], {
+    cwd: sourceDir,
+    stdio: 'inherit',
+    env: buildUnprivilegedEnv(process.env)
+  });
+  if (dependencyRestore.status !== 0) {
+    throw new Error('DEPENDENCY_RESTORE_FAILED:' + dependencyRestore.status);
+  }
+
   const jest = run(process.execPath, [path.join(sourceDir, 'node_modules', 'jest', 'bin', 'jest.js'), '--runInBand'], {
     cwd: sourceDir,
     stdio: 'inherit',
