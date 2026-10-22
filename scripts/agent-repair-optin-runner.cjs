@@ -47,7 +47,7 @@ function run(command, args, options = {}) {
 function gitStatus(sourceDir) {
   return run('git', [
     'status', '--porcelain=v1', '--untracked-files=all', '--',
-    '.', ':(exclude).kilo', ':(exclude).hooshyar', ':(exclude)node_modules'
+    '.', ':(exclude).hooshyar', ':(exclude)node_modules'
   ], { cwd: sourceDir });
 }
 
@@ -247,4 +247,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { buildUnprivilegedEnv, buildKiloInvocation, injectControlledDefect, parseResult };
+module.exports = { buildUnprivilegedEnv, buildKiloInvocation, gitStatus, injectControlledDefect, parseResult };

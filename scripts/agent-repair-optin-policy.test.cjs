@@ -11,9 +11,11 @@ const {
   buildControlledDrillEvidence
 } = require('./agent-repair-optin-policy.cjs');
 const { isCiFeedbackPass } = require('./cline-runtime-evidence-collector.cjs');
-const { buildKiloInvocation } = require('./agent-repair-optin-runner.cjs');
+const { buildKiloInvocation, gitStatus } = require('./agent-repair-optin-runner.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
+const cp = require('node:child_process');
 
 const SHA = 'a'.repeat(40);
 const REPO = 'hooshyarAI/HooshyarOS';
@@ -132,6 +134,31 @@ describe('autonomous CI repair opt-in policy', () => {
     expect(isCiFeedbackPass(evidence, SHA)).toBe(false);
     expect(isCiFeedbackPass(evidence, SHA, evidence.drill.runId + 1)).toBe(false);
     expect(isCiFeedbackPass(evidence, 'f'.repeat(40), evidence.drill.runId)).toBe(false);
+  });
+
+  test('gitStatus detects changes to tracked Kilo agent configuration', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hooshyar-repair-scope-'));
+    try {
+      cp.execFileSync('git', ['init', '-q'], { cwd: root });
+      const agentPath = path.join(root, '.kilo', 'agents', 'hooshyar-repair.md');
+      fs.mkdirSync(path.dirname(agentPath), { recursive: true });
+      fs.writeFileSync(agentPath, 'original agent policy\n', 'utf8');
+      cp.execFileSync('git', ['add', '.kilo/agents/hooshyar-repair.md'], { cwd: root });
+      cp.execFileSync('git', [
+        '-c', 'user.name=Hooshyar Test',
+        '-c', 'user.email=hooshyar-test@example.invalid',
+        'commit', '-qm', 'baseline'
+      ], { cwd: root });
+
+      fs.writeFileSync(agentPath, 'modified agent policy\n', 'utf8');
+      const status = gitStatus(root);
+
+      expect(status.status).toBe(0);
+      expect(status.stdout).toContain('.kilo/agents/hooshyar-repair.md');
+      expect(status.stdout).toMatch(/^\\sM \.kilo\\/agents\\/hooshyar-repair\\.md/m);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 
   test('Kilo invocation pins an explicit free model and keeps the task attachment bounded', () => {
